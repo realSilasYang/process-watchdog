@@ -1,0 +1,20 @@
+# Runtime state
+watchdog.maintenance.ini
+watchdog.maintenance.ini.*
+*.tmp
+*.writing
+
+# Logs
+*.log
+ProcessWatchdogLogs/
+
+# Build and packaged outputs
+*.exe
+*.zip
+
+# Editor and Windows metadata
+.vscode/
+.idea/
+*.user
+Thumbs.db
+Desktop.ini
