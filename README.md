@@ -1,5 +1,9 @@
 # 进程守护小助手
 
+[![CI](https://github.com/realSilasYang/process-watchdog/actions/workflows/ci.yml/badge.svg)](https://github.com/realSilasYang/process-watchdog/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/realSilasYang/process-watchdog?display_name=tag)](https://github.com/realSilasYang/process-watchdog/releases/latest)
+[![License](https://img.shields.io/github/license/realSilasYang/process-watchdog)](LICENSE)
+
 面向 Windows 桌面程序、脚本和快捷方式的本地守护工具。它不只按进程名判断，
 而是结合完整路径、进程创建身份、快捷方式真实目标和命令行证据确认目标是否仍在
 运行；证据不足时会等待下一轮检查，避免把“暂时无法确认”误判为停止并重复启动。
@@ -33,8 +37,8 @@
 
 ## 快速开始
 
-1. 从 Releases 下载 `process-watchdog-<版本>-windows-x64.zip` 和同一版本的
-   `SHA256SUMS.txt`。
+1. 从 [Releases](https://github.com/realSilasYang/process-watchdog/releases) 下载
+   `process-watchdog-<版本>-windows-x64.zip` 和同一版本的 `SHA256SUMS.txt`。
 2. 核对 ZIP 与独立 SBOM 的 SHA-256，然后完整解压；不能只复制 EXE。
 3. 运行 `进程守护小助手.exe`，点击“添加”选择目标。
 4. 按需设置工作目录、参数和管理员运行。软件升级保护需要手动开启。

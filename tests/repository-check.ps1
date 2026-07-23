@@ -88,6 +88,8 @@ if ($mainScripts.Count -ne 1) {
 }
 $mainScript = $mainScripts[0]
 $source = Get-Content -LiteralPath $mainScript.FullName -Raw -Encoding UTF8
+$applicationTelemetrySource = Get-Content -LiteralPath (Join-Path `
+    $projectRoot 'app\ApplicationTelemetry.ahk') -Raw -Encoding UTF8
 $mainLineCount = (Get-Content -LiteralPath $mainScript.FullName `
     -Encoding UTF8).Count
 if ($mainLineCount -gt 1600) {
@@ -104,6 +106,12 @@ $fileVersion = "$version.0"
 if ($source -notmatch ('(?m)^;@Ahk2Exe-SetVersion\s+' +
         [regex]::Escape($fileVersion) + '$')) {
     throw "Compiled file version does not match VERSION: $fileVersion"
+}
+if ($applicationTelemetrySource -notmatch
+        'FileGetVersion\(A_ScriptFullPath\)' -or
+    $applicationTelemetrySource -notmatch 'return "unknown"' -or
+    $applicationTelemetrySource -match 'return "\d+\.\d+\.\d+"') {
+    throw 'Runtime version fallback must use compiled metadata without a duplicated release literal.'
 }
 
 $examplePath = Join-Path $projectRoot 'watchdog.example.ini'

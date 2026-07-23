@@ -169,7 +169,15 @@ ReadApplicationVersion() {
         if RegExMatch(version, "^\d+\.\d+\.\d+$")
             return version
     }
-    return "0.1.0"
+    if A_IsCompiled {
+        try {
+            compiledVersion := FileGetVersion(A_ScriptFullPath)
+            if RegExMatch(compiledVersion,
+                    "^(\d+\.\d+\.\d+)(?:\.\d+)?$", &versionMatch)
+                return versionMatch[1]
+        }
+    }
+    return "unknown"
 }
 
 BuildDiagnosticStateSummary() {

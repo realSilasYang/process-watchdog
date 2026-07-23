@@ -21,8 +21,9 @@
 3. 在“Settings → General”启用 Issues，按需关闭 Discussions 和 Wiki。
 4. 在“Settings → Code security”启用 Dependabot alerts、Dependabot security updates、
    Secret scanning、Push protection 和 Private Vulnerability Reporting。
-5. 为 `main` 建立规则集：禁止强制推送和删除，要求 Pull Request、CODEOWNERS 审查、
-   分支保持最新，并要求 CI 的 `verify` 检查通过。
+5. 为 `main` 建立规则集：禁止强制推送和删除，要求 Pull Request、讨论已解决、
+   分支保持最新，并要求 CI 的 `verify` 检查通过。只有一名维护者时审批数设为零，
+   避免作者无法批准自己的 PR；增加第二名维护者后再启用 CODEOWNERS 审批。
 6. 保留 Actions 的默认最小权限；发布工作流只使用文件内显式声明的 `contents`、
    `id-token` 和 `attestations` 权限。
 7. 检查 Actions 允许使用仓库中已经固定完整提交 SHA 的第三方 Action。

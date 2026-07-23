@@ -47,7 +47,7 @@ RunLogWindowSmokeTests() {
             A_Index, "x" . "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"))
     }
     App.logRevision := App.logMessages.Length
-    App.diagnosticBundleService := DiagnosticBundleService("0.1.0", {
+    App.diagnosticBundleService := DiagnosticBundleService("9.8.7", {
         State: LogWindowSmokeState,
         Logs: LogWindowSmokeLogs
     })

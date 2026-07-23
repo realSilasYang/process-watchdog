@@ -5,7 +5,7 @@
 
 ## [未发布]
 
-## [0.1.0] - 2026-07-23
+## [1.0.0] - 2026-07-23
 
 ### 新增
 
@@ -32,3 +32,6 @@
 
 - 按钮渲染器在 GDI+ 初始化期间保持 DLL 模块引用，退出和重载时能够可靠关闭并重新初始化。
 - 运行日志的“导出诊断包”按钮现在按正确顺序注册悬浮状态和点击回调，真实控件能够可靠响应交互。
+
+[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/realSilasYang/process-watchdog/releases/tag/v1.0.0
