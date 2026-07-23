@@ -1117,7 +1117,7 @@ if (Test-Path -LiteralPath $removedExecutionModule) {
 $removedWindowsServiceMarkers = @(
     ('Service' + 'Controller'),
     ('Service' + ':'),
-    ('Windows ' + '服务'),
+    ('Windows ' + [char]0x670D + [char]0x52A1),
     ('ResumePaused' + 'Services'),
     ('ServicePending' + 'TimeoutSeconds'),
     ('QueryService' + 'State'),
@@ -1576,7 +1576,9 @@ elseif ($logWindowMatch.Value.Contains('CreateOwnedGui(')) {
 }
 if ($logWindowMatch.Success -and
     ($logWindowMatch.Value -notmatch 'RegisterButtonClick\(this\.exportButton' -or
-        $logWindowMatch.Value -notmatch 'diagnosticBundleService\.Export\(')) {
+        $logWindowMatch.Value -notmatch 'diagnosticBundleService\.Export\(' -or
+        $logWindowMatch.Value -notmatch 'SetHoverButtonColors\(this\.exportButton' -or
+        $logWindowMatch.Value -notmatch 'this\.exportButton\.Move\(\(Width - 120\) // 2, Height - 40, 120, 30\)')) {
     $failures.Add('The log window must expose the local diagnostic bundle export')
 }
 

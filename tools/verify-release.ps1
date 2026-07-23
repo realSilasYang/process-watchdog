@@ -12,6 +12,12 @@ if (-not (Test-Path -LiteralPath $packageRoot -PathType Container)) {
 }
 $version = (Get-Content -LiteralPath (Join-Path $projectRoot 'VERSION') `
     -Raw -Encoding UTF8).Trim()
+$mainScript = Get-ChildItem -LiteralPath $projectRoot -Filter '*.ahk' -File |
+    Where-Object { $_.Name -notlike '_*' } |
+    Select-Object -First 1
+if (-not $mainScript) {
+    throw 'Main AutoHotkey source was not found.'
+}
 $requiredPaths = @(
     'VERSION',
     'LICENSE',
@@ -49,7 +55,11 @@ if ($executable.VersionInfo.FileVersion -ne "$version.0" -or
 $manifest = Get-Content -LiteralPath `
     (Join-Path $packageRoot 'build-manifest.json') -Raw -Encoding UTF8 |
     ConvertFrom-Json
-if ($manifest.version -ne $version -or $manifest.platform -ne 'windows-x64') {
+if ($manifest.schemaVersion -ne 1 -or
+    $manifest.version -ne $version -or
+    $manifest.platform -ne 'windows-x64' -or
+    $manifest.sourceEntry -cne $mainScript.Name -or
+    $executable.BaseName -cne $mainScript.BaseName) {
     throw 'Release build manifest is inconsistent.'
 }
 $sbom = Get-Content -LiteralPath (Join-Path $packageRoot 'SBOM.spdx.json') `

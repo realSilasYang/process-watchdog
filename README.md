@@ -115,11 +115,14 @@ GUI 测试会创建真实的深色控件、Owner 层级和 ImageList，并在压
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-release.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\reproducible-build.ps1 `
+  -OutputDirectory .\artifacts\validation
 ```
 
 脚本会下载并校验固定版本的 AutoHotkey 与 Ahk2Exe，在 ASCII 虚拟构建路径中
-编译，执行编译版启动验证，生成确定性 ZIP 和 `SHA256SUMS.txt`。连续两次相同
-输入应产生相同的 ZIP SHA-256。
+编译，执行编译版启动验证，生成确定性 ZIP 和 `SHA256SUMS.txt`。可复现构建
+测试使用独立输出目录连续构建两次；相同输入必须产生相同的 ZIP SHA-256，且
+不会因另一个已运行发行版锁定默认产物目录而误报失败。
 
 项目采用 MIT 许可证。第三方组件的版本、来源和许可证见
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)及 `third_party/`。

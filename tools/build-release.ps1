@@ -213,7 +213,10 @@ $buildManifest = [ordered]@{
     platform = 'windows-x64'
     autoHotkey = $toolLock.tools.autoHotkey.version
     ahk2Exe = $toolLock.tools.ahk2Exe.version
-    sourceEntry = '进程守护小助手.ahk'
+    # Derive the Unicode entry name from the filesystem. Windows PowerShell
+    # 5.1 parses UTF-8-without-BOM scripts through the active ANSI code page,
+    # so embedding the Chinese filename here corrupts release metadata.
+    sourceEntry = $mainScript.Name
 }
 $manifestPath = Join-Path $packageDirectory 'build-manifest.json'
 $buildManifest | ConvertTo-Json -Depth 4 |

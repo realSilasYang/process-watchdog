@@ -1,13 +1,18 @@
 [CmdletBinding()]
 param(
     [string]$AutoHotkeyPath = "",
-    [string]$CompilerPath = ""
+    [string]$CompilerPath = "",
+    [string]$OutputDirectory = ""
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $buildScript = Join-Path $projectRoot 'tools\build-release.ps1'
-$outputRoot = Join-Path $projectRoot 'artifacts\release'
+$outputRoot = if ($OutputDirectory) {
+    [System.IO.Path]::GetFullPath($OutputDirectory)
+} else {
+    Join-Path $projectRoot 'artifacts\release'
+}
 
 $first = & $buildScript -OutputDirectory $outputRoot `
     -AutoHotkeyPath $AutoHotkeyPath -CompilerPath $CompilerPath
