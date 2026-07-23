@@ -66,7 +66,7 @@ class FileScanService {
                 if InStr(A_LoopFileAttrib, "H")
                     || InStr(A_LoopFileAttrib, "S")
                     continue
-                if InStr(A_LoopFileAttrib, "D") {
+                if DirExist(A_LoopFileFullPath) {
                     if (depth > 0 && !this.ScanDirectoryToDepth(
                         A_LoopFileFullPath, depth - 1, deadlineTicks,
                         maximumResults, seen, results))

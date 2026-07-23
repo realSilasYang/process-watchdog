@@ -33,8 +33,8 @@
 
 - 按钮渲染器在 GDI+ 初始化期间保持 DLL 模块引用，退出和重载时能够可靠关闭并重新初始化。
 - 运行日志的“导出诊断包”按钮现在按正确顺序注册悬浮状态和点击回调，真实控件能够可靠响应交互。
-- 后台文件扫描临时文件遇到瞬时占用时执行短时有界重试；测试分别报告结果协议、
-  文件集合和清理失败，避免环境差异产生无法定位的 CI 错误。
+- 后台文件扫描使用 `DirExist` 明确区分目录边界，临时文件遇到瞬时占用时执行
+  短时有界重试；测试分别报告结果协议、实际文件集合和清理失败。
 
 [未发布]: https://github.com/realSilasYang/process-watchdog/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/realSilasYang/process-watchdog/releases/tag/v1.0.0

@@ -108,6 +108,9 @@ RunFileScanServiceTests() {
             false, 20, 5), "非递归扫描结果写入失败")
         flatPaths := service.ReadResult(flatOutput, &flatTruncated, &flatReady)
         flatSet := FileScanPathSet(flatPaths)
+        flatPathList := ""
+        for flatPath in flatPaths
+            flatPathList .= (flatPathList == "" ? "" : "，") flatPath
         AssertFileScan(flatReady && !flatTruncated,
             "非递归扫描结果协议无效（ready=" flatReady
             "，truncated=" flatTruncated "）")
@@ -115,7 +118,8 @@ RunFileScanServiceTests() {
             && flatSet.Has(FileScanTestCanonical(rootExe))
             && flatSet.Has(FileScanTestCanonical(rootScript))
             && !flatSet.Has(FileScanTestCanonical(nestedScript)),
-            "非递归扫描文件集合错误（count=" flatPaths.Length "）")
+            "非递归扫描文件集合错误（count=" flatPaths.Length
+            "，paths=" flatPathList "）")
         AssertFileScan(!FileExist(flatOutput),
             "非递归扫描结果文件未由服务清理")
 
