@@ -148,12 +148,13 @@ class FileScanService {
             outputText .= IniFieldCodec.Encode(filePath) "`r`n"
         tempPath := outputPath ".writing"
         try {
-            try FileDelete(tempPath)
+            if !this.DeletePathWithRetry(tempPath)
+                return false
             FileAppend(outputText, tempPath, "UTF-16")
             FileMove(tempPath, outputPath, 1)
             return true
         } catch {
-            try FileDelete(tempPath)
+            this.DeletePathWithRetry(tempPath)
             return false
         }
     }
@@ -187,8 +188,7 @@ class FileScanService {
             if !workerPid
                 throw Error("后台扫描进程未返回 PID")
         } catch as scanError {
-            try FileDelete(outputPath)
-            try FileDelete(outputPath ".writing")
+            this.DeleteOutputFiles(outputPath)
             try this.Callbacks.Log.Call("无法启动后台文件扫描: "
                 scanError.Message)
             return ""
@@ -240,10 +240,9 @@ class FileScanService {
             }
         } finally {
             this.Forget(outputPath)
-            if outputPath {
-                try FileDelete(outputPath)
-                try FileDelete(outputPath ".writing")
-            }
+            if outputPath && !this.DeleteOutputFiles(outputPath)
+                try this.Callbacks.Log.Call(
+                    "无法清理后台扫描临时文件: " outputPath)
         }
     }
 
@@ -256,8 +255,9 @@ class FileScanService {
         try return this.ParseResultText(resultText, &truncated, &resultReady)
         finally {
             this.Forget(outputPath)
-            try FileDelete(outputPath)
-            try FileDelete(outputPath ".writing")
+            if !this.DeleteOutputFiles(outputPath)
+                try this.Callbacks.Log.Call(
+                    "无法清理后台扫描结果文件: " outputPath)
         }
     }
 
@@ -302,6 +302,28 @@ class FileScanService {
     Forget(outputPath) {
         if outputPath != "" && this.Workers.Has(outputPath)
             this.Workers.Delete(outputPath)
+    }
+
+    DeletePathWithRetry(path, maximumAttempts := 4) {
+        if path == "" || !FileExist(path)
+            return true
+        maximumAttempts := Max(1, Integer(maximumAttempts))
+        Loop maximumAttempts {
+            try FileDelete(path)
+            if !FileExist(path)
+                return true
+            if A_Index < maximumAttempts
+                Sleep(10)
+        }
+        return !FileExist(path)
+    }
+
+    DeleteOutputFiles(outputPath) {
+        if outputPath == ""
+            return true
+        outputDeleted := this.DeletePathWithRetry(outputPath)
+        writingDeleted := this.DeletePathWithRetry(outputPath ".writing")
+        return outputDeleted && writingDeleted
     }
 
     Shutdown(*) {

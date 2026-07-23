@@ -27,11 +27,14 @@
   完整校验清单及 GitHub 构建溯源证明。
 - 锁定 GitHub Actions 与本地编译工具的实际可执行文件哈希，发行包附带
   AutoHotkey 许可证、精确提交的完整对应源码和工具链锁定清单。
+- GitHub Actions 升级到基于 Node.js 24 的当前主版本，并继续固定完整提交 SHA。
 
 ### 修复
 
 - 按钮渲染器在 GDI+ 初始化期间保持 DLL 模块引用，退出和重载时能够可靠关闭并重新初始化。
 - 运行日志的“导出诊断包”按钮现在按正确顺序注册悬浮状态和点击回调，真实控件能够可靠响应交互。
+- 后台文件扫描临时文件遇到瞬时占用时执行短时有界重试；测试分别报告结果协议、
+  文件集合和清理失败，避免环境差异产生无法定位的 CI 错误。
 
 [未发布]: https://github.com/realSilasYang/process-watchdog/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/realSilasYang/process-watchdog/releases/tag/v1.0.0

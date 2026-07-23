@@ -108,12 +108,16 @@ RunFileScanServiceTests() {
             false, 20, 5), "非递归扫描结果写入失败")
         flatPaths := service.ReadResult(flatOutput, &flatTruncated, &flatReady)
         flatSet := FileScanPathSet(flatPaths)
-        AssertFileScan(flatReady && !flatTruncated && flatPaths.Length == 2
+        AssertFileScan(flatReady && !flatTruncated,
+            "非递归扫描结果协议无效（ready=" flatReady
+            "，truncated=" flatTruncated "）")
+        AssertFileScan(flatPaths.Length == 2
             && flatSet.Has(FileScanTestCanonical(rootExe))
             && flatSet.Has(FileScanTestCanonical(rootScript))
-            && !flatSet.Has(FileScanTestCanonical(nestedScript))
-            && !FileExist(flatOutput),
-            "非递归扫描越界或结果文件未由服务清理")
+            && !flatSet.Has(FileScanTestCanonical(nestedScript)),
+            "非递归扫描文件集合错误（count=" flatPaths.Length "）")
+        AssertFileScan(!FileExist(flatOutput),
+            "非递归扫描结果文件未由服务清理")
 
         recursiveOutput := rootPath "\recursive-result.tmp"
         AssertFileScan(service.WriteWorkerFile(recursiveOutput, "batch",

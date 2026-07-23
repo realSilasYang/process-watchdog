@@ -1971,9 +1971,12 @@ if ($fileScanServiceSource -notmatch 'Start\(mode, rootPath, recursive, maximumR
     $addItemDialogSource -notmatch 'seenRoots\s*:=\s*Map\(\)[\s\S]{0,260}!seenRoots\.Has\(canonicalRoot\)') {
     $failures.Add('Concurrent file scans must use unique output paths and deduplicate batch roots')
 }
-if ($fileScanServiceSource -notmatch 'Stop\(workerPid, outputPath, creationIdentity := ""\)[\s\S]{0,650}finally\s*\{[\s\S]{0,180}FileDelete\(outputPath\)[\s\S]{0,100}FileDelete\(outputPath "\.writing"\)' -or
+if ($fileScanServiceSource -notmatch 'Stop\(workerPid, outputPath, creationIdentity := ""\)[\s\S]{0,750}finally\s*\{[\s\S]{0,220}this\.DeleteOutputFiles\(outputPath\)' -or
+    $fileScanServiceSource -notmatch 'ReadResult\(outputPath,[\s\S]{0,500}finally\s*\{[\s\S]{0,220}this\.DeleteOutputFiles\(outputPath\)' -or
+    $fileScanServiceSource -notmatch 'DeletePathWithRetry\(path, maximumAttempts := 4\)[\s\S]{0,500}Loop maximumAttempts[\s\S]{0,300}Sleep\(10\)' -or
+    $fileScanServiceSource -notmatch 'DeleteOutputFiles\(outputPath\)[\s\S]{0,300}DeletePathWithRetry\(outputPath\)[\s\S]{0,180}DeletePathWithRetry\(outputPath "\.writing"\)' -or
     $fileScanServiceSource -notmatch 'Shutdown\(\*\)[\s\S]{0,650}this\.Workers\.Clear\(\)[\s\S]{0,300}this\.Stop\(job\.Pid, job\.Path, job\.CreationIdentity\)') {
-    $failures.Add('File-scan output cleanup must run even when worker identity inspection fails')
+    $failures.Add('File-scan output cleanup must use bounded retries even when worker identity inspection fails')
 }
 if ($source -notmatch 'AcquireMainImageListUse\(imageList\)[\s\S]{0,180}iconResources\.AcquireMainImageList\(imageList' -or
     $source -notmatch 'ReleaseMainImageListUse\(imageList\)[\s\S]{0,240}iconResources\.ReleaseMainImageList\(imageList\)[\s\S]{0,180}IL_Destroy\(imageList\)' -or
