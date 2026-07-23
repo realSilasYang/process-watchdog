@@ -104,7 +104,7 @@ foreach ($appModule in Get-ChildItem -LiteralPath (Join-Path $projectRoot 'app')
 }
 $fileVersion = "$version.0"
 if ($source -notmatch ('(?m)^;@Ahk2Exe-SetVersion\s+' +
-        [regex]::Escape($fileVersion) + '$')) {
+        [regex]::Escape($fileVersion) + '\r?$')) {
     throw "Compiled file version does not match VERSION: $fileVersion"
 }
 if ($applicationTelemetrySource -notmatch
