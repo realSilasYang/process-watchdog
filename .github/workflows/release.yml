@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify tag and version
+        shell: pwsh
+        run: |
+          $version = (Get-Content .\VERSION -Raw).Trim()
+          if ("v$version" -ne '${{ github.ref_name }}') {
+            throw "Tag ${{ github.ref_name }} does not match VERSION $version."
+          }
+
+      - name: Bootstrap pinned toolchain
+        id: toolchain
+        shell: pwsh
+        run: |
+          $tools = .\tools\bootstrap-toolchain.ps1
+          "ahk=$($tools.AutoHotkeyPath)" >> $env:GITHUB_OUTPUT
+          "compiler=$($tools.CompilerPath)" >> $env:GITHUB_OUTPUT
+
+      - name: Verify
+        shell: pwsh
+        run: .\tests\verify.ps1 -AutoHotkeyPath '${{ steps.toolchain.outputs.ahk }}'
+
+      - name: Build
+        shell: pwsh
+        run: >-
+          .\tools\build-release.ps1
+          -AutoHotkeyPath '${{ steps.toolchain.outputs.ahk }}'
+          -CompilerPath '${{ steps.toolchain.outputs.compiler }}'
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/release/*.zip
+            artifacts/release/SHA256SUMS.txt

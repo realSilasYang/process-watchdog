@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "dependencies": [
+    {
+      "name": "resvg C API",
+      "version": "0.47.0",
+      "path": "third_party/resvg/resvg.dll",
+      "source": "https://github.com/linebender/resvg/releases/tag/v0.47.0",
+      "sha256": "0E17157FF257F05EE862720E5974082E956FDE82F6FC0F905492E786D98D14A8",
+      "architecture": "x86-64",
+      "licenses": ["MIT", "Apache-2.0"]
+    },
+    {
+      "name": "Everything SDK DLL",
+      "version": "1.4.1.1028",
+      "path": "third_party/everything/Everything64.dll",
+      "source": "https://www.voidtools.com/Everything-SDK.zip",
+      "sha256": "C7AB8B47F7DD4C41AA735F4BA40B35AD5460A86FA7ABE0C94383F12BCE33BFB6",
+      "architecture": "x86-64",
+      "licenses": ["MIT"]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+Name: Everything SDK DLL
+SDK API version: 2
+Official SDK: https://www.voidtools.com/Everything-SDK.zip
+Official SDK Last-Modified: 2026-02-28 01:49:55 GMT
+Official SDK ZIP SHA-256: 00693A1561D86D29A24E4691877ECE7FB23E9A5D8D8CBB2435E0B8576E96F343
+
+Bundled binary: Everything64.dll
+Bundled binary SHA-256: C7AB8B47F7DD4C41AA735F4BA40B35AD5460A86FA7ABE0C94383F12BCE33BFB6
+Bundled binary size: 90280 bytes
+Architecture: x86-64
+Retrieved and verified: 2026-07-23
+
+voidtools publishes the SDK at a rolling URL without a semantic DLL file
+version. This snapshot is pinned by the HTTP Last-Modified value, ZIP hash and
+DLL hash above.

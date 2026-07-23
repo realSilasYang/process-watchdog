@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "tools": {
+    "autoHotkey": {
+      "version": "2.0.26",
+      "archive": "AutoHotkey_2.0.26.zip",
+      "url": "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.26/AutoHotkey_2.0.26.zip",
+      "sha256": "43522AA3122A57784AC5DB30ABF85C2244475C36ACD7796E2C993355F9E926AE",
+      "executable": "AutoHotkey64.exe"
+    },
+    "ahk2Exe": {
+      "version": "1.1.37.02a2",
+      "archive": "Ahk2Exe1.1.37.02a2.zip",
+      "url": "https://github.com/AutoHotkey/Ahk2Exe/releases/download/Ahk2Exe1.1.37.02a2/Ahk2Exe1.1.37.02a2.zip",
+      "sha256": "C29B8C3A5124850D79FC9E66E2CA79677C377D7F31631AD3022BA159C5D9E3BE",
+      "executable": "Ahk2Exe.exe"
+    }
+  }
+}

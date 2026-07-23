@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "codex/**"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Bootstrap pinned AutoHotkey toolchain
+        id: toolchain
+        shell: pwsh
+        run: |
+          $tools = .\tools\bootstrap-toolchain.ps1
+          "ahk=$($tools.AutoHotkeyPath)" >> $env:GITHUB_OUTPUT
+          "compiler=$($tools.CompilerPath)" >> $env:GITHUB_OUTPUT
+
+      - name: Verify source and tests
+        shell: pwsh
+        run: .\tests\verify.ps1 -AutoHotkeyPath '${{ steps.toolchain.outputs.ahk }}'
+
+      - name: GUI smoke and resource soak
+        shell: pwsh
+        run: >-
+          .\tests\run-gui-tests.ps1
+          -AutoHotkeyPath '${{ steps.toolchain.outputs.ahk }}'
+          -SoakSeconds 15
+
+      - name: Verify reproducible release package
+        shell: pwsh
+        run: >-
+          .\tests\reproducible-build.ps1
+          -AutoHotkeyPath '${{ steps.toolchain.outputs.ahk }}'
+          -CompilerPath '${{ steps.toolchain.outputs.compiler }}'
+
+      - name: Upload release-shaped artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: process-watchdog-windows-x64
+          path: |
+            artifacts/release/*.zip
+            artifacts/release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,25 @@
+Name: resvg C API
+Upstream version: 0.47.0
+Upstream release date: 2026-02-10
+Upstream release: https://github.com/linebender/resvg/releases/tag/v0.47.0
+Upstream source asset: resvg-0.47.0.tar.xz
+Upstream source SHA-256: 22D12BF638479688F3762AC951446F51CA75CB24C6853B23384F96FDA02096C5
+Official win64 EXE asset: resvg-win64.zip
+Official win64 EXE archive SHA-256: 5684E59CEAA53CE720B49EFB441B0918AE99D04E8CE3F6F753664524592D67F1
+
+Bundled binary: resvg.dll
+Bundled binary SHA-256: 0E17157FF257F05EE862720E5974082E956FDE82F6FC0F905492E786D98D14A8
+Architecture: x86-64 PE (machine 0x8664)
+Exports: resvg 0.47.0 official C API (34 named exports)
+Non-system runtime dependencies: none
+
+Build source: the unmodified resvg 0.47.0 release source asset above
+Build package: crates/c-api (resvg-capi 0.47.0)
+Build command: cargo build --release --locked -p resvg-capi
+Rust toolchain: rustc 1.87.0 (17067e9ac 2025-05-09), x86_64-pc-windows-gnu
+Cargo: 1.87.0 (99624be96 2025-05-06)
+Cargo.lock SHA-256: B70631996D9140118410A57090F2DA7AC7F8BB6B96E033E7A30B2839C6DC3B2F
+Build date: 2026-07-23
+
+The official release does not publish a C API DLL. The DLL is reproducibly built
+from the official C API crate; no project-specific source patch is applied.

@@ -1,0 +1,6 @@
+<!-- Watchdog status icon v2: centered triangular risk sign with rounded corners. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" data-design="watchdog-status-v2" shape-rendering="geometricPrecision">
+  <path d="M29.4 6.5c1.1-2 4.1-2 5.2 0l26.5 46.9c1.1 2-.3 4.6-2.6 4.6h-53c-2.3 0-3.7-2.6-2.6-4.6Z" fill="#F07A3E"/>
+  <rect x="28.5" y="22" width="7" height="20" rx="3.5" fill="#FFFFFF"/>
+  <circle cx="32" cy="49" r="3.5" fill="#FFFFFF"/>
+</svg>

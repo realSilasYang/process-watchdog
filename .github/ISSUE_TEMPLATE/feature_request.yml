@@ -1,0 +1,28 @@
+name: 功能建议
+description: 说明使用场景、目标和可接受的交互方式
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景
+      description: 当前在什么情况下遇到限制？
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: 希望达到的结果
+      description: 请描述用户能够观察到的结果，而不只是一种实现方法。
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 已尝试的替代方案
+  - type: textarea
+    id: notes
+    attributes:
+      label: 补充信息或界面参考

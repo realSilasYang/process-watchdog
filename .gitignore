@@ -1,20 +1,29 @@
-# Runtime state
+# Local runtime state
+watchdog.ini
 watchdog.maintenance.ini
 watchdog.maintenance.ini.*
 *.tmp
 *.writing
+*.bak
 
 # Logs
 *.log
 ProcessWatchdogLogs/
 
-# Build and packaged outputs
+# Build, test and packaged outputs
+artifacts/
+dist/
+test-results/
+coverage/
+.build/
+.tools/
 *.exe
 *.zip
 
 # Editor and Windows metadata
 .vscode/
 .idea/
+.vs/
 *.user
 Thumbs.db
 Desktop.ini

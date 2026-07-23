@@ -1,0 +1,47 @@
+name: 缺陷报告
+description: 报告能够稳定复现的功能或界面问题
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: 请先确认正在使用最新版本，并删除日志中的私人路径或参数后再提交。
+  - type: input
+    id: version
+    attributes:
+      label: 小助手版本
+      placeholder: 例如 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 系统与显示环境
+      placeholder: 例如 Windows 11 24H2、150% 缩放、双显示器
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 请提供最短、稳定的操作顺序。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果与日志
+      description: 可附截图、日志窗口内容或诊断包。
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: 补充信息

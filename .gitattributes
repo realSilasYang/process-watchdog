@@ -5,5 +5,6 @@
 *.ps1 text eol=crlf
 *.md text eol=crlf
 *.ini -text
+watchdog.example.ini -text
 *.ico -text
 *.dll -text

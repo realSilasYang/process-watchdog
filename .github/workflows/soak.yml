@@ -1,0 +1,40 @@
+name: Scheduled soak
+
+on:
+  schedule:
+    - cron: "17 19 * * 0"
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: GUI resource soak duration
+        required: false
+        default: "300"
+
+permissions:
+  contents: read
+
+jobs:
+  resource-soak:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bootstrap pinned AutoHotkey
+        id: toolchain
+        shell: pwsh
+        run: |
+          $tools = .\tools\bootstrap-toolchain.ps1
+          "ahk=$($tools.AutoHotkeyPath)" >> $env:GITHUB_OUTPUT
+      - name: Run GUI resource soak
+        shell: pwsh
+        env:
+          REQUESTED_SECONDS: ${{ inputs.seconds }}
+        run: |
+          $seconds = if ($env:REQUESTED_SECONDS) {
+            [int]$env:REQUESTED_SECONDS
+          } else {
+            300
+          }
+          .\tests\run-gui-tests.ps1 `
+            -AutoHotkeyPath '${{ steps.toolchain.outputs.ahk }}' `
+            -SoakSeconds $seconds
