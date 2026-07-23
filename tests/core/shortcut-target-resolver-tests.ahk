@@ -24,7 +24,23 @@ class ShortcutTargetTestSnapshots {
 
 ShortcutTargetTestCanonical(path) {
     path := StrLower(StrReplace(Trim(String(path), ' `t`r`n"'), "/", "\"))
-    return StrLen(path) > 3 ? RTrim(path, "\") : path
+    if (path == "")
+        return ""
+    fullPathBuffer := Buffer(32768 * 2, 0)
+    fullLength := DllCall("kernel32\GetFullPathNameW", "Str", path,
+        "UInt", 32768, "Ptr", fullPathBuffer, "Ptr", 0, "UInt")
+    fullPath := fullLength && fullLength < 32768
+        ? StrGet(fullPathBuffer, fullLength, "UTF-16") : path
+    if FileExist(fullPath) {
+        longPathBuffer := Buffer(32768 * 2, 0)
+        longLength := DllCall("kernel32\GetLongPathNameW", "WStr", fullPath,
+            "Ptr", longPathBuffer, "UInt", 32768, "UInt")
+        if longLength && longLength < 32768
+            fullPath := StrGet(longPathBuffer, longLength, "UTF-16")
+    }
+    if SubStr(fullPath, 1, 4) == "\\?\"
+        fullPath := SubStr(fullPath, 5)
+    return StrLower(StrLen(fullPath) > 3 ? RTrim(fullPath, "\") : fullPath)
 }
 
 ShortcutTargetTestNormalize(path) {
