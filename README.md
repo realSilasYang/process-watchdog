@@ -23,6 +23,7 @@
 - [故障排查](docs/troubleshooting.md)
 - [兼容性与已知限制](docs/compatibility.md)
 - [诊断包](docs/diagnostics.md)
+- [获取帮助](SUPPORT.md)
 - [贡献指南](CONTRIBUTING.md)
 
 ## 运行要求
@@ -108,6 +109,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-gui-tests.ps1 -S
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify.ps1
 ```
 
+`verify.ps1` 还会使用锁定版本和可执行文件哈希的 actionlint 对全部 GitHub
+Actions 工作流做语法及语义检查。
+
 核心测试入口会先执行主脚本的 `--startup-validation`，并核对标准错误和真实进程退出码，再运行设置及布局边界回退、当前九字段格式、损坏编码隔离、恢复记录保留、配置模型与维护会话的 Unicode 往返、监控项快照规范化、逐字段三方合并、历史上限、失败重试与重入隔离、目标文件指纹与完整性、快捷方式参数目标、缺失身份回退、候选歧义、规格缓存、冲突失败原子性和控制器替换隔离、控制器任务取消与实例替换竞态、暂停后拒绝调度、所有权调度、共享调度顺序与回调内关闭、1000 任务性能、冷却恢复策略、启动与探活规格、真实及缺失快捷方式、执行命令构造、停止超时语义、快照与文件扫描服务关闭终态、目录变化通知解析及真实递归事件、启动准备异常清理、新鲜度、结果完整性及同毫秒路径唯一性、解释器命令行、绝对和相对脚本、死亡 PID、PID 身份刷新、命令行缺失、1000 项索引性能、图标缓存隔离、窗口图标所有权、ImageList 延迟销毁与 DPI 任务代际、真实 PNG/JPG/JPEG/BMP/SVG/ANI 解码、透明留白与纵横比、UI 交互注册、清理节流与光标缓存、托管窗口创建失败回滚、外部销毁收敛与幂等清理、窗口所有权嵌套租约、失效句柄清理与独立最小化、升级保护转换矩阵、显式维护超时恢复、作用根证据、PID 复用、运行时旧任务隔离、未知探活延迟、诊断包内容与清理，以及维护命令排队、仲裁快照、共享工作门、目录监听器实例替换和单实例故障隔离。运行器通过 `finally` 比较正式 `watchdog.ini` 的测试前后哈希，任何成功或失败路径都不得改写用户配置。
 
 GUI 测试会反复创建真实圆角按钮及 GDI+ 绘制、文本输入注册、只读日志滚动区、带图标 ListView 和三级 Owner 层级，并在每轮核对交互注册表归零、预热后比较 GDI／USER 句柄基线。普通 CI 运行 15 秒，每周 CI 运行 30 分钟；不同物理显示器和缩放比例仍按[手工 GUI 回归矩阵](tests/gui/MANUAL-REGRESSION.md)验证。
@@ -120,10 +124,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\reproducible-build.p
   -OutputDirectory .\artifacts\validation
 ```
 
-脚本会下载并校验固定版本的 AutoHotkey 与 Ahk2Exe，在 ASCII 虚拟构建路径中
-编译，执行编译版启动验证，生成确定性 ZIP 和 `SHA256SUMS.txt`。可复现构建
-测试使用独立输出目录连续构建两次；相同输入必须产生相同的 ZIP SHA-256，且
-不会因另一个已运行发行版锁定默认产物目录而误报失败。
+脚本会下载并校验固定版本的 AutoHotkey 与 Ahk2Exe，随后再次核对实际可执行
+文件及 AutoHotkey 许可证哈希，在 ASCII 虚拟构建路径中编译并执行编译版启动
+验证。发行输出包含确定性 ZIP、独立 SPDX SBOM 和同时覆盖两者的
+`SHA256SUMS.txt`。可复现构建测试使用独立输出目录连续构建两次；相同输入必须
+产生相同的 ZIP 与 SBOM SHA-256，且不会因另一个已运行发行版锁定默认产物目录
+而误报失败。标签发布还会为三个发行文件生成 GitHub 构建溯源证明。
 
 项目采用 MIT 许可证。第三方组件的版本、来源和许可证见
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)及 `third_party/`。

@@ -36,6 +36,39 @@ foreach ($toolPath in @($AutoHotkeyPath, $CompilerPath)) {
     }
 }
 
+$toolLockPath = Join-Path $PSScriptRoot 'toolchain.lock.json'
+$toolLock = Get-Content -LiteralPath $toolLockPath -Raw -Encoding UTF8 |
+    ConvertFrom-Json
+function Assert-PinnedBuildTool {
+    param(
+        [string]$Name,
+        [string]$Path,
+        [pscustomobject]$Definition
+    )
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $actualHash = (Get-FileHash -Algorithm SHA256 `
+        -LiteralPath $fullPath).Hash
+    if ($actualHash -ne $Definition.executableSha256) {
+        throw "$Name executable does not match the pinned toolchain: $actualHash"
+    }
+    return $fullPath
+}
+$AutoHotkeyPath = Assert-PinnedBuildTool 'AutoHotkey' $AutoHotkeyPath `
+    $toolLock.tools.autoHotkey
+$CompilerPath = Assert-PinnedBuildTool 'Ahk2Exe' $CompilerPath `
+    $toolLock.tools.ahk2Exe
+$autoHotkeyLicensePath = Join-Path (Split-Path -Parent $AutoHotkeyPath) `
+    $toolLock.tools.autoHotkey.licenseFile
+if (-not (Test-Path -LiteralPath $autoHotkeyLicensePath -PathType Leaf)) {
+    throw "Pinned AutoHotkey license is missing: $autoHotkeyLicensePath"
+}
+$autoHotkeyLicenseHash = (Get-FileHash -Algorithm SHA256 `
+    -LiteralPath $autoHotkeyLicensePath).Hash
+if ($autoHotkeyLicenseHash -ne $toolLock.tools.autoHotkey.licenseSha256) {
+    throw "AutoHotkey license hash mismatch: $autoHotkeyLicenseHash"
+}
+
 & (Join-Path $PSScriptRoot 'verify-dependencies.ps1')
 
 function Assert-OutputPath {
@@ -54,8 +87,11 @@ New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
 $packageName = "process-watchdog-$version-windows-x64"
 $packageDirectory = Assert-OutputPath (Join-Path $outputRoot $packageName)
 $zipPath = Assert-OutputPath (Join-Path $outputRoot "$packageName.zip")
+$standaloneSbomPath = Assert-OutputPath `
+    (Join-Path $outputRoot "$packageName.spdx.json")
 $checksumsPath = Assert-OutputPath (Join-Path $outputRoot 'SHA256SUMS.txt')
-foreach ($path in @($packageDirectory, $zipPath, $checksumsPath)) {
+foreach ($path in @($packageDirectory, $zipPath, $standaloneSbomPath,
+        $checksumsPath)) {
     if (Test-Path -LiteralPath $path) {
         [void](Assert-OutputPath $path)
         Remove-Item -LiteralPath $path -Recurse -Force
@@ -177,6 +213,10 @@ foreach ($file in @(
     'watchdog.example.ini',
     'README.md',
     'CHANGELOG.md',
+    'CONTRIBUTING.md',
+    'CODE_OF_CONDUCT.md',
+    'SECURITY.md',
+    'SUPPORT.md',
     'LICENSE',
     'THIRD_PARTY_NOTICES.md',
     'VERSION'
@@ -184,6 +224,14 @@ foreach ($file in @(
     Copy-Item -LiteralPath (Join-Path $projectRoot $file) `
         -Destination $packageDirectory
 }
+$licenseDirectory = Join-Path $packageDirectory 'licenses'
+New-Item -ItemType Directory -Force -Path $licenseDirectory | Out-Null
+Copy-Item -LiteralPath $autoHotkeyLicensePath `
+    -Destination (Join-Path $licenseDirectory 'AutoHotkey-LICENSE.txt')
+$buildMetadataDirectory = Join-Path $packageDirectory 'build-metadata'
+New-Item -ItemType Directory -Force -Path $buildMetadataDirectory | Out-Null
+Copy-Item -LiteralPath $toolLockPath `
+    -Destination (Join-Path $buildMetadataDirectory 'toolchain.lock.json')
 foreach ($directory in @('assets', 'third_party')) {
     Copy-Item -LiteralPath (Join-Path $projectRoot $directory) `
         -Destination $packageDirectory -Recurse
@@ -203,16 +251,21 @@ foreach ($documentationFile in @(
         ("docs\" + $documentationFile)) `
         -Destination $packageDocumentationDirectory
 }
+$manualRegressionDirectory = Join-Path $packageDirectory 'tests\gui'
+New-Item -ItemType Directory -Force `
+    -Path $manualRegressionDirectory | Out-Null
+Copy-Item -LiteralPath (Join-Path $projectRoot `
+    'tests\gui\MANUAL-REGRESSION.md') -Destination $manualRegressionDirectory
 
-$toolLock = Get-Content -LiteralPath `
-    (Join-Path $PSScriptRoot 'toolchain.lock.json') -Raw -Encoding UTF8 |
-    ConvertFrom-Json
 $buildManifest = [ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
     version = $version
     platform = 'windows-x64'
     autoHotkey = $toolLock.tools.autoHotkey.version
+    autoHotkeyExecutableSha256 = `
+        $toolLock.tools.autoHotkey.executableSha256
     ahk2Exe = $toolLock.tools.ahk2Exe.version
+    ahk2ExeExecutableSha256 = $toolLock.tools.ahk2Exe.executableSha256
     # Derive the Unicode entry name from the filesystem. Windows PowerShell
     # 5.1 parses UTF-8-without-BOM scripts through the active ANSI code page,
     # so embedding the Chinese filename here corrupts release metadata.
@@ -221,8 +274,10 @@ $buildManifest = [ordered]@{
 $manifestPath = Join-Path $packageDirectory 'build-manifest.json'
 $buildManifest | ConvertTo-Json -Depth 4 |
     Set-Content -LiteralPath $manifestPath -Encoding UTF8
+$packageSbomPath = Join-Path $packageDirectory 'SBOM.spdx.json'
 & (Join-Path $PSScriptRoot 'generate-sbom.ps1') `
-    -OutputPath (Join-Path $packageDirectory 'SBOM.spdx.json')
+    -OutputPath $packageSbomPath
+Copy-Item -LiteralPath $packageSbomPath -Destination $standaloneSbomPath
 
 if (-not $SkipStartupValidation) {
     $process = Start-Process -FilePath $executablePath `
@@ -268,15 +323,24 @@ try {
 }
 
 $zipHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zipPath).Hash
-"$zipHash  $([System.IO.Path]::GetFileName($zipPath))" |
+$sbomHash = (Get-FileHash -Algorithm SHA256 `
+    -LiteralPath $standaloneSbomPath).Hash
+@(
+    "$zipHash  $([System.IO.Path]::GetFileName($zipPath))"
+    "$sbomHash  $([System.IO.Path]::GetFileName($standaloneSbomPath))"
+) |
     Set-Content -LiteralPath $checksumsPath -Encoding ASCII
 
 Write-Host "Release package: $zipPath"
-Write-Host "SHA-256: $zipHash"
+Write-Host "Release SBOM: $standaloneSbomPath"
+Write-Host "ZIP SHA-256: $zipHash"
+Write-Host "SBOM SHA-256: $sbomHash"
 [pscustomobject]@{
     Version = $version
     PackageDirectory = $packageDirectory
     ZipPath = $zipPath
+    SbomPath = $standaloneSbomPath
     ChecksumsPath = $checksumsPath
     Sha256 = $zipHash
+    SbomSha256 = $sbomHash
 }

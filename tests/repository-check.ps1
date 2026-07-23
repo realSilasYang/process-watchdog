@@ -11,6 +11,7 @@ $requiredFiles = @(
     'CONTRIBUTING.md',
     'CODE_OF_CONDUCT.md',
     'SECURITY.md',
+    'SUPPORT.md',
     'THIRD_PARTY_NOTICES.md',
     'VERSION',
     'watchdog.example.ini',
@@ -26,7 +27,8 @@ $requiredFiles = @(
     'third_party\dependencies.lock.json',
     'tools\toolchain.lock.json',
     'tools\generate-sbom.ps1',
-    'tools\verify-release.ps1'
+    'tools\verify-release.ps1',
+    'tests\verify-workflows.ps1'
 )
 foreach ($relativePath in $requiredFiles) {
     $path = Join-Path $projectRoot $relativePath
@@ -74,8 +76,12 @@ $version = (Get-Content -LiteralPath (Join-Path $projectRoot 'VERSION') `
 if ($version -notmatch '^\d+\.\d+\.\d+$') {
     throw "VERSION is not semantic version text: $version"
 }
-$mainScript = Get-ChildItem -LiteralPath $projectRoot -File -Filter '*.ahk' |
-    Select-Object -First 1
+$mainScripts = @(Get-ChildItem -LiteralPath $projectRoot -File `
+    -Filter '*.ahk' | Where-Object { $_.Name -notlike '_*' })
+if ($mainScripts.Count -ne 1) {
+    throw "Repository must contain exactly one root entry script; found $($mainScripts.Count)."
+}
+$mainScript = $mainScripts[0]
 $source = Get-Content -LiteralPath $mainScript.FullName -Raw -Encoding UTF8
 $mainLineCount = (Get-Content -LiteralPath $mainScript.FullName `
     -Encoding UTF8).Count
@@ -113,6 +119,77 @@ $allText = Get-ChildItem -LiteralPath $projectRoot -Recurse -File |
 $repositoryPlaceholder = 'OWNER' + '/REPOSITORY'
 if (($allText -join "`n").Contains($repositoryPlaceholder)) {
     throw 'Repository documentation contains an unresolved hosting placeholder.'
+}
+
+$toolLockPath = Join-Path $projectRoot 'tools\toolchain.lock.json'
+$toolLock = Get-Content -LiteralPath $toolLockPath -Raw -Encoding UTF8 |
+    ConvertFrom-Json
+if ($toolLock.schemaVersion -ne 1) {
+    throw 'Toolchain lock schema is invalid.'
+}
+foreach ($toolName in @('autoHotkey', 'ahk2Exe', 'actionlint')) {
+    $definition = $toolLock.tools.$toolName
+    foreach ($propertyName in @('version', 'archive', 'url', 'sha256',
+            'executable', 'executableSha256', 'licenseExpression',
+            'sbomRelationship')) {
+        if ($definition.PSObject.Properties.Name -notcontains $propertyName -or
+            -not $definition.$propertyName) {
+            throw "Toolchain lock is missing $toolName.$propertyName."
+        }
+    }
+    foreach ($hashProperty in @('sha256', 'executableSha256')) {
+        if ($definition.$hashProperty -notmatch '^[0-9A-F]{64}$') {
+            throw "Toolchain lock hash is invalid: $toolName.$hashProperty"
+        }
+    }
+    if ($definition.PSObject.Properties.Name -contains 'licenseFile') {
+        foreach ($propertyName in @('licenseFile', 'licenseSha256')) {
+            if ($definition.PSObject.Properties.Name `
+                    -notcontains $propertyName -or
+                -not $definition.$propertyName) {
+                throw "Toolchain lock is missing $toolName.$propertyName."
+            }
+        }
+        if ($definition.licenseSha256 -notmatch '^[0-9A-F]{64}$') {
+            throw "Toolchain license hash is invalid: $toolName"
+        }
+    }
+}
+$autoHotkeyDefinition = $toolLock.tools.autoHotkey
+if ($autoHotkeyDefinition.sbomRelationship -ne 'DEPENDS_ON') {
+    throw 'AutoHotkey must be recorded as an application runtime dependency.'
+}
+
+$workflowFiles = Get-ChildItem -LiteralPath `
+    (Join-Path $projectRoot '.github\workflows') -File -Filter '*.yml'
+foreach ($workflowFile in $workflowFiles) {
+    $workflowLines = Get-Content -LiteralPath $workflowFile.FullName `
+        -Encoding UTF8
+    foreach ($workflowLine in $workflowLines) {
+        if ($workflowLine -notmatch '^\s*uses:\s*([^\s#]+)') {
+            continue
+        }
+        $actionReference = $Matches[1]
+        if ($actionReference.StartsWith('./')) {
+            continue
+        }
+        if ($actionReference -notmatch '@[0-9a-f]{40}$') {
+            throw "Workflow action is not pinned to a commit SHA: $actionReference"
+        }
+    }
+}
+
+$releaseWorkflow = Get-Content -LiteralPath `
+    (Join-Path $projectRoot '.github\workflows\release.yml') `
+    -Raw -Encoding UTF8
+foreach ($releaseRequirement in @(
+        '.\tests\run-gui-tests.ps1',
+        '.\tests\reproducible-build.ps1',
+        'actions/attest-build-provenance@',
+        'artifacts/release/*.spdx.json')) {
+    if (-not $releaseWorkflow.Contains($releaseRequirement)) {
+        throw "Release workflow is missing: $releaseRequirement"
+    }
 }
 
 Write-Host "Repository checks passed for version $version."

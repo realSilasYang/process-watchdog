@@ -2,9 +2,10 @@
 
 ## 发行包
 
-下载与系统架构匹配的 Windows x64 ZIP，核对同一 Release 中
-`SHA256SUMS.txt`，然后完整解压。EXE、`assets/` 和 `third_party/` 必须保持
-相对位置，不能只复制 EXE。
+下载与系统架构匹配的 Windows x64 ZIP，使用同一 Release 中的
+`SHA256SUMS.txt` 核对 ZIP 和独立 SPDX SBOM，然后完整解压。托管在 GitHub
+时还可以核对 Release 附带的构建溯源证明。EXE、`assets/` 和 `third_party/`
+必须保持相对位置，不能只复制 EXE。
 
 发行包已经包含运行所需的 AutoHotkey 运行时，不要求用户安装 AutoHotkey。
 源码开发才需要 AutoHotkey v2 x64。
