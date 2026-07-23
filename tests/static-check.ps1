@@ -15,7 +15,10 @@ $appModuleFiles = Get-ChildItem -LiteralPath (Join-Path $projectRoot 'app') `
 $appModuleSource = ($appModuleFiles | ForEach-Object {
         Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8
     }) -join "`n"
-$source = $mainSource + "`n" + $appModuleSource
+# App modules are expanded at the root include directives before executable
+# main-script statements. Preserve that order so a call in the composition
+# root cannot be mistaken for a later module function definition.
+$source = $appModuleSource + "`n" + $mainSource
 $iniFieldCodecSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Config\IniFieldCodec.ahk') -Raw -Encoding UTF8
 $displayConfigCodecSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Config\DisplayConfigCodec.ahk') -Raw -Encoding UTF8
 $maintenanceConfigCodecSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Config\MaintenanceConfigCodec.ahk') -Raw -Encoding UTF8
@@ -1575,9 +1578,8 @@ elseif ($logWindowMatch.Value.Contains('CreateOwnedGui(')) {
     $failures.Add('The log window must not acquire or disable the main window')
 }
 if ($logWindowMatch.Success -and
-    ($logWindowMatch.Value -notmatch 'RegisterButtonClick\(this\.exportButton' -or
+    ($logWindowMatch.Value -notmatch 'RegisterHoverButton\(this\.exportButton,[\s\S]{0,120}RegisterButtonClick\(this\.exportButton' -or
         $logWindowMatch.Value -notmatch 'diagnosticBundleService\.Export\(' -or
-        $logWindowMatch.Value -notmatch 'SetHoverButtonColors\(this\.exportButton' -or
         $logWindowMatch.Value -notmatch 'this\.exportButton\.Move\(\(Width - 120\) // 2, Height - 40, 120, 30\)')) {
     $failures.Add('The log window must expose the local diagnostic bundle export')
 }

@@ -432,14 +432,15 @@ AssertStatusIconResources() {
         }
     }
 
-    mainSource := FileRead(A_ScriptDir "\..\..\进程守护小助手.ahk", "UTF-8")
-    AssertCustomIcon(InStr(mainSource,
+    visualSource := FileRead(A_ScriptDir
+        "\..\..\app\UI\MainVisualPipeline.ahk", "UTF-8")
+    AssertCustomIcon(InStr(visualSource,
         "CreateSvgPaddedIcon(resourcePath, glyphSize, cellSize, true)"),
         "状态图标没有启用独立的高质量超采样渲染")
     for retiredFunction in ["StatusPointNearSegment", "StatusShapeContains",
         "StatusGlyphContains", "CreateStatusGlyphSnapshot",
         "CreateStatusGlyphIcon"] {
-        AssertCustomIcon(!InStr(mainSource, retiredFunction "("),
+        AssertCustomIcon(!InStr(visualSource, retiredFunction "("),
             "状态图标仍依赖运行时自绘函数：" retiredFunction)
     }
 }

@@ -33,9 +33,9 @@ class LogWindow extends ManagedWindow {
         this.renderedRevision := App.logRevision
         this.exportButton := this.gui.Add("Button", "x250 y280 w120 h30",
             "导出诊断包")
+        RegisterHoverButton(this.exportButton, "3A4656")
         RegisterButtonClick(this.exportButton,
             ObjBindMethod(this, "ExportDiagnostics"))
-        SetHoverButtonColors(this.exportButton, "3A4656")
         SetButtonTextColor(this.exportButton, "FFFFFF")
         this.MeasureContent()
         DllCall("user32\ShowScrollBar", "Ptr", this.textEdit.Hwnd, "Int", Win32.SB_BOTH, "Int", 0)

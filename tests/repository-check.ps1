@@ -15,6 +15,11 @@ $requiredFiles = @(
     'VERSION',
     'watchdog.example.ini',
     '.editorconfig',
+    'app\ApplicationState.ahk',
+    'app\RuntimeAdapters.ahk',
+    'app\WatchlistCommands.ahk',
+    'app\UI\InteractionPresenter.ahk',
+    'app\UI\MainVisualPipeline.ahk',
     '.github\workflows\ci.yml',
     '.github\workflows\release.yml',
     '.github\workflows\soak.yml',
@@ -72,6 +77,18 @@ if ($version -notmatch '^\d+\.\d+\.\d+$') {
 $mainScript = Get-ChildItem -LiteralPath $projectRoot -File -Filter '*.ahk' |
     Select-Object -First 1
 $source = Get-Content -LiteralPath $mainScript.FullName -Raw -Encoding UTF8
+$mainLineCount = (Get-Content -LiteralPath $mainScript.FullName `
+    -Encoding UTF8).Count
+if ($mainLineCount -gt 1600) {
+    throw "Composition root grew beyond 1600 lines: $mainLineCount"
+}
+foreach ($appModule in Get-ChildItem -LiteralPath (Join-Path $projectRoot 'app') `
+    -Recurse -File -Filter '*.ahk') {
+    $relativePath = $appModule.FullName.Substring($projectRoot.Length + 1)
+    if (-not $source.Contains("#Include $relativePath")) {
+        throw "Application module is not included by the composition root: $relativePath"
+    }
+}
 $fileVersion = "$version.0"
 if ($source -notmatch ('(?m)^;@Ahk2Exe-SetVersion\s+' +
         [regex]::Escape($fileVersion) + '$')) {

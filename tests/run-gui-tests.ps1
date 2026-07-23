@@ -53,7 +53,8 @@ function Invoke-GuiTest {
         throw "GUI test timed out: $ScriptPath`n$stdout`n$stderr"
     }
     if ($process.ExitCode -ne 0) {
-        throw "GUI test failed: $ScriptPath`n$stderr"
+        throw "GUI test failed with exit code $($process.ExitCode): " +
+            "$ScriptPath`nSTDOUT:`n$stdout`nSTDERR:`n$stderr"
     }
     if ($stderr) {
         Write-Warning $stderr
@@ -62,6 +63,8 @@ function Invoke-GuiTest {
 
 Write-Host 'Running GUI smoke test...'
 Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\gui-smoke-tests.ahk')
+Write-Host 'Running log-window and diagnostic smoke test...'
+Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\log-window-smoke-tests.ahk')
 Write-Host "Running GUI resource soak for $SoakSeconds seconds..."
 Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\resource-soak-tests.ahk') `
     -Arguments $SoakSeconds `

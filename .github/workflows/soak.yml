@@ -8,7 +8,7 @@ on:
       seconds:
         description: GUI resource soak duration
         required: false
-        default: "300"
+        default: "1800"
 
 permissions:
   contents: read
@@ -16,7 +16,7 @@ permissions:
 jobs:
   resource-soak:
     runs-on: windows-2022
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - name: Bootstrap pinned AutoHotkey
@@ -33,7 +33,7 @@ jobs:
           $seconds = if ($env:REQUESTED_SECONDS) {
             [int]$env:REQUESTED_SECONDS
           } else {
-            300
+            1800
           }
           .\tests\run-gui-tests.ps1 `
             -AutoHotkeyPath '${{ steps.toolchain.outputs.ahk }}' `
