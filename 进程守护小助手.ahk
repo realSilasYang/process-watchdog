@@ -984,8 +984,6 @@ if (!App.isReloadedMode) {
         Main.gui.Show("w" App.savedWidth " h" App.savedHeight " Hide")
 }
 
-ApplyTemporaryPreviewStates()
-
 SetTimer(UpdateCountdownUI, 1000) ; 倒计时显示按整秒刷新
 if !App.guardRuntime.Start()
     LogMsg("核心守护计时器启动失败。")
@@ -993,55 +991,6 @@ LogMsg(App.isReloadedMode ? "代码热重载完毕，界面已恢复显示。" :
 
 OnMainGuiClose(*) {
     HideMainGui()
-}
-
-ApplyTemporaryPreviewStates() {
-    previewStatuses := Map(
-        "【状态测试】01 初始化", "初始化...",
-        "【状态测试】02 运行正常", "✅ 运行中",
-        "【状态测试】03 权限不符", "⚠️ 运行中（权限不符）",
-        "【状态测试】04 疑似停止", "⚠️ 疑似停止",
-        "【状态测试】05 重试倒计时", "⏳ 重试倒计时 5s",
-        "【状态测试】06 正在启动", "🚀 正在启动...",
-        "【状态测试】07 验证运行", "⏳ 验证运行状态...",
-        "【状态测试】08 状态未知", "⏳ 等待进程状态...",
-        "【状态测试】09 稍后自动重试", "⏳ 稍后自动重试",
-        "【状态测试】10 程序缺失", "❌ 程序不存在",
-        "【状态测试】11 脚本缺失", "❌ 脚本不存在",
-        "【状态测试】12 已暂停", "⏸️ 已暂停",
-        "【状态测试】13 软件升级中", "🔄 软件升级中",
-        "【状态测试】14 升级仲裁", "⏳ 判断是否正在升级",
-        "【状态测试】15 文件稳定", "⏳ 确认升级文件稳定 3s",
-        "【状态测试】16 升级超时", "⚠️ 升级等待超时",
-        "【状态测试】17 非驻留目标", "✅ 已启动（非驻留目标）",
-        "【状态测试】18 停止失败", "❌ 无法停止原进程")
-    firstPreviewRow := 0
-    for path, stateObj in App.appStates {
-        if stateObj.Enabled || !stateObj.DisplayConfig
-            continue
-        displayName := stateObj.DisplayConfig.Name
-        if displayName == "【状态测试】09 低频恢复" {
-            stateObj.DisplayConfig.Name := "【状态测试】09 稍后自动重试"
-            displayName := stateObj.DisplayConfig.Name
-        }
-        if !InStr(displayName, "【图标格式测试】")
-            && !previewStatuses.Has(displayName)
-            continue
-        row := FindRow(path)
-        if !row
-            continue
-        if !firstPreviewRow
-            firstPreviewRow := row
-        if displayName == "【状态测试】09 稍后自动重试"
-            Main.lv.Modify(row, "Col1", FormatMainListLabel(displayName,
-                stateObj.RunAsAdmin))
-        if previewStatuses.Has(displayName) {
-            stateObj.State := previewStatuses[displayName]
-            SetMainListStatus(row, stateObj.State)
-        }
-    }
-    if firstPreviewRow
-        try Main.lv.Modify(firstPreviewRow, "Vis")
 }
 
 HideMainGui(force := false) {
