@@ -119,9 +119,11 @@ RunShortcutTargetResolverTests() {
 
         onlyCandidate := candidateRoot "\OnlyApp.exe"
         FileCopy(A_AhkPath, onlyCandidate)
+        resolvedOnlyCandidate := resolver.FindExecutableCandidate(
+            testRoot "\Whatever.lnk", candidateRoot)
         AssertShortcutTargetResolver(
-            resolver.FindExecutableCandidate(testRoot "\Whatever.lnk",
-                candidateRoot) == onlyCandidate,
+            ShortcutTargetTestCanonical(resolvedOnlyCandidate)
+                == ShortcutTargetTestCanonical(onlyCandidate),
             "安装目录中的唯一主程序没有被选中")
         updaterCandidate := auxiliaryRoot "\ProductUpdater.exe"
         FileCopy(A_AhkPath, updaterCandidate)
@@ -140,9 +142,11 @@ RunShortcutTargetResolverTests() {
             "同分候选没有因证据歧义而拒绝")
         snapshots.Fresh := true
         snapshots.LatestSnapshot := [{exe: widgetTwo}]
+        observedCandidate := resolver.FindExecutableCandidate(
+            testRoot "\Widget.lnk", ambiguousRoot)
         AssertShortcutTargetResolver(
-            resolver.FindExecutableCandidate(testRoot "\Widget.lnk",
-                ambiguousRoot) == widgetTwo,
+            ShortcutTargetTestCanonical(observedCandidate)
+                == ShortcutTargetTestCanonical(widgetTwo),
             "已观察到的真实进程没有用于解除候选歧义")
 
         firstVersionValues := resolver.GetExecutableVersionValues(A_AhkPath)
