@@ -64,6 +64,19 @@ $readmeSource = Get-Content -LiteralPath (Join-Path $projectRoot 'README.md') -R
 $allModuleSource = (Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src') -Recurse -Filter '*.ahk' -File |
     ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 }) -join "`n"
 $iniText = Get-Content -LiteralPath $iniPath -Raw -Encoding Unicode
+
+$productionSource = $source + $allModuleSource
+$temporaryPreviewPatterns = @(
+    'ApplyTemporaryPreviewStates',
+    '\u3010\u72B6\u6001\u6D4B\u8BD5\u3011',
+    '\u3010\u56FE\u6807\u683C\u5F0F\u6D4B\u8BD5\u3011',
+    'ProcessWatchdogPreview-'
+)
+foreach ($temporaryPreviewPattern in $temporaryPreviewPatterns) {
+    if ($productionSource -match $temporaryPreviewPattern) {
+        throw "Temporary preview fixture remains in production source: $temporaryPreviewPattern"
+    }
+}
 $iniLines = Get-Content -LiteralPath $iniPath -Encoding Unicode
 
 $failures = New-Object 'System.Collections.Generic.List[string]'
