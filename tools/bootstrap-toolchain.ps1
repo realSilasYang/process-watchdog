@@ -104,13 +104,48 @@ function Install-Tool {
     return $executablePath
 }
 
+function Get-PinnedArchive {
+    param(
+        [string]$Name,
+        [string]$Archive,
+        [string]$Url,
+        [string]$Sha256
+    )
+
+    $archivePath = Assert-PathUnderRoot (Join-Path $cacheRoot $Archive) `
+        $toolsRoot
+    $archiveValid = (Test-Path -LiteralPath $archivePath -PathType Leaf) -and
+        ((Get-FileHash -Algorithm SHA256 -LiteralPath $archivePath).Hash `
+            -eq $Sha256)
+    if (-not $archiveValid) {
+        if (Test-Path -LiteralPath $archivePath) {
+            Remove-Item -LiteralPath $archivePath -Force
+        }
+        Write-Host "Downloading $Name..."
+        Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $archivePath
+    }
+    $actualHash = (Get-FileHash -Algorithm SHA256 `
+        -LiteralPath $archivePath).Hash
+    if ($actualHash -ne $Sha256) {
+        Remove-Item -LiteralPath $archivePath -Force
+        throw "$Name archive hash mismatch: $actualHash"
+    }
+    return $archivePath
+}
+
 $autoHotkeyPath = Install-Tool 'AutoHotkey' $lock.tools.autoHotkey
 $compilerPath = Install-Tool 'Ahk2Exe' $lock.tools.ahk2Exe
 $actionlintPath = Install-Tool 'actionlint' $lock.tools.actionlint
+$gitleaksPath = Install-Tool 'gitleaks' $lock.tools.gitleaks
+$autoHotkeySourcePath = Get-PinnedArchive 'AutoHotkey source' `
+    $lock.tools.autoHotkey.sourceArchive $lock.tools.autoHotkey.sourceUrl `
+    $lock.tools.autoHotkey.sourceSha256
 
 [pscustomobject]@{
     AutoHotkeyPath = $autoHotkeyPath
+    AutoHotkeySourcePath = $autoHotkeySourcePath
     CompilerPath = $compilerPath
     ActionlintPath = $actionlintPath
+    GitleaksPath = $gitleaksPath
     ToolsRoot = $toolsRoot
 }

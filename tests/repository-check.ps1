@@ -12,10 +12,13 @@ $requiredFiles = @(
     'CODE_OF_CONDUCT.md',
     'SECURITY.md',
     'SUPPORT.md',
+    'GOVERNANCE.md',
     'THIRD_PARTY_NOTICES.md',
     'VERSION',
     'watchdog.example.ini',
     '.editorconfig',
+    '.mailmap',
+    '.github\CODEOWNERS',
     'app\ApplicationState.ahk',
     'app\RuntimeAdapters.ahk',
     'app\WatchlistCommands.ahk',
@@ -29,6 +32,8 @@ $requiredFiles = @(
     'tools\generate-sbom.ps1',
     'tools\verify-release.ps1',
     'tests\verify-workflows.ps1'
+    'tests\verify-publication.ps1'
+    'docs\publication-checklist.md'
 )
 foreach ($relativePath in $requiredFiles) {
     $path = Join-Path $projectRoot $relativePath
@@ -127,7 +132,7 @@ $toolLock = Get-Content -LiteralPath $toolLockPath -Raw -Encoding UTF8 |
 if ($toolLock.schemaVersion -ne 1) {
     throw 'Toolchain lock schema is invalid.'
 }
-foreach ($toolName in @('autoHotkey', 'ahk2Exe', 'actionlint')) {
+foreach ($toolName in @('autoHotkey', 'ahk2Exe', 'actionlint', 'gitleaks')) {
     $definition = $toolLock.tools.$toolName
     foreach ($propertyName in @('version', 'archive', 'url', 'sha256',
             'executable', 'executableSha256', 'licenseExpression',
@@ -159,6 +164,18 @@ $autoHotkeyDefinition = $toolLock.tools.autoHotkey
 if ($autoHotkeyDefinition.sbomRelationship -ne 'DEPENDS_ON') {
     throw 'AutoHotkey must be recorded as an application runtime dependency.'
 }
+foreach ($propertyName in @('sourceCommit', 'sourceArchive', 'sourceUrl',
+        'sourceSha256')) {
+    if ($autoHotkeyDefinition.PSObject.Properties.Name `
+            -notcontains $propertyName -or
+        -not $autoHotkeyDefinition.$propertyName) {
+        throw "Toolchain lock is missing autoHotkey.$propertyName."
+    }
+}
+if ($autoHotkeyDefinition.sourceCommit -notmatch '^[0-9a-f]{40}$' -or
+    $autoHotkeyDefinition.sourceSha256 -notmatch '^[0-9A-F]{64}$') {
+    throw 'Pinned AutoHotkey source provenance is invalid.'
+}
 
 $workflowFiles = Get-ChildItem -LiteralPath `
     (Join-Path $projectRoot '.github\workflows') -File -Filter '*.yml'
@@ -185,10 +202,20 @@ $releaseWorkflow = Get-Content -LiteralPath `
 foreach ($releaseRequirement in @(
         '.\tests\run-gui-tests.ps1',
         '.\tests\reproducible-build.ps1',
+        '-GitleaksPath',
+        '-AutoHotkeySourcePath',
         'actions/attest-build-provenance@',
         'artifacts/release/*.spdx.json')) {
     if (-not $releaseWorkflow.Contains($releaseRequirement)) {
         throw "Release workflow is missing: $releaseRequirement"
+    }
+}
+
+foreach ($workflowName in @('ci.yml', 'release.yml')) {
+    $workflowText = Get-Content -LiteralPath (Join-Path $projectRoot `
+        ".github\workflows\$workflowName") -Raw -Encoding UTF8
+    if ($workflowText -notmatch '(?m)^\s+fetch-depth:\s+0\s*$') {
+        throw "$workflowName must fetch the complete Git history."
     }
 }
 

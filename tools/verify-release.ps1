@@ -12,6 +12,10 @@ if (-not (Test-Path -LiteralPath $packageRoot -PathType Container)) {
 }
 $version = (Get-Content -LiteralPath (Join-Path $projectRoot 'VERSION') `
     -Raw -Encoding UTF8).Trim()
+$sourceToolLock = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'tools\toolchain.lock.json') `
+    -Raw -Encoding UTF8 | ConvertFrom-Json
+$autoHotkeySourceRelativePath = "licenses\sources\AutoHotkey-$($sourceToolLock.tools.autoHotkey.version)-source.zip"
 $mainScript = Get-ChildItem -LiteralPath $projectRoot -Filter '*.ahk' -File |
     Where-Object { $_.Name -notlike '_*' } |
     Select-Object -First 1
@@ -26,7 +30,9 @@ $requiredPaths = @(
     'build-manifest.json',
     'build-metadata\toolchain.lock.json',
     'licenses\AutoHotkey-LICENSE.txt',
+    $autoHotkeySourceRelativePath,
     'SUPPORT.md',
+    'GOVERNANCE.md',
     'watchdog.example.ini',
     'assets\status-icons\running.svg',
     'third_party\dependencies.lock.json',
@@ -34,6 +40,9 @@ $requiredPaths = @(
     'third_party\everything\Everything64.dll',
     'docs\quick-start.md',
     'docs\troubleshooting.md',
+    'docs\architecture.md',
+    'docs\release-process.md',
+    'docs\publication-checklist.md',
     'tests\gui\MANUAL-REGRESSION.md'
 )
 foreach ($relativePath in $requiredPaths) {
@@ -69,12 +78,16 @@ if ((Get-FileHash -Algorithm SHA256 -LiteralPath $packagedToolLockPath).Hash `
 }
 $toolLock = Get-Content -LiteralPath $packagedToolLockPath -Raw `
     -Encoding UTF8 | ConvertFrom-Json
-if ($manifest.schemaVersion -ne 2 -or
+if ($manifest.schemaVersion -ne 3 -or
     $manifest.version -ne $version -or
     $manifest.platform -ne 'windows-x64' -or
     $manifest.autoHotkey -ne $toolLock.tools.autoHotkey.version -or
     $manifest.autoHotkeyExecutableSha256 -ne `
         $toolLock.tools.autoHotkey.executableSha256 -or
+    $manifest.autoHotkeySourceCommit -ne `
+        $toolLock.tools.autoHotkey.sourceCommit -or
+    $manifest.autoHotkeySourceSha256 -ne `
+        $toolLock.tools.autoHotkey.sourceSha256 -or
     $manifest.ahk2Exe -ne $toolLock.tools.ahk2Exe.version -or
     $manifest.ahk2ExeExecutableSha256 -ne `
         $toolLock.tools.ahk2Exe.executableSha256 -or
@@ -94,6 +107,7 @@ $expectedPackageNames = @(
     'AutoHotkey',
     'Ahk2Exe',
     'actionlint',
+    'gitleaks',
     'Google Material Symbols Rounded'
 )
 $actualPackageNames = @($sbom.packages | ForEach-Object { $_.name })
@@ -109,6 +123,8 @@ $ahk2ExePackage = $sbom.packages |
     Where-Object { $_.name -eq 'Ahk2Exe' } | Select-Object -First 1
 $actionlintPackage = $sbom.packages |
     Where-Object { $_.name -eq 'actionlint' } | Select-Object -First 1
+$gitleaksPackage = $sbom.packages |
+    Where-Object { $_.name -eq 'gitleaks' } | Select-Object -First 1
 if ($autoHotkeyPackage.licenseDeclared -ne `
         'GPL-2.0-only AND BSD-3-Clause' -or
     $autoHotkeyPackage.checksums[0].checksumValue -ne `
@@ -118,7 +134,10 @@ if ($autoHotkeyPackage.licenseDeclared -ne `
         $toolLock.tools.ahk2Exe.sha256 -or
     $actionlintPackage.licenseDeclared -ne 'MIT' -or
     $actionlintPackage.checksums[0].checksumValue -ne `
-        $toolLock.tools.actionlint.sha256) {
+        $toolLock.tools.actionlint.sha256 -or
+    $gitleaksPackage.licenseDeclared -ne 'MIT' -or
+    $gitleaksPackage.checksums[0].checksumValue -ne `
+        $toolLock.tools.gitleaks.sha256) {
     throw 'Release SPDX SBOM toolchain provenance is inconsistent.'
 }
 $autoHotkeyLicensePath = Join-Path $packageRoot `
@@ -127,6 +146,13 @@ if ((Get-FileHash -Algorithm SHA256 `
         -LiteralPath $autoHotkeyLicensePath).Hash -ne `
         $toolLock.tools.autoHotkey.licenseSha256) {
     throw 'Packaged AutoHotkey license hash is inconsistent.'
+}
+$autoHotkeySourcePath = Join-Path $packageRoot `
+    $autoHotkeySourceRelativePath
+if ((Get-FileHash -Algorithm SHA256 `
+        -LiteralPath $autoHotkeySourcePath).Hash -ne `
+        $toolLock.tools.autoHotkey.sourceSha256) {
+    throw 'Packaged AutoHotkey source archive hash is inconsistent.'
 }
 
 $dependencyLock = Get-Content -LiteralPath `

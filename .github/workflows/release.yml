@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
 
       - name: Verify tag and version
         shell: pwsh
@@ -34,6 +36,8 @@ jobs:
           "ahk=$($tools.AutoHotkeyPath)" >> $env:GITHUB_OUTPUT
           "compiler=$($tools.CompilerPath)" >> $env:GITHUB_OUTPUT
           "actionlint=$($tools.ActionlintPath)" >> $env:GITHUB_OUTPUT
+          "gitleaks=$($tools.GitleaksPath)" >> $env:GITHUB_OUTPUT
+          "ahk_source=$($tools.AutoHotkeySourcePath)" >> $env:GITHUB_OUTPUT
 
       - name: Verify
         shell: pwsh
@@ -41,6 +45,7 @@ jobs:
           .\tests\verify.ps1
           -AutoHotkeyPath '${{ steps.toolchain.outputs.ahk }}'
           -ActionlintPath '${{ steps.toolchain.outputs.actionlint }}'
+          -GitleaksPath '${{ steps.toolchain.outputs.gitleaks }}'
 
       - name: GUI smoke and resource soak
         shell: pwsh
@@ -55,6 +60,7 @@ jobs:
           .\tests\reproducible-build.ps1
           -AutoHotkeyPath '${{ steps.toolchain.outputs.ahk }}'
           -CompilerPath '${{ steps.toolchain.outputs.compiler }}'
+          -AutoHotkeySourcePath '${{ steps.toolchain.outputs.ahk_source }}'
 
       - name: Attest release artifacts
         uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2

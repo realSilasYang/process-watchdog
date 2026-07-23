@@ -8,7 +8,9 @@
 必须保持相对位置，不能只复制 EXE。
 
 发行包已经包含运行所需的 AutoHotkey 运行时，不要求用户安装 AutoHotkey。
-源码开发才需要 AutoHotkey v2 x64。
+源码开发才需要 AutoHotkey v2 x64。发行包的 `licenses/sources/` 同时附带与内嵌
+运行时精确对应的 AutoHotkey 完整源码归档；版本、提交和哈希记录在
+`build-metadata/toolchain.lock.json`。
 
 ## 系统集成
 

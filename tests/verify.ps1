@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$AutoHotkeyPath = "",
-    [string]$ActionlintPath = ""
+    [string]$ActionlintPath = "",
+    [string]$GitleaksPath = ""
 )
 
 $ErrorActionPreference = 'Stop'
@@ -11,6 +12,8 @@ $ErrorActionPreference = 'Stop'
 & (Join-Path $PSScriptRoot 'run-core-tests.ps1') `
     -AutoHotkeyPath $AutoHotkeyPath
 & (Join-Path $PSScriptRoot 'repository-check.ps1')
+& (Join-Path $PSScriptRoot 'verify-publication.ps1') `
+    -GitleaksPath $GitleaksPath
 & (Join-Path $PSScriptRoot 'verify-workflows.ps1') `
     -ActionlintPath $ActionlintPath
 

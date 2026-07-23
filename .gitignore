@@ -5,6 +5,15 @@ watchdog.maintenance.ini.*
 *.tmp
 *.writing
 *.bak
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.pem
+*.key
+*.snk
+_codex_*
 
 # Logs
 *.log

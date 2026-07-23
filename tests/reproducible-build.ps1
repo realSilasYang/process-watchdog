@@ -2,6 +2,7 @@
 param(
     [string]$AutoHotkeyPath = "",
     [string]$CompilerPath = "",
+    [string]$AutoHotkeySourcePath = "",
     [string]$OutputDirectory = ""
 )
 
@@ -15,11 +16,13 @@ $outputRoot = if ($OutputDirectory) {
 }
 
 $first = & $buildScript -OutputDirectory $outputRoot `
-    -AutoHotkeyPath $AutoHotkeyPath -CompilerPath $CompilerPath
+    -AutoHotkeyPath $AutoHotkeyPath -CompilerPath $CompilerPath `
+    -AutoHotkeySourcePath $AutoHotkeySourcePath
 $firstHash = $first.Sha256
 $firstSbomHash = $first.SbomSha256
 $second = & $buildScript -OutputDirectory $outputRoot `
-    -AutoHotkeyPath $AutoHotkeyPath -CompilerPath $CompilerPath
+    -AutoHotkeyPath $AutoHotkeyPath -CompilerPath $CompilerPath `
+    -AutoHotkeySourcePath $AutoHotkeySourcePath
 $secondHash = $second.Sha256
 $secondSbomHash = $second.SbomSha256
 if ($firstHash -ne $secondHash) {

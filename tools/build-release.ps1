@@ -3,6 +3,7 @@ param(
     [string]$OutputDirectory = "",
     [string]$AutoHotkeyPath = "",
     [string]$CompilerPath = "",
+    [string]$AutoHotkeySourcePath = "",
     [switch]$SkipStartupValidation
 )
 
@@ -21,13 +22,17 @@ if ($version -notmatch '^\d+\.\d+\.\d+$') {
     throw "Invalid VERSION value: $version"
 }
 
-if (-not $AutoHotkeyPath -or -not $CompilerPath) {
+if (-not $AutoHotkeyPath -or -not $CompilerPath -or
+    -not $AutoHotkeySourcePath) {
     $toolchain = & (Join-Path $PSScriptRoot 'bootstrap-toolchain.ps1')
     if (-not $AutoHotkeyPath) {
         $AutoHotkeyPath = $toolchain.AutoHotkeyPath
     }
     if (-not $CompilerPath) {
         $CompilerPath = $toolchain.CompilerPath
+    }
+    if (-not $AutoHotkeySourcePath) {
+        $AutoHotkeySourcePath = $toolchain.AutoHotkeySourcePath
     }
 }
 foreach ($toolPath in @($AutoHotkeyPath, $CompilerPath)) {
@@ -67,6 +72,16 @@ $autoHotkeyLicenseHash = (Get-FileHash -Algorithm SHA256 `
     -LiteralPath $autoHotkeyLicensePath).Hash
 if ($autoHotkeyLicenseHash -ne $toolLock.tools.autoHotkey.licenseSha256) {
     throw "AutoHotkey license hash mismatch: $autoHotkeyLicenseHash"
+}
+$AutoHotkeySourcePath = [System.IO.Path]::GetFullPath(
+    $AutoHotkeySourcePath)
+if (-not (Test-Path -LiteralPath $AutoHotkeySourcePath -PathType Leaf)) {
+    throw "Pinned AutoHotkey source archive is missing: $AutoHotkeySourcePath"
+}
+$autoHotkeySourceHash = (Get-FileHash -Algorithm SHA256 `
+    -LiteralPath $AutoHotkeySourcePath).Hash
+if ($autoHotkeySourceHash -ne $toolLock.tools.autoHotkey.sourceSha256) {
+    throw "AutoHotkey source archive hash mismatch: $autoHotkeySourceHash"
 }
 
 & (Join-Path $PSScriptRoot 'verify-dependencies.ps1')
@@ -217,6 +232,7 @@ foreach ($file in @(
     'CODE_OF_CONDUCT.md',
     'SECURITY.md',
     'SUPPORT.md',
+    'GOVERNANCE.md',
     'LICENSE',
     'THIRD_PARTY_NOTICES.md',
     'VERSION'
@@ -228,6 +244,11 @@ $licenseDirectory = Join-Path $packageDirectory 'licenses'
 New-Item -ItemType Directory -Force -Path $licenseDirectory | Out-Null
 Copy-Item -LiteralPath $autoHotkeyLicensePath `
     -Destination (Join-Path $licenseDirectory 'AutoHotkey-LICENSE.txt')
+$sourceDirectory = Join-Path $licenseDirectory 'sources'
+New-Item -ItemType Directory -Force -Path $sourceDirectory | Out-Null
+$packagedAutoHotkeySource = "AutoHotkey-$($toolLock.tools.autoHotkey.version)-source.zip"
+Copy-Item -LiteralPath $AutoHotkeySourcePath `
+    -Destination (Join-Path $sourceDirectory $packagedAutoHotkeySource)
 $buildMetadataDirectory = Join-Path $packageDirectory 'build-metadata'
 New-Item -ItemType Directory -Force -Path $buildMetadataDirectory | Out-Null
 Copy-Item -LiteralPath $toolLockPath `
@@ -245,7 +266,10 @@ foreach ($documentationFile in @(
     'configuration.md',
     'troubleshooting.md',
     'compatibility.md',
-    'diagnostics.md'
+    'diagnostics.md',
+    'architecture.md',
+    'release-process.md',
+    'publication-checklist.md'
 )) {
     Copy-Item -LiteralPath (Join-Path $projectRoot `
         ("docs\" + $documentationFile)) `
@@ -258,12 +282,14 @@ Copy-Item -LiteralPath (Join-Path $projectRoot `
     'tests\gui\MANUAL-REGRESSION.md') -Destination $manualRegressionDirectory
 
 $buildManifest = [ordered]@{
-    schemaVersion = 2
+    schemaVersion = 3
     version = $version
     platform = 'windows-x64'
     autoHotkey = $toolLock.tools.autoHotkey.version
     autoHotkeyExecutableSha256 = `
         $toolLock.tools.autoHotkey.executableSha256
+    autoHotkeySourceCommit = $toolLock.tools.autoHotkey.sourceCommit
+    autoHotkeySourceSha256 = $toolLock.tools.autoHotkey.sourceSha256
     ahk2Exe = $toolLock.tools.ahk2Exe.version
     ahk2ExeExecutableSha256 = $toolLock.tools.ahk2Exe.executableSha256
     # Derive the Unicode entry name from the filesystem. Windows PowerShell

@@ -84,6 +84,11 @@ $toolPackages = @(
         Definition = $toolchainLock.tools.actionlint
         Name = 'actionlint'
         Copyright = 'Copyright actionlint contributors'
+    },
+    [ordered]@{
+        Definition = $toolchainLock.tools.gitleaks
+        Name = 'gitleaks'
+        Copyright = 'Copyright Gitleaks contributors'
     }
 )
 foreach ($toolPackage in $toolPackages) {
@@ -100,6 +105,11 @@ foreach ($toolPackage in $toolPackages) {
         licenseConcluded = $licenseExpression
         licenseDeclared = $licenseExpression
         copyrightText = $toolPackage.Copyright
+        comment = if ($toolPackage.Name -eq 'AutoHotkey') {
+            "Corresponding source commit $($definition.sourceCommit) is included in the release package; source archive SHA-256 $($definition.sourceSha256)."
+        } else {
+            'Used only while building or verifying the project; not included in the runtime distribution.'
+        }
         checksums = @([ordered]@{
             algorithm = 'SHA256'
             checksumValue = [string]$definition.sha256

@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
 
       - name: Bootstrap pinned AutoHotkey toolchain
         id: toolchain
@@ -31,6 +33,8 @@ jobs:
           "ahk=$($tools.AutoHotkeyPath)" >> $env:GITHUB_OUTPUT
           "compiler=$($tools.CompilerPath)" >> $env:GITHUB_OUTPUT
           "actionlint=$($tools.ActionlintPath)" >> $env:GITHUB_OUTPUT
+          "gitleaks=$($tools.GitleaksPath)" >> $env:GITHUB_OUTPUT
+          "ahk_source=$($tools.AutoHotkeySourcePath)" >> $env:GITHUB_OUTPUT
 
       - name: Verify source and tests
         shell: pwsh
@@ -38,6 +42,7 @@ jobs:
           .\tests\verify.ps1
           -AutoHotkeyPath '${{ steps.toolchain.outputs.ahk }}'
           -ActionlintPath '${{ steps.toolchain.outputs.actionlint }}'
+          -GitleaksPath '${{ steps.toolchain.outputs.gitleaks }}'
 
       - name: GUI smoke and resource soak
         shell: pwsh
@@ -52,6 +57,7 @@ jobs:
           .\tests\reproducible-build.ps1
           -AutoHotkeyPath '${{ steps.toolchain.outputs.ahk }}'
           -CompilerPath '${{ steps.toolchain.outputs.compiler }}'
+          -AutoHotkeySourcePath '${{ steps.toolchain.outputs.ahk_source }}'
 
       - name: Upload release-shaped artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
