@@ -1,3 +1,7 @@
+; Windows 目录变更监听器。
+; 使用重叠 I/O 持续监听安装目录，并在每次通知后重新挂起下一次读取；
+; 停止和异常路径都会取消请求、关闭事件与目录句柄，迟到完成包不能重新开启监听。
+
 class DirectoryChangeWatcher {
     __New(rootPath) {
         this.Root := StrLen(rootPath) > 3 ? RTrim(rootPath, "\") : rootPath
@@ -68,7 +72,7 @@ class DirectoryChangeWatcher {
             "UInt*", &bytesReturned, "Int", false, "Int")
         if !completed {
             this.RearmOrClose()
-            return []
+            return [{Action: 0, RelativePath: "*"}]
         }
         try return DirectoryChangeWatcher.ParseNotificationBuffer(
             this.NotificationBuffer, bytesReturned)
@@ -104,6 +108,7 @@ class DirectoryChangeWatcher {
             return changes
         }
         offset := 0
+        malformed := false
         while (offset + 12 <= safeBytes) {
             nextOffset := NumGet(notificationBuffer, offset, "UInt")
             action := NumGet(notificationBuffer, offset + 4, "UInt")
@@ -118,10 +123,14 @@ class DirectoryChangeWatcher {
                 break
             nextEntry := offset + nextOffset
             if (nextOffset < 12 || Mod(nextOffset, 4)
-                || nextEntry > safeBytes)
+                || nextEntry > safeBytes) {
+                malformed := true
                 break
+            }
             offset := nextEntry
         }
+        if (malformed || !changes.Length)
+            changes.Push({Action: 0, RelativePath: "*"})
         return changes
     }
 }

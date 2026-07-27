@@ -1,3 +1,7 @@
+; 软件升级保护阶段及纯转换规则。
+; 从候选检测、退出确认、升级活动、文件稳定到恢复守护逐步推进，
+; 超时和用户结束等待都有明确出口，不与普通守护状态文案互相驱动。
+
 class MaintenancePhase {
     static Normal := "Normal"
     static Arbitrating := "Arbitrating"
@@ -55,6 +59,16 @@ class MaintenanceStateMachine {
             throw Error("不允许的升级保护阶段转换: " this.Phase " -> " nextPhase)
         previousPhase := this.Phase
         this.Phase := nextPhase
+        return previousPhase
+    }
+
+    ; 仅供持久化会话恢复使用。恢复不是运行期事件，不能为了装载 TimedOut
+    ; 而放宽 Normal 的合法转换集合；未知阶段仍必须被拒绝。
+    Restore(restoredPhase) {
+        if !MaintenanceStateMachine.AllowedTransitions.Has(restoredPhase)
+            throw ValueError("未知升级保护阶段", -1, restoredPhase)
+        previousPhase := this.Phase
+        this.Phase := restoredPhase
         return previousPhase
     }
 

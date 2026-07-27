@@ -1,3 +1,7 @@
+; 全应用控件交互状态注册表。
+; 按 HWND 记录按钮悬浮、文本输入命中和系统光标缓存，窗口销毁后统一剪除失效项；
+; 注册表只保存交互元数据，不拥有 GUI 控件本身，也不执行具体按钮功能。
+
 class UiCursorKind {
     static Hand := "hand"
     static Arrow := "arrow"

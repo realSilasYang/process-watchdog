@@ -1,6 +1,12 @@
+; Windows 原生进程信息检查器。
+; 统一读取创建时间、完整路径、父进程和令牌提升状态，并以“进程号＋创建身份”
+; 区分 PID 复用；访问被拒绝属于未知证据，不自动解释为目标已经停止。
+
 class ProcessInspector {
     __New(clock := "") {
         this.Clock := clock
+        this.AutoHotkeyScriptSnapshot := ""
+        this.AutoHotkeyScriptSnapshotReuseMs := 1000
     }
 
     CaptureNativeSnapshot() {
@@ -118,6 +124,88 @@ class ProcessInspector {
                 DllCall("kernel32\CloseHandle", "Ptr", tokenHandle)
             DllCall("kernel32\CloseHandle", "Ptr", processHandle)
         }
+    }
+
+    CaptureAutoHotkeyScriptSnapshot(maximumAgeMs := 0) {
+        ; 提权脚本的命令行可能完全不可读，但 AHK 隐藏主窗口仍公开完整脚本路径。
+        ; 只有每个解释器进程都能对应到标准主窗口时，快照才足以证明某脚本未运行。
+        nowTicks := this.Now()
+        maximumAgeMs := maximumAgeMs > 0 ? maximumAgeMs
+            : this.AutoHotkeyScriptSnapshotReuseMs
+        if IsObject(this.AutoHotkeyScriptSnapshot)
+            && nowTicks >= this.AutoHotkeyScriptSnapshot.CapturedAtTicks
+            && nowTicks - this.AutoHotkeyScriptSnapshot.CapturedAtTicks
+                <= maximumAgeMs {
+            return this.AutoHotkeyScriptSnapshot
+        }
+
+        nativeSnapshot := this.CaptureNativeSnapshot()
+        result := {
+            Ready: nativeSnapshot.Ready,
+            Complete: false,
+            Scripts: [],
+            CapturedAtTicks: nativeSnapshot.CapturedAtTicks,
+            Reason: nativeSnapshot.Reason
+        }
+        if !nativeSnapshot.Ready {
+            this.AutoHotkeyScriptSnapshot := result
+            return result
+        }
+
+        candidatePids := Map()
+        for processInfo in nativeSnapshot.Processes {
+            if processInfo.pid
+                && ProcessInspector.IsAutoHotkeyInterpreterName(
+                    processInfo.name) {
+                candidatePids[processInfo.pid] := true
+            }
+        }
+        identifiedPids := Map()
+        hiddenWindowsBefore := A_DetectHiddenWindows
+        try {
+            DetectHiddenWindows(true)
+            for windowHandle in WinGetList("ahk_class AutoHotkey") {
+                pid := 0
+                title := ""
+                try pid := WinGetPID("ahk_id " windowHandle)
+                if !pid || !candidatePids.Has(pid) || !ProcessExist(pid)
+                    continue
+                try title := WinGetTitle("ahk_id " windowHandle)
+                scriptPath := ProcessInspector.ExtractAutoHotkeyScriptPath(
+                    title)
+                if scriptPath == ""
+                    continue
+                identifiedPids[pid] := true
+                result.Scripts.Push({PID: pid, Path: scriptPath})
+            }
+        } catch as windowError {
+            result.Reason := windowError.Message
+        } finally DetectHiddenWindows(hiddenWindowsBefore)
+
+        result.Complete := true
+        for pid in candidatePids {
+            if !identifiedPids.Has(pid) {
+                result.Complete := false
+                if result.Reason == ""
+                    result.Reason := "存在无法识别主窗口的 AutoHotkey 进程"
+                break
+            }
+        }
+        this.AutoHotkeyScriptSnapshot := result
+        return result
+    }
+
+    static IsAutoHotkeyInterpreterName(processName) {
+        SplitPath(processName, &fileName)
+        return RegExMatch(fileName, "i)^AutoHotkey.*\.exe$") != 0
+    }
+
+    static ExtractAutoHotkeyScriptPath(windowTitle) {
+        if RegExMatch(windowTitle,
+            "i)^(.*\.ahk) - AutoHotkey v[0-9]+(?:\.[0-9]+)*.*$", &match) {
+            return match[1]
+        }
+        return ""
     }
 
     Now() {

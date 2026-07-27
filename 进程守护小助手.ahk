@@ -1,27 +1,41 @@
 /*
 ================================================================================
-    进程守护小助手 (Process Watchdog)
+    进程守护小助手
     开发语言：AutoHotkey v2
     主要功能：后台进程、脚本、启动项守护与定时保活。
     【核心特性说明】
-    1. 多态守护：全面支持原生应用(.exe)、解释型脚本(.py/.ahk/.js)、文件(.bat/.cmd)和快捷方式。
+    1. 多态守护：支持原生应用、解释型脚本、批处理文件和快捷方式等常见启动入口。
     2. 进程探活：优先使用原生快照与已核验 PID，命令行证据由后台 WMI 快照补充。
-    3. UI 界面动态适配：通过调用 dwmapi, uxtheme, shell32 等系统 API 适配深色模式。
+    3. 深色界面：通过 Windows 原生窗口、主题和 Shell 接口统一适配标题栏、控件与图标。
     4. 异常处理：快速重试耗尽后改为间隔自动重试，避免连续崩溃造成资源过度占用。
 ================================================================================
 */
 
 ;@Ahk2Exe-SetName 进程守护小助手
 ;@Ahk2Exe-SetDescription 进程、脚本和快捷方式守护工具
-;@Ahk2Exe-SetVersion 1.0.0.0
+;@Ahk2Exe-SetVersion 1.1.0.0
 ;@Ahk2Exe-SetCopyright Copyright (c) 2026 进程守护小助手 contributors
-;@Ahk2Exe-SetMainIcon watchdog.ico
+;@Ahk2Exe-SetMainIcon assets\app\watchdog.ico
 
 #Requires AutoHotkey v2.0 64-bit
 #SingleInstance Off
 #Warn All, StdOut ; 严格警告写入诊断输出，避免后台启动被不可见对话框阻塞
 
 #Include src\Platform\Win32.ahk
+#Include src\Localization\EnglishStrings.ahk
+#Include src\Localization\TraditionalHongKongStrings.ahk
+#Include src\Localization\TraditionalTaiwanStrings.ahk
+#Include src\Localization\JapaneseStrings.ahk
+#Include src\Localization\VietnameseStrings.ahk
+#Include src\Localization\KoreanStrings.ahk
+#Include src\Localization\SpanishStrings.ahk
+#Include src\Localization\FrenchStrings.ahk
+#Include src\Localization\PortugueseBrazilStrings.ahk
+#Include src\Localization\RussianStrings.ahk
+#Include src\Localization\GermanStrings.ahk
+#Include src\Localization\ItalianStrings.ahk
+#Include src\Localization\LocalizationService.ahk
+#Include src\UI\UiThemeService.ahk
 #Include src\Config\IniFieldCodec.ahk
 #Include src\Config\DisplayConfigCodec.ahk
 #Include src\Config\MaintenanceConfigCodec.ahk
@@ -30,10 +44,13 @@
 #Include src\Config\WindowLayoutService.ahk
 #Include src\Config\WatchlistPersistenceService.ahk
 #Include src\Config\WatchdogConfigRepository.ahk
+#Include src\Update\ApplicationVersionInfo.ahk
+#Include src\Update\ApplicationUpdateService.ahk
 #Include src\Core\GuardTypes.ahk
 #Include src\Core\GuardStateMachine.ahk
 #Include src\Maintenance\MaintenanceStateMachine.ahk
 #Include src\Core\GuardWorkGate.ahk
+#Include src\Core\GuardMutationQueue.ahk
 #Include src\Core\WatchdogScheduler.ahk
 #Include src\Core\RestartPolicy.ahk
 #Include src\Core\TargetSupervisor.ahk
@@ -60,9 +77,13 @@
 #Include src\UI\SvgRenderLibrary.ahk
 #Include src\UI\UiInteractionRegistry.ahk
 #Include src\UI\MainListProjection.ahk
+#Include src\UI\ListViewPseudoHeader.ahk
 #Include src\UI\WindowHierarchy.ahk
 #Include src\UI\ManagedWindow.ahk
 #Include app\UI\InteractionPresenter.ahk
+#Include app\UI\ListViewSelectionPresenter.ahk
+#Include app\UI\ContextMenuPresenter.ahk
+#Include app\UI\StatusBarPresenter.ahk
 #Include app\UI\MainVisualPipeline.ahk
 #Include app\UI\DarkMessageBox.ahk
 #Include app\RuntimeAdapters.ahk
@@ -71,6 +92,7 @@
 #Include app\SystemIntegration.ahk
 #Include app\ApplicationState.ahk
 #Include app\MainWindowState.ahk
+#Include app\MainWindowController.ahk
 #Include app\GuiModuleRegistry.ahk
 #Include app\Windows\CustomDisplayDialog.ahk
 #Include app\Windows\MaintenanceSettingsDialog.ahk
@@ -79,14 +101,25 @@
 #Include app\Windows\SettingsWindow.ahk
 #Include app\Windows\LogWindow.ahk
 #Include app\Windows\HelpWindow.ahk
+#Include app\Windows\BatchOutputLogNoticeWindow.ahk
+#Include app\Windows\SupportInfoWindow.ahk
+#Include app\Windows\DonationWindow.ahk
 #Include app\Windows\ApplicationSearchDialog.ahk
 #Include app\Windows\DarkTooltipWindow.ahk
+#Include app\Windows\HistoryToastWindow.ahk
 #Include src\Core\GuardRuntime.ahk
 ; 业务运行态只有一个稳定根对象；函数只修改实例属性，不再重新绑定全局变量。
+LocalizationService.Configure(LocalizationService.ReadConfiguredLanguage(
+    A_ScriptDir "\watchdog.ini"))
+LocalizationService.ConfigureUiFont(LocalizationService.ReadConfiguredUiFont(
+    A_ScriptDir "\watchdog.ini"))
+UiThemeService.Configure(UiThemeService.ReadConfiguredTheme(
+    A_ScriptDir "\watchdog.ini"))
 global App := ApplicationState()
 
 ; 按钮绘制与鼠标分发必须早于权限提示框安装，确保启动失败界面同样可操作。
-OnMessage(Win32.WM_DRAWITEM, OnDrawRoundedButton)
+OnMessage(Win32.WM_MEASUREITEM, OnMeasureApplicationControl)
+OnMessage(Win32.WM_DRAWITEM, OnDrawApplicationControl)
 OnMessage(Win32.WM_SETFOCUS, OnRoundedButtonFocusChanged)
 OnMessage(Win32.WM_KILLFOCUS, OnRoundedButtonFocusChanged)
 OnMessage(Win32.WM_SETCURSOR, OnSetCursor)
@@ -97,15 +130,34 @@ OnMessage(Win32.WM_CANCELMODE, OnButtonPressCancelled)
 OnMessage(Win32.WM_CAPTURECHANGED, OnButtonCaptureChanged)
 OnMessage(Win32.WM_MOUSEMOVE, OnMouseMove_Tooltip)
 OnMessage(Win32.WM_MOUSELEAVE, OnMouseLeave_Hover)
+OnMessage(Win32.WM_SETTINGCHANGE, OnSystemSettingChange)
 OnMessage(Win32.AHK_NOTIFYICON, OnTrayNotification)
 OnExit(ShutdownApplication)
 
 if ProcessMaintenanceCommandClient()
     ExitApp()
-/*  * ========================================================================
- * 1. 自动提升管理员权限 (UAC)
- * 由于程序需要操作定时任务与检测进程，启动时若缺乏权限则自动提升。
- * ========================================================================
+
+OnSystemSettingChange(*) {
+    if UiThemeService.GetRequestedTheme() != "auto"
+        return
+    ; Windows 会在一次主题切换中连续发送多条设置消息，合并为一次重建，
+    ; 避免主列表和下级窗口被重复销毁、创建。
+    SetTimer(ApplySystemThemeChange, -250)
+}
+
+ApplySystemThemeChange(*) {
+    global GuiModules
+    if !IsSet(Main) || !UiThemeService.HandleSystemSettingChange()
+        return
+    RefreshMainWindowTheme()
+    if IsSet(GuiModules) {
+        GuiModules.Shutdown()
+        GuiModules := GuiModuleRegistry(Main.gui)
+    }
+}
+/*
+ * 守护进程检查、计划任务和按管理员身份启动目标都需要提升权限。
+ * 当前实例未提升时，只负责用相同参数请求 UAC 后退出，不继续创建运行态资源。
  */
 if not A_IsAdmin {
     try {
@@ -114,16 +166,15 @@ if not A_IsAdmin {
             relaunchArguments .= " " QuoteCommandLineArgument(relaunchArgument)
         Run('*RunAs "' A_ScriptFullPath '"' relaunchArguments)
     } catch {
-        ShowDarkMsgBox("守护监控操作必须具备高级别系统读写权限，请以管理员身份运行此程序！", "系统权限拦截", "Error")
+        ShowDarkMsgBox(Tr("守护监控操作必须具备高级别系统读写权限，请以管理员身份运行此程序！"),
+            Tr("系统权限拦截"), "Error")
     }
     ExitApp()
 }
 
-/*  * ========================================================================
- * 2. 程序单实例互斥锁 (Mutex Single Instance)
- * 运用系统内核级的 Mutex 锁定机制，确保全局只存在一个工具实例。
- * 如果检测到程序已在运行，则主动弹出原有窗口，然后退出当前进程。
- * ========================================================================
+/*
+ * 命名互斥锁是唯一的单实例裁决依据。普通重复启动只激活现有主窗口；重载接班和
+ * 后台维护命令则先把请求交给原实例，避免两个守护循环短暂并行。
  */
 startupHandoffPid := GetReloadHandoffPid()
 if startupHandoffPid
@@ -131,17 +182,17 @@ if startupHandoffPid
 startupMutexExists := false
 App.mutexHandle := AcquireApplicationMutex(&startupMutexExists)
 if !App.mutexHandle {
-    ShowDarkMsgBox("无法建立单实例运行锁，小助手将退出。", "启动失败", "Error")
+    ShowDarkMsgBox(Tr("无法建立单实例运行锁，小助手将退出。"), Tr("启动失败"), "Error")
     ExitApp()
 }
 if startupMutexExists {
     DetectHiddenWindows(True)
-    existingWindow := WinExist("进程守护小助手 ahk_class AutoHotkeyGUI")
+    existingWindow := FindRunningApplicationWindow()
     if (!existingWindow
         && App.maintenanceCoordinator.PendingCommands.Length) {
         Loop 30 {
             Sleep(100)
-            existingWindow := WinExist("进程守护小助手 ahk_class AutoHotkeyGUI")
+            existingWindow := FindRunningApplicationWindow()
             if existingWindow
                 break
         }
@@ -154,9 +205,9 @@ if startupMutexExists {
             }
             ExitApp()
         }
-        WinShow()       ; 从托盘盲区强制释放展示
-        WinRestore()    ; 复原可能存在的最小化压栈操作
-        WinActivate()   ; 置前获取软硬件焦点
+        WinShow()       ; 现有窗口可能仅隐藏到托盘，先恢复可见性。
+        WinRestore()    ; 若窗口已最小化，再恢复到原来的正常尺寸。
+        WinActivate()   ; 最后激活窗口，避免只显示却仍停留在后台。
     }
     ExitApp()
 }
@@ -171,33 +222,19 @@ A_IconHidden := true
 Sleep(50)
 A_IconHidden := false
 ; Windows 会把未注册的 AppUserModelID 直接显示为通知来源名称；必须稳定且可读。
-try DllCall("shell32\SetCurrentProcessExplicitAppUserModelID", "WStr", "进程守护小助手")
+try DllCall("shell32\SetCurrentProcessExplicitAppUserModelID", "WStr", Tr("进程守护小助手"))
 
-if FileExist(A_ScriptDir "\watchdog.ico") {
-    TraySetIcon(A_ScriptDir "\watchdog.ico")
-    SetWindowIcon(A_ScriptHwnd, A_ScriptDir "\watchdog.ico")
+applicationIconPath := GetApplicationIconPath()
+if FileExist(applicationIconPath) {
+    TraySetIcon(applicationIconPath)
+    SetWindowIcon(A_ScriptHwnd, applicationIconPath)
 }
 
-/*  * ========================================================================
- * 3. 应用程序全局深色上下文设置
- * 动态判断操作系统版本，通过 uxtheme 接口挂载深色基底。
- * ========================================================================
- */
-if (VerCompare(A_OSVersion, "10.0.18362") >= 0) {
-    try DllCall("uxtheme\135", "Int", 2) ; Windows 10/11 极夜模式
-} else if (VerCompare(A_OSVersion, "10.0.17763") >= 0) {
-    try DllCall("uxtheme\135", "Int", 1) ; 早期深色实现指令
-}
-
-; ==========================================
-; 4. 主窗口与 INI 配置文件初始化
-; ==========================================
+; 主窗口在共享服务之后创建；控件安装前先建立唯一的长期窗口所有者。
 global Main := MainWindow()
 
-; ==========================================
-; 修复：解除 UAC 管理员权限下的 UIPI（用户界面特权隔离）限制
-; 允许接收来自低权限进程（如普通资源管理器/桌面）的文件拖放
-; ==========================================
+; 管理员进程默认会被 UIPI（用户界面特权隔离）阻止接收普通资源管理器的拖放消息。
+; 这里只放行文件拖放所需的三类消息，不改变其它跨权限窗口消息的过滤规则。
 try {
     DllCall("user32\ChangeWindowMessageFilterEx", "Ptr", Main.gui.Hwnd, "UInt", Win32.WM_DROPFILES, "UInt", 1, "Ptr", 0)
     DllCall("user32\ChangeWindowMessageFilterEx", "Ptr", Main.gui.Hwnd, "UInt", Win32.WM_COPYGLOBALDATA, "UInt", 1, "Ptr", 0)
@@ -224,81 +261,221 @@ App.runtimeSettingsService.EnsureExists()
 App.runtimeSettingsService.Apply(App, App.runtimeSettingsService.Load())
 CleanupBatchLogs()
 
-; 读取布局设定
+; 先读取持久化布局再创建控件，避免首次显示时从默认尺寸跳变到用户保存的尺寸。
 App.windowLayoutService.Apply(App, App.windowLayoutService.Load())
-; ==========================================
-; 6. 自定义系统托盘菜单
-; ==========================================
-A_IconTip := "进程守护小助手"
-A_TrayMenu.Delete()
-A_TrayMenu.Add("显示主界面", ShowMainGui)
-A_TrayMenu.Add("重新加载", ReloadScript)
-A_TrayMenu.Add("退出程序", ExitProgram)
-A_TrayMenu.Default := "显示主界面"
-A_TrayMenu.ClickCount := 1
+; 托盘菜单是主窗口隐藏后的应用级入口；显示设置热切换时会调用同一函数原位重建。
+ConfigureTrayMenu() {
+    A_IconTip := Tr("进程守护小助手")
+    A_TrayMenu.Delete()
+    A_TrayMenu.Add(Tr("显示主界面"), ShowMainGui)
+    A_TrayMenu.Add(Tr("重新加载"), ReloadScript)
+    A_TrayMenu.Add(Tr("退出程序"), ExitProgram)
+    A_TrayMenu.Default := Tr("显示主界面")
+    A_TrayMenu.ClickCount := 1
+}
 
-; ==========================================
-; 7. 构建主 GUI 界面 (支持复选框和直接编辑)
-; ==========================================
-SetDarkTitleBar(Main.gui.Hwnd)
-SetWindowIcon(Main.gui.Hwnd, A_ScriptDir "\watchdog.ico")
-Main.gui.BackColor := "1E1E1E"
-Main.gui.SetFont("s10 cWhite", "Microsoft YaHei")
+ConfigureTrayMenu()
 
-; 初始化主窗口界面的控制按钮并分配大小与间距
-Main.btnAdd  := Main.gui.Add("Text", "x10 y15 w80 h30 Center 0x200 Background3F6B5B cWhite", "➕ 添加")
+ConfigureMainCommandButtonMetrics() {
+    compactLayout := LocalizationService.UsesCompactLayout()
+    Main.settingsButtonWidth := compactLayout ? 70 : 80
+    Main.supportButtonWidth := compactLayout ? 100 : 110
+    Main.donateButtonWidth := compactLayout ? 70 : 80
+    Main.commandButtonGap := 10
+    Main.commandButtonRightMargin := 10
+}
+
+GetMainCommandButtonPositions(clientWidth) {
+    donateX := clientWidth - Main.commandButtonRightMargin
+        - Main.donateButtonWidth
+    supportX := donateX - Main.commandButtonGap
+        - Main.supportButtonWidth
+    settingsX := supportX - Main.commandButtonGap
+        - Main.settingsButtonWidth
+    return {Settings: settingsX, Support: supportX, Donate: donateX}
+}
+
+GetControlRectInParentClient(control, parentHwnd) {
+    try controlHwnd := control.Hwnd
+    catch
+        return false
+    if !controlHwnd || !DllCall("user32\IsWindow", "Ptr", controlHwnd, "Int")
+        return false
+    rect := Buffer(16, 0)
+    if !DllCall("user32\GetWindowRect", "Ptr", controlHwnd, "Ptr", rect, "Int")
+        return false
+    DllCall("user32\MapWindowPoints", "Ptr", 0, "Ptr", parentHwnd,
+        "Ptr", rect, "UInt", 2, "Int")
+    return {
+        Left: NumGet(rect, 0, "Int"),
+        Top: NumGet(rect, 4, "Int"),
+        Right: NumGet(rect, 8, "Int"),
+        Bottom: NumGet(rect, 12, "Int")
+    }
+}
+
+GetMainCommandButtonBounds() {
+    bounds := false
+    for button in [Main.btnSet, Main.btnSupport, Main.btnDonate] {
+        rect := GetControlRectInParentClient(button, Main.gui.Hwnd)
+        if !rect
+            continue
+        if !bounds {
+            bounds := rect
+            continue
+        }
+        bounds.Left := Min(bounds.Left, rect.Left)
+        bounds.Top := Min(bounds.Top, rect.Top)
+        bounds.Right := Max(bounds.Right, rect.Right)
+        bounds.Bottom := Max(bounds.Bottom, rect.Bottom)
+    }
+    return bounds
+}
+
+RedrawMainCommandButtonLayout(oldBounds, newBounds) {
+    if !oldBounds && !newBounds
+        return
+    bounds := oldBounds ? oldBounds : newBounds
+    if oldBounds && newBounds {
+        bounds.Left := Min(bounds.Left, newBounds.Left)
+        bounds.Top := Min(bounds.Top, newBounds.Top)
+        bounds.Right := Max(bounds.Right, newBounds.Right)
+        bounds.Bottom := Max(bounds.Bottom, newBounds.Bottom)
+    }
+    ; 扩大两个物理像素，完整擦除圆角抗锯齿边缘，再只重绘命令栏受影响区域。
+    redrawRect := Buffer(16, 0)
+    NumPut("Int", Max(0, bounds.Left - 2), redrawRect, 0)
+    NumPut("Int", Max(0, bounds.Top - 2), redrawRect, 4)
+    NumPut("Int", bounds.Right + 2, redrawRect, 8)
+    NumPut("Int", bounds.Bottom + 2, redrawRect, 12)
+    DllCall("user32\RedrawWindow", "Ptr", Main.gui.Hwnd, "Ptr", redrawRect,
+        "Ptr", 0, "UInt", Win32.RDW_LAYOUT_REFRESH, "Int")
+}
+
+PositionMainCommandButtons(clientWidth) {
+    oldBounds := GetMainCommandButtonBounds()
+    positions := GetMainCommandButtonPositions(clientWidth)
+    Main.btnSet.Move(positions.Settings, 15,
+        Main.settingsButtonWidth, 30)
+    Main.btnSupport.Move(positions.Support, 15,
+        Main.supportButtonWidth, 30)
+    Main.btnDonate.Move(positions.Donate, 15,
+        Main.donateButtonWidth, 30)
+    RedrawMainCommandButtonLayout(oldBounds, GetMainCommandButtonBounds())
+}
+
+; 主界面使用可多选、可拖动排序且支持标签编辑的 ListView 展示守护项。
+InitializeApplicationWindow(Main.gui)
+
+; 命令栏保持固定按钮高度；宽度只按文案需要分配，剩余空间留给窗口拖动和缩放。
+Main.btnAdd  := Main.gui.Add("Text", "x10 y15 w80 h30 Center 0x200 Background"
+    UiThemeService.Color("Add") " c" UiThemeService.Color("ButtonText"),
+    Tr("➕ 添加"))
 
 
 
-Main.btnDel  := Main.gui.Add("Text", "x+10 y15 w80 h30 Center 0x200 Background4C4A4A cB8BAB9", "🗑️ 删除")
-Main.btnPause:= Main.gui.Add("Text", "x+10 y15 w80 h30 Center 0x200 Background4C4B49 cB8BAB9", "⏸️ 暂停")
+Main.btnPause:= Main.gui.Add("Text", "x+10 y15 w80 h30 Center 0x200 Background"
+    UiThemeService.Color("PauseDisabled") " c"
+        UiThemeService.Color("DisabledButtonText"),
+    Tr("⏸️ 暂停"))
+Main.btnDel  := Main.gui.Add("Text", "x+10 y15 w80 h30 Center 0x200 Background"
+    UiThemeService.Color("DeleteDisabled") " c"
+        UiThemeService.Color("DisabledButtonText"),
+    Tr("🗑️ 删除"))
 
-    btnSetX := App.savedWidth > 730 ? App.savedWidth - 240 : 730 - 240
-    btnHelpX := App.savedWidth > 730 ? App.savedWidth - 160 : 730 - 160
-    btnLogX := App.savedWidth > 730 ? App.savedWidth - 80 : 730 - 80
-
-Main.btnSet  := Main.gui.Add("Text", "x" btnSetX " y15 w70 h30 Center 0x200 Background333333 cWhite", "⚙️ 设置")
-Main.btnHelp := Main.gui.Add("Text", "x" btnHelpX " y15 w70 h30 Center 0x200 Background333333 cWhite", "📖 帮助")
-Main.btnLog  := Main.gui.Add("Text", "x" btnLogX " y15 w70 h30 Center 0x200 Background333333 cWhite", "📋 日志")
-RegisterHoverButton(Main.btnAdd, "3F6B5B")
-RegisterHoverButton(Main.btnDel, "4C4A4A", "4C4A4A", "", "B8BAB9")
-RegisterHoverButton(Main.btnPause, "4C4B49", "4C4B49", "", "B8BAB9")
-RegisterHoverButton(Main.btnSet, "333333")
-RegisterHoverButton(Main.btnHelp, "333333")
-RegisterHoverButton(Main.btnLog, "333333")
+ConfigureMainCommandButtonMetrics()
+buttonPositions := GetMainCommandButtonPositions(App.savedWidth)
+Main.btnSet  := Main.gui.Add("Text", "x" buttonPositions.Settings " y15 w" Main.settingsButtonWidth " h30 Center 0x200 Background" UiThemeService.Color("Toolbar") " c" UiThemeService.Color("ToolbarText"), Tr("设置"))
+Main.btnSupport := Main.gui.Add("Text", "x" buttonPositions.Support " y15 w" Main.supportButtonWidth " h30 Center 0x200 Background" UiThemeService.Color("Toolbar") " c" UiThemeService.Color("ToolbarText"), Tr("帮助信息"))
+Main.btnDonate := Main.gui.Add("Text", "x" buttonPositions.Donate " y15 w" Main.donateButtonWidth " h30 Center 0x200 Background" UiThemeService.Color("Toolbar") " c" UiThemeService.Color("ToolbarText"), Tr("捐赠"))
+RegisterHoverButton(Main.btnAdd, UiThemeService.Color("Add"))
+RegisterHoverButton(Main.btnPause, UiThemeService.Color("PauseDisabled"),
+    UiThemeService.Color("PauseDisabled"), "",
+    UiThemeService.Color("DisabledButtonText"))
+RegisterHoverButton(Main.btnDel, UiThemeService.Color("DeleteDisabled"),
+    UiThemeService.Color("DeleteDisabled"), "",
+    UiThemeService.Color("DisabledButtonText"))
+RegisterHoverButton(Main.btnSet, UiThemeService.Color("Toolbar"))
+RegisterHoverButton(Main.btnSupport, UiThemeService.Color("Toolbar"))
+RegisterHoverButton(Main.btnDonate, UiThemeService.Color("Toolbar"))
+SetButtonLucideIcon(Main.btnSet, "settings.svg", 15, 6)
+SetButtonLucideIcon(Main.btnSupport, "circle-question-mark.svg", 15, 6)
+SetButtonLucideIcon(Main.btnDonate, "heart.svg", 15, 6)
 ; 主列表统一使用 28px 逻辑尺寸，并按窗口 DPI 缩放。
 Main.appIcons := CreateMainImageList(Main.statusIconIndices)
 
-Main.gui.SetFont("s12 cWhite", "Microsoft YaHei") ; 将ListView专用字体字号放大为12
+Main.gui.SetFont("s12 c" UiThemeService.Color("Text"),
+    LocalizationService.GetUiFontName()) ; 列表单独使用较大字号，便于连续扫描名称和状态。
 
-; 设置基础 ListView 参数，隐藏表头并添加路径辅助列 (移除 -Multi 允许支持 Ctrl/Shift 多选)
-    Main.lv := Main.gui.Add("ListView", "x10 y+15 w" (App.savedWidth-20) " h" (App.savedHeight-85) " Background252526 cWhite Report +LV0x10002 -E0x200 +ReadOnly -HScroll -Hdr", ["应用程序", "状态", "完整路径"])
-Main.lv.SetImageList(Main.appIcons, 1) ; 【修复】必须强制指定参数 1 (小图标槽位)，否则 32x32 列表会被底层自动错误分配给大图标视图，导致列表(Report)里隐形！
+; 内部列保持名称、状态、路径、序号和状态语义排序键，显示顺序另设为
+; 序号、名称、状态。两个隐藏列分别承担稳定身份和本地化无关的状态排序。
+Main.lv := Main.gui.Add("ListView", "x10 y88 w" (App.savedWidth - 20)
+    " h" (App.savedHeight - 113) " Background"
+    UiThemeService.Color("Surface") " c" UiThemeService.Color("Text")
+    " Report +LV0x10002 -E0x200 +ReadOnly -HScroll -Hdr",
+    [Tr("应用程序"), Tr("状态"), Tr("完整路径"), Tr("序号"), ""])
+; 报表视图从小图标槽读取图像；显式传入槽位 1，避免系统附着到不会显示的大图标槽。
+Main.lv.SetImageList(Main.appIcons, 1)
 Main.lv.IL := Main.appIcons
 
-Main.gui.SetFont("s10 cWhite", "Microsoft YaHei") ; 将Gui上下文切回10号字，防止影响后续弹窗
+Main.gui.SetFont("s10 c" UiThemeService.Color("Text"),
+    LocalizationService.GetUiFontName()) ; 恢复主窗口默认字号，避免后续控件继承列表字体。
 
 Main.lv.ModifyCol(1, App.savedColumn1)
-Main.lv.ModifyCol(2, App.savedColumn2)
+statusColumnWidth := LocalizationService.UsesCompactLayout()
+    ? 180
+    : Min(Max(App.savedColumn2, 200), 220)
+Main.lv.ModifyCol(2, statusColumnWidth)
 Main.lv.ModifyCol(3, 0) ; 隐藏路径辅助列
+Main.lv.ModifyCol(4, "Center 48")
+Main.lv.ModifyCol(5, 0) ; 隐藏状态语义排序键
+Main.listProjection.ApplyColumnOrder(Main.lv)
+Main.listSelectionPresenter := ListViewSelectionPresenter(Main.lv)
+Main.listHeader := ListViewPseudoHeader(Main.gui, Main.lv, [
+    {Column: 4, Label: Tr("序号"), Align: "Center", SortOptions: "Integer",
+        SkipAscending: true},
+    {Column: 1, Label: Tr("应用程序"), SortOptions: "Logical"},
+    {Column: 5, Label: Tr("状态"), SortOptions: "Logical"}
+], {
+    BackgroundColor: UiThemeService.Color("Toolbar"),
+    TextColor: UiThemeService.Color("MutedText"),
+    FontName: LocalizationService.GetLanguageSystemUiFontName(),
+    CursorRegistrar: RegisterHandCursorControl,
+    RestoreColumn: 4,
+    RestoreSortOptions: "Integer Center",
+    OnBeforeSort: PrepareMainListTemporarySort,
+    OnSortChanged: OnMainListTemporarySortChanged
+})
+LayoutMainListHeader(App.savedWidth)
 
 SetDarkListView(Main.lv.Hwnd)
 
-Main.statsText := Main.gui.Add("Text", "x10 y+5 w" (App.savedWidth-20) " h20 c888888 BackgroundTrans", "载入中...")
+Main.statsText := Main.gui.Add("Text", "x10 y" (App.savedHeight - 20)
+    " w" (App.savedWidth - 20)
+    " h20 c" UiThemeService.Color("MutedText") " Background"
+    UiThemeService.Color("Window") " +0xD", Tr("载入中..."))
+Main.statsText.SetFont("s10 bold",
+    LocalizationService.GetLanguageSystemUiFontName())
+Main.statsPresenter := SvgStatusBarPresenter(Main.statsText)
 
 RegisterButtonClick(Main.btnAdd, AddItem)
+RegisterButtonClick(Main.btnPause, ToggleItemPause)
 RegisterButtonClick(Main.btnDel, DelItem)
-    RegisterButtonClick(Main.btnPause, ToggleItemPause)
     RegisterButtonClick(Main.btnSet, ShowSettings)
-    RegisterButtonClick(Main.btnLog, ShowLog)
-    RegisterButtonClick(Main.btnHelp, ShowHelp)
+    RegisterButtonClick(Main.btnSupport, ShowSupportInfo)
+    RegisterButtonClick(Main.btnDonate, ShowDonation)
 
-; 动态监控 Main.lv 的选中状态以刷新暂停按钮可用性及文本
+; 选择变化只刷新命令状态，不重新投影列表或触发守护项初始化。
 Main.lv.OnEvent("ItemSelect", OnLVSelectChange)
 Main.lv.OnEvent("ItemFocus", OnLVSelectChange)
 
 OnLVSelectChange(*) {
+    RefreshMainCommandState()
+}
+
+RefreshMainCommandState(forceRefresh := false) {
     static lastState := ""
+    themeStatePrefix := UiThemeService.GetActualTheme() "_"
 
     row := 0
     selCount := 0
@@ -310,9 +487,9 @@ OnLVSelectChange(*) {
         if (row == 0)
             break
 
-        selCount++
         chkPath := Main.lv.GetText(row, 3)
         if App.appStates.Has(chkPath) {
+            selCount++
             currentState := App.appStates[chkPath].Enabled
             if (firstState == -1) {
                 firstState := currentState
@@ -323,26 +500,28 @@ OnLVSelectChange(*) {
     }
 
     if (selCount > 0) {
-        newState := "active_" . (allSameState && firstState != -1 ? (firstState ? "pause" : "resume") : "reverse")
-        if (lastState == newState)
+        newState := themeStatePrefix "active_"
+            . (allSameState && firstState != -1
+                ? (firstState ? "pause" : "resume") : "reverse")
+        if (!forceRefresh && lastState == newState)
             return
         lastState := newState
 
-        SetButtonTextColor(Main.btnDel, "FFFFFF")
-        SetButtonTextColor(Main.btnPause, "FFFFFF")
-        SetHoverButtonColors(Main.btnDel, "6B4B4B")
-        SetHoverButtonColors(Main.btnPause, "6B6244")
-        SetButtonBackground(Main.btnDel, "6B4B4B")
-        SetButtonBackground(Main.btnPause, "6B6244")
-
+        SetButtonTextColor(Main.btnDel, UiThemeService.Color("ButtonText"))
+        SetButtonTextColor(Main.btnPause, UiThemeService.Color("ButtonText"))
+        SetHoverButtonColors(Main.btnDel, UiThemeService.Color("Delete"))
+        SetHoverButtonColors(Main.btnPause, UiThemeService.Color("Pause"))
+        SetButtonBackground(Main.btnDel, UiThemeService.Color("Delete"))
+        SetButtonBackground(Main.btnPause, UiThemeService.Color("Pause"))
         if (allSameState && firstState != -1) {
-            if (firstState)
-                Main.btnPause.Text := "⏸️ 暂停"
-            else
-                Main.btnPause.Text := "▶️ 恢复"
+            if (firstState) {
+                Main.btnPause.Text := Tr("⏸️ 暂停")
+            } else {
+                Main.btnPause.Text := Tr("▶️ 恢复")
+            }
         } else {
             ; 选中的项目里既有运行中的，也有暂停的，统一显示「反转状态」
-            Main.btnPause.Text := "🔄 反转状态"
+            Main.btnPause.Text := Tr("🔄 反转状态")
         }
 
         Main.btnDel.Redraw()
@@ -350,23 +529,28 @@ OnLVSelectChange(*) {
         return
     }
 
-    if (lastState == "inactive")
+    newState := themeStatePrefix "inactive"
+    if (!forceRefresh && lastState == newState)
         return
-    lastState := "inactive"
+    lastState := newState
 
-    SetButtonTextColor(Main.btnDel, "B8BAB9")
-    SetButtonTextColor(Main.btnPause, "B8BAB9")
-    SetHoverButtonColors(Main.btnDel, "554B4B", "554B4B")
-    SetHoverButtonColors(Main.btnPause, "555148", "555148")
-    SetButtonBackground(Main.btnDel, "554B4B")
-    SetButtonBackground(Main.btnPause, "555148")
-    Main.btnPause.Text := "⏸️ 暂停"
+    SetButtonTextColor(Main.btnDel,
+        UiThemeService.Color("DisabledButtonText"))
+    SetButtonTextColor(Main.btnPause,
+        UiThemeService.Color("DisabledButtonText"))
+    SetHoverButtonColors(Main.btnDel, UiThemeService.Color("DeleteDisabled"),
+        UiThemeService.Color("DeleteDisabled"))
+    SetHoverButtonColors(Main.btnPause, UiThemeService.Color("PauseDisabled"),
+        UiThemeService.Color("PauseDisabled"))
+    SetButtonBackground(Main.btnDel, UiThemeService.Color("DeleteDisabled"))
+    SetButtonBackground(Main.btnPause, UiThemeService.Color("PauseDisabled"))
+    Main.btnPause.Text := Tr("⏸️ 暂停")
     Main.btnDel.Redraw()
     Main.btnPause.Redraw()
 }
 
 /*  * ========================================================================
- * ListView 拖拽排序逻辑 (Drag-and-Drop Reorder)
+ * ListView 拖拽排序逻辑
  * ========================================================================
  * 监听 LVN_BEGINDRAG (-109) 事件处理鼠标界面的拖拽调整顺序。
  */
@@ -385,7 +569,7 @@ LV_ItemDrag(ctrl, lParam) {
         hitInfo := Buffer(24, 0)
         NumPut("Int", NumGet(pt, 0, "Int"), hitInfo, 0)
         NumPut("Int", NumGet(pt, 4, "Int"), hitInfo, 4)
-        targetRow := SendMessage(0x1012, 0, hitInfo.Ptr, ctrl.Hwnd) ; LVM_HITTEST
+        targetRow := SendMessage(0x1012, 0, hitInfo.Ptr, ctrl.Hwnd) ; LVM_HITTEST：按客户区坐标定位列表行。
 
         insertMark := Buffer(16, 0)
         NumPut("UInt", 16, insertMark, 0)
@@ -395,7 +579,7 @@ LV_ItemDrag(ctrl, lParam) {
         } else {
             NumPut("Int", -1, insertMark, 8)
         }
-        SendMessage(0x10A6, 0, insertMark.Ptr, ctrl.Hwnd) ; LVM_SETINSERTMARK
+        SendMessage(0x10A6, 0, insertMark.Ptr, ctrl.Hwnd) ; LVM_SETINSERTMARK：更新拖拽插入标记。
 
         Sleep 20
     }
@@ -421,81 +605,272 @@ LV_ItemDrag(ctrl, lParam) {
     if (rawTargetRow < 0)
         targetRow := NumGet(pt, 4, "Int") < 0 ? 1 : ctrl.GetCount() + 1
 
-    ; 枚举并保存当前所有选中项的数据，以支持多选项目的整体位置移动
-    selectedData := []
+    ; 只捕获稳定路径和目标锚点。真正的顺序、列表和配置更新由共享工作门
+    ; 串行提交，避免拖拽与暂停、删除、监控回调同时改写运行态。
+    selectedPaths := []
+    selectedRows := Map()
     row := 0
     Loop {
         row := ctrl.GetNext(row)
         if (row == 0)
             break
-        selectedData.Push({row: row, name: ctrl.GetText(row, 1), status: ctrl.GetText(row, 2), path: ctrl.GetText(row, 3)})
+        selectedPath := ctrl.GetText(row, 3)
+        ; 列表投影可能因异步刷新短暂滞后于运行态；遇到失效行时放弃重排，
+        ; 避免把不完整的顺序写回配置。
+        if !App.appStates.Has(selectedPath)
+            return
+        selectedRows[row] := true
+        selectedPaths.Push(selectedPath)
     }
 
-    if (selectedData.Length == 0)
+    if (selectedPaths.Length == 0)
         return
 
     ; 拖回选中项自身时应保持原顺序；否则移除后再插入会把项目意外移到列表顶部。
-    for data in selectedData {
-        if (data.row == targetRow)
-            return
+    if selectedRows.Has(targetRow)
+        return
+
+    appendToEnd := targetRow > ctrl.GetCount()
+    anchorCandidates := []
+    if !appendToEnd {
+        Loop ctrl.GetCount() - targetRow + 1 {
+            candidateRow := targetRow + A_Index - 1
+            if !selectedRows.Has(candidateRow)
+                anchorCandidates.Push(ctrl.GetText(candidateRow, 3))
+        }
     }
-
-    App.editSessionId++
-    undoState := CaptureAppConfigState()
-
-    ; 优先移除被选中的需要移动的原有行（使用逆序删除以规避递进造成的行号偏移）
-    Loop selectedData.Length {
-        idx := selectedData.Length - A_Index + 1
-        ctrl.Delete(selectedData[idx].row)
-    }
-
-    ; 计算元素在旧行位移除后，新目标在当前相对状态中对应的真实序列索引
-    shiftedTarget := targetRow
-    Loop selectedData.Length {
-        if (selectedData[A_Index].row < targetRow)
-            shiftedTarget--
-    }
-
-    if (shiftedTarget > ctrl.GetCount() + 1)
-        shiftedTarget := ctrl.GetCount() + 1
-
-    ; 将保存的原有行项目插入到最终序列目标点，并落盘存储更新后的状态
-    for data in selectedData {
-        stateObj := App.appStates.Has(data.path) ? App.appStates[data.path] : ""
-        iconIdx := GetMainListIconIndex(data.path, stateObj, ctrl.IL)
-        insertedRow := ctrl.Insert(shiftedTarget, "Icon" iconIdx " Select",
-            data.name, data.status, data.path)
-        persistedStatus := App.appStates.Has(data.path)
-            ? App.appStates[data.path].State
-            : data.status
-        SetMainListStatus(insertedRow, persistedStatus)
-        shiftedTarget++
-    }
-
-    Main.listProjection.Rebuild(ctrl)
-
-    if !AppConfigStateOrderMatchesCurrent(undoState)
-        CommitUndoState(undoState)
-    SyncAppOrderFromListView()
-    SaveAppsToIni()
-    OnLVSelectChange()
+    QueueGuardMutation(ApplyMainListReorder.Bind(selectedPaths,
+        anchorCandidates, appendToEnd), "主列表拖拽排序")
 }
 
-; 绑定事件：双击编辑
+; 双击名称进入原生标签编辑；其它列仍由完整路径身份保持只读。
 Main.lv.OnEvent("DoubleClick", OnDoubleClick)
 
-; 右键菜单相关
-Main.contextMenu := Menu()
-Main.contextMenu.Add("📂 打开所在位置", OpenFileLocation)
-Main.contextMenu.Add("🔄 重新启动", RestartSelectedApp)
-Main.contextMenu.Add("✒️ 编辑完整路径（F2）", (*) => TriggerEdit(Main.lv, Main.contextTargetRow))
-Main.contextMenu.Add("🎨 自定义名称和图标…", OpenDisplaySettings)
-Main.contextMenu.Add("🛡️ 以管理员身份运行", ToggleRunAsAdmin)
-Main.contextMenu.Add("⚙️ 高级运行环境设置", OpenEnvSettings)
-Main.contextMenu.Add("🔄 软件升级保护…", OpenMaintenanceSettings)
-Main.contextMenu.Add()
-Main.contextMenu.Add("📄 查看运行日志", OpenProcessLog)
+; 将开关状态放入菜单最右侧的快捷键栏；不同长度的正文不会再让勾号左右漂移。
+FormatContextMenuToggleLabel(label, checked) {
+    return checked ? label "`t✓" : label
+}
+
+SuppressNativeMenuCheckGutter(menuObj) {
+    structureSize := A_PtrSize == 8 ? 40 : 28
+    menuInfo := Buffer(structureSize, 0)
+    NumPut("UInt", structureSize, menuInfo, 0)
+    NumPut("UInt", Win32.MIM_STYLE, menuInfo, 4)
+    if !DllCall("user32\GetMenuInfo", "Ptr", menuObj.Handle,
+            "Ptr", menuInfo, "Int")
+        return false
+    currentStyle := NumGet(menuInfo, 8, "UInt")
+    if currentStyle & Win32.MNS_NOCHECK
+        return true
+    NumPut("UInt", currentStyle | Win32.MNS_NOCHECK, menuInfo, 8)
+    return DllCall("user32\SetMenuInfo", "Ptr", menuObj.Handle,
+        "Ptr", menuInfo, "Int") != 0
+}
+
+; 右键菜单在打开前根据当前行和展示配置动态刷新；语言切换仍复用同一原生句柄，
+; 避免反复销毁带主题样式的菜单时累积 GDI 资源。
+ConfigureMainContextMenu(isAdmin := false, maintenanceEnabled := false,
+    maintenanceSupported := true, batchLogSupported := false) {
+    if Main.contextMenu is Menu {
+        contextMenu := Main.contextMenu
+        ContextMenuPresenter.Detach(contextMenu.Handle)
+        contextMenu.Delete()
+    } else
+        contextMenu := Menu()
+    contextMenu.Add(Tr("📂 打开所在位置"), OpenFileLocation)
+    contextMenu.Add(Tr("🔄 重新启动"), RestartSelectedApp)
+    contextMenu.Add(Tr("✒️ 编辑完整路径（F2）"),
+        (*) => TriggerEdit(Main.lv, Main.contextTargetRow))
+    contextMenu.Add(Tr("🎨 自定义名称和图标"), OpenDisplaySettings)
+    adminLabel := FormatContextMenuToggleLabel(
+        Tr("🛡️ 以管理员身份运行"), isAdmin)
+    contextMenu.Add(adminLabel, ToggleRunAsAdmin)
+    contextMenu.Add(Tr("⚙️ 进程识别与启动设置"), OpenEnvSettings)
+    maintenanceLabel := FormatContextMenuToggleLabel(
+        Tr("🔄 软件升级保护"), maintenanceEnabled)
+    contextMenu.Add(maintenanceLabel, OpenMaintenanceSettings)
+    if !maintenanceSupported
+        contextMenu.Disable(maintenanceLabel)
+    if batchLogSupported {
+        contextMenu.Add()
+        contextMenu.Add(Tr("📄 查看批处理输出日志"), OpenProcessLog)
+    }
+    ; 所有开关状态都显示在右侧，不再为原生左侧勾选栏预留空白。
+    SuppressNativeMenuCheckGutter(contextMenu)
+    ContextMenuPresenter.Attach(contextMenu, Main.gui.Hwnd)
+    if !(Main.contextMenu is Menu)
+        Main.contextMenu := contextMenu
+    return contextMenu
+}
+
+ConfigureMainContextMenu()
 Main.lv.OnEvent("ContextMenu", ShowContextMenu)
+
+CaptureMainStateTexts() {
+    stateTexts := Map()
+    stateTexts.CaseSense := "Off"
+    for path, stateObj in App.appStates
+        stateTexts[path] := stateObj.State
+    return stateTexts
+}
+
+RestoreMainStateTexts(stateTexts) {
+    for path, stateText in stateTexts {
+        if App.appStates.Has(path)
+            App.appStates[path].State := stateText
+    }
+}
+
+TranslateMainStateTexts(fromLanguage, toLanguage) {
+    for _, stateObj in App.appStates {
+        stateObj.State := LocalizationService
+            .TranslateRenderedTextBetweenLanguages(stateObj.State,
+                fromLanguage, toLanguage)
+    }
+}
+
+RefreshMainWindowDisplay() {
+    fontName := LocalizationService.GetUiFontName()
+    systemFontName := LocalizationService.GetLanguageSystemUiFontName()
+    Main.gui.Title := Tr("进程守护小助手")
+    Main.gui.SetFont("s10 c" UiThemeService.Color("Text"), fontName)
+
+    for button in [Main.btnAdd, Main.btnDel, Main.btnPause,
+            Main.btnSet, Main.btnSupport, Main.btnDonate]
+        button.SetFont("s10 bold", systemFontName)
+    Main.lv.SetFont("s12 c" UiThemeService.Color("Text"), fontName)
+    if Main.HasOwnProp("listHeader") && IsObject(Main.listHeader)
+        Main.listHeader.SetLabels([Tr("序号"), Tr("应用程序"), Tr("状态")])
+    Main.statsText.SetFont("s10 bold c"
+        UiThemeService.Color("MutedText"), systemFontName)
+
+    Main.btnAdd.Text := Tr("➕ 添加")
+    Main.btnDel.Text := Tr("🗑️ 删除")
+    Main.btnSet.Text := Tr("设置")
+    Main.btnSupport.Text := Tr("帮助信息")
+    Main.btnDonate.Text := Tr("捐赠")
+
+    ConfigureMainCommandButtonMetrics()
+    Main.gui.GetClientPos(,, &clientWidth)
+    PositionMainCommandButtons(clientWidth)
+
+    RefreshMainWindowTheme()
+
+    ; 用户可能已在当前会话拖动列宽。语言或字体切换只更新显示内容，
+    ; 不把尚未隐藏窗口落盘的列宽重置为上一次保存值。
+
+    Main.lv.Opt("-Redraw")
+    try {
+        Loop Main.lv.GetCount() {
+            path := NormalizeTargetPath(Main.lv.GetText(A_Index, 3))
+            if App.appStates.Has(path)
+                SetMainListStatus(A_Index, App.appStates[path].State)
+        }
+    } finally Main.lv.Opt("+Redraw")
+
+    UpdateStatsUI()
+    ConfigureMainContextMenu()
+    ConfigureTrayMenu()
+    for button in [Main.btnAdd, Main.btnDel, Main.btnPause,
+            Main.btnSet, Main.btnSupport, Main.btnDonate]
+        button.Redraw()
+}
+
+RefreshMainWindowTheme() {
+    UiThemeService.ApplyProcessPreference()
+    ApplyNativeWindowTheme(Main.gui.Hwnd)
+    Main.gui.BackColor := UiThemeService.Color("Window")
+
+    SetHoverButtonColors(Main.btnAdd, UiThemeService.Color("Add"))
+    SetButtonBackground(Main.btnAdd, UiThemeService.Color("Add"))
+    SetButtonTextColor(Main.btnAdd, UiThemeService.Color("ButtonText"))
+    for button in [Main.btnSet, Main.btnSupport, Main.btnDonate] {
+        SetHoverButtonColors(button, UiThemeService.Color("Toolbar"))
+        SetButtonBackground(button, UiThemeService.Color("Toolbar"))
+        SetButtonTextColor(button, UiThemeService.Color("ToolbarText"))
+    }
+    ; 暂停和删除取决于列表选择状态，不能像固定工具按钮那样直接套一种颜色。
+    ; 把同步放在主题刷新边界内，确保手动切换、跟随系统切换和失败回滚都覆盖。
+    RefreshMainCommandState(true)
+
+    Main.lv.Opt("Background" UiThemeService.Color("Surface")
+        " c" UiThemeService.Color("Text"))
+    Main.lv.SetFont("c" UiThemeService.Color("Text"))
+    SetDarkListView(Main.lv.Hwnd)
+    if Main.HasOwnProp("listHeader") && IsObject(Main.listHeader) {
+        Main.listHeader.ApplyAppearance(UiThemeService.Color("Toolbar"),
+            UiThemeService.Color("MutedText"),
+            LocalizationService.GetLanguageSystemUiFontName())
+    }
+    Main.statsText.Opt("Background" UiThemeService.Color("Window"))
+    Main.statsText.SetFont("c" UiThemeService.Color("MutedText"))
+    try DllCall("user32\RedrawWindow", "Ptr", Main.gui.Hwnd, "Ptr", 0,
+        "Ptr", 0, "UInt", 0x485, "Int")
+}
+
+ApplyDisplaySettingsHot(requestedLanguage, requestedFont,
+    requestedTheme := "") {
+    global GuiModules
+
+    oldRequestedLanguage := LocalizationService.GetRequestedLanguage()
+    oldActualLanguage := LocalizationService.GetLanguage()
+    oldRequestedFont := LocalizationService.GetRequestedUiFont()
+    oldRequestedTheme := UiThemeService.GetRequestedTheme()
+    oldStateTexts := CaptureMainStateTexts()
+    oldModules := GuiModules
+    modulesReplaced := false
+    previousCritical := A_IsCritical
+    Critical("On")
+    try {
+        LocalizationService.Configure(requestedLanguage)
+        LocalizationService.ConfigureUiFont(requestedFont)
+        UiThemeService.Configure(requestedTheme == ""
+            ? oldRequestedTheme : requestedTheme)
+        newActualLanguage := LocalizationService.GetLanguage()
+        App.uiLanguage := LocalizationService.GetRequestedLanguage()
+        App.uiFont := LocalizationService.GetRequestedUiFont()
+        App.uiTheme := UiThemeService.GetRequestedTheme()
+        App.applicationUpdateService.UiLanguage := newActualLanguage
+
+        TranslateMainStateTexts(oldActualLanguage, newActualLanguage)
+        RefreshMainWindowDisplay()
+
+        ; 下级窗口按当前语言在每次打开时创建。关闭旧注册表并立即换成新实例，
+        ; 不触碰应用状态、守护运行时、调度器或主窗口的任何长期对象。
+        oldModules.Shutdown()
+        GuiModules := GuiModuleRegistry(Main.gui)
+        modulesReplaced := true
+
+        ; 设置值已由调用方原子保存；空写入只让仓储用新语言替换就地注释。
+        try App.configRepository.WriteValues("Settings", [])
+        catch as commentError
+            LogMsg(Tr("更新配置注释语言失败：{1}",
+                TrDiagnostic(commentError.Message)))
+        return true
+    } catch as displayError {
+        rollbackError := ""
+        try {
+            LocalizationService.Configure(oldRequestedLanguage)
+            LocalizationService.ConfigureUiFont(oldRequestedFont)
+            UiThemeService.Configure(oldRequestedTheme)
+            App.uiLanguage := oldRequestedLanguage
+            App.uiFont := oldRequestedFont
+            App.uiTheme := oldRequestedTheme
+            App.applicationUpdateService.UiLanguage := oldActualLanguage
+            RestoreMainStateTexts(oldStateTexts)
+            RefreshMainWindowDisplay()
+            if modulesReplaced
+                try GuiModules.Shutdown()
+            if oldModules.stopped || modulesReplaced
+                GuiModules := GuiModuleRegistry(Main.gui)
+        } catch as rollbackFailure {
+            rollbackError := rollbackFailure.Message
+        }
+        if rollbackError != ""
+            throw Error(displayError.Message " | " rollbackError)
+        throw displayError
+    } finally Critical(previousCritical ? previousCritical : "Off")
+}
 
 OpenEnvSettings(*) {
     if (Main.contextTargetRow == 0)
@@ -613,31 +988,35 @@ HashPath(path) {
 
 OpenProcessLog(*) {
     if (Main.contextTargetRow > 0) {
-        logPath := GetLogFilePath(Main.lv.GetText(Main.contextTargetRow, 3))
+        path := Main.lv.GetText(Main.contextTargetRow, 3)
+        if !App.appStates.Has(path)
+            return
+        stateObj := App.appStates[path]
+        try selectedTargetSpecs := App.targetSpecsService.Get(path, stateObj)
+        catch
+            return
+        if selectedTargetSpecs.Launch.Kind != TargetLaunchKind.Batch
+            return
+        logPath := GetLogFilePath(path)
         if FileExist(logPath)
             Run('notepad.exe "' logPath '"')
-        else
-            ShowDarkMsgBox("日志文件不存在: " logPath, "运行日志", "Info", Main.gui)
+        else if IsSet(GuiModules)
+            GuiModules.batchOutputLogNotice.Show(logPath)
     }
 }
 
 ToggleRunAsAdmin(*) {
-    rows := []
-    row := 0
-    Loop {
-        row := Main.lv.GetNext(row)
-        if (!row)
-            break
-        rows.Push(row)
-    }
-    if (rows.Length == 0 && Main.contextTargetRow > 0)
-        rows.Push(Main.contextTargetRow)
+    paths := CaptureSelectedWatchPaths(true)
+    if !paths.Length
+        return
+    QueueGuardMutation(ToggleRunAsAdminCore.Bind(paths))
+}
 
-    undoState := rows.Length > 0 ? CaptureAppConfigState() : ""
+ToggleRunAsAdminCore(paths) {
+    undoState := CaptureAppConfigState()
     changedAny := false
 
-    for row in rows {
-        path := Main.lv.GetText(row, 3)
+    for path in paths {
         if App.appStates.Has(path) {
             stateObj := App.appStates[path]
             priorPhase := stateObj.Phase
@@ -645,114 +1024,332 @@ ToggleRunAsAdmin(*) {
             stateObj.RunAsAdmin := !(stateObj.HasOwnProp("RunAsAdmin") ? stateObj.RunAsAdmin : 0)
             if (stateObj.Enabled
                 && !App.maintenanceCoordinator.IsBlocking(stateObj)) {
-                stateObj.Pending := false
-                stateObj.TargetStartTicks := 0
-                stateObj.VerifyAttempts := 0
+                stateObj.ResetGuardAttemptState()
                 if StateProcessIdentityIsValid(path, stateObj) {
                     UpdateRunningState(path, stateObj,
                         stateObj.Generation)
                 } else if !(stateObj.OneShot
                     && priorPhase == GuardPhase.Running) {
                     stateObj.TransitionTo(GuardPhase.Initializing)
-                    UpdateState(path, "初始化...", stateObj,
+                    UpdateState(path, Tr("初始化..."), stateObj,
                         stateObj.Generation)
                 }
             }
             displayName := GetMainDisplayName(path, stateObj)
-            Main.lv.Modify(row, "Col1", FormatMainListLabel(displayName, stateObj.RunAsAdmin))
+            row := FindRow(path)
+            if row > 0 {
+                Main.lv.Modify(row, "Col1", FormatMainListLabel(
+                    displayName, stateObj.RunAsAdmin))
+                SetMainListAdminOverlay(row, stateObj.RunAsAdmin)
+            }
             if StateProcessIdentityIsValid(path, stateObj)
                 UpdateRunningState(path, stateObj)
-            LogMsg((stateObj.RunAsAdmin ? "启用" : "关闭") . "了以管理员身份运行: " . displayName)
+            LogMsg(stateObj.RunAsAdmin
+                ? Tr("已启用以管理员身份运行：{1}", displayName)
+                : Tr("已关闭以管理员身份运行：{1}", displayName))
             changedAny := true
         }
     }
     if changedAny {
-        CommitUndoState(undoState)
+        CommitUndoState(undoState,
+            CreateAppHistoryAction("run-as-admin", paths))
         SaveAppsToIni()
     }
 }
 
 RestartSelectedApp(*) {
-    rows := []
-    row := 0
-    Loop {
-        row := Main.lv.GetNext(row)
-        if (!row)
-            break
-        rows.Push(row)
-    }
-    if (rows.Length == 0 && Main.contextTargetRow > 0)
-        rows.Push(Main.contextTargetRow)
+    paths := CaptureSelectedWatchPaths(true)
+    if !paths.Length
+        return
+    QueueGuardMutation(BeginManualRestartRequests.Bind(paths))
+}
 
-    for row in rows {
-        path := Main.lv.GetText(row, 3)
+BeginManualRestartRequests(paths) {
+    resumedAny := false
+    resumedPaths := []
+    blockedAny := false
+    undoState := ""
+    for path in paths {
         if !App.appStates.Has(path)
             continue
         stateObj := App.appStates[path]
         if App.maintenanceCoordinator.IsBlocking(stateObj) {
-            ShowDarkMsgBox("该软件正在升级保护中。请等待升级完成，或在“软件升级保护”中结束等待后再重新启动。", "暂时无法重新启动", "Info", Main.gui)
+            blockedAny := true
             continue
         }
-
-        ; 手动操作先作废旧回调；等待外部进程期间，删除、暂停或撤销仍可
-        ; 通过控制器实例和代际使本次操作失效。
-        stateObj.CancelScheduledTasks()
-        operationGeneration := stateObj.Generation
-        UpdateState(path, "⏳ 停止原进程...")
-        observation := ObserveTarget(path, "", 1000)
-        if !App.guardRuntime.IsSupervisorCurrent(path, stateObj,
-            operationGeneration)
+        if stateObj.ManualRestartRequested
             continue
-        if observation.IsUnknown() {
+        wasEnabled := !!stateObj.Enabled
+        if !wasEnabled {
+            if Type(undoState) != "Array"
+                undoState := CaptureAppConfigState()
             stateObj.Enabled := 1
-            stateObj.Pending := true
-            UpdateState(path, "⏳ 等待进程状态...")
-            App.guardRuntime.ScheduleRestart(path, 2000)
-            LogMsg("暂时无法查询进程状态，稍后重试手动重启: " path)
-            continue
-        }
-        if observation.IsRunning() {
-            pid := observation.PID
-            stopped := GracefulStop(pid)
-            if !App.guardRuntime.IsSupervisorCurrent(path, stateObj,
-                operationGeneration)
-                continue
-            if !stopped {
-                SetStateProcessIdentity(stateObj, pid)
-                stateObj.Pending := false
-                UpdateState(path, "❌ 无法停止原进程")
-                LogMsg("手动重启已取消，原进程未能停止: " path)
-                continue
+            try App.maintenanceCoordinator.EnsureWatcher(path, stateObj)
+            catch {
+                stateObj.Enabled := 0
+                try App.maintenanceCoordinator.CloseWatcher(stateObj)
+                stateObj.TransitionTo(GuardPhase.Paused)
+                throw
             }
         }
-
-        if !App.guardRuntime.IsSupervisorCurrent(path, stateObj,
-            operationGeneration)
-            || App.maintenanceCoordinator.IsBlocking(stateObj)
-            continue
-        stateObj.Enabled := 1
+        stateObj.CancelScheduledTasks()
+        stateObj.ResetGuardAttemptState()
+        operationGeneration := stateObj.Generation
+        stateObj.ManualRestartRequested := true
         stateObj.Pending := true
-        stateObj.TargetStartTicks := 0
-        stateObj.FailCount := 0
-        ClearStateProcessIdentity(stateObj)
-
-        App.guardRuntime.Restart(path)
-        LogMsg("手动触发了重新启动: " path)
+        ; 暂停项被“重新启动”隐式恢复后，不能继续显示已暂停，哪怕后续
+        ; 一次性计时器尚未获得执行机会。
+        UpdateState(path, Tr("⏳ 停止原进程..."), stateObj,
+            operationGeneration, !wasEnabled)
+        try {
+            SetTimer(PerformManualRestart.Bind(path, stateObj,
+                operationGeneration, 0), -1)
+            if !wasEnabled {
+                resumedAny := true
+                resumedPaths.Push(path)
+            }
+        }
+        catch {
+            stateObj.ManualRestartRequested := false
+            stateObj.Pending := false
+            if !wasEnabled {
+                stateObj.Enabled := 0
+                try App.maintenanceCoordinator.CleanupTarget(path,
+                    stateObj, false)
+                stateObj.TransitionTo(GuardPhase.Paused)
+                UpdateState(path, Tr("⏸️ 已暂停"), stateObj,
+                    stateObj.Generation)
+            } else {
+                UpdateState(path, Tr("❌ 无法停止原进程"), stateObj,
+                    stateObj.Generation)
+            }
+            LogMsg(Tr("手动重启已取消，原进程未能停止：{1}", path))
+        }
     }
 
-    if (rows.Length > 0) {
+    if resumedAny {
+        CommitUndoState(undoState,
+            CreateAppHistoryAction("toggle-pause", resumedPaths))
         SaveAppsToIni()
+    }
+    if blockedAny {
+        ShowDarkMsgBoxDeferred(Tr("该软件正在升级保护中。请等待升级完成，或在“软件升级保护”中结束等待后再重新启动。"),
+            Tr("暂时无法重新启动"), "Info", Main.gui)
+    }
+    if (paths.Length > 0) {
         OnLVSelectChange()
     }
 }
 
+PerformManualRestart(path, expectedSupervisor, expectedGeneration,
+    attempt) {
+    if !App.guardRuntime.IsSupervisorCurrent(path, expectedSupervisor,
+        expectedGeneration) {
+        if App.appStates.Has(path)
+            && App.appStates[path] == expectedSupervisor {
+            expectedSupervisor.ManualRestartRequested := false
+        }
+        return
+    }
+    if App.maintenanceCoordinator.IsBlocking(expectedSupervisor) {
+        expectedSupervisor.ManualRestartRequested := false
+        return
+    }
+    if !App.guardWorkGate.TryEnter() {
+        retryCallback := PerformManualRestart.Bind(path,
+            expectedSupervisor, expectedGeneration, attempt)
+        if !TryScheduleManualRestartCallback(retryCallback, path,
+            expectedSupervisor, expectedGeneration)
+            return
+        return
+    }
+
+    operationGeneration := expectedGeneration
+    gateHeld := true
+    try {
+        if !App.guardRuntime.IsSupervisorCurrent(path, expectedSupervisor,
+            expectedGeneration)
+            return
+        stateObj := expectedSupervisor
+        stateObj.CancelScheduledTasks()
+        operationGeneration := stateObj.Generation
+        stateObj.Pending := true
+        stateObj.TargetStartTicks := 0
+        UpdateState(path, Tr("⏳ 停止原进程..."), stateObj,
+            operationGeneration)
+        observation := ObserveTarget(path, "", 1000)
+        if !App.guardRuntime.IsSupervisorCurrent(path, stateObj,
+            operationGeneration)
+            return
+        if observation.IsUnknown() {
+            ScheduleManualRestartRetry(path, stateObj,
+                operationGeneration, attempt)
+            return
+        }
+        if observation.IsRunning() {
+            pid := observation.PID
+            creationIdentity := observation.CreationIdentity
+            if creationIdentity == ""
+                creationIdentity := App.processInspector
+                    .GetCreationIdentity(pid)
+            if creationIdentity == "" {
+                ScheduleManualRestartRetry(path, stateObj,
+                    operationGeneration, attempt)
+                return
+            }
+            ; 正常关闭和 Ctrl+C 等待可能持续数秒。目标身份和事务代际已经在
+            ; 门内冻结，耗时停止放到门外执行，避免阻塞其它守护项与配置操作。
+            App.guardWorkGate.Leave()
+            gateHeld := false
+            try stopResult := StopTargetProcess(pid, creationIdentity)
+            catch as stopError {
+                errorDetail := TrDiagnostic(stopError.Message)
+                LogMsg(Tr("无法停止进程 PID：{1}{2}", pid,
+                    Tr("（{1}）", errorDetail)))
+                stopResult := TargetStopResult(false,
+                    TargetStopStage.Failed, errorDetail)
+            }
+            completionCallback := CompleteManualRestartAfterStop.Bind(path,
+                stateObj, operationGeneration, pid, creationIdentity,
+                stopResult)
+            try SetTimer(completionCallback, -1)
+            catch
+                completionCallback.Call()
+            return
+        }
+
+        FinalizeManualRestart(path, stateObj, operationGeneration)
+    } finally {
+        if App.appStates.Has(path)
+            && App.appStates[path] == expectedSupervisor
+            && expectedSupervisor.ManualRestartRequested
+            && expectedSupervisor.Generation != operationGeneration {
+            expectedSupervisor.ManualRestartRequested := false
+        }
+        if gateHeld
+            App.guardWorkGate.Leave()
+    }
+}
+
+CompleteManualRestartAfterStop(path, expectedSupervisor,
+    expectedGeneration, pid, creationIdentity, stopResult) {
+    if !App.guardRuntime.IsSupervisorCurrent(path, expectedSupervisor,
+        expectedGeneration) {
+        if App.appStates.Has(path)
+            && App.appStates[path] == expectedSupervisor {
+            expectedSupervisor.ManualRestartRequested := false
+        }
+        return
+    }
+    if !App.guardWorkGate.TryEnter() {
+        retryCallback := CompleteManualRestartAfterStop.Bind(path,
+            expectedSupervisor, expectedGeneration, pid,
+            creationIdentity, stopResult)
+        if !TryScheduleManualRestartCallback(retryCallback, path,
+            expectedSupervisor, expectedGeneration)
+            return
+        return
+    }
+    try {
+        if !App.guardRuntime.IsSupervisorCurrent(path, expectedSupervisor,
+            expectedGeneration)
+            return
+        stateObj := expectedSupervisor
+        if App.maintenanceCoordinator.IsBlocking(stateObj) {
+            stateObj.ManualRestartRequested := false
+            return
+        }
+        if !stopResult.Stopped {
+            stateObj.ManualRestartRequested := false
+            stateObj.Pending := false
+            identityStatus := App.targetStopper.GetIdentityStatus(pid,
+                creationIdentity)
+            if identityStatus == 0
+                ClearStateProcessIdentity(stateObj)
+            else
+                SetStateProcessIdentity(stateObj, pid, creationIdentity)
+            UpdateState(path, Tr("❌ 无法停止原进程"), stateObj,
+                expectedGeneration)
+            LogMsg(Tr("手动重启已取消，原进程未能停止：{1}", path))
+            return
+        }
+        FinalizeManualRestart(path, stateObj, expectedGeneration)
+    } finally App.guardWorkGate.Leave()
+}
+
+FinalizeManualRestart(path, stateObj, expectedGeneration) {
+    if !App.guardRuntime.IsSupervisorCurrent(path, stateObj,
+        expectedGeneration) || !stateObj.Enabled
+        || App.maintenanceCoordinator.IsBlocking(stateObj) {
+        stateObj.ManualRestartRequested := false
+        if !stateObj.Enabled {
+            stateObj.Pending := false
+            stateObj.TargetStartTicks := 0
+        }
+        return false
+    }
+    stateObj.Pending := true
+    stateObj.TargetStartTicks := 0
+    stateObj.FailCount := 0
+    stateObj.ManualRestartRequested := false
+    ClearStateProcessIdentity(stateObj)
+    ; 调用方持有共享工作门，直接进入核心启动事务，避免重复获取工作门。
+    App.guardRuntime.RestartCore(path, stateObj)
+    LogMsg(Tr("手动触发了重新启动：{1}", path))
+    return true
+}
+
+ScheduleManualRestartRetry(path, stateObj, operationGeneration, attempt) {
+    if attempt >= 4 {
+        stateObj.ManualRestartRequested := false
+        stateObj.Pending := false
+        UpdateState(path, Tr("⏳ 等待进程状态..."), stateObj,
+            operationGeneration)
+        LogMsg(Tr("暂时无法查询进程状态，稍后重试手动重启：{1}", path))
+        return false
+    }
+    UpdateState(path, Tr("⏳ 等待进程状态..."), stateObj,
+        operationGeneration)
+    if attempt == 0
+        LogMsg(Tr("暂时无法查询进程状态，稍后重试手动重启：{1}", path))
+    retryCallback := PerformManualRestart.Bind(path, stateObj,
+        operationGeneration, attempt + 1)
+    return TryScheduleManualRestartCallback(retryCallback, path, stateObj,
+        operationGeneration, 2000)
+}
+
+TryScheduleManualRestartCallback(callback, path, stateObj,
+    expectedGeneration, delayMs := 100) {
+    try {
+        SetTimer(callback, -Max(1, delayMs))
+        return true
+    } catch as timerError {
+        if App.guardRuntime.IsSupervisorCurrent(path, stateObj,
+            expectedGeneration) {
+            stateObj.ManualRestartRequested := false
+            stateObj.Pending := App.maintenanceCoordinator.IsBlocking(
+                stateObj)
+            stateObj.TargetStartTicks := 0
+            if !stateObj.Pending {
+                stateObj.TransitionTo(GuardPhase.Initializing)
+                UpdateState(path, Tr("初始化..."), stateObj,
+                    expectedGeneration)
+            }
+        }
+        LogMsg(Tr("后台调度任务异常（{1}）：{2}", path,
+            TrDiagnostic(timerError.Message)))
+        return false
+    }
+}
+
 /*  * ========================================================================
- * 全局界面的按键拦截钩子 (Global Key Hook)
+ * 全局界面的按键拦截钩子
  * ========================================================================
  * 使用 OnMessage 监听 WM_KEYDOWN 消息实现快捷键，
- * 如撤销(Undo)、重做(Redo)和列表操作功能。
+ * 如撤销、重做和列表操作功能。
  */
 OnMessage(Win32.WM_KEYDOWN, Global_KeyDown)
+OnMessage(Win32.WM_MOVE, MainWindowMoved)
 OnMessage(Win32.WM_DPICHANGED, MainDpiChanged)
 OnMessage(Win32.WM_COPYDATA, ReceiveMaintenanceCopyData)
 OnMessage(Win32.WM_SYSCOMMAND, OnManagedWindowSystemCommand)
@@ -772,59 +1369,65 @@ Global_KeyDown(wParam, lParam, msg, hwnd) {
             return 0
         }
     }
-    isMainGui := (DllCall("user32\GetAncestor", "Ptr", hwnd, "UInt", 2) == Main.gui.Hwnd)
-    if (isMainGui) {
-        if (wParam == 90 && GetKeyState("Ctrl", "P")) { ; Ctrl+Z / Ctrl+Shift+Z
+    rootHwnd := DllCall("user32\GetAncestor", "Ptr", hwnd, "UInt", 2,
+        "Ptr")
+    rootClass := ""
+    try rootClass := WinGetClass("ahk_id " rootHwnd)
+    ; OnMessage 只接收本进程窗口的消息；根窗口为 AutoHotkeyGUI 即可确认
+    ; 来源属于小助手。这样所有下级窗口都共享应用历史，同时文本框仍保留
+    ; 自身的字符级撤销与重做。
+    if (rootClass == "AutoHotkeyGUI") {
+        if (wParam == 90 && GetKeyState("Ctrl", "P")) { ; Ctrl+Z 撤销，Ctrl+Shift+Z 重做。
             if GetKeyState("Shift", "P")
                 PerformRedo()
             else
                 PerformUndo()
-            return
+            return 0
         }
-        if (wParam == 89 && GetKeyState("Ctrl", "P")) { ; Ctrl+Y
+        if (wParam == 89 && GetKeyState("Ctrl", "P")) { ; Ctrl+Y 使用另一组常见按键执行重做。
             PerformRedo()
-            return
+            return 0
         }
     }
 
-    ; 如果在ListView编辑框内
+    ; 标签编辑框拥有自己的文本快捷键，主窗口不能截获其中的按键。
     if (wParam == 27) {
-        hEdit := SendMessage(0x1018, 0, 0, Main.lv.Hwnd) ; LVM_GETEDITCONTROL
+        hEdit := SendMessage(0x1018, 0, 0, Main.lv.Hwnd) ; LVM_GETEDITCONTROL：取得当前标签编辑框。
         if (hEdit && hEdit == hwnd) {
             SendMessage(0x0100, 27, 0, hEdit) ; 传给编辑框取消编辑
             return
         }
     }
 
-    ; 判断：若当前获取输入焦点的对象在 ListView 列表本身
+    ; 只有列表本身持有焦点时，才把按键解释为列表级选择、删除或关闭操作。
     if (hwnd == Main.lv.Hwnd) {
-        if (wParam == 113) { ; F2 热键深度编辑绝对路径
+        if (wParam == 113) { ; F2 编辑当前守护项的完整路径。
             row := Main.lv.GetNext(0, "Focused")
             if (row > 0)
                 TriggerEdit(Main.lv, row)
             return
         }
-        if (wParam == 65 && GetKeyState("Ctrl")) { ; Ctrl+A 秒全选响应
+        if (wParam == 65 && GetKeyState("Ctrl")) { ; Ctrl+A 选择列表中的全部项目。
             Main.lv.Modify(0, "Select")
             return
         }
-        if (wParam == 46) { ; Delete 直删选中目标
+        if (wParam == 46) { ; Delete 删除当前选中的守护项。
             if (Main.lv.GetNext(0) > 0)
                 DelItem()
             return
         }
-        if (wParam == 27) { ; ESC 交互回退降级策略
+        if (wParam == 27) { ; Esc 先清除选择，再在无选择时隐藏主窗口。
             if (Main.lv.GetNext(0) > 0) {
-                Main.lv.Modify(0, "-Select") ; 层级一：撤销选择抹去高背光
+                Main.lv.Modify(0, "-Select") ; 第一次按下只清除当前选择。
             } else {
-                OnMainGuiClose()        ; 层级二：若无可放弃选取的东西则视为归隐后台
+                OnMainGuiClose()        ; 已无选择时把主窗口隐藏到托盘。
             }
             return
         }
     }
 
-    ; 补充逻辑：若当前焦点游离在父级主 GUI 中的其它控件控件，点击 Esc 收起窗口面板
-    ; 参数 `2` (GA_ROOT) = 找到主 GUI 框架
+    ; 焦点位于主窗口其它控件时，Esc 同样隐藏主窗口；下级窗口会自行处理关闭。
+    ; 参数 2（GA_ROOT）用于找到主 GUI 框架。
     if (wParam == 27 && DllCall("user32\GetAncestor", "Ptr", hwnd, "UInt", 2) == Main.gui.Hwnd) {
         OnMainGuiClose()
     }
@@ -832,8 +1435,11 @@ Global_KeyDown(wParam, lParam, msg, hwnd) {
 
 ; 从 INI 读取监控项及对应的升级保护配置。
 LoadWatchlistFromConfig()
+; 控件从创建起采用不可用配色；列表载入后再按真实选择状态强制同步，
+; 避免首次启动没有 ItemSelect 事件时仍残留可用色。
+RefreshMainCommandState(true)
 if !App.maintenanceCoordinator.Initialize()
-    LogMsg("升级保护协调器未能初始化，核心守护不会启动。")
+    LogMsg(Tr("升级保护协调器未能初始化，核心守护不会启动。"))
 
 UpdateTaskButtonStatus()
 
@@ -841,129 +1447,6 @@ Main.gui.OnEvent("Size", GuiResized)
 Main.gui.OnEvent("Close", OnMainGuiClose)
 Main.gui.OnEvent("Escape", OnMainGuiClose)
 Main.gui.OnEvent("DropFiles", OnGuiDropFiles)
-
-ResolveShortcutForAdd(path, &shortcutArguments := "", &resolvedWorkDir := "") {
-    shortcutArguments := ""
-    resolvedWorkDir := ""
-    SplitPath(path, , , &ext)
-    if (StrLower(ext) == "lnk") {
-        descriptor := App.shortcutTargetResolver.Read(path)
-        if descriptor.Readable {
-            resolvedWorkDir := descriptor.WorkingDirectory
-            shortcutArguments := descriptor.Arguments
-        }
-    }
-    ; 快捷方式始终作为启动入口保存；真实进程身份由 ResolvedTarget 独立维护。
-    return path
-}
-
-MainDpiChanged(wParam, lParam, msg, hwnd) {
-    if (hwnd != Main.gui.Hwnd)
-        return
-    newDpi := wParam & 0xFFFF
-    iconResources := App.iconResources
-    if (!newDpi || newDpi == iconResources.MainDpi)
-        return
-    rebuildRequest := iconResources.CreateDpiRebuildRequest(newDpi,
-        RebuildMainImageList)
-    if rebuildRequest.PreviousTimer
-        SetTimer(rebuildRequest.PreviousTimer, 0)
-    SetTimer(rebuildRequest.Timer, -250)
-}
-
-RebuildMainImageList(rebuildGeneration, expectedDpi, *) {
-    iconResources := App.iconResources
-    if !iconResources.AcceptDpiRebuild(rebuildGeneration)
-        return
-    if !DllCall("user32\IsWindow", "Ptr", Main.gui.Hwnd, "Int")
-        return
-    currentDpi := DllCall("user32\GetDpiForWindow", "Ptr", Main.gui.Hwnd, "UInt")
-    if (currentDpi != expectedDpi)
-        return
-    oldImageList := Main.appIcons
-    previousMetrics := iconResources.GetMainIconMetrics()
-    newStatusIconIndices := Map()
-    newImageList := CreateMainImageList(newStatusIconIndices)
-    if !newImageList
-        return
-    if !iconResources.IsDpiRebuildCurrent(rebuildGeneration) {
-        ClearImageListIconCache(newImageList)
-        try IL_Destroy(newImageList)
-        iconResources.RestoreMainIconMetrics(previousMetrics)
-        return
-    }
-    redrawSuspended := false
-    newImageListAttached := false
-    try {
-        Main.lv.Opt("-Redraw")
-        redrawSuspended := true
-        Main.lv.SetImageList(newImageList, 1)
-        newImageListAttached := true
-        Main.appIcons := newImageList
-        Main.statusIconIndices := newStatusIconIndices
-        Main.lv.IL := newImageList
-        Loop Main.lv.GetCount() {
-            try {
-                path := Main.lv.GetText(A_Index, 3)
-                stateObj := App.appStates.Has(path)
-                    ? App.appStates[path] : ""
-                iconIndex := GetMainListIconIndex(path, stateObj,
-                    newImageList)
-                if iconIndex
-                    Main.lv.Modify(A_Index, "Icon" iconIndex)
-                statusText := App.appStates.Has(path)
-                    ? App.appStates[path].State
-                    : Main.lv.GetText(A_Index, 2)
-                SetMainListStatus(A_Index, statusText)
-            } catch as rowIconError {
-                LogMsg("DPI 变化后刷新图标失败: " rowIconError.Message)
-            }
-        }
-    } catch as imageListError {
-        LogMsg("DPI 变化后重建图标列表失败: " imageListError.Message)
-    } finally {
-        if redrawSuspended
-            try Main.lv.Opt("+Redraw")
-        if newImageListAttached {
-            RetireMainImageList(oldImageList)
-        } else {
-            ClearImageListIconCache(newImageList)
-            try IL_Destroy(newImageList)
-            iconResources.RestoreMainIconMetrics(previousMetrics)
-        }
-    }
-}
-
-OnGuiDropFiles(GuiObj, CtrlObj, FileArray, X, Y) {
-    directories := []
-    files := []
-    for dropPath in FileArray {
-        if DirExist(dropPath)
-            directories.Push(dropPath)
-        else if App.fileScanner.IsSupported(dropPath)
-            files.Push(dropPath)
-    }
-    if directories.Length {
-        GuiModules.addItem.StartBatchImport(directories, files)
-        return
-    }
-    if files.Length {
-        undoState := CaptureAppConfigState()
-        addedCount := 0
-        for filePath in files {
-            shortcutArgs := "", resolvedWorkDir := ""
-            resolvedPath := ResolveShortcutForAdd(filePath, &shortcutArgs, &resolvedWorkDir)
-            if RegisterApp(resolvedPath, 1, 0, resolvedWorkDir,
-                "", "", "", "", false, shortcutArgs)
-                addedCount++
-        }
-        if addedCount {
-            CommitUndoState(undoState)
-            SaveAppsToIni()
-        }
-        LogMsg("通过拖拽添加了 " addedCount " 个监控项。")
-    }
-}
 
 ; 检查是否是通过“重新加载”触发的启动，决定显示界面还是静默系统托盘
 try {
@@ -985,161 +1468,26 @@ if (!App.isReloadedMode) {
 }
 
 SetTimer(UpdateCountdownUI, 1000) ; 倒计时显示按整秒刷新
-if !App.guardRuntime.Start()
-    LogMsg("核心守护计时器启动失败。")
-LogMsg(App.isReloadedMode ? "代码热重载完毕，界面已恢复显示。" : "进程守护小助手已静默启动。")
-
-OnMainGuiClose(*) {
-    HideMainGui()
+guardRuntimeStarted := App.guardRuntime.Start()
+if !guardRuntimeStarted
+    LogMsg(Tr("核心守护计时器启动失败。"))
+LogMsg(App.isReloadedMode ? Tr("代码热重载完毕，界面已恢复显示。")
+    : Tr("进程守护小助手已静默启动。"))
+LogMsg(GetApplicationVersionSummary())
+; 自动更新助手只有在新版完成配置加载、窗口装配和核心计时器启动后才会提交替换。
+applicationUpdateReadyPath := GetApplicationUpdateReadyPath()
+if applicationUpdateReadyPath {
+    ; 更新只能在核心守护真正开始运行后提交。普通启动仍保留诊断界面，但更新
+    ; 启动若无法守护目标，必须退出并让安装助手恢复旧版本与个人配置。
+    if !guardRuntimeStarted
+        || !WriteApplicationUpdateReadySignal(applicationUpdateReadyPath,
+            ReadApplicationVersion())
+        ExitApplication(1)
 }
+; 更新检查延后到主窗口与守护计时器均已就绪后启动；网络工作始终位于独立进程。
+if App.checkUpdatesOnStartup
+    SetTimer(CheckForApplicationUpdate.Bind("", false), -1500)
 
-HideMainGui(force := false) {
-    if !force && WindowHierarchy.IsOwnerLocked(Main.gui) {
-        WindowHierarchy.ActivateTopOwned(Main.gui)
-        return false
-    }
-    if IsSet(GuiModules)
-        GuiModules.HideTransientWindows()
-    Main.gui.GetClientPos(,, &gW, &gH)
-    if (gW >= 730 && gH >= 530 && WinGetMinMax(Main.gui.Hwnd) != -1) {
-        try {
-            c1 := SendMessage(Win32.LVM_GETCOLUMNWIDTH, 0, 0, Main.lv.Hwnd)
-            c2 := SendMessage(Win32.LVM_GETCOLUMNWIDTH, 1, 0, Main.lv.Hwnd)
-            windowDpi := DllCall("user32\GetDpiForWindow", "Ptr",
-                Main.gui.Hwnd, "UInt")
-            dpiScale := (windowDpi ? windowDpi : 96) / 96
-            App.windowLayoutService.Save({
-                Width: Round(gW), Height: Round(gH),
-                Column1: Round(c1 / dpiScale),
-                Column2: Round(c2 / dpiScale)
-            })
-        } catch as layoutErr {
-            LogMsg("保存窗口布局失败: " layoutErr.Message)
-        }
-    }
-    Main.gui.Hide()
-    return true
-}
-
-; ==========================================
-; 8. 窗口尺寸自适应调整
-; ==========================================
-GuiResized(GuiObj, MinMax, Width, Height) {
-    if (MinMax == -1)
-        return
-    Main.btnSet.Move(Width - 240)
-    Main.btnHelp.Move(Width - 160)
-    Main.btnLog.Move(Width - 80)
-
-    Main.lv.Move(,, Width - 20, Height - 85)
-    Main.statsText.Move(10, Height - 20, Width - 20, 20)
-
-    ; 动态拉伸第一列来占用剩余空间
-    rc := Buffer(16)
-    DllCall("GetClientRect", "Ptr", Main.lv.Hwnd, "Ptr", rc)
-    clientW := NumGet(rc, 8, "Int")
-
-    col2W := SendMessage(Win32.LVM_GETCOLUMNWIDTH, 1, 0, Main.lv.Hwnd)
-
-    if (clientW > col2W) {
-        SendMessage(0x101E, 0, clientW - col2W, Main.lv.Hwnd) ; 自动拉伸应用程序列(索引0)
-    }
-    SendMessage(0x101E, 2, 0, Main.lv.Hwnd) ; LVM_SETCOLUMNWIDTH 避免拖动展示出第三列(索引2)
-}
-
-ShowContextMenu(GuiCtrlObj, Item, IsRightClick, X, Y) {
-    if (Item > 0) {
-        Main.contextTargetRow := Item
-        ; 右键未选中的行时，将上下文目标设为唯一选中项，避免菜单操作误作用于旧选择。
-        isSelected := false
-        probeRow := 0
-        Loop {
-            probeRow := Main.lv.GetNext(probeRow)
-            if (!probeRow)
-                break
-            if (probeRow == Item) {
-                isSelected := true
-                break
-            }
-        }
-        if !isSelected {
-            Main.lv.Modify(0, "-Select")
-            Main.lv.Modify(Item, "Select Focus")
-        }
-        path := Main.lv.GetText(Item, 3)
-        if App.appStates.Has(path) {
-            isAdmin := App.appStates[path].HasOwnProp("RunAsAdmin") && App.appStates[path].RunAsAdmin
-            if (isAdmin)
-                Main.contextMenu.Check("🛡️ 以管理员身份运行")
-            else
-                Main.contextMenu.Uncheck("🛡️ 以管理员身份运行")
-            if IsMaintenanceSupportedTarget(path) {
-                Main.contextMenu.Enable("🔄 软件升级保护…")
-                if App.appStates[path].MaintenanceConfig.Enabled
-                    Main.contextMenu.Check("🔄 软件升级保护…")
-                else
-                    Main.contextMenu.Uncheck("🔄 软件升级保护…")
-            } else {
-                Main.contextMenu.Uncheck("🔄 软件升级保护…")
-                Main.contextMenu.Disable("🔄 软件升级保护…")
-            }
-        }
-        Main.contextMenu.Show()
-    }
-}
-
-OpenFileLocation(*) {
-    if (Main.contextTargetRow > 0) {
-        path := Main.lv.GetText(Main.contextTargetRow, 3)
-        locationPath := FileExist(path) ? path
-            : App.targetIdentityService.GetMonitoredTargetPath(path)
-        SplitPath(locationPath, , &dir)
-        if FileExist(locationPath)
-            Run('explorer.exe /select,"' locationPath '"')
-        else if FileExist(dir)
-            Run('explorer.exe "' dir '"')
-    }}
-
-; ==========================================
-; 9. 托盘与窗口控制
-; ==========================================
-IsApplicationNotificationClick(lParam, hwnd) {
-    return hwnd == A_ScriptHwnd
-        && (lParam & 0xFFFF) == Win32.NIN_BALLOONUSERCLICK
-}
-
-OnTrayNotification(wParam, lParam, msg, hwnd) {
-    if !IsApplicationNotificationClick(lParam, hwnd)
-        return
-    ; Windows 消息回调内不直接创建 GUI，避免通知连点造成重入与焦点竞争。
-    SetTimer(OpenNotificationWindows, -1)
-    return 0
-}
-
-OpenNotificationWindows(*) {
-    if !IsSet(Main) || !IsSet(GuiModules)
-        return
-    if IsSet(App) && App.shutdownStarted
-        return
-
-    try ShowMainGui()
-    try WinShow("ahk_id " Main.gui.Hwnd)
-    try WinRestore("ahk_id " Main.gui.Hwnd)
-
-    try ShowLog()
-    if GuiModules.log.IsOpen() {
-        logHwnd := GuiModules.log.gui.Hwnd
-        try WinShow("ahk_id " logHwnd)
-        try WinRestore("ahk_id " logHwnd)
-        try WinActivate("ahk_id " logHwnd)
-    }
-}
-
-ShowMainGui(*) {
-    Main.gui.Show()
-    if WindowHierarchy.IsOwnerLocked(Main.gui)
-        WindowHierarchy.ActivateTopOwned(Main.gui)
-}
 ReloadScript(*) {
     HideMainGui(true)
     previousCritical := A_IsCritical
@@ -1152,7 +1500,7 @@ ReloadScript(*) {
             validationCommand := BuildReloadValidationCommand(A_AhkPath,
                 A_ScriptFullPath)
             if RunWait(validationCommand, A_ScriptDir, "Hide") != 0
-                throw Error("新脚本未通过 AutoHotkey 解析检查")
+                throw Error(Tr("新脚本未通过 AutoHotkey 解析检查"))
         }
         ; 只有候选脚本验证通过后才写入一次性标记。
         App.configRepository.WriteValue("Settings", "ShowAfterReload", 1)
@@ -1168,10 +1516,10 @@ ReloadScript(*) {
             try App.configRepository.WriteValue("Settings", "ShowAfterReload", 0)
         Critical(previousCritical ? previousCritical : "Off")
         reloadDetails := FormatRuntimeErrorDetails(reloadErr)
-        LogMsg("重新加载失败，已保留当前实例: " reloadDetails)
+        LogMsg(Tr("重新加载失败，已保留当前实例：{1}", reloadDetails))
         ShowMainGui()
-        ShowDarkMsgBox("重新加载失败，当前守护仍在运行。`n`n"
-            reloadDetails, "重新加载失败", "Error", Main.gui)
+        ShowDarkMsgBox(Tr("重新加载失败，当前守护仍在运行。`n`n{1}", reloadDetails),
+            Tr("重新加载失败"), "Error", Main.gui)
         return
     }
 

@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证自定义图标对常见图片、SVG 和原生图标资源的解码与缩放质量。
+; 通过像素、透明通道和资源计数检查黑底、偏移、锯齿以及 GDI 句柄泄漏回归。
+
 try {
     RunCustomIconImageTests()
     ExitApp(0)
@@ -148,77 +151,83 @@ GetOpaqueIconBounds(snapshot) {
         : {Width: 0, Height: 0}
 }
 
-AssertStatusIconColor(snapshot, statusKind, expectedRgb) {
+AssertStatusIconStrokeColor(snapshot, statusKind, expectedRgb) {
     expectedRed := (expectedRgb >> 16) & 0xFF
     expectedGreen := (expectedRgb >> 8) & 0xFF
     expectedBlue := expectedRgb & 0xFF
-    opaqueColorPixels := 0
-    opaqueWhitePixels := 0
-    brightGlyphPixels := 0
-    brightestMinimumChannel := 0
-    outerLeft := snapshot.Width
-    outerTop := snapshot.Height
-    outerRight := -1
-    outerBottom := -1
-    glyphLeft := snapshot.Width
-    glyphTop := snapshot.Height
-    glyphRight := -1
-    glyphBottom := -1
+    visiblePixels := 0
+    opaqueStrokePixels := 0
     Loop snapshot.Width * snapshot.Height {
         offset := (A_Index - 1) * 4
         alpha := NumGet(snapshot.Pixels, offset + 3, "UChar")
-        x := Mod(A_Index - 1, snapshot.Width)
-        y := Floor((A_Index - 1) / snapshot.Width)
-        if alpha >= 32 {
-            outerLeft := Min(outerLeft, x)
-            outerTop := Min(outerTop, y)
-            outerRight := Max(outerRight, x)
-            outerBottom := Max(outerBottom, y)
+        if alpha <= 8
+            continue
+        visiblePixels++
+        blue := Round(NumGet(snapshot.Pixels, offset, "UChar") * 255 / alpha)
+        green := Round(NumGet(snapshot.Pixels,
+            offset + 1, "UChar") * 255 / alpha)
+        red := Round(NumGet(snapshot.Pixels,
+            offset + 2, "UChar") * 255 / alpha)
+        ; resvg 返回预乘 BGRA。低 Alpha 边缘会有量化误差，因此仅要求
+        ; 高不透明度描边严格匹配资源颜色；透明边缘由像素数量单独覆盖。
+        if alpha < 200
+            continue
+        AssertCustomIcon(Abs(red - expectedRed) <= 8
+            && Abs(green - expectedGreen) <= 8
+            && Abs(blue - expectedBlue) <= 8,
+            "状态 SVG 的描边颜色与资源规格不一致：" statusKind
+                "（实际 RGB=" red "," green "," blue
+                "；预期 RGB=" expectedRed "," expectedGreen ","
+                expectedBlue "）")
+        opaqueStrokePixels++
+    }
+    AssertCustomIcon(visiblePixels >= 16 && opaqueStrokePixels >= 4,
+        "状态 SVG 缺少清晰的单色描边：" statusKind)
+}
+
+GetOpaqueIconRectangle(snapshot) {
+    left := snapshot.Width
+    top := snapshot.Height
+    right := -1
+    bottom := -1
+    Loop snapshot.Height {
+        y := A_Index - 1
+        Loop snapshot.Width {
+            x := A_Index - 1
+            if NumGet(snapshot.Pixels,
+                (y * snapshot.Width + x) * 4 + 3, "UChar") <= 8
+                continue
+            left := Min(left, x)
+            top := Min(top, y)
+            right := Max(right, x)
+            bottom := Max(bottom, y)
         }
-        if alpha < 240
+    }
+    return {Left: left, Top: top, Right: right, Bottom: bottom}
+}
+
+AssertWindowsAdminShieldColors(snapshot, dpi) {
+    bluePixels := 0
+    yellowPixels := 0
+    Loop snapshot.Width * snapshot.Height {
+        offset := (A_Index - 1) * 4
+        alpha := NumGet(snapshot.Pixels, offset + 3, "UChar")
+        if alpha < 128
             continue
         blue := Round(NumGet(snapshot.Pixels, offset, "UChar") * 255 / alpha)
         green := Round(NumGet(snapshot.Pixels,
             offset + 1, "UChar") * 255 / alpha)
         red := Round(NumGet(snapshot.Pixels,
             offset + 2, "UChar") * 255 / alpha)
-        isBaseColor := Abs(red - expectedRed) <= 8
-            && Abs(green - expectedGreen) <= 8
-            && Abs(blue - expectedBlue) <= 8
-        ; 20px WIC 缩小会把细白色笔画与彩色底层混合；238 以上在
-        ; sRGB 中仍属于视觉白色，同时资源源码另行断言为 #FFFFFF。
-        isWhite := red >= 238 && green >= 238 && blue >= 238
-        brightestMinimumChannel := Max(brightestMinimumChannel,
-            Min(red, green, blue))
-        isAntialiasedBlend := red >= expectedRed - 8
-            && green >= expectedGreen - 8 && blue >= expectedBlue - 8
-        AssertCustomIcon(isBaseColor || isWhite || isAntialiasedBlend,
-            "状态 SVG 的颜色与资源规格不一致：" statusKind
-                "（实际 RGB=" red "," green "," blue
-                "；预期 RGB=" expectedRed "," expectedGreen ","
-                expectedBlue "）")
-        if isBaseColor
-            opaqueColorPixels++
-        if isWhite
-            opaqueWhitePixels++
-        if Min(red, green, blue) >= 200 {
-            brightGlyphPixels++
-            glyphLeft := Min(glyphLeft, x)
-            glyphTop := Min(glyphTop, y)
-            glyphRight := Max(glyphRight, x)
-            glyphBottom := Max(glyphBottom, y)
-        }
+        if blue >= 110 && blue >= green + 10 && blue >= red + 25
+            bluePixels++
+        if red >= 150 && green >= 105 && blue <= 155
+            && red >= blue + 35
+            yellowPixels++
     }
-    AssertCustomIcon(opaqueColorPixels >= 12,
-        "状态 SVG 缺少清晰的彩色主体：" statusKind)
-    AssertCustomIcon(opaqueWhitePixels >= 1 && brightGlyphPixels >= 4,
-        "状态 SVG 的语义符号没有使用不透明白色：" statusKind
-            "（纯白像素=" opaqueWhitePixels "，高亮像素="
-            brightGlyphPixels "，最高最低通道=" brightestMinimumChannel "）")
-    AssertCustomIcon(glyphRight >= glyphLeft
-        && glyphLeft > outerLeft && glyphTop > outerTop
-        && glyphRight < outerRight && glyphBottom < outerBottom,
-        "状态 SVG 的彩色容器没有完整包裹白色语义符号：" statusKind)
+    AssertCustomIcon(bluePixels >= 2 && yellowPixels >= 2,
+        "Windows 原生管理员盾牌缺少清晰的蓝黄象限：DPI=" dpi
+            "（蓝色像素=" bluePixels "，黄色像素=" yellowPixels "）")
 }
 
 AssertPaddedCustomIcon(filePath, expectWideContent := true,
@@ -280,6 +289,11 @@ AssertBmpMatteRemoved(filePath) {
 }
 
 AssertIndexedIconResourceSelection() {
+    AssertCustomIcon(SelectHighQualityMainIconSourceSize(28) == 64
+        && SelectHighQualityMainIconSourceSize(42) == 96
+        && SelectHighQualityMainIconSourceSize(56) == 128
+        && SelectHighQualityMainIconSourceSize(84) == 256,
+        "主列表图标没有按 DPI 选择约两倍尺寸的高清源资源")
     resourcePath := A_WinDir "\System32\shell32.dll"
     indexedSource := FormatCustomIconSource(resourcePath, 44, true)
     parsedSource := ParseCustomIconSource(indexedSource)
@@ -302,6 +316,11 @@ AssertIndexedIconResourceSelection() {
     try {
         snapshot := ReadIconPixelSnapshot(iconHandle)
         bounds := GetOpaqueIconBounds(snapshot)
+        AssertCustomIcon(snapshot.Width
+                == SelectHighQualityMainIconSourceSize(
+                    App.iconResources.MainIconPixelSize)
+            && snapshot.Height == snapshot.Width,
+            "原生资源没有按高清源尺寸提取")
         AssertCustomIcon(bounds.Width > 0 && bounds.Height > 0,
             "指定索引的 DLL 图标资源渲染为空")
     } finally {
@@ -357,69 +376,106 @@ AssertNativeSvgRasterization(filePath, expectedAspectRatio := 0) {
 }
 
 AssertStatusIconResources() {
-    circularStatuses := Map(
-        "Paused", true,
-        "Error", true,
-        "Pending", true,
-        "Countdown", true,
-        "Updating", true,
-        "Idle", true)
     specs := Map(
-        "Running", {Color: 0x2FBF71, File: "running.svg", Scale: 1.00},
-        "Paused", {Color: 0xC9902E, File: "paused.svg", Scale: 1.10},
-        "Warning", {Color: 0xE5B73B, File: "warning.svg", Scale: 1.10},
-        "SuspectedStop", {Color: 0xF07A3E, File: "suspected-stop.svg", Scale: 1.16},
-        "Error", {Color: 0xDC5666, File: "error.svg", Scale: 1.10},
-        "Pending", {Color: 0x3D8FE3, File: "pending.svg", Scale: 1.10},
-        "Countdown", {Color: 0x20A7B9, File: "countdown.svg", Scale: 1.10},
-        "Updating", {Color: 0x8D6AD8, File: "updating.svg", Scale: 1.10},
-        "Idle", {Color: 0x718096, File: "idle.svg", Scale: 1.10})
+        GuardStatusKind.Initializing,
+            {Color: 0x0F7EE7, File: "loader-circle.svg"},
+        GuardStatusKind.Running,
+            {Color: 0x03C078, File: "circle-check-big.svg"},
+        GuardStatusKind.PermissionMismatch,
+            {Color: 0xA16207, File: "shield-alert.svg"},
+        GuardStatusKind.Paused,
+            {Color: 0xF4A71D, File: "circle-pause.svg"},
+        GuardStatusKind.SuspectedStop,
+            {Color: 0xEF4444, File: "triangle-alert-red.svg",
+                Group: "Failure"},
+        GuardStatusKind.WaitingObservation,
+            {Color: 0xA0B7FF, File: "timer.svg", Group: "TimedWait"},
+        GuardStatusKind.StartCountdown,
+            {Color: 0xA0B7FF, File: "timer.svg", Group: "TimedWait"},
+        GuardStatusKind.RetryCountdown,
+            {Color: 0xA0B7FF, File: "timer.svg", Group: "TimedWait"},
+        GuardStatusKind.CoolingDown,
+            {Color: 0xA0B7FF, File: "timer.svg", Group: "TimedWait"},
+        GuardStatusKind.Starting,
+            {Color: 0xB4875A, File: "rocket.svg"},
+        GuardStatusKind.Verifying,
+            {Color: 0xE9C08C, File: "scan-search.svg", Group: "Query"},
+        GuardStatusKind.TargetMissing,
+            {Color: 0xEF4444, File: "circle-x.svg", Group: "Failure"},
+        GuardStatusKind.ProgramMissing,
+            {Color: 0xEF4444, File: "file-x-2.svg", Group: "Failure"},
+        GuardStatusKind.ScriptMissing,
+            {Color: 0xEF4444, File: "file-code-2.svg", Group: "Failure"},
+        GuardStatusKind.SafeStartWait,
+            {Color: 0x5F9B0D, File: "shield-ellipsis.svg"},
+        GuardStatusKind.LaunchRetry,
+            {Color: 0xEF4444, File: "rotate-ccw.svg", Group: "Failure"},
+        GuardStatusKind.MaintenanceArbitrating,
+            {Color: 0xE9C08C, File: "scan-search.svg", Group: "Query"},
+        GuardStatusKind.MaintenanceUpdating,
+            {Color: 0x878DF9, File: "refresh-cw.svg"},
+        GuardStatusKind.MaintenanceFileWaiting,
+            {Color: 0xA0B7FF, File: "file-clock.svg", Group: "TimedWait"},
+        GuardStatusKind.MaintenanceStabilizing,
+            {Color: 0xA0B7FF, File: "file-clock.svg", Group: "TimedWait"},
+        GuardStatusKind.MaintenanceRecovering,
+            {Color: 0xA0B7FF, File: "timer.svg", Group: "TimedWait"},
+        GuardStatusKind.MaintenanceTimedOut,
+            {Color: 0xEF4444, File: "triangle-alert-timeout.svg",
+                Group: "Failure"},
+        GuardStatusKind.Unknown,
+            {Color: 0x858585, File: "circle-info-unknown.svg"})
     resourceFiles := StatusIconResourceFiles()
     AssertCustomIcon(resourceFiles.Count == specs.Count,
         "状态图标资源映射数量不完整")
-    seenColors := Map()
+    usedColors := Map()
+    usedFiles := Map()
     for statusKind, spec in specs {
-        colorKey := Format("{:06X}", spec.Color)
-        AssertCustomIcon(!seenColors.Has(colorKey),
-            "不同状态重复使用了相同颜色：" statusKind)
-        seenColors[colorKey] := statusKind
+        semanticGroup := spec.HasOwnProp("Group")
+            ? spec.Group : statusKind
         AssertCustomIcon(resourceFiles.Has(statusKind)
             && resourceFiles[statusKind] == spec.File,
             "状态图标资源映射错误：" statusKind)
-        AssertCustomIcon(StatusIconVisualScale(statusKind) == spec.Scale,
-            "状态图标视觉面积补偿错误：" statusKind)
+        AssertCustomIcon(StatusIconVisualScale(statusKind) == 1.00,
+            "主列表状态图标没有使用统一 Lucide 视觉比例：" statusKind)
+        AssertCustomIcon(!usedColors.Has(spec.Color)
+                || usedColors[spec.Color] == semanticGroup,
+            "无关状态错误使用了完全相同的颜色：" statusKind " 与 "
+                (usedColors.Has(spec.Color)
+                    ? usedColors[spec.Color] : ""))
+        usedColors[spec.Color] := semanticGroup
+        AssertCustomIcon(!usedFiles.Has(spec.File)
+                || usedFiles[spec.File] == semanticGroup,
+            "无关状态错误复用了同一 SVG 资源：" statusKind " 与 "
+                (usedFiles.Has(spec.File) ? usedFiles[spec.File] : ""))
+        usedFiles[spec.File] := semanticGroup
         resourcePath := GetStatusIconResourcePath(statusKind)
-        AssertCustomIcon(FileExist(resourcePath),
-            "状态 SVG 资源不存在：" resourcePath)
+        normalizedResourcePath := StrReplace(resourcePath, "/", "\")
+        AssertCustomIcon(FileExist(resourcePath)
+            && InStr(normalizedResourcePath,
+                "\assets\ui-icons\lucide\" spec.File),
+            "状态 SVG 没有复用 Lucide 界面资源：" resourcePath)
         svgText := FileRead(resourcePath, "UTF-8")
-        expectedFill := 'fill="#' Format("{:06X}", spec.Color) '"'
-        AssertCustomIcon(InStr(svgText, 'data-design="watchdog-status-v2"')
-            && InStr(svgText, expectedFill)
-            && (InStr(svgText, 'fill="#FFFFFF"')
-                || InStr(svgText, 'stroke="#FFFFFF"'))
-            && (InStr(svgText, "<path ") || InStr(svgText, "<circle ")
-                || InStr(svgText, "<rect ")),
-            "状态 SVG 缺少重绘版标记、矢量图元或预期颜色：" statusKind)
-        if circularStatuses.Has(statusKind)
-            AssertCustomIcon(InStr(svgText,
-                '<circle cx="32" cy="32" r="29" fill="'
-                    SubStr(expectedFill, 7)),
-                "圆形状态没有使用精确 SVG 圆形图元：" statusKind)
+        expectedStroke := 'stroke="#' Format("{:06X}", spec.Color) '"'
+        AssertCustomIcon(InStr(svgText, "<!-- Lucide ")
+            && InStr(svgText, 'viewBox="0 0 24 24"')
+            && InStr(svgText, 'fill="none"')
+            && InStr(svgText, expectedStroke)
+            && InStr(svgText, 'stroke-width="2"'),
+            "状态 SVG 缺少 Lucide 标记、透明背景或预期描边："
+                statusKind)
 
-        visualSize := Round(20 * spec.Scale)
+        visualSize := 20
         iconHandle := CreateStatusResourceIcon(statusKind, visualSize, 36)
         AssertCustomIcon(iconHandle, "无法从 SVG 创建状态图标：" statusKind)
         try {
             snapshot := ReadIconPixelSnapshot(iconHandle)
             bounds := GetOpaqueIconBounds(snapshot)
-            AssertStatusIconColor(snapshot, statusKind, spec.Color)
-            minimumVisibleEdge := statusKind == "SuspectedStop" ? 17 : 18
-            minimumMaximumEdge := statusKind == "Running" ? 18 : 20
-            AssertCustomIcon(bounds.Width >= minimumVisibleEdge
-                && bounds.Height >= minimumVisibleEdge
-                && Max(bounds.Width, bounds.Height) >= minimumMaximumEdge
+            AssertStatusIconStrokeColor(snapshot, statusKind, spec.Color)
+            AssertCustomIcon(Min(bounds.Width, bounds.Height) >= 8
+                && Max(bounds.Width, bounds.Height) >= 16
                 && bounds.Width <= visualSize && bounds.Height <= visualSize,
-                "状态 SVG 的视觉补偿尺寸不在预期范围内：" statusKind)
+                "状态 SVG 的透明描边尺寸不在预期范围内：" statusKind)
             cornerOffsets := [0, (snapshot.Width - 1) * 4,
                 (snapshot.Height - 1) * snapshot.Width * 4,
                 (snapshot.Width * snapshot.Height - 1) * 4]
@@ -432,6 +488,72 @@ AssertStatusIconResources() {
         }
     }
 
+    ; 主列表统计栏与命令栏复用同一套语义色约束，避免之后替换资源时
+    ; 又把停止类拆成多种红色，或让设置、帮助图标退回旧配色。
+    semanticIconColors := Map(
+        "ban.svg", "#EF4444",
+        "settings.svg", "#BABABC",
+        "circle-question-mark.svg", "#23A9F2")
+    for resourceName, expectedColor in semanticIconColors {
+        resourcePath := GetApplicationAssetPath(
+            "ui-icons\lucide\" resourceName)
+        AssertCustomIcon(FileExist(resourcePath)
+            && InStr(FileRead(resourcePath, "UTF-8"),
+                'stroke="' expectedColor '"'),
+            "界面 SVG 的语义颜色不正确：" resourceName)
+    }
+
+    AssertCustomIcon(resourceFiles[GuardStatusKind.Initializing]
+            == "loader-circle.svg"
+        && resourceFiles[GuardStatusKind.MaintenanceRecovering]
+            == "timer.svg"
+        && resourceFiles[GuardStatusKind.Initializing]
+            != resourceFiles[GuardStatusKind.MaintenanceRecovering],
+        "初始化仍错误复用了只代表恢复过程的沙漏")
+    AssertCustomIcon(resourceFiles[GuardStatusKind.Running]
+            == "circle-check-big.svg"
+        && resourceFiles[GuardStatusKind.Paused] == "circle-pause.svg"
+        && resourceFiles[GuardStatusKind.MaintenanceUpdating]
+            == "refresh-cw.svg",
+        "与底部统计栏同义的运行、暂停或升级状态没有复用同一 SVG")
+    stopwatchFile := resourceFiles[GuardStatusKind.StartCountdown]
+    for stopwatchStatus in [GuardStatusKind.WaitingObservation,
+            GuardStatusKind.StartCountdown, GuardStatusKind.RetryCountdown,
+            GuardStatusKind.CoolingDown,
+            GuardStatusKind.MaintenanceRecovering] {
+        AssertCustomIcon(resourceFiles[stopwatchStatus] == stopwatchFile,
+            "等待、倒计时或升级恢复状态没有共用蓝色秒表："
+                stopwatchStatus)
+    }
+    AssertCustomIcon(stopwatchFile == "timer.svg"
+        && resourceFiles[GuardStatusKind.MaintenanceFileWaiting]
+            == "file-clock.svg"
+        && resourceFiles[GuardStatusKind.MaintenanceStabilizing]
+            == "file-clock.svg"
+        && resourceFiles[GuardStatusKind.Verifying]
+            == "scan-search.svg"
+        && resourceFiles[GuardStatusKind.MaintenanceArbitrating]
+            == "scan-search.svg",
+        "时间、升级文件或查询语义没有使用指定的共享 SVG")
+
+    stateObj := TargetSupervisor({Enabled: true,
+        StatusKind: GuardStatusKind.Initializing})
+    for statusKind in specs {
+        stateObj.StatusKind := statusKind
+        AssertCustomIcon(GetMainStatusVisualKind(stateObj) == statusKind,
+            "细粒度状态视觉键被重新压缩为统计类别：" statusKind)
+    }
+    stateObj.Enabled := false
+    AssertCustomIcon(GetMainStatusVisualKind(stateObj)
+            == GuardStatusKind.Paused,
+        "暂停硬状态没有覆盖过期视觉键")
+    stateObj.Enabled := true
+    stateObj.MissingSinceTicks := 1
+    stateObj.StatusKind := GuardStatusKind.Initializing
+    AssertCustomIcon(GetMainStatusVisualKind(stateObj)
+            == GuardStatusKind.TargetMissing,
+        "缺失硬状态没有覆盖过期视觉键")
+
     visualSource := FileRead(A_ScriptDir
         "\..\..\app\UI\MainVisualPipeline.ahk", "UTF-8")
     AssertCustomIcon(InStr(visualSource,
@@ -443,6 +565,56 @@ AssertStatusIconResources() {
         AssertCustomIcon(!InStr(visualSource, retiredFunction "("),
             "状态图标仍依赖运行时自绘函数：" retiredFunction)
     }
+}
+
+AssertAdminOverlayIcon() {
+    previousMetrics := App.iconResources.GetMainIconMetrics()
+    try {
+        for dpi in [96, 288] {
+            App.iconResources.UpdateMainIconMetrics(dpi)
+            cellSize := App.iconResources.MainIconCellPixelSize
+            badgeSize := Max(12, Round(14 * dpi / 96))
+            badgeMargin := Max(1, Round(dpi / 96))
+            expectedOffset := cellSize - badgeSize - badgeMargin
+            imageList := IL_Create(2, 2, 1)
+            iconHandle := 0
+            try {
+                DllCall("comctl32\ImageList_SetIconSize", "Ptr", imageList,
+                    "Int", cellSize, "Int", cellSize)
+                AssertCustomIcon(AddMainAdminOverlayIcon(imageList),
+                    "Windows 管理员盾牌没有注册为图像列表 overlay：DPI=" dpi)
+                imageCount := DllCall("comctl32\ImageList_GetImageCount",
+                    "Ptr", imageList, "Int")
+                AssertCustomIcon(imageCount == 1,
+                    "管理员 overlay 添加了意外的图像数量：DPI=" dpi)
+                iconHandle := DllCall("comctl32\ImageList_GetIcon",
+                    "Ptr", imageList, "Int", 0,
+                    "UInt", Win32.ILD_TRANSPARENT, "Ptr")
+                AssertCustomIcon(iconHandle,
+                    "无法读取管理员 overlay 图标：DPI=" dpi)
+                snapshot := ReadIconPixelSnapshot(iconHandle)
+                bounds := GetOpaqueIconRectangle(snapshot)
+                AssertCustomIcon(bounds.Right >= bounds.Left
+                    && bounds.Bottom >= bounds.Top
+                    && bounds.Left >= expectedOffset
+                    && bounds.Top >= expectedOffset
+                    && bounds.Right < cellSize && bounds.Bottom < cellSize,
+                    "Windows 管理员盾牌没有稳定定位在应用图标右下角：DPI=" dpi)
+                AssertWindowsAdminShieldColors(snapshot, dpi)
+            } finally {
+                if iconHandle
+                    try DllCall("user32\DestroyIcon", "Ptr", iconHandle)
+                if imageList
+                    try IL_Destroy(imageList)
+            }
+        }
+        visualSource := FileRead(A_ScriptDir
+            "\..\..\app\UI\MainVisualPipeline.ahk", "UTF-8")
+        AssertCustomIcon(InStr(visualSource, "SHGetStockIconInfo")
+            && InStr(visualSource, "Win32.SIID_SHIELD")
+            && InStr(visualSource, "Win32.SHIL_JUMBO"),
+            "管理员盾牌没有从 Windows 高分辨率库存图标取得")
+    } finally App.iconResources.RestoreMainIconMetrics(previousMetrics)
 }
 
 RunCustomIconImageTests() {
@@ -508,6 +680,7 @@ RunCustomIconImageTests() {
         }
         AssertIndexedIconResourceSelection()
         AssertStatusIconResources()
+        AssertAdminOverlayIcon()
 
         genericPixels := Buffer(8 * 8 * 4, 0)
         Loop 8 * 8

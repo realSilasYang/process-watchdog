@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证守护项配置快照的捕获、比较与差量合并。
+; 覆盖展示配置和后来学习到的升级证据，防止撤销旧操作时覆盖新运行态。
+
 #Include ..\..\src\Config\IniFieldCodec.ahk
 #Include ..\..\src\Config\DisplayConfigCodec.ahk
 #Include ..\..\src\Config\MaintenanceConfigCodec.ahk

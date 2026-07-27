@@ -1,3 +1,6 @@
+﻿# 真实 GUI 冒烟与资源循环测试调度器。
+# 为每个测试设置独立超时并收集标准输出，避免无响应窗口或后台定时器让持续集成永久等待。
+
 [CmdletBinding()]
 param(
     [string]$AutoHotkeyPath = "",
@@ -8,10 +11,14 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
+$resolvedLocalAhk = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot '.tools') `
+    -Recurse -File -Filter 'AutoHotkey64.exe' -ErrorAction SilentlyContinue |
+    Sort-Object { try { [Version]$_.VersionInfo.FileVersion } catch { [Version]'0.0' } } `
+        -Descending | ForEach-Object { $_.FullName })
 $candidates = @(
     $AutoHotkeyPath,
     $env:AUTOHOTKEY_EXE,
-    (Join-Path $projectRoot '.tools\AutoHotkey-2.0.26\AutoHotkey64.exe'),
+    $resolvedLocalAhk,
     'D:\Program Files\AutoHotkey\v2\AutoHotkey64.exe',
     "$env:ProgramFiles\AutoHotkey\v2\AutoHotkey64.exe"
 ) | Where-Object { $_ }
@@ -36,7 +43,11 @@ function Invoke-GuiTest {
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
+    $startInfo.StandardOutputEncoding = [System.Text.Encoding]::Default
+    $startInfo.StandardErrorEncoding = [System.Text.Encoding]::Default
     $process = [System.Diagnostics.Process]::Start($startInfo)
+    $standardOutputTask = $process.StandardOutput.ReadToEndAsync()
+    $standardErrorTask = $process.StandardError.ReadToEndAsync()
     $timedOut = -not $process.WaitForExit($TimeoutMilliseconds)
     if ($timedOut) {
         try {
@@ -44,8 +55,8 @@ function Invoke-GuiTest {
             [void]$process.WaitForExit(5000)
         } catch {}
     }
-    $stdout = $process.StandardOutput.ReadToEnd().Trim()
-    $stderr = $process.StandardError.ReadToEnd().Trim()
+    $stdout = $standardOutputTask.GetAwaiter().GetResult().Trim()
+    $stderr = $standardErrorTask.GetAwaiter().GetResult().Trim()
     if ($stdout) {
         Write-Host $stdout
     }
@@ -57,7 +68,7 @@ function Invoke-GuiTest {
             "$ScriptPath`nSTDOUT:`n$stdout`nSTDERR:`n$stderr"
     }
     if ($stderr) {
-        Write-Warning $stderr
+        throw "GUI test wrote to standard error: $ScriptPath`n$stderr"
     }
 }
 
@@ -65,6 +76,12 @@ Write-Host 'Running GUI smoke test...'
 Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\gui-smoke-tests.ahk')
 Write-Host 'Running log-window and diagnostic smoke test...'
 Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\log-window-smoke-tests.ahk')
+Write-Host 'Running 13-language production-window smoke test...'
+Invoke-GuiTest (Join-Path $PSScriptRoot `
+    'gui\localized-window-smoke-tests.ahk') -TimeoutMilliseconds 300000
+Write-Host 'Running in-process language and font hot-switch test...'
+Invoke-GuiTest (Join-Path $PSScriptRoot `
+    'gui\display-hot-switch-tests.ahk') -TimeoutMilliseconds 180000
 Write-Host "Running GUI resource soak for $SoakSeconds seconds..."
 Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\resource-soak-tests.ahk') `
     -Arguments $SoakSeconds `

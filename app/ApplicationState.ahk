@@ -1,19 +1,26 @@
-; Root application state and service composition.
+; 应用级根状态与依赖装配入口。
+; 这里集中持有配置、守护、升级保护、进程检查和界面资源服务，避免业务模块
+; 通过零散全局变量找回依赖；关闭时也能沿同一所有权关系释放后台任务和原生资源。
 
 class ApplicationState {
     __New() {
         this.mutexHandle := 0
         this.configRepository := WatchdogConfigRepository(
-            A_ScriptDir "\watchdog.ini")
+            A_ScriptDir "\watchdog.ini", "", Tr,
+            LocalizationService.GetAllTranslationCatalogs())
         this.runtimeSettingsService := RuntimeSettingsService(
             this.configRepository, ParseRetrySequence,
             A_Temp "\ProcessWatchdogLogs")
         this.windowLayoutService := WindowLayoutService(this.configRepository)
         this.maintenanceJournalPath := A_ScriptDir "\watchdog.maintenance.ini"
+        this.uiLanguage := LocalizationService.GetRequestedLanguage()
+        this.uiFont := LocalizationService.GetRequestedUiFont()
+        this.uiTheme := UiThemeService.GetRequestedTheme()
         this.checkInterval := 2000
         this.retrySequence := "1, 10, 60"
         this.retryDelayArray := []
         this.showAtStartup := false
+        this.checkUpdatesOnStartup := true
         this.recursiveBatchImport := true
         this.logMaxEntries := 500
         this.logDirectory := A_Temp "\ProcessWatchdogLogs"
@@ -22,24 +29,43 @@ class ApplicationState {
         this.gracefulStopSeconds := 3
         this.ctrlCWaitSeconds := 2
         this.allowForceTerminate := true
-        this.preferEverything := true
-        this.nativeScanTimeoutSeconds := 15
-        this.everythingMaxResults := 80
+        this.applicationUpdateService := ApplicationUpdateService({
+            Repository: "realSilasYang/process-watchdog",
+            CurrentVersion: ReadApplicationVersion(),
+            HelperPath: A_ScriptDir "\runtime\application-update.ps1",
+            HelperLocalizationPath: A_ScriptDir
+                "\runtime\application-update.strings.json",
+            InstallRoot: A_ScriptDir,
+            EntryPath: A_ScriptFullPath,
+            InterpreterPath: A_AhkPath,
+            Compiled: A_IsCompiled,
+            UiLanguage: LocalizationService.GetLanguage(),
+            Log: LogMsg,
+            Localize: Tr,
+            OnResult: HandleApplicationUpdateCheckResult,
+            Now: GetTickCount64,
+            Quote: QuoteCommandLineArgument
+        })
         this.maintenancePollInterval := 1000
         this.maintenanceProcessInterval := 1000
         this.maintenanceFingerprintInterval := 30000
         this.maintenanceFingerprintRetryInterval := 5000
         this.guardWorkGate := GuardWorkGate()
+        this.guardMutationQueue := GuardMutationQueue(this.guardWorkGate,
+            HandleGuardMutationError)
         this.appStates := Map()
         this.appStates.CaseSense := "Off"
         this.scheduler := WatchdogScheduler("", true, "")
         this.targetLauncher := TargetLauncher()
-        this.targetStopper := TargetStopper()
         this.processInspector := ProcessInspector()
+        this.targetStopper := TargetStopper(ObjBindMethod(
+            this.processInspector, "GetCreationIdentity"))
         this.fileScanner := FileScanService({
             CanonicalPath: GetCanonicalPath,
             GetCreationIdentity: ObjBindMethod(this.processInspector,
                 "GetCreationIdentity"),
+            Localize: Tr,
+            LocalizeDiagnostic: TrDiagnostic,
             Log: LogMsg,
             Now: GetTickCount64
         }, {
@@ -55,6 +81,8 @@ class ApplicationState {
             CreateProcessSnapshotIndex, "",
             ObjBindMethod(IniFieldCodec, "Encode"),
             ObjBindMethod(IniFieldCodec, "Decode"), LogMsg)
+        this.processSnapshots.Localizer := Tr
+        this.processSnapshots.DiagnosticLocalizer := TrDiagnostic
         this.maintenanceActorMatcher := MaintenanceActorMatcher(
             ObjBindMethod(this.processInspector, "GetCreationIdentity"))
         this.displayConfigCodec := DisplayConfigCodec(NormalizeTargetPath,
@@ -76,6 +104,8 @@ class ApplicationState {
             this.displayConfigCodec, this.appConfigSnapshotService)
         this.maintenanceSessionCodec := MaintenanceSessionCodec()
         this.targetIdentityService := TargetIdentityService(this, {
+            InvalidateRuntimeIdentity: InvalidateShortcutRuntimeIdentity,
+            Localize: Tr,
             Log: LogMsg,
             NormalizeRoot: NormalizeMaintenanceRoot,
             Now: GetTickCount64,
@@ -102,7 +132,9 @@ class ApplicationState {
             ObjBindMethod(this.processInspector, "CaptureNativeSnapshot"),
             ObjBindMethod(this.processInspector, "GetImagePath"),
             ObjBindMethod(this.processInspector, "GetCreationIdentity"),
-            GetCanonicalPath)
+            GetCanonicalPath,
+            ObjBindMethod(this.processInspector,
+                "CaptureAutoHotkeyScriptSnapshot"))
         this.maintenanceCoordinator := MaintenanceCoordinator(this, {
             CanonicalPath: GetCanonicalPath,
             ClearProcessIdentity: ClearStateProcessIdentity,
@@ -116,12 +148,13 @@ class ApplicationState {
             IsSupportedTarget: IsMaintenanceSupportedTarget,
             IsTargetFileReady: ObjBindMethod(this.targetFileInspector,
                 "IsReady"),
+            Localize: Tr,
+            LocalizeDiagnostic: TrDiagnostic,
             Log: LogMsg,
             LogSlow: LogSlowBackgroundOperation,
             NormalizeRoot: NormalizeMaintenanceRoot,
             NormalizeTargetPath: NormalizeTargetPath,
             ObserveTarget: ObserveTarget,
-            QueryProcessSnapshot: QueryProcessSnapshot,
             RefreshShortcutIdentity: ObjBindMethod(
                 this.targetIdentityService, "RefreshShortcut"),
             SaveApps: SaveAppsToIni,
@@ -131,6 +164,8 @@ class ApplicationState {
             SetProcessIdentity: SetStateProcessIdentity,
             TargetReferenceExists: ObjBindMethod(this.targetIdentityService,
                 "TargetReferenceExists"),
+            TargetSubjectExists: ObjBindMethod(this.targetIdentityService,
+                "TargetSubjectExists"),
             UpdateRunningState: UpdateRunningState,
             UpdateState: UpdateState,
             WatcherFactory: DirectoryChangeWatcher
@@ -139,6 +174,8 @@ class ApplicationState {
             ClearProcessIdentity: ClearStateProcessIdentity,
             GetLogFilePath: GetLogFilePath,
             GetTargetSpecs: ObjBindMethod(this.targetSpecsService, "Get"),
+            Localize: Tr,
+            LocalizeDiagnostic: TrDiagnostic,
             Log: LogMsg,
             LogSlow: LogSlowBackgroundOperation,
             NormalizeTargetPath: NormalizeTargetPath,
@@ -158,7 +195,11 @@ class ApplicationState {
         this.maintenanceCoordinator.Callbacks.ScheduleRestart := ObjBindMethod(
             this.guardRuntime, "ScheduleRestartFor")
         this.processSnapshots.SnapshotPublishedCallback := ObjBindMethod(
-            this.maintenanceCoordinator, "OnSnapshotPublished")
+            this, "OnProcessSnapshotPublished")
+        this.pendingProcessSnapshot := ""
+        this.pendingProcessSnapshotIndex := ""
+        this.processSnapshotDeliveryTimer := ObjBindMethod(this,
+            "DeliverPendingProcessSnapshot")
         this.appOrder := []
         this.configLoadWarnings := []
         this.configRecoveryEntries := []
@@ -178,10 +219,10 @@ class ApplicationState {
                 A_ScriptDir "\third_party\dependencies.lock.json",
                 A_ScriptDir "\third_party\resvg\VERSION.txt",
                 A_ScriptDir "\third_party\everything\VERSION.txt"
-            ])
+            ], "", Tr, TrDiagnostic)
         this.iconResources := IconResourceRegistry()
         this.svgRenderer := SvgRenderLibrary(
-            A_ScriptDir "\third_party\resvg\resvg.dll")
+            GetApplicationRootFilePath("third_party\resvg\resvg.dll"))
         this.uiInteractions := UiInteractionRegistry()
         this.reloadInProgress := false
         this.shutdownStarted := false
@@ -192,20 +233,97 @@ class ApplicationState {
         this.batchEditRows := []
         this.editSessionId := 0
         this.savedWidth := 730
-        this.savedHeight := 530
+        this.savedHeight := 520
         this.savedColumn1 := 500
-        this.savedColumn2 := 205
+        this.savedColumn2 := 180
         this.batchImportMaxResults := 2000
     }
 
+    OnProcessSnapshotPublished(snapshot, snapshotIndex) {
+        if this.shutdownStarted
+            return false
+        previousCritical := A_IsCritical
+        Critical("On")
+        try {
+            this.pendingProcessSnapshot := snapshot
+            this.pendingProcessSnapshotIndex := snapshotIndex
+        } finally {
+            Critical(previousCritical ? previousCritical : "Off")
+        }
+        return this.DeliverPendingProcessSnapshot()
+    }
+
+    DeliverPendingProcessSnapshot(*) {
+        if this.shutdownStarted {
+            this.ClearPendingProcessSnapshot()
+            return false
+        }
+        if !this.guardWorkGate.TryEnter() {
+            try SetTimer(this.processSnapshotDeliveryTimer, -25)
+            return false
+        }
+        snapshot := ""
+        snapshotIndex := ""
+        maintenanceAccepted := false
+        guardAccepted := false
+        try {
+            previousCritical := A_IsCritical
+            Critical("On")
+            try {
+                snapshot := this.pendingProcessSnapshot
+                snapshotIndex := this.pendingProcessSnapshotIndex
+                this.pendingProcessSnapshot := ""
+                this.pendingProcessSnapshotIndex := ""
+                try SetTimer(this.processSnapshotDeliveryTimer, 0)
+            } finally {
+                Critical(previousCritical ? previousCritical : "Off")
+            }
+            if Type(snapshot) != "Array"
+                || !(snapshotIndex is ProcessSnapshotIndex) {
+                return false
+            }
+            try {
+            maintenanceAccepted := this.maintenanceCoordinator
+                .OnSnapshotPublished(snapshot, snapshotIndex)
+            } catch as maintenanceError {
+                LogMsg(Tr("处理后台进程快照时发生错误：{1}",
+                    TrDiagnostic(maintenanceError.Message)))
+            }
+            try {
+            guardAccepted := this.guardRuntime.OnSnapshotPublished(
+                snapshot, snapshotIndex)
+            } catch as guardError {
+                LogMsg(Tr("处理后台进程快照时发生错误：{1}",
+                    TrDiagnostic(guardError.Message)))
+            }
+        } finally {
+            this.guardWorkGate.Leave()
+            if Type(this.pendingProcessSnapshot) == "Array"
+                try SetTimer(this.processSnapshotDeliveryTimer, -1)
+        }
+        return maintenanceAccepted || guardAccepted
+    }
+
+    ClearPendingProcessSnapshot() {
+        try SetTimer(this.processSnapshotDeliveryTimer, 0)
+        this.pendingProcessSnapshot := ""
+        this.pendingProcessSnapshotIndex := ""
+    }
+
     RetryDirtyAppConfig(*) {
-        if this.appsDirty
-            SaveAppsToIni()
+        if !this.appsDirty
+            return
+        if !this.guardWorkGate.TryEnter() {
+            this.guardMutationQueue.Enqueue(SaveAppsToIni)
+            return
+        }
+        try SaveAppsToIni()
+        finally this.guardWorkGate.Leave()
     }
 
     SetConfigRepository(repository) {
         if !IsObject(repository)
-            throw TypeError("配置仓储无效")
+            throw TypeError(Tr("配置仓储无效"))
         this.configRepository := repository
         for serviceName in ["runtimeSettingsService", "windowLayoutService",
             "watchlistPersistenceService"] {

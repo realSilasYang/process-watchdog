@@ -1,3 +1,7 @@
+; 软件升级相关进程的身份匹配器。
+; 综合进程路径、父子关系、命令行、安装目录和已学习特征判断更新参与者；
+; 单一弱信号不会直接进入升级保护，PID 还必须与创建时间配对以防复用误认。
+
 class MaintenanceActorIdentity {
     __New(pid, creationIdentity, imagePath, rootPath, parentChain) {
         this.PID := Integer(pid)
@@ -26,7 +30,8 @@ class MaintenanceActorMatcher {
     }
 
     Match(processInfo, targetPath, rootPath, learnedActors, targetPid := 0,
-        targetCreationIdentity := "", processMap := "", maintenanceBlocking := false) {
+        targetCreationIdentity := "", processMap := "", maintenanceBlocking := false,
+        trackedActorAnchors := "") {
         pid := this.Value(processInfo, "pid", 0)
         if !pid || (targetPid && pid == targetPid)
             return MaintenanceActorMatchResult(false)
@@ -46,6 +51,9 @@ class MaintenanceActorMatcher {
         referencesRoot := this.ReferencesRoot(processInfo, targetPath, rootPath)
         descendant := this.IsDescendantOfTarget(processInfo, targetPid,
             targetCreationIdentity, processMap)
+        actorDescendant := maintenanceBlocking
+            && this.IsDescendantOfTrackedActor(processInfo, processMap,
+                trackedActorAnchors)
         evidence := ""
         if learned
             evidence := "learned-scoped-path"
@@ -55,7 +63,7 @@ class MaintenanceActorMatcher {
             evidence := "installer-references-root"
         else if installerLike && descendant
             evidence := "installer-descendant"
-        else if maintenanceBlocking && descendant
+        else if maintenanceBlocking && (descendant || actorDescendant)
             evidence := "maintenance-descendant"
         if evidence == ""
             return MaintenanceActorMatchResult(false)
@@ -83,11 +91,16 @@ class MaintenanceActorMatcher {
     }
 
     IsIdentityAlive(identity) {
+        return this.GetIdentityStatus(identity) != 0
+    }
+
+    GetIdentityStatus(identity) {
         if !(identity is MaintenanceActorIdentity) || !ProcessExist(identity.PID)
-            return false
+            return 0
         currentCreation := this.ResolveLiveCreation(identity.PID)
-        return currentCreation != ""
-            && currentCreation == identity.CreationIdentity
+        if currentCreation == ""
+            return -1
+        return currentCreation == identity.CreationIdentity ? 1 : 0
     }
 
     RetainLiveRecords(previousRecords, activeRecords) {
@@ -101,7 +114,7 @@ class MaintenanceActorMatcher {
             identity := actorRecord.Identity
             if !(identity is MaintenanceActorIdentity)
                 || identity.Key != identityKey
-                || !this.IsIdentityAlive(identity)
+                || this.GetIdentityStatus(identity) == 0
                 continue
             activeRecords[identityKey] := actorRecord
         }
@@ -183,12 +196,25 @@ class MaintenanceActorMatcher {
 
     IsDescendantOfTarget(processInfo, targetPid, targetCreationIdentity,
         processMap := "") {
-        if !targetPid
+        if !targetPid || targetCreationIdentity == ""
             return false
-        if ProcessExist(targetPid) && targetCreationIdentity != "" {
+        if ProcessExist(targetPid) {
             currentCreation := this.ResolveLiveCreation(targetPid)
             if (currentCreation == ""
                 || currentCreation != targetCreationIdentity)
+                return false
+        } else {
+            ; 目标可能在创建更新器后立即退出。此时只能使用同一份快照中
+            ; 已记录的创建身份继续追溯，绝不能让一个旧 PID 单独充当父链锚点。
+            if Type(processMap) != "Map" || !processMap.Has(targetPid)
+                return false
+            snapshotTarget := processMap[targetPid]
+            snapshotCreation := this.Value(snapshotTarget, "identity", "")
+            if snapshotCreation == ""
+                snapshotCreation := this.Value(snapshotTarget,
+                    "liveCreationIdentity", "")
+            if (snapshotCreation == ""
+                || snapshotCreation != targetCreationIdentity)
                 return false
         }
         parentPid := this.Value(processInfo, "parent", 0)
@@ -224,6 +250,105 @@ class MaintenanceActorMatcher {
             parentPid := this.Value(parentInfo, "parent", 0)
         }
         return chain
+    }
+
+    BuildActorAnchorMap(actorRecords) {
+        anchors := Map()
+        this.AddActorAnchors(anchors, actorRecords)
+        return anchors
+    }
+
+    AddActorAnchors(anchors, actorRecords) {
+        if Type(anchors) != "Map" || Type(actorRecords) != "Map"
+            return anchors
+        for _, actorRecord in actorRecords {
+            if !IsObject(actorRecord) || !actorRecord.HasOwnProp("Identity")
+                || !(actorRecord.Identity is MaintenanceActorIdentity) {
+                continue
+            }
+            identity := actorRecord.Identity
+            if !anchors.Has(identity.PID)
+                anchors[identity.PID] := []
+            anchors[identity.PID].Push(identity)
+        }
+        return anchors
+    }
+
+    IsDescendantOfTrackedActor(processInfo, processMap, actorAnchors) {
+        if Type(actorAnchors) != "Map" || !actorAnchors.Count
+            return false
+        parentPid := this.Value(processInfo, "parent", 0)
+        childInfo := processInfo
+        visited := Map()
+        Loop 16 {
+            if !parentPid || visited.Has(parentPid)
+                return false
+            if actorAnchors.Has(parentPid) {
+                for actorIdentity in actorAnchors[parentPid] {
+                    if this.ActorAnchorMatches(actorIdentity, parentPid,
+                        childInfo, processMap) {
+                        return true
+                    }
+                }
+            }
+            visited[parentPid] := true
+            if Type(processMap) != "Map" || !processMap.Has(parentPid)
+                return false
+            childInfo := processMap[parentPid]
+            parentPid := this.Value(childInfo, "parent", 0)
+        }
+        return false
+    }
+
+    ActorAnchorMatches(identity, actorPid, childInfo, processMap) {
+        if !(identity is MaintenanceActorIdentity)
+            || identity.PID != actorPid {
+            return false
+        }
+        if Type(processMap) == "Map" && processMap.Has(actorPid) {
+            actorInfo := processMap[actorPid]
+            snapshotIdentity := this.ProcessCreationIdentity(actorInfo)
+            return snapshotIdentity != ""
+                && snapshotIdentity == identity.CreationIdentity
+        }
+        identityStatus := this.GetIdentityStatus(identity)
+        if identityStatus > 0
+            return true
+        if identityStatus < 0
+            return false
+        ; 父更新器可能已经退出，子进程仍保留原父 PID。只有子进程的
+        ; FILETIME 创建身份明确晚于已跟踪父进程时，才接受这次短命交接。
+        childCreation := this.ProcessCreationIdentity(childInfo)
+        return this.CreationIdentityIsLater(childCreation,
+            identity.CreationIdentity)
+    }
+
+    ProcessCreationIdentity(processInfo) {
+        creationIdentity := this.Value(processInfo,
+            "liveCreationIdentity", "")
+        if creationIdentity == ""
+            creationIdentity := this.Value(processInfo, "identity", "")
+        if creationIdentity == "" {
+            pid := this.Value(processInfo, "pid", 0)
+            if pid
+                creationIdentity := this.ResolveLiveCreation(pid)
+            if creationIdentity != ""
+                processInfo.liveCreationIdentity := creationIdentity
+        }
+        return String(creationIdentity)
+    }
+
+    CreationIdentityIsLater(candidateIdentity, earlierIdentity) {
+        candidateIdentity := String(candidateIdentity)
+        earlierIdentity := String(earlierIdentity)
+        if !RegExMatch(candidateIdentity, "i)^[0-9a-f]{16}$")
+            || !RegExMatch(earlierIdentity, "i)^[0-9a-f]{16}$") {
+            return false
+        }
+        try return Integer("0x" candidateIdentity)
+            > Integer("0x" earlierIdentity)
+        catch
+            return false
     }
 
     PathIsWithinRoot(candidatePath, rootPath) {

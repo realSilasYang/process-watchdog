@@ -1,12 +1,18 @@
+; 一次进程快照的只读索引。
+; 同一轮守护检查复用按 PID、规范化路径和文件名建立的映射，减少重复 WMI 查询；
+; 索引保留创建身份和可访问性证据，候选匹配仍需由目标探测器完成严格确认。
+
 class ProcessSnapshotIndex {
     __New(processes, capturedAtTicks := 0, supportsCommandLine := true,
-        canonicalizePath := "") {
+        canonicalizePath := "", creationIdentityResolver := "") {
         this.Processes := []
         for processInfo in processes
             this.Processes.Push(ProcessSnapshotIndex.CopyProcessInfo(processInfo))
         this.CapturedAtTicks := capturedAtTicks
+        this.RequestTicks := capturedAtTicks
         this.SupportsCommandLine := supportsCommandLine
         this.CanonicalizePath := canonicalizePath
+        this.CreationIdentityResolver := creationIdentityResolver
         this.ByPID := Map()
         this.ByImagePath := Map()
         this.ByImagePath.CaseSense := "Off"
@@ -33,7 +39,8 @@ class ProcessSnapshotIndex {
         if (targetName != "" && this.HasLiveEntryWithoutValue(this.ByName,
             StrLower(targetName), "exe")) {
             return ProcessObservation.Unknown(this.CapturedAtTicks,
-                "process-image", "同名进程的镜像路径不可用")
+                "process-image", "同名进程的镜像路径不可用",
+                ProcessObservationReason.InaccessibleImagePath)
         }
         return observation
     }
@@ -41,7 +48,8 @@ class ProcessSnapshotIndex {
     ObserveCommandTarget(targetPath) {
         if !this.SupportsCommandLine {
             return ProcessObservation.Unknown(this.CapturedAtTicks,
-                "process-command", "快照不包含命令行信息")
+                "process-command", "快照不包含命令行信息",
+                ProcessObservationReason.CommandLineUnavailable)
         }
         key := this.Canonical(targetPath)
         observation := this.ObserveEntries(this.ByCommandTarget, key,
@@ -52,11 +60,13 @@ class ProcessSnapshotIndex {
         if (targetName != "" && this.HasLiveEntry(this.ByRelativeCommandName,
             StrLower(targetName))) {
             return ProcessObservation.Unknown(this.CapturedAtTicks,
-                "process-command", "命令行只包含相对目标路径，无法证明完整身份")
+                "process-command", "命令行只包含相对目标路径，无法证明完整身份",
+                ProcessObservationReason.RelativeCommandTarget)
         }
         if this.HasLiveCommandLineGap(targetPath) {
             return ProcessObservation.Unknown(this.CapturedAtTicks,
-                "process-command", "候选解释器的命令行不可用")
+                "process-command", "候选解释器的命令行不可用",
+                ProcessObservationReason.CommandLineUnavailable)
         }
         return observation
     }
@@ -66,31 +76,60 @@ class ProcessSnapshotIndex {
         if (root == "")
             return ProcessObservation.Stopped(this.CapturedAtTicks,
                 "process-working-directory")
-        candidates := []
-        if (preferredName != "" && this.ByName.Has(preferredName))
-            candidates := this.ByName[preferredName]
-        else if (preferredName == "")
-            candidates := this.Processes
         matching := []
-        for processInfo in candidates {
-            if (!processInfo.HasOwnProp("exe") || processInfo.exe == ""
-                || !this.IsAlive(processInfo.pid))
+        preferredMatching := []
+        uncertainMatching := []
+        preferredUncertain := []
+        for processInfo in this.Processes {
+            if !processInfo.HasOwnProp("exe") || processInfo.exe == ""
+                continue
+            liveStatus := this.GetLiveStatus(processInfo)
+            if liveStatus == 0
                 continue
             imagePath := this.Canonical(processInfo.exe)
-            if (imagePath == root || InStr(imagePath, root "\") == 1)
-                matching.Push(processInfo)
+            if (imagePath == root || InStr(imagePath, root "\") == 1) {
+                processName := processInfo.HasOwnProp("name")
+                    ? StrLower(processInfo.name) : ""
+                isPreferred := preferredName != ""
+                    && processName == StrLower(preferredName)
+                if liveStatus > 0 {
+                    matching.Push(processInfo)
+                    if isPreferred
+                        preferredMatching.Push(processInfo)
+                } else {
+                    uncertainMatching.Push(processInfo)
+                    if isPreferred
+                        preferredUncertain.Push(processInfo)
+                }
+            }
         }
-        if (preferredName != "" && matching.Length)
-            return this.RunningObservation(matching[1], "process-working-directory")
-        if (preferredName == "" && matching.Length == 1)
+        if preferredMatching.Length == 1
+            return this.RunningObservation(preferredMatching[1],
+                "process-working-directory")
+        if preferredMatching.Length > 1
+            return ProcessObservation.Unknown(this.CapturedAtTicks,
+                "process-working-directory", "安装目录内存在多个同名候选进程",
+                ProcessObservationReason.AmbiguousTarget)
+        if preferredUncertain.Length
+            return ProcessObservation.Unknown(this.CapturedAtTicks,
+                "process-working-directory", "首选候选进程的创建身份无法核对",
+                ProcessObservationReason.ProcessIdentityUnavailable)
+        if matching.Length == 1
             return this.RunningObservation(matching[1], "process-working-directory")
         if (matching.Length > 1)
             return ProcessObservation.Unknown(this.CapturedAtTicks,
-                "process-working-directory", "安装目录内存在多个候选进程")
+                "process-working-directory", "安装目录内存在多个候选进程",
+                ProcessObservationReason.AmbiguousTarget)
+        if uncertainMatching.Length {
+            return ProcessObservation.Unknown(this.CapturedAtTicks,
+                "process-working-directory", "候选进程的创建身份无法核对",
+                ProcessObservationReason.ProcessIdentityUnavailable)
+        }
         if (preferredName != "" && this.HasLiveEntryWithoutValue(this.ByName,
             preferredName, "exe")) {
             return ProcessObservation.Unknown(this.CapturedAtTicks,
-                "process-working-directory", "同名进程的镜像路径不可用")
+                "process-working-directory", "同名进程的镜像路径不可用",
+                ProcessObservationReason.InaccessibleImagePath)
         }
         return ProcessObservation.Stopped(this.CapturedAtTicks,
             "process-working-directory")
@@ -121,19 +160,75 @@ class ProcessSnapshotIndex {
     ObserveEntries(indexMap, key, source) {
         if (key == "" || !indexMap.Has(key))
             return ProcessObservation.Stopped(this.CapturedAtTicks, source)
+        identityUnavailable := false
+        runningCandidates := []
         for processInfo in indexMap[key] {
-            if this.IsAlive(processInfo.pid)
-                return this.RunningObservation(processInfo, source)
+            liveStatus := this.GetLiveStatus(processInfo)
+            if liveStatus > 0
+                runningCandidates.Push(processInfo)
+            if liveStatus < 0
+                identityUnavailable := true
+        }
+        if runningCandidates.Length
+            return this.RunningObservation(
+                this.SelectOldestCandidate(runningCandidates), source)
+        if identityUnavailable {
+            return ProcessObservation.Unknown(this.CapturedAtTicks, source,
+                "候选进程的创建身份无法核对",
+                ProcessObservationReason.ProcessIdentityUnavailable)
         }
         return ProcessObservation.Stopped(this.CapturedAtTicks, source,
             "快照中的候选 PID 已结束")
+    }
+
+    SelectOldestCandidate(candidates) {
+        selected := candidates[1]
+        selectedCreation := this.GetCreationSortValue(selected)
+        for index, processInfo in candidates {
+            if index == 1
+                continue
+            candidateCreation := this.GetCreationSortValue(processInfo)
+            if (candidateCreation > 0
+                && (!selectedCreation
+                    || candidateCreation < selectedCreation)) {
+                selected := processInfo
+                selectedCreation := candidateCreation
+                continue
+            }
+            if (candidateCreation == selectedCreation
+                && this.ProcessIdValue(processInfo)
+                    < this.ProcessIdValue(selected)) {
+                selected := processInfo
+                selectedCreation := candidateCreation
+            }
+        }
+        return selected
+    }
+
+    GetCreationSortValue(processInfo) {
+        identity := processInfo.HasOwnProp("identity")
+            ? String(processInfo.identity) : ""
+        if identity == "" && processInfo.HasOwnProp("creation")
+            && RegExMatch(String(processInfo.creation), "i)^[0-9a-f]{16}$")
+            identity := String(processInfo.creation)
+        if !RegExMatch(identity, "i)^[0-9a-f]{16}$")
+            return 0
+        try return Integer("0x" identity)
+        catch
+            return 0
+    }
+
+    ProcessIdValue(processInfo) {
+        try return Integer(processInfo.pid)
+        catch
+            return 0x7FFFFFFF
     }
 
     HasLiveEntry(indexMap, key) {
         if (key == "" || !indexMap.Has(key))
             return false
         for processInfo in indexMap[key]
-            if this.IsAlive(processInfo.pid)
+            if this.GetLiveStatus(processInfo) != 0
                 return true
         return false
     }
@@ -142,7 +237,7 @@ class ProcessSnapshotIndex {
         if (key == "" || !indexMap.Has(key))
             return false
         for processInfo in indexMap[key] {
-            if this.IsAlive(processInfo.pid)
+            if this.GetLiveStatus(processInfo) != 0
                 && (!processInfo.HasOwnProp(propertyName)
                     || processInfo.%propertyName% == "")
                 return true
@@ -157,7 +252,7 @@ class ProcessSnapshotIndex {
                 || !ProcessSnapshotIndex.CommandLauncherMatchesExtension(
                     processInfo.name, targetExtension))
                 continue
-            if this.IsAlive(processInfo.pid)
+            if this.GetLiveStatus(processInfo) != 0
                 && (!processInfo.HasOwnProp("cmd") || processInfo.cmd == "")
                 return true
         }
@@ -165,14 +260,41 @@ class ProcessSnapshotIndex {
     }
 
     RunningObservation(processInfo, source) {
-        creationIdentity := processInfo.HasOwnProp("creation")
-            ? processInfo.creation : ""
+        creationIdentity := processInfo.HasOwnProp("identity")
+            && processInfo.identity != "" ? processInfo.identity
+            : (processInfo.HasOwnProp("creation") ? processInfo.creation : "")
         return ProcessObservation.Running(processInfo.pid, creationIdentity,
             this.CapturedAtTicks, source)
     }
 
-    IsAlive(pid) {
-        return pid && ProcessExist(pid)
+    IsAlive(processInfo) {
+        return this.GetLiveStatus(processInfo) > 0
+    }
+
+    GetLiveStatus(processInfo) {
+        if !IsObject(processInfo) || !processInfo.HasOwnProp("pid")
+            || !processInfo.pid || !ProcessExist(processInfo.pid) {
+            return 0
+        }
+        expectedIdentity := processInfo.HasOwnProp("identity")
+            ? String(processInfo.identity) : ""
+        if expectedIdentity == "" && processInfo.HasOwnProp("creation")
+            && RegExMatch(String(processInfo.creation), "i)^[0-9a-f]{16}$") {
+            ; 单元调用方和原生适配器可直接把 FILETIME 身份放在 creation；
+            ; WMI 的 CreationDate 具有完全不同的长时间戳格式，不会误入此分支。
+            expectedIdentity := String(processInfo.creation)
+        }
+        if !IsObject(this.CreationIdentityResolver)
+            return 1
+        if expectedIdentity == ""
+            return -1
+        try currentIdentity := String(
+            this.CreationIdentityResolver.Call(processInfo.pid))
+        catch
+            return -1
+        if currentIdentity == ""
+            return -1
+        return currentIdentity == expectedIdentity ? 1 : 0
     }
 
     Canonical(path) {
@@ -192,7 +314,7 @@ class ProcessSnapshotIndex {
     static CopyProcessInfo(processInfo) {
         copy := {}
         for propertyName in ["pid", "parent", "name", "cmd", "exe", "creation",
-            "observedTicks"] {
+            "identity", "observedTicks"] {
             if processInfo.HasOwnProp(propertyName)
                 copy.%propertyName% := processInfo.%propertyName%
         }
@@ -206,17 +328,24 @@ class ProcessSnapshotIndex {
         switch targetExtension {
             case "msc": return RegExMatch(launcherName, "^mmc\.exe$") != 0
             case "ahk": return RegExMatch(launcherName, "^autohotkey.*\.exe$") != 0
-            case "py", "pyw": return RegExMatch(launcherName, "^pythonw?\.exe$") != 0
-            case "js": return RegExMatch(launcherName, "^(?:node|wscript|cscript)\.exe$") != 0
+            case "py", "pyw": return RegExMatch(launcherName,
+                "^(?:py|python(?:w|\d+(?:\.\d+)?w?)?)\.exe$") != 0
+            case "js": return RegExMatch(launcherName,
+                "^(?:nodew?|deno|bun|wscript|cscript)\.exe$") != 0
             case "vbs", "vbe", "wsf": return RegExMatch(launcherName, "^(?:wscript|cscript)\.exe$") != 0
-            case "ps1": return RegExMatch(launcherName, "^(?:powershell(?:_ise)?|pwsh)\.exe$") != 0
+            case "ps1": return RegExMatch(launcherName,
+                "^(?:powershell(?:_ise)?|pwsh(?:-preview)?)\.exe$") != 0
             case "bat", "cmd": return launcherName == "cmd.exe"
-            case "rb": return launcherName == "ruby.exe"
-            case "pl": return launcherName == "perl.exe"
-            case "php": return launcherName == "php.exe"
-            case "lua": return launcherName == "lua.exe"
+            case "rb": return RegExMatch(launcherName, "^rubyw?\.exe$") != 0
+            case "pl": return RegExMatch(launcherName,
+                "^(?:w?perl)(?:\d+(?:\.\d+)*)?\.exe$") != 0
+            case "php": return RegExMatch(launcherName,
+                "^php(?:-cgi|-win)?\.exe$") != 0
+            case "lua": return RegExMatch(launcherName,
+                "^(?:lua(?:jit|\d+(?:\.\d+)*)?|luajit)\.exe$") != 0
             case "jar": return RegExMatch(launcherName, "^javaw?\.exe$") != 0
-            case "sh", "bash": return RegExMatch(launcherName, "^(?:bash|sh)\.exe$") != 0
+            case "sh", "bash": return RegExMatch(launcherName,
+                "^(?:bash|sh|zsh|dash)\.exe$") != 0
         }
         return false
     }
@@ -234,6 +363,10 @@ class ProcessSnapshotIndex {
             return result
         SplitPath(arguments[1], &launcherName)
         launcherName := StrLower(launcherName)
+        ; Run 可以用 PATH 中无扩展名的命令启动程序，WMI 会原样保留该命令行。
+        ; 后续只匹配受支持的启动器白名单，因此在这里补齐 .exe 不会扩大识别范围。
+        if !InStr(launcherName, ".")
+            launcherName .= ".exe"
         isPowerShellLauncher := RegExMatch(launcherName,
             "i)^(?:powershell(?:_ise)?|pwsh)\.exe$") != 0
 
@@ -304,8 +437,21 @@ class ProcessSnapshotIndex {
 
         if !this.IsSupportedCommandLauncher(launcherName)
             return result
+        skipNextArgument := false
         for index, argument in arguments {
-            if (index == 1 || argument == "" || SubStr(argument, 1, 1) == "-"
+            if index == 1
+                continue
+            if skipNextArgument {
+                skipNextArgument := false
+                continue
+            }
+            if this.LauncherOptionConsumesNext(launcherName, argument) {
+                skipNextArgument := true
+                continue
+            }
+            if this.LauncherExecutesCodeOrModule(launcherName, argument)
+                return result
+            if (argument == "" || SubStr(argument, 1, 1) == "-"
                 || SubStr(argument, 1, 1) == "/")
                 continue
             if (this.AddEmbeddedCommandCandidates(result, argument)
@@ -315,9 +461,56 @@ class ProcessSnapshotIndex {
         return result
     }
 
+    static LauncherExecutesCodeOrModule(launcherName, argument) {
+        option := StrLower(argument)
+        if RegExMatch(launcherName,
+            "i)^(?:py|python(?:w|\d+(?:\.\d+)?w?)?)\.exe$") {
+            return RegExMatch(option, "^(?:-c|-m)$") != 0
+                || RegExMatch(option, "^-c.+$") != 0
+        }
+        if RegExMatch(launcherName, "i)^(?:nodew?|bun)\.exe$") {
+            return RegExMatch(option,
+                "^(?:-e|--eval|-p|--print)(?:=.*)?$") != 0
+        }
+        if RegExMatch(launcherName, "i)^deno\.exe$")
+            return option == "eval"
+        if RegExMatch(launcherName,
+            "i)^(?:rubyw?|w?perl(?:\d+(?:\.\d+)*)?|php(?:-cgi|-win)?|lua(?:jit|\d+(?:\.\d+)*)?|luajit)\.exe$") {
+            return RegExMatch(option,
+                "^(?:-e|-r|--eval)(?:=.*)?$") != 0
+        }
+        return false
+    }
+
+    static LauncherOptionConsumesNext(launcherName, argument) {
+        option := StrLower(argument)
+        if RegExMatch(launcherName, "i)^(?:nodew?)\.exe$") {
+            return RegExMatch(option,
+                "^(?:-r|--require|--import|--loader|--experimental-loader)$") != 0
+        }
+        if RegExMatch(launcherName, "i)^bun\.exe$")
+            return RegExMatch(option, "^(?:-r|--preload)$") != 0
+        if RegExMatch(launcherName, "i)^deno\.exe$") {
+            return RegExMatch(option,
+                "^(?:-c|--config|--import-map|--cert|--location)$") != 0
+        }
+        if RegExMatch(launcherName,
+            "i)^(?:py|python(?:w|\d+(?:\.\d+)?w?)?)\.exe$") {
+            return RegExMatch(option,
+                "^(?:-w|-x|--check-hash-based-pycs)$") != 0
+        }
+        if RegExMatch(launcherName, "i)^rubyw?\.exe$")
+            return RegExMatch(option, "^(?:-r|--require|-i|-e)$") != 0
+        if RegExMatch(launcherName, "i)^(?:bash|sh|zsh|dash)\.exe$") {
+            return RegExMatch(option,
+                "^(?:--rcfile|--init-file|--profile|-o)$") != 0
+        }
+        return false
+    }
+
     static IsSupportedCommandLauncher(launcherName) {
         return RegExMatch(launcherName,
-            "i)^(?:autohotkey.*|pythonw?|node|wscript|cscript|ruby|perl|php|lua|bash|sh|powershell(?:_ise)?|pwsh|javaw?|cmd|mmc)\.exe$") != 0
+            "i)^(?:autohotkey.*|py|python(?:w|\d+(?:\.\d+)?w?)?|nodew?|deno|bun|wscript|cscript|rubyw?|w?perl(?:\d+(?:\.\d+)*)?|php(?:-cgi|-win)?|lua(?:jit|\d+(?:\.\d+)*)?|luajit|bash|sh|zsh|dash|powershell(?:_ise)?|pwsh(?:-preview)?|javaw?|cmd|mmc)\.exe$") != 0
     }
 
     static AddCommandCandidate(result, argument) {

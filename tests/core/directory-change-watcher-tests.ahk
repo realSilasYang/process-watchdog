@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证目录监听器的启动、重新挂起、停止和句柄释放。
+; 停止后的迟到回调不能重开监听，也不能访问已经关闭的原生资源。
+
 #Include ..\..\src\Platform\Win32.ahk
 #Include ..\..\src\Inspection\DirectoryChangeWatcher.ahk
 
@@ -60,9 +63,10 @@ RunDirectoryChangeWatcherTests() {
     NumPut("UInt", 4, malformedBuffer, 0)
     malformedChanges := DirectoryChangeWatcher.ParseNotificationBuffer(
         malformedBuffer, malformedBuffer.Size + 100)
-    AssertDirectoryWatcher(malformedChanges.Length == 1
-        && malformedChanges[1].RelativePath == "safe.exe",
-        "畸形后继偏移破坏了已经解析的有效通知")
+    AssertDirectoryWatcher(malformedChanges.Length == 2
+        && malformedChanges[1].RelativePath == "safe.exe"
+        && malformedChanges[2].RelativePath == "*",
+        "畸形后继偏移没有保留有效通知并触发全目录复核")
 
     processId := DllCall("kernel32\GetCurrentProcessId", "UInt")
     rootPath := Format("{}\ProcessWatchdog-DirectoryWatcher-{}-{}",

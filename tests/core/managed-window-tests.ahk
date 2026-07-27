@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证托管窗口创建、层级租约、关闭顺序和幂等清理。
+; 原生窗口意外消失与显式关闭都必须恢复上级交互，并且只执行一次资源收尾。
+
 #Include ..\..\src\UI\ManagedWindow.ahk
 
 class FakeManagedWindowCallbacks {

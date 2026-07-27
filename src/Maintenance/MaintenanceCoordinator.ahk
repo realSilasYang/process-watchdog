@@ -1,3 +1,7 @@
+; 软件升级保护的运行时协调器。
+; 它连接更新进程识别、目录监听、文件稳定确认、会话日志和目标控制器阶段转换；
+; 普通守护与升级检查共享工作门，所有定时器、监听器和迟到回调都受会话代际约束。
+
 class MaintenanceCoordinator {
     __New(runtime, callbacks) {
         this.Runtime := runtime
@@ -22,9 +26,20 @@ class MaintenanceCoordinator {
         if this.Initialized
             return true
         this.RestoreSessions()
-        for path, stateObj in this.Runtime.appStates
-            this.EnsureWatcher(path, stateObj)
-        snapshot := this.QueryNativeSnapshot(&snapshotReady)
+        for path, stateObj in this.Runtime.appStates {
+            try this.EnsureWatcher(path, stateObj)
+            catch as watcherError {
+                this.LogTargetError(path, watcherError)
+            }
+        }
+        snapshot := []
+        snapshotReady := false
+        try snapshot := this.QueryNativeSnapshot(&snapshotReady)
+        catch as snapshotError {
+            this.Log(this.Text("升级保护初始化时无法建立进程基线，将在下一轮重试。"))
+            this.Log(this.Text("升级进程扫描异常：{1}",
+                this.DiagnosticText(snapshotError.Message)))
+        }
         if snapshotReady {
             initialSnapshotTicks := this.Now()
             initialSnapshotIndex := this.CreateSnapshotIndex(snapshot,
@@ -32,16 +47,25 @@ class MaintenanceCoordinator {
             for path, stateObj in this.Runtime.appStates {
                 if !stateObj.Enabled || !InStr(path, "\")
                     continue
-                observation := this.Callbacks.ObserveTarget.Call(path,
-                    initialSnapshotIndex)
-                if observation.IsRunning()
-                    this.Callbacks.SetProcessIdentity.Call(stateObj,
-                        observation.PID)
+                try {
+                    observation := this.Callbacks.ObserveTarget.Call(path,
+                        initialSnapshotIndex)
+                    if observation.IsRunning()
+                        this.Callbacks.SetProcessIdentity.Call(stateObj,
+                            observation.PID, observation.CreationIdentity)
+                } catch as initializationProbeError {
+                    this.LogTargetError(path, initializationProbeError)
+                }
             }
-            this.RefreshActors(snapshot, true,
+            try this.RefreshActors(snapshot, true,
                 this.SnapshotSupportsCommandLine, initialSnapshotIndex)
+            catch as actorError {
+                this.Log(this.Text("升级保护初始化时无法建立进程基线，将在下一轮重试。"))
+                this.Log(this.Text("升级进程扫描异常：{1}",
+                    this.DiagnosticText(actorError.Message)))
+            }
         } else {
-            this.Log("升级保护初始化时无法建立进程基线，将在下一轮重试。")
+            this.Log(this.Text("升级保护初始化时无法建立进程基线，将在下一轮重试。"))
         }
         this.Runtime.processSnapshots.Start()
         this.Initialized := true
@@ -87,6 +111,8 @@ class MaintenanceCoordinator {
     QueueCommand(command) {
         if this.Stopped
             return false
+        if command == "PING|"
+            return true
         if !this.Initialized {
             this.PendingCommands.Push(command)
             return true
@@ -109,8 +135,8 @@ class MaintenanceCoordinator {
                 this.ApplyCommand(command)
                 processed++
             } catch as commandError {
-                try this.Log("显式升级维护命令执行异常: "
-                    commandError.Message)
+                try this.Log(this.Text("显式升级维护命令执行异常：{1}",
+                    this.DiagnosticText(commandError.Message)))
             }
         }
         return processed
@@ -124,7 +150,7 @@ class MaintenanceCoordinator {
         path := this.Callbacks.NormalizeTargetPath.Call(
             SubStr(command, separator + 1))
         if !this.Runtime.appStates.Has(path) {
-            this.Log("显式升级维护命令未找到监控目标: " path)
+            this.Log(this.Text("显式升级维护命令未找到监控目标：{1}", path))
             return false
         }
         if (action == "BEGIN")
@@ -139,14 +165,16 @@ class MaintenanceCoordinator {
             return false
         stateObj := this.Runtime.appStates[path]
         if !stateObj.Enabled || !this.IsProtectionEnabled(path, stateObj) {
-            this.Log("显式升级维护命令被忽略，目标未启用升级保护: " path)
+            this.Log(this.Text("显式升级维护命令被忽略，目标未启用升级保护：{1}", path))
             return false
         }
         if (stateObj.MaintenanceMode == MaintenancePhase.TimedOut)
             this.ResetSession(path, stateObj, false)
         stateObj.ExplicitMaintenance := true
         this.Enter(path, stateObj, "收到显式维护开始命令")
-        this.UpdateState(path, stateObj, "🔄 显式升级维护中")
+        this.UpdateState(path, stateObj,
+            this.Text("🔄 显式升级维护中"),
+            GuardStatusKind.MaintenanceUpdating)
         this.SaveJournal()
         return true
     }
@@ -167,9 +195,11 @@ class MaintenanceCoordinator {
             stateObj.MaintenanceStartedTicks := this.Now()
             stateObj.MaintenanceStartedAt := A_NowUTC
         }
-        this.UpdateState(path, stateObj, "⏳ 确认升级文件稳定")
+        this.UpdateState(path, stateObj,
+            this.Text("⏳ 确认升级文件稳定"),
+            GuardStatusKind.MaintenanceStabilizing)
         this.SaveJournal()
-        this.Log("收到显式维护结束命令，开始执行安全恢复检查: " path)
+        this.Log(this.Text("收到显式维护结束命令，开始执行安全恢复检查：{1}", path))
         return true
     }
 
@@ -194,33 +224,58 @@ class MaintenanceCoordinator {
             stateObj := this.Runtime.appStates[path]
             if !stateObj.Enabled || !this.IsProtectionEnabled(path, stateObj)
                 continue
-            stateObj.MaintenanceMode := MaintenancePhase.Recovering
+            restoredMode := String(session.Mode)
+            validActiveMode := restoredMode == MaintenancePhase.Updating
+                || restoredMode == MaintenancePhase.Stabilizing
+                || restoredMode == MaintenancePhase.Recovering
+            restoredAsTimedOut := restoredMode == MaintenancePhase.TimedOut
+                || !validActiveMode
             stateObj.Pending := true
             stateObj.TargetStartTicks := 0
-            stateObj.MaintenanceStartedAt := session.StartedAt != ""
-                ? session.StartedAt : A_NowUTC
+            stateObj.MaintenanceStartedAt := session.StartedAt
             elapsedSeconds := 0
-            try elapsedSeconds := Max(0, DateDiff(A_NowUTC,
-                stateObj.MaintenanceStartedAt, "Seconds"))
+            validStartedAt := RegExMatch(stateObj.MaintenanceStartedAt,
+                "^\d{14}$") != 0
+            if validStartedAt {
+                try {
+                    elapsedSeconds := DateDiff(A_NowUTC,
+                        stateObj.MaintenanceStartedAt, "Seconds")
+                    if elapsedSeconds < 0
+                        validStartedAt := false
+                } catch
+                    validStartedAt := false
+            }
+            if !validStartedAt {
+                restoredAsTimedOut := true
+                elapsedSeconds := stateObj.MaintenanceConfig.MaxWaitSeconds
+                stateObj.MaintenanceStartedAt := A_NowUTC
+            }
             stateObj.MaintenanceStartedTicks := this.Now()
                 - elapsedSeconds * 1000
             stateObj.MaintenanceLastActivityTicks := this.Now()
+            stateObj.MaintenanceActorCheckedTicks := 0
             stateObj.MaintenanceBaselineFingerprint := session.BaselineFingerprint
             stateObj.MaintenanceFileChanged := session.FileChanged
             stateObj.ExplicitMaintenance := session.Explicit
-            if (elapsedSeconds >= stateObj.MaintenanceConfig.MaxWaitSeconds) {
-                stateObj.MaintenanceMode := MaintenancePhase.TimedOut
-                this.UpdateState(path, stateObj, "⚠️ 升级等待超时")
+            if (restoredAsTimedOut
+                || elapsedSeconds >= stateObj.MaintenanceConfig.MaxWaitSeconds) {
+                stateObj.RestoreMaintenanceMode(MaintenancePhase.TimedOut)
+                this.UpdateState(path, stateObj,
+                    this.Text("⚠️ 升级等待超时"),
+                    GuardStatusKind.MaintenanceTimedOut)
             } else {
-                this.UpdateState(path, stateObj, "🔄 恢复升级保护状态")
+                stateObj.RestoreMaintenanceMode(MaintenancePhase.Recovering)
+                this.UpdateState(path, stateObj,
+                    this.Text("🔄 恢复升级保护状态"),
+                    GuardStatusKind.MaintenanceRecovering)
             }
-            this.Log("已恢复未完成的升级保护会话: " path)
+            this.Log(this.Text("已恢复未完成的升级保护会话：{1}", path))
         }
         this.SaveJournal()
     }
 
     ProcessTick() {
-        if this.Stopped || !this.Initialized || !this.ProcessBaselineReady
+        if this.Stopped || !this.Initialized
             return
         if !this.Runtime.guardWorkGate.TryEnter()
             return
@@ -229,10 +284,29 @@ class MaintenanceCoordinator {
             loopStartedTicks := this.Now()
             nowTicks := this.Now()
             snapshots := this.Runtime.processSnapshots
-            if snapshots.HasFreshSnapshot(snapshots.ReuseIntervalMs, nowTicks)
+            snapshots.Pump()
+            if !this.ProcessBaselineReady {
+                ; 初始化瞬间的原生快照可能暂时失败，完整 WMI 快照也可能长期
+                ; 不可用。定时器继续用低成本原生枚举重建基线，但绝不在 UI
+                ; 线程同步回退 WMI；最近启动的安装器仍按基线规则保守纳入。
+                if snapshots.HasFreshSnapshot(snapshots.ReuseIntervalMs,
+                    nowTicks) {
+                    return
+                }
+                if snapshots.CanRetry(nowTicks)
+                    snapshots.Start()
+                baselineSnapshot := this.QueryNativeSnapshot(
+                    &baselineReady)
+                if baselineReady {
+                    baselineIndex := this.CreateSnapshotIndex(
+                        baselineSnapshot, nowTicks,
+                        this.SnapshotSupportsCommandLine)
+                    this.RefreshActors(baselineSnapshot, true,
+                        this.SnapshotSupportsCommandLine, baselineIndex)
+                }
                 return
-            if snapshots.HasFreshNativeSnapshot(snapshots.ReuseIntervalMs,
-                nowTicks)
+            }
+            if snapshots.HasFreshSnapshot(snapshots.ReuseIntervalMs, nowTicks)
                 return
             shouldRefreshActors := false
             for path, stateObj in this.Runtime.appStates {
@@ -246,14 +320,19 @@ class MaintenanceCoordinator {
             }
             if !shouldRefreshActors || !snapshots.CanRetry(nowTicks)
                 return
-            if snapshots.Pump()
+            ; 完整命令行快照始终交给后台工作器。原生快照仅提供快速路径，
+            ; 不能因为它成功就长期跳过安装器命令行和父子关系证据。
+            snapshots.Start()
+            if snapshots.HasFreshNativeSnapshot(snapshots.ReuseIntervalMs,
+                nowTicks)
                 return
             snapshot := this.QueryNativeSnapshot(&snapshotReady)
             if snapshotReady
                 this.RefreshActors(snapshot, false,
                     this.SnapshotSupportsCommandLine)
         } catch as processError {
-            try this.Log("升级进程扫描异常: " processError.Message)
+            try this.Log(this.Text("升级进程扫描异常：{1}",
+                this.DiagnosticText(processError.Message)))
         } finally {
             this.Runtime.guardWorkGate.Leave()
             if loopStartedTicks
@@ -285,20 +364,25 @@ class MaintenanceCoordinator {
                     changes := entry.watcher.Poll()
                 } catch as watcherError {
                     try entry.watcher.Close()
-                    this.Log("升级文件监听异常（" entry.rootPath "）："
-                        watcherError.Message)
+                    this.Log(this.Text("升级文件监听异常（{1}）：{2}",
+                        entry.rootPath,
+                        this.DiagnosticText(watcherError.Message)))
                     continue
                 }
                 for change in changes {
                     for path, stateObj in entry.subscribers {
-                        if (this.Runtime.appStates.Has(path)
-                            && this.Runtime.appStates[path] == stateObj
-                            && stateObj.Enabled
-                            && this.IsProtectionEnabled(path, stateObj)
-                            && this.IsRelevantFootprintChange(path, stateObj,
-                                change.RelativePath, entry)) {
-                            this.RecordFootprintActivity(path, stateObj,
-                                change.RelativePath)
+                        try {
+                            if (this.Runtime.appStates.Has(path)
+                                && this.Runtime.appStates[path] == stateObj
+                                && stateObj.Enabled
+                                && this.IsProtectionEnabled(path, stateObj)
+                                && this.IsRelevantFootprintChange(path,
+                                    stateObj, change.RelativePath, entry)) {
+                                this.RecordFootprintActivity(path, stateObj,
+                                    change.RelativePath)
+                            }
+                        } catch as targetEventError {
+                            this.LogTargetError(path, targetEventError)
                         }
                     }
                 }
@@ -315,6 +399,7 @@ class MaintenanceCoordinator {
                     * this.Runtime.maintenancePollInterval
                     / this.Runtime.maintenanceFingerprintRetryInterval))
             for path, stateObj in this.Runtime.appStates {
+                try {
                 if !stateObj.Enabled || !this.IsProtectionEnabled(path,
                     stateObj) {
                     this.CloseWatcher(stateObj)
@@ -374,11 +459,15 @@ class MaintenanceCoordinator {
                     }
                 }
                 this.Advance(path, stateObj)
+                } catch as targetAdvanceError {
+                    this.LogTargetError(path, targetAdvanceError)
+                }
             }
             if (this.JournalDirty && nowTicks >= this.JournalRetryDueTicks)
                 this.SaveJournal()
         } catch as eventError {
-            try this.Log("升级文件监听异常: " eventError.Message)
+            try this.Log(this.Text("升级文件监听异常：{1}",
+                this.DiagnosticText(eventError.Message)))
         } finally {
             this.Runtime.guardWorkGate.Leave()
             if loopStartedTicks
@@ -470,9 +559,10 @@ class MaintenanceCoordinator {
         if (!InStr(subjectRelative, "\")
             && StrLower(changedName) == StrLower(targetName))
             return true
-        if (watcherEntry && watcherEntry.subscribers.Count > 1)
-            return false
         extension := StrLower(extension)
+        ; 同一套件的多个目标常共享根目录下的 DLL、资源包和运行库。无法把
+        ; 公共文件变化唯一归给某个 EXE 时，必须通知全部订阅者，不能让变化
+        ; 因“归属不明”而完全消失；目标仍在运行时这只记录证据，不会直接暂停。
         return InStr("|exe|com|dll|sys|ocx|cpl|mui|pak|bin|dat|node|asar|jar|",
             "|" extension "|") != 0
     }
@@ -482,13 +572,8 @@ class MaintenanceCoordinator {
         snapshotResult := this.Runtime.processInspector.CaptureNativeSnapshot()
         snapshotReady := snapshotResult.Ready
         snapshot := snapshotResult.Processes
-        if !snapshotReady {
-            this.SnapshotSupportsCommandLine := true
-            snapshot := this.Callbacks.QueryProcessSnapshot.Call(&snapshotReady)
-            if !snapshotReady
-                this.Runtime.processSnapshots.DelayRetry(3000)
+        if !snapshotReady
             return snapshot
-        }
         this.EnrichNativeProcessPaths(snapshot)
         return snapshot
     }
@@ -533,12 +618,15 @@ class MaintenanceCoordinator {
         learnedPaths.CaseSense := "Off"
         targetPids := Map()
         matcher := this.Runtime.maintenanceActorMatcher
+        trackedActorAnchors := Map()
         for path, stateObj in this.Runtime.appStates {
             if !stateObj.Enabled || !this.IsProtectionEnabled(path, stateObj)
                 continue
             targetPid := stateObj.PID ? stateObj.PID : stateObj.LastKnownPID
             if targetPid
                 targetPids[targetPid] := true
+            matcher.AddActorAnchors(trackedActorAnchors,
+                stateObj.TransientActorIdentities)
             for signature in stateObj.MaintenanceConfig.LearnedActors {
                 normalized := matcher.NormalizeLearnedSignature(signature,
                     stateObj.MaintenanceConfig.InstallRoot)
@@ -557,6 +645,11 @@ class MaintenanceCoordinator {
             }
             if (processInfo.exe != "" && learnedPaths.Count
                 && learnedPaths.Has(matcher.Canonical(processInfo.exe))) {
+                candidates.Push(processInfo)
+                continue
+            }
+            if matcher.IsDescendantOfTrackedActor(processInfo, processMap,
+                trackedActorAnchors) {
                 candidates.Push(processInfo)
                 continue
             }
@@ -601,10 +694,14 @@ class MaintenanceCoordinator {
         for path, stateObj in this.Runtime.appStates {
             if !stateObj.Enabled || !this.IsProtectionEnabled(path, stateObj)
                 continue
+            try {
             knownActorIdentities := stateObj.KnownActorIdentities
             transientActorIdentities := stateObj.TransientActorIdentities
+            trackedActorAnchors := matcher.BuildActorAnchorMap(
+                transientActorIdentities)
             activeKnown := Map()
             activeTransient := Map()
+            observedTransientCount := 0
             for processInfo in actorCandidates {
                 targetPid := stateObj.PID ? stateObj.PID : stateObj.LastKnownPID
                 targetCreation := stateObj.PID
@@ -614,7 +711,8 @@ class MaintenanceCoordinator {
                     this.Callbacks.GetMaintenanceSubjectPath.Call(path),
                     stateObj.MaintenanceConfig.InstallRoot,
                     stateObj.MaintenanceConfig.LearnedActors, targetPid,
-                    targetCreation, processMap, this.IsBlocking(stateObj))
+                    targetCreation, processMap, this.IsBlocking(stateObj),
+                    trackedActorAnchors)
                 if !matchResult.Matched
                     continue
                 identity := matcher.CreateIdentity(processInfo,
@@ -622,11 +720,16 @@ class MaintenanceCoordinator {
                 if !(identity is MaintenanceActorIdentity)
                     continue
                 actorRecord := {Process: processInfo, Identity: identity,
-                    Match: matchResult}
+                    Match: matchResult, LastSeenTicks: snapshotTicks}
                 identityKey := identity.Key
                 activeKnown[identityKey] := actorRecord
                 wasKnown := knownActorIdentities.Has(identityKey)
-                shouldTrack := transientActorIdentities.Has(identityKey)
+                ; 用户规则或已验证学习结果是强证据，即使更新器早于小助手启动，
+                ; 也不能被初始基线吞掉；“最近启动”只约束启发式发现的候选。
+                strongConfiguredMatch := matchResult.Evidence
+                    == "learned-scoped-path"
+                shouldTrack := strongConfiguredMatch
+                    || transientActorIdentities.Has(identityKey)
                     || (!isBaseline && !wasKnown)
                     || (stateObj.MaintenanceMode
                         == MaintenancePhase.Recovering && !wasKnown)
@@ -635,6 +738,7 @@ class MaintenanceCoordinator {
                             stateObj.MaintenanceConfig.DetectionSeconds))
                 if shouldTrack {
                     activeTransient[identityKey] := actorRecord
+                    observedTransientCount++
                     if !wasKnown
                         this.RecordActor(path, stateObj, actorRecord)
                 }
@@ -642,10 +746,16 @@ class MaintenanceCoordinator {
             matcher.RetainLiveRecords(knownActorIdentities, activeKnown)
             matcher.RetainLiveRecords(transientActorIdentities,
                 activeTransient)
+            this.RetainRecentActorAnchors(stateObj,
+                transientActorIdentities, activeTransient, snapshotTicks)
             stateObj.KnownActorIdentities := activeKnown
             stateObj.TransientActorIdentities := activeTransient
-            if (activeTransient.Count && this.IsBlocking(stateObj))
+            stateObj.MaintenanceActorCheckedTicks := snapshotTicks
+            if (observedTransientCount && this.IsBlocking(stateObj))
                 stateObj.MaintenanceLastActivityTicks := this.Now()
+            } catch as targetActorError {
+                this.LogTargetError(path, targetActorError)
+            }
         }
         this.ProcessBaselineReady := true
     }
@@ -701,24 +811,69 @@ class MaintenanceCoordinator {
         if stateObj.PIDCreationIdentity != "" {
             currentCreation := this.Runtime.processInspector
                 .GetCreationIdentity(stateObj.PID)
-            return currentCreation == ""
-                || currentCreation == stateObj.PIDCreationIdentity
+            return currentCreation != ""
+                && currentCreation == stateObj.PIDCreationIdentity
         }
         return true
     }
 
     HasActiveActors(stateObj) {
         staleIdentities := []
+        hasActiveActor := false
+        nowTicks := this.Now()
+        anchorWindowMs := stateObj.MaintenanceConfig.DetectionSeconds * 1000
         for identityKey, actorRecord in stateObj.TransientActorIdentities {
-            if !actorRecord.HasOwnProp("Identity")
-                || !this.Runtime.maintenanceActorMatcher
-                    .IsIdentityAlive(actorRecord.Identity) {
+            if !actorRecord.HasOwnProp("Identity") {
+                staleIdentities.Push(identityKey)
+                continue
+            }
+            identityStatus := this.Runtime.maintenanceActorMatcher
+                .GetIdentityStatus(actorRecord.Identity)
+            if identityStatus != 0 {
+                hasActiveActor := true
+                continue
+            }
+            lastSeenTicks := actorRecord.HasOwnProp("LastSeenTicks")
+                ? actorRecord.LastSeenTicks : stateObj.LastActorSeenTicks
+            if !lastSeenTicks || nowTicks < lastSeenTicks
+                || nowTicks - lastSeenTicks > anchorWindowMs {
                 staleIdentities.Push(identityKey)
             }
         }
         for identityKey in staleIdentities
             stateObj.TransientActorIdentities.Delete(identityKey)
-        return stateObj.TransientActorIdentities.Count > 0
+        return hasActiveActor
+    }
+
+    RetainRecentActorAnchors(stateObj, previousRecords, activeRecords,
+        snapshotTicks) {
+        if Type(previousRecords) != "Map" || Type(activeRecords) != "Map"
+            return activeRecords
+        anchorWindowMs := stateObj.MaintenanceConfig.DetectionSeconds * 1000
+        for identityKey, actorRecord in previousRecords {
+            if activeRecords.Has(identityKey) || !IsObject(actorRecord)
+                || !actorRecord.HasOwnProp("Identity") {
+                continue
+            }
+            lastSeenTicks := actorRecord.HasOwnProp("LastSeenTicks")
+                ? actorRecord.LastSeenTicks : stateObj.LastActorSeenTicks
+            if lastSeenTicks && snapshotTicks >= lastSeenTicks
+                && snapshotTicks - lastSeenTicks <= anchorWindowMs {
+                activeRecords[identityKey] := actorRecord
+            }
+        }
+        return activeRecords
+    }
+
+    HasFreshActorEvidence(stateObj, nowTicks) {
+        checkedTicks := stateObj.MaintenanceActorCheckedTicks
+        requiredTicks := Max(stateObj.MaintenanceStartedTicks,
+            stateObj.LastFileActivityTicks)
+        maximumAgeMs := Max(2000,
+            this.Runtime.maintenanceProcessInterval * 2)
+        return checkedTicks && checkedTicks >= requiredTicks
+            && nowTicks >= checkedTicks
+            && nowTicks - checkedTicks <= maximumAgeMs
     }
 
     HasRecentSignal(stateObj) {
@@ -770,7 +925,7 @@ class MaintenanceCoordinator {
             if (stateObj.MaintenanceMode != MaintenancePhase.Arbitrating)
                 stateObj.MaintenanceMode := MaintenancePhase.Updating
         } else if !this.TargetAppearsRunning(stateObj) && stateObj.Enabled {
-            if this.Callbacks.TargetReferenceExists.Call(path, stateObj) {
+            if this.TargetSubjectExists(path, stateObj) {
                 this.Enter(path, stateObj, relativePath == ""
                     ? "检测到程序文件变化" : "检测到安装目录变化")
             } else {
@@ -784,8 +939,7 @@ class MaintenanceCoordinator {
             return false
         if this.IsBlocking(stateObj)
             return true
-        targetExists := this.Callbacks.TargetReferenceExists.Call(path,
-            stateObj)
+        targetExists := this.TargetSubjectExists(path, stateObj)
         if this.HasActiveActors(stateObj)
             || (targetExists && this.HasRecentSignal(stateObj)) {
             this.Enter(path, stateObj, "目标退出时检测到升级信号")
@@ -809,12 +963,15 @@ class MaintenanceCoordinator {
         if (stateObj.MaintenanceMode != MaintenancePhase.Arbitrating)
             return true
         stateObj.ArbitrationSnapshotRequestTicks := snapshotRequestTicks
-        this.UpdateState(path, stateObj, "⏳ 判断是否正在升级")
+        this.UpdateState(path, stateObj,
+            this.Text("⏳ 判断是否正在升级"),
+            GuardStatusKind.MaintenanceArbitrating)
         this.SaveJournal()
         return true
     }
 
-    MarkTargetMissing(path, stateObj, statusText) {
+    MarkTargetMissing(path, stateObj, statusText,
+        statusKind := "") {
         wasBlocking := this.IsBlocking(stateObj)
         firstMissingObservation := !stateObj.MissingSinceTicks
         if (firstMissingObservation || wasBlocking)
@@ -828,8 +985,10 @@ class MaintenanceCoordinator {
         if firstMissingObservation
             stateObj.MissingSinceTicks := this.Now()
         if (stateObj.State != statusText) {
-            this.UpdateState(path, stateObj, statusText)
-            this.Log("监测到目标文件已不存在，守护进入缺失状态，文件恢复后将自动复核: " path)
+            this.UpdateState(path, stateObj, statusText,
+                statusKind != "" ? statusKind
+                    : GuardStatusKind.TargetMissing)
+            this.Log(this.Text("监测到目标文件已不存在，守护进入缺失状态，文件恢复后将自动复核：{1}", path))
         }
         if (firstMissingObservation || wasBlocking)
             this.SaveJournal()
@@ -844,8 +1003,9 @@ class MaintenanceCoordinator {
         stateObj.MaintenanceFingerprintCheckedTicks := 0
         stateObj.MaintenanceReadyCheckedTicks := 0
         stateObj.TransitionTo(GuardPhase.Initializing)
-        this.UpdateState(path, stateObj, "初始化...")
-        this.Log("目标文件已恢复，重新核对运行状态: " path)
+        this.UpdateState(path, stateObj, this.Text("初始化..."),
+            GuardStatusKind.Initializing)
+        this.Log(this.Text("目标文件已恢复，重新核对运行状态：{1}", path))
         return true
     }
 
@@ -868,13 +1028,14 @@ class MaintenanceCoordinator {
             stateObj.MaintenanceStartedAt := A_NowUTC
             if !stateObj.MaintenanceFileChanged
                 stateObj.MaintenanceBaselineFingerprint := this.GetFingerprint(path)
-            this.Log("已进入软件升级保护: " path
-                (reason != "" ? "（" reason "）" : ""))
+            this.Log(this.Text("已进入软件升级保护：{1}{2}", path,
+                reason != "" ? this.Text("（{1}）", this.Text(reason)) : ""))
         }
         stateObj.MaintenanceLastActivityTicks := nowTicks
         stateObj.MaintenanceMode := MaintenancePhase.Updating
         stateObj.Pending := true
-        this.UpdateState(path, stateObj, "🔄 软件升级中")
+        this.UpdateState(path, stateObj, this.Text("🔄 软件升级中"),
+            GuardStatusKind.MaintenanceUpdating)
         if firstEntry
             this.SaveJournal()
         return true
@@ -897,39 +1058,82 @@ class MaintenanceCoordinator {
             }
         }
         if changed
-            this.Log("已从本次升级过程学习更新程序特征: " path)
+            this.Log(this.Text("已从本次升级过程学习更新程序特征：{1}", path))
         return changed
     }
 
     Complete(path, stateObj) {
+        expectedGeneration := stateObj.Generation
+        expectedMode := stateObj.MaintenanceMode
+        if !this.IsCurrentSession(path, stateObj, expectedGeneration,
+            expectedMode)
+            return false
         learnedChanged := this.LearnActors(path, stateObj)
         identityChanged := this.Callbacks.RefreshShortcutIdentity.Call(path,
             stateObj, true)
+        if !this.IsCurrentSession(path, stateObj, expectedGeneration,
+            expectedMode)
+            return false
         currentFingerprint := this.GetFingerprint(path)
+        if !this.IsCurrentSession(path, stateObj, expectedGeneration,
+            expectedMode)
+            return false
         stableMs := stateObj.MaintenanceConfig.StableSeconds * 1000
         stateObj.SafetyFingerprint := currentFingerprint
         stateObj.SafetyStableSince := this.Now() - stableMs
         this.ResetSession(path, stateObj, false)
+        if !this.IsCurrentSession(path, stateObj, expectedGeneration,
+            MaintenancePhase.Normal)
+            return false
         this.SaveJournal()
-        if (learnedChanged || identityChanged)
+        if !this.IsCurrentSession(path, stateObj, expectedGeneration,
+            MaintenancePhase.Normal)
+            return false
+        if (learnedChanged || identityChanged) {
             this.Callbacks.SaveApps.Call()
+            if !this.IsCurrentSession(path, stateObj, expectedGeneration,
+                MaintenancePhase.Normal)
+                return false
+        }
         observation := this.Callbacks.ObserveTarget.Call(path, "", 1000)
+        if !this.IsCurrentSession(path, stateObj, expectedGeneration,
+            MaintenancePhase.Normal)
+            return false
         if observation.IsRunning() {
-            this.Callbacks.SetProcessIdentity.Call(stateObj, observation.PID)
+            this.Callbacks.SetProcessIdentity.Call(stateObj, observation.PID,
+                observation.CreationIdentity)
+            if !this.IsCurrentSession(path, stateObj, expectedGeneration,
+                MaintenancePhase.Normal)
+                return false
             stateObj.FailCount := 0
             this.Callbacks.UpdateRunningState.Call(path, stateObj)
-            this.Log("软件升级完成，已恢复正常守护: " path)
-            return
+            this.Log(this.Text("软件升级完成，已恢复正常守护：{1}", path))
+            return true
         }
         if observation.IsUnknown() {
             stateObj.Pending := true
-            this.UpdateState(path, stateObj, "⏳ 等待进程状态...")
+            this.UpdateState(path, stateObj,
+                this.Text("⏳ 等待进程状态..."),
+                GuardStatusKind.WaitingObservation)
             this.Callbacks.ScheduleRestart.Call(path, stateObj, 2000)
-            return
+            return true
         }
-        this.UpdateState(path, stateObj, "⏳ 升级完成，准备恢复")
+        this.UpdateState(path, stateObj,
+            this.Text("⏳ 升级完成，准备恢复"),
+            GuardStatusKind.MaintenanceRecovering)
         this.Callbacks.ScheduleRestart.Call(path, stateObj, 200)
-        this.Log("软件升级完成，准备恢复启动: " path)
+        this.Log(this.Text("软件升级完成，准备恢复启动：{1}", path))
+        return true
+    }
+
+    IsCurrentSession(path, stateObj, expectedGeneration,
+        expectedMode := "") {
+        path := this.Callbacks.NormalizeTargetPath.Call(path)
+        return !this.Stopped && stateObj is TargetSupervisor
+            && this.Runtime.appStates.Has(path)
+            && this.Runtime.appStates[path] == stateObj
+            && stateObj.Generation == expectedGeneration
+            && (expectedMode == "" || stateObj.MaintenanceMode == expectedMode)
     }
 
     MarkTimedOut(path, stateObj) {
@@ -937,9 +1141,10 @@ class MaintenanceCoordinator {
         stateObj.MaintenanceMode := MaintenancePhase.TimedOut
         stateObj.Pending := true
         stateObj.TargetStartTicks := 0
-        this.UpdateState(path, stateObj, "⚠️ 升级等待超时")
+        this.UpdateState(path, stateObj, this.Text("⚠️ 升级等待超时"),
+            GuardStatusKind.MaintenanceTimedOut)
         this.SaveJournal()
-        this.Log("软件升级保护超过最长等待时间，需要用户确认后恢复: " path)
+        this.Log(this.Text("软件升级保护超过最长等待时间，需要用户确认后恢复：{1}", path))
     }
 
     Advance(path, stateObj) {
@@ -958,8 +1163,7 @@ class MaintenanceCoordinator {
                 this.Callbacks.UpdateRunningState.Call(path, stateObj)
                 return
             }
-            targetExists := this.Callbacks.TargetReferenceExists.Call(path,
-                stateObj)
+            targetExists := this.TargetSubjectExists(path, stateObj)
             arbitrationBaseline := stateObj.ArbitrationSignalBaselineTicks
             hasNewSignal := (stateObj.LastActorSeenTicks
                     && stateObj.LastActorSeenTicks > arbitrationBaseline)
@@ -971,33 +1175,37 @@ class MaintenanceCoordinator {
             }
             elapsedMs := nowTicks - stateObj.MaintenanceStartedTicks
             detectionMs := stateObj.MaintenanceConfig.DetectionSeconds * 1000
-            fastDecisionMs := Min(2000, detectionMs)
-            fallbackDecisionMs := Min(3500, detectionMs)
             freshSnapshotReady := stateObj.ArbitrationSnapshotRequestTicks
-                && this.Runtime.processSnapshots.LatestSnapshotTicks
+                && this.Runtime.processSnapshots.LatestSnapshotRequestTicks
                     >= stateObj.ArbitrationSnapshotRequestTicks
-            if ((freshSnapshotReady && elapsedMs >= fastDecisionMs)
-                || elapsedMs >= fallbackDecisionMs) {
+            ; 单次快照只能确认当前存在升级参与者，不能证明检测窗口余下时间
+            ; 不会再出现更新器。无论快照是否及时返回，都等待用户配置的完整窗口。
+            if (elapsedMs >= detectionMs) {
                 elapsedSeconds := Format("{:.1f}", elapsedMs / 1000)
                 decisionNote := freshSnapshotReady
                     ? "后台进程快照已确认"
-                    : "后台进程快照未及时返回，已使用快速兜底"
+                    : "后台进程快照未及时返回，已等待完整检测窗口"
                 if !targetExists {
                     SplitPath(path, , , &missingExtension)
                     missingStatus := RegExMatch(missingExtension,
                         "i)^(ahk|py|pyw|js|vbs|vbe|wsf|ps1|bat|cmd|rb|pl|php|lua|jar|sh|bash)$")
-                        ? "❌ 脚本不存在" : "❌ 程序不存在"
-                    this.Log("未发现升级活动（" decisionNote "，耗时 "
-                        elapsedSeconds " 秒），目标仍不存在: " path)
-                    this.MarkTargetMissing(path, stateObj, missingStatus)
+                        ? this.Text("❌ 脚本不存在")
+                        : this.Text("❌ 程序不存在")
+                    this.Log(this.Text("未发现升级活动（{1}，耗时 {2} 秒），目标仍不存在：{3}",
+                        this.Text(decisionNote), elapsedSeconds, path))
+                    this.MarkTargetMissing(path, stateObj, missingStatus,
+                        RegExMatch(missingExtension,
+                            "i)^(ahk|py|pyw|js|vbs|vbe|wsf|ps1|bat|cmd|rb|pl|php|lua|jar|sh|bash)$")
+                            ? GuardStatusKind.ScriptMissing
+                            : GuardStatusKind.ProgramMissing)
                     return
                 }
                 remainingDelay := Max(100,
                     stateObj.MaintenanceRestartDueTicks - nowTicks)
                 this.ResetSession(path, stateObj, false)
                 this.SaveJournal()
-                this.Log("未发现升级活动（" decisionNote "，耗时 "
-                    elapsedSeconds " 秒），恢复普通重启流程: " path)
+                this.Log(this.Text("未发现升级活动（{1}，耗时 {2} 秒），恢复普通重启流程：{3}",
+                    this.Text(decisionNote), elapsedSeconds, path))
                 this.Callbacks.ScheduleRestart.Call(path, stateObj,
                     remainingDelay)
             }
@@ -1011,7 +1219,9 @@ class MaintenanceCoordinator {
         if stateObj.ExplicitMaintenance {
             stateObj.MaintenanceLastActivityTicks := nowTicks
             stateObj.MaintenanceMode := MaintenancePhase.Updating
-            this.UpdateState(path, stateObj, "🔄 显式升级维护中")
+            this.UpdateState(path, stateObj,
+                this.Text("🔄 显式升级维护中"),
+                GuardStatusKind.MaintenanceUpdating)
             return
         }
         if this.Callbacks.RefreshShortcutIdentity.Call(path, stateObj) {
@@ -1032,19 +1242,30 @@ class MaintenanceCoordinator {
         if activeActors {
             stateObj.MaintenanceLastActivityTicks := nowTicks
             stateObj.MaintenanceMode := MaintenancePhase.Updating
-            this.UpdateState(path, stateObj, "🔄 软件升级中")
+            this.UpdateState(path, stateObj, this.Text("🔄 软件升级中"),
+                GuardStatusKind.MaintenanceUpdating)
             return
         }
         if !fileReady {
             stateObj.MaintenanceMode := MaintenancePhase.Updating
             this.UpdateState(path, stateObj, FileExist(path)
-                ? "🔄 等待程序文件可用" : "🔄 等待程序文件恢复")
+                ? this.Text("🔄 等待程序文件可用")
+                : this.Text("🔄 等待程序文件恢复"),
+                GuardStatusKind.MaintenanceFileWaiting)
             return
         }
         if (quietMs < stableMs) {
             stateObj.MaintenanceMode := MaintenancePhase.Stabilizing
             remaining := Max(1, Ceil((stableMs - quietMs) / 1000))
-            this.UpdateState(path, stateObj, "⏳ 确认升级文件稳定 " remaining "s")
+            this.UpdateState(path, stateObj,
+                this.Text("⏳ 确认升级文件稳定 {1}s", remaining),
+                GuardStatusKind.MaintenanceStabilizing)
+            return
+        }
+        if !this.HasFreshActorEvidence(stateObj, nowTicks) {
+            this.UpdateState(path, stateObj,
+                this.Text("⏳ 等待进程状态..."),
+                GuardStatusKind.WaitingObservation)
             return
         }
         this.Complete(path, stateObj)
@@ -1064,8 +1285,7 @@ class MaintenanceCoordinator {
             this.Enter(path, stateObj, reason)
             return false
         }
-        maintenanceSubject := this.Callbacks.GetMaintenanceSubjectPath.Call(path)
-        if !FileExist(maintenanceSubject) {
+        if !this.TargetSubjectExists(path, stateObj) {
             reason := "目标程序文件不存在"
             return false
         }
@@ -1107,6 +1327,16 @@ class MaintenanceCoordinator {
         return this.Callbacks.IsSupportedTarget.Call(path)
     }
 
+    TargetSubjectExists(path, stateObj := "") {
+        if this.Callbacks.HasOwnProp("TargetSubjectExists")
+            && IsObject(this.Callbacks.TargetSubjectExists) {
+            return !!this.Callbacks.TargetSubjectExists.Call(path, stateObj)
+        }
+        subjectPath := this.Callbacks.GetMaintenanceSubjectPath.Call(path)
+        return subjectPath != "" && FileExist(subjectPath)
+            && !DirExist(subjectPath)
+    }
+
     CanonicalPath(path) {
         return this.Callbacks.CanonicalPath.Call(path)
     }
@@ -1115,7 +1345,7 @@ class MaintenanceCoordinator {
         return this.Callbacks.GetFingerprint.Call(path)
     }
 
-    UpdateState(path, expectedSupervisor, statusText) {
+    UpdateState(path, expectedSupervisor, statusText, statusKind := "") {
         path := this.Callbacks.NormalizeTargetPath.Call(path)
         if !(expectedSupervisor is TargetSupervisor)
             || !this.Runtime.appStates.Has(path)
@@ -1123,7 +1353,7 @@ class MaintenanceCoordinator {
             return false
         }
         this.Callbacks.UpdateState.Call(path, statusText,
-            expectedSupervisor)
+            expectedSupervisor, 0, false, statusKind)
         return true
     }
 
@@ -1136,6 +1366,7 @@ class MaintenanceCoordinator {
             return false
         }
         isSaving := true
+        Critical(previousCritical ? previousCritical : "Off")
         tempPath := this.Runtime.maintenanceJournalPath ".tmp."
             this.Now() "_" A_ScriptHwnd
         try {
@@ -1161,16 +1392,43 @@ class MaintenanceCoordinator {
             retryDelayMs := this.JournalRetryDelayMs
             this.JournalRetryDueTicks := this.Now() + retryDelayMs
             this.JournalRetryDelayMs := Min(retryDelayMs * 2, 60000)
-            this.Log("保存升级保护恢复状态失败: " journalError.Message)
+            this.Log(this.Text("保存升级保护恢复状态失败：{1}",
+                this.DiagnosticText(journalError.Message)))
             return false
         } finally {
-            isSaving := false
-            Critical(previousCritical ? previousCritical : "Off")
+            finishCritical := A_IsCritical
+            Critical("On")
+            try isSaving := false
+            finally Critical(finishCritical ? finishCritical : "Off")
         }
     }
 
     Log(message) {
         this.Callbacks.Log.Call(message)
+    }
+
+    LogTargetError(path, operationError) {
+        errorMessage := IsObject(operationError)
+            && operationError.HasOwnProp("Message")
+            ? operationError.Message : String(operationError)
+        this.Log(this.Text("升级文件监听异常（{1}）：{2}", path,
+            this.DiagnosticText(errorMessage)))
+    }
+
+    Text(template, values*) {
+        if this.Callbacks.HasOwnProp("Localize")
+            && IsObject(this.Callbacks.Localize) {
+            return this.Callbacks.Localize.Call(template, values*)
+        }
+        return values.Length ? Format(template, values*) : template
+    }
+
+    DiagnosticText(value) {
+        if this.Callbacks.HasOwnProp("LocalizeDiagnostic")
+            && IsObject(this.Callbacks.LocalizeDiagnostic) {
+            return this.Callbacks.LocalizeDiagnostic.Call(value)
+        }
+        return this.Text(value)
     }
 
     Now() {

@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证目标启动与分级停止的规格、命令构造和环境隔离。
+; 覆盖管理员启动、脚本宿主、正常关闭与超时结果，不实际终止用户进程。
+
 #Include ..\..\src\Platform\Win32.ahk
 #Include ..\..\src\Core\TargetSpecs.ahk
 #Include ..\..\src\Execution\TargetLauncher.ahk
@@ -23,6 +26,38 @@ AssertExecutionThrows(callback, message) {
         didThrow := true
     if !didThrow
         throw Error(message)
+}
+
+ResolveExecutionIdentity(identityState, pid) {
+    return identityState.Has(pid) ? identityState[pid] : ""
+}
+
+class RecordingTargetStopper extends TargetStopper {
+    __New(identityResolver) {
+        super.__New(identityResolver)
+        this.WindowCloseRequests := 0
+    }
+
+    RequestWindowClose(*) {
+        this.WindowCloseRequests++
+        return true
+    }
+}
+
+class NoWindowTargetStopper extends TargetStopper {
+    __New(identityResolver) {
+        super.__New(identityResolver)
+        this.WaitCalls := 0
+    }
+
+    RequestWindowClose(*) {
+        return false
+    }
+
+    WaitUntilStopped(*) {
+        this.WaitCalls++
+        return false
+    }
 }
 
 RunExecutionTests() {
@@ -100,6 +135,34 @@ RunExecutionTests() {
         "环境变量映射应忽略名称大小写")
     AssertExecutionEqual("a=b=c", variables["WATCHDOG_TOKEN"],
         "环境变量值中的等号不应被截断")
+    strictEnvironment := launcher.ValidateEnvironment(
+        "WATCHDOG_ALPHA= one `nWATCHDOG_TOKEN=a=b=c")
+    AssertExecution(strictEnvironment.Valid
+        && strictEnvironment.Variables.Count == 2
+        && strictEnvironment.Variables["WATCHDOG_ALPHA"] == " one "
+        && strictEnvironment.Normalized
+            == "WATCHDOG_ALPHA= one `nWATCHDOG_TOKEN=a=b=c",
+        "严格环境变量解析没有保留值内容或规范化有效配置")
+    missingSeparator := launcher.ValidateEnvironment(
+        "WATCHDOG_ALPHA=one`nBROKEN_LINE")
+    AssertExecution(!missingSeparator.Valid
+        && missingSeparator.ErrorCode == "MissingSeparator"
+        && missingSeparator.LineNumber == 2,
+        "严格环境变量解析没有定位缺少等号的行")
+    invalidVariableName := launcher.ValidateEnvironment(
+        "WATCHDOG_ALPHA=one`nINVALID NAME=value")
+    AssertExecution(!invalidVariableName.Valid
+        && invalidVariableName.ErrorCode == "InvalidName"
+        && invalidVariableName.LineNumber == 2
+        && invalidVariableName.VariableName == "INVALID NAME",
+        "严格环境变量解析没有拒绝非法变量名")
+    duplicateVariable := launcher.ValidateEnvironment(
+        "Watchdog_Token=one`nWATCHDOG_TOKEN=two")
+    AssertExecution(!duplicateVariable.Valid
+        && duplicateVariable.ErrorCode == "DuplicateName"
+        && duplicateVariable.LineNumber == 2
+        && duplicateVariable.VariableName == "WATCHDOG_TOKEN",
+        "严格环境变量解析没有拒绝大小写不同的重复变量名")
     systemRootState := launcher.CaptureEnvironment("SystemRoot")
     AssertExecution(systemRootState.Exists && systemRootState.Value != "",
         "启动器无法捕获现有环境变量")
@@ -125,6 +188,47 @@ RunExecutionTests() {
     currentPid := DllCall("kernel32\GetCurrentProcessId", "UInt")
     AssertExecution(!stopper.WaitUntilStopped(currentPid, 0),
         "停止等待超时不得误判仍在运行的进程已经退出")
+    terminateError := ""
+    AssertExecution(stopper.TerminateVerifiedProcess(currentPid,
+        "WRONG-INSTANCE", &terminateError) == 0 && ProcessExist(currentPid),
+        "原子强制终止没有拒绝创建身份不符的现存进程")
+    AssertExecution(stopper.TerminateVerifiedProcess(currentPid, "",
+        &terminateError) < 0 && ProcessExist(currentPid),
+        "缺少创建身份时仍允许强制终止现存进程")
+    missingIdentityStopper := RecordingTargetStopper((*) => "CURRENT")
+    missingIdentityResult := missingIdentityStopper.Stop(currentPid, 0, 0,
+        true)
+    AssertExecution(!missingIdentityResult.Stopped
+        && missingIdentityResult.Stage == TargetStopStage.Failed
+        && missingIdentityStopper.WindowCloseRequests == 0,
+        "缺少创建身份时停止器仍向现存进程发送了关闭请求")
+
+    identityState := Map(currentPid, "CURRENT-INSTANCE")
+    identityStopper := RecordingTargetStopper(
+        ResolveExecutionIdentity.Bind(identityState))
+    reusedResult := identityStopper.Stop(currentPid, 0, 0, true,
+        "", "", "OLD-INSTANCE")
+    AssertExecution(reusedResult.Stopped
+        && reusedResult.Stage == TargetStopStage.AlreadyStopped
+        && identityStopper.WindowCloseRequests == 0,
+        "PID 已复用时停止器仍向无关的新进程发送了关闭请求")
+    identityState[currentPid] := ""
+    inaccessibleResult := identityStopper.Stop(currentPid, 0, 0, true,
+        "", "", "CURRENT-INSTANCE")
+    AssertExecution(!inaccessibleResult.Stopped
+        && inaccessibleResult.Stage == TargetStopStage.Failed
+        && identityStopper.WindowCloseRequests == 0,
+        "创建身份不可核对时停止器仍继续执行破坏性操作")
+
+    identityState[currentPid] := "CURRENT-INSTANCE"
+    noWindowStopper := NoWindowTargetStopper(
+        ResolveExecutionIdentity.Bind(identityState))
+    noWindowResult := noWindowStopper.Stop(currentPid, 30, 0, false,
+        "", "", "CURRENT-INSTANCE")
+    AssertExecution(!noWindowResult.Stopped
+        && noWindowResult.Stage == TargetStopStage.ForceSkipped
+        && noWindowStopper.WaitCalls == 0,
+        "无窗口目标仍无意义等待了完整 GUI 关闭超时")
 
 }
 

@@ -1,3 +1,6 @@
+﻿# AHK 核心测试调度器。
+# 先验证主入口和快照工作器可独立退出，再逐项运行核心测试，并保证测试前后用户配置哈希不变。
+
 [CmdletBinding()]
 param(
     [string]$AutoHotkeyPath = ""
@@ -6,10 +9,14 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
+$resolvedLocalAhk = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot '.tools') `
+    -Recurse -File -Filter 'AutoHotkey64.exe' -ErrorAction SilentlyContinue |
+    Sort-Object { try { [Version]$_.VersionInfo.FileVersion } catch { [Version]'0.0' } } `
+        -Descending | ForEach-Object { $_.FullName })
 $ahkCandidates = @(
     $AutoHotkeyPath,
     $env:AUTOHOTKEY_EXE,
-    (Join-Path $projectRoot '.tools\AutoHotkey-2.0.26\AutoHotkey64.exe'),
+    $resolvedLocalAhk,
     'D:\Program Files\AutoHotkey\v2\AutoHotkey64.exe',
     "$env:ProgramFiles\AutoHotkey\v2\AutoHotkey64.exe"
 ) | Where-Object { $_ }
@@ -34,7 +41,11 @@ function Invoke-AutoHotkeyTest {
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
+    $startInfo.StandardOutputEncoding = [System.Text.Encoding]::Default
+    $startInfo.StandardErrorEncoding = [System.Text.Encoding]::Default
     $process = [System.Diagnostics.Process]::Start($startInfo)
+    $standardOutputTask = $process.StandardOutput.ReadToEndAsync()
+    $standardErrorTask = $process.StandardError.ReadToEndAsync()
     if (-not $process.WaitForExit($TimeoutMilliseconds)) {
         try {
             $process.Kill()
@@ -43,16 +54,16 @@ function Invoke-AutoHotkeyTest {
         }
         throw "$FailureMessage AutoHotkey process timed out after $TimeoutMilliseconds ms."
     }
-    $standardOutput = $process.StandardOutput.ReadToEnd()
-    $standardError = $process.StandardError.ReadToEnd()
+    $standardOutput = $standardOutputTask.GetAwaiter().GetResult()
+    $standardError = $standardErrorTask.GetAwaiter().GetResult()
     if ($standardOutput) {
         Write-Host $standardOutput.TrimEnd()
     }
-    if ($standardError) {
-        Write-Error $standardError.TrimEnd()
-    }
     if ($process.ExitCode -ne 0) {
-        throw $FailureMessage
+        throw "$FailureMessage`n$($standardError.TrimEnd())"
+    }
+    if ($standardError) {
+        throw "$FailureMessage AutoHotkey wrote to standard error:`n$($standardError.TrimEnd())"
     }
 }
 
@@ -85,7 +96,7 @@ try {
         }
         $workerHeader = Get-Content -LiteralPath $workerOutputPath `
             -Encoding Unicode -TotalCount 1
-        if ($workerHeader -notmatch '^SNAPSHOT\|\d+$') {
+        if ($workerHeader -notmatch '^SNAPSHOT\|\d+\|\d+$') {
             throw 'Process-snapshot worker published an invalid result header.'
         }
         Write-Host 'Process-snapshot worker exit validation passed.'
@@ -101,8 +112,11 @@ try {
     }
 
     foreach ($testScript in $testScripts) {
+        $testTimeoutMilliseconds = if ($testScript.Name -eq
+            'live-command-target-tests.ahk') { 120000 } else { 30000 }
         Invoke-AutoHotkeyTest "/ErrorStdOut `"$($testScript.FullName)`"" `
-            "Core test failed: $($testScript.Name)"
+            "Core test failed: $($testScript.Name)" `
+            -TimeoutMilliseconds $testTimeoutMilliseconds
     }
 
     Write-Host "Core tests passed: $($testScripts.Count) scripts."

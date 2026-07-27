@@ -1,6 +1,14 @@
+; 本地诊断包生成服务。
+; 汇总版本、Windows、DPI、资源句柄、守护阶段和日志摘要，并在写入前对敏感配置做脱敏；
+; 诊断包只生成到用户选择的位置，不负责上传或向外部服务发送数据。
+
 class DiagnosticBundleService {
-    __New(version, providers, supportFiles := "", archiveCallback := "") {
+    __New(version, providers, supportFiles := "", archiveCallback := "",
+        localize := "", diagnosticLocalize := "") {
         this.Version := version != "" ? String(version) : "unknown"
+        this.Localize := IsObject(localize) ? localize : ""
+        this.DiagnosticLocalize := IsObject(diagnosticLocalize)
+            ? diagnosticLocalize : ""
         this.StateProvider := this.RequireCallback(providers, "State")
         this.LogProvider := this.RequireCallback(providers, "Logs")
         this.SupportFiles := supportFiles is Array ? supportFiles : []
@@ -11,21 +19,21 @@ class DiagnosticBundleService {
     RequireCallback(providers, name) {
         if !IsObject(providers) || !providers.HasOwnProp(name)
             || !IsObject(providers.%name%)
-            throw TypeError("缺少诊断信息提供器: " name)
+            throw TypeError(this.Text("缺少诊断信息提供器：{1}", name))
         return providers.%name%
     }
 
     Export(destinationDirectory) {
         destinationDirectory := Trim(String(destinationDirectory))
         if !DirExist(destinationDirectory)
-            throw Error("诊断包保存目录不存在")
+            throw Error(this.Text("诊断包保存目录不存在"))
 
         stamp := FormatTime(, "yyyyMMdd-HHmmss")
         baseName := "process-watchdog-diagnostics-" stamp
         scratchDirectory := A_Temp "\" baseName "-" A_ScriptHwnd
             . "-" DllCall("kernel32\GetTickCount64", "UInt64")
         if DirExist(scratchDirectory)
-            throw Error("诊断临时目录已存在")
+            throw Error(this.Text("诊断临时目录已存在"))
         archivePath := this.FindAvailableArchive(destinationDirectory,
             baseName)
 
@@ -43,7 +51,7 @@ class DiagnosticBundleService {
             else
                 this.CreateArchive(scratchDirectory, archivePath)
             if !FileExist(archivePath)
-                throw Error("诊断压缩包未生成")
+                throw Error(this.Text("诊断压缩包未生成"))
             return archivePath
         } catch {
             try FileDelete(archivePath)
@@ -56,7 +64,8 @@ class DiagnosticBundleService {
     GetProviderText(provider) {
         try return String(provider.Call())
         catch as providerError
-            return "无法收集此部分诊断信息: " providerError.Message "`r`n"
+            return this.Text("无法收集此部分诊断信息：{1}",
+                this.DiagnosticText(providerError.Message)) "`r`n"
     }
 
     BuildEnvironmentText() {
@@ -68,7 +77,7 @@ class DiagnosticBundleService {
         dpi := 0
         try dpi := DllCall("user32\GetDpiForWindow", "Ptr", A_ScriptHwnd,
             "UInt")
-        return "Application=进程守护小助手`r`n"
+        return "Application=" this.Text("进程守护小助手") "`r`n"
             . "Version=" this.Version "`r`n"
             . "CollectedAt=" FormatTime(, "yyyy-MM-dd HH:mm:ss") "`r`n"
             . "Windows=" A_OSVersion "`r`n"
@@ -98,7 +107,7 @@ class DiagnosticBundleService {
     WriteText(path, text) {
         outputFile := FileOpen(path, "w", "UTF-8")
         if !outputFile
-            throw Error("无法写入诊断文件: " path)
+            throw Error(this.Text("无法写入诊断文件：{1}", path))
         try outputFile.Write(text)
         finally outputFile.Close()
     }
@@ -110,7 +119,7 @@ class DiagnosticBundleService {
             if !FileExist(candidate)
                 return candidate
         }
-        throw Error("诊断包目标文件名已被占用")
+        throw Error(this.Text("诊断包目标文件名已被占用"))
     }
 
     CreateArchive(sourceDirectory, archivePath) {
@@ -133,7 +142,7 @@ class DiagnosticBundleService {
             . "-ExecutionPolicy Bypass -Command "
             . this.QuoteArgument(powerShellCommand)
         if RunWait(command, , "Hide") != 0 || !FileExist(archivePath)
-            throw Error("系统压缩工具未能创建诊断包")
+            throw Error(this.Text("系统压缩工具未能创建诊断包"))
         return true
     }
 
@@ -153,5 +162,19 @@ class DiagnosticBundleService {
             return false
         try DirDelete(path, true)
         return !DirExist(path)
+    }
+
+    Text(template, values*) {
+        if IsObject(this.Localize)
+            return this.Localize.Call(template, values*)
+        return values.Length ? Format(template, values*) : template
+    }
+
+    DiagnosticText(value) {
+        ; 诊断包服务自身可以独立测试；生产环境传入的本地化回调负责
+        ; 把下游异常转换为当前界面语言，未注入时保留原始详情。
+        if IsObject(this.DiagnosticLocalize)
+            return this.DiagnosticLocalize.Call(value)
+        return String(value)
     }
 }

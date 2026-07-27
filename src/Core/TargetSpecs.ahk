@@ -1,3 +1,7 @@
+; 目标启动、探测和维护所需的不可变规格对象。
+; 启动入口与进程识别身份刻意分离：快捷方式可负责启动，真实可执行文件负责探测；
+; 各层只接收所需规格，避免再次从全局配置拼装出含义不一致的参数。
+
 class TargetLaunchKind {
     static Direct := "Direct"
     static Batch := "Batch"

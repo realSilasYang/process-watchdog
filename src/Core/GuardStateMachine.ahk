@@ -1,3 +1,7 @@
+; 普通守护阶段的纯状态转换规则。
+; 状态机只根据明确事件返回下一阶段，不读取界面文案或全局运行态，
+; 让“未知”“疑似停止”和“确认停止”保持不同语义，避免证据不足时盲目启动。
+
 class GuardStateMachine {
     static ValidPhases := Map(
         GuardPhase.Initializing, true,

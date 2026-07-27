@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证目标规格服务的构建、缓存和失效条件。
+; 快捷方式读取时间变化不应无故清缓存，真正影响启动或探测语义的变化必须重建。
+
 #Include ..\..\src\Core\TargetSpecs.ahk
 #Include ..\..\src\Inspection\ShortcutResolver.ahk
 #Include ..\..\src\Core\TargetSpecsService.ahk

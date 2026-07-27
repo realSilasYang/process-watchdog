@@ -1,22 +1,47 @@
+﻿# 项目工具链引导脚本。
+# AutoHotkey 与 Ahk2Exe 来自一次性解析快照；测试工具仍由仓库锁文件固定。
+# 正式发布必须传入 RefreshBuildTools，使每次人工发布都重新检查上游版本。
+
 [CmdletBinding()]
 param(
-    [string]$Destination = ""
+    [string]$Destination = "",
+    [string]$ResolvedToolchainPath = "",
+    [switch]$RefreshBuildTools
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$lockPath = Join-Path $PSScriptRoot 'toolchain.lock.json'
-$lock = Get-Content -LiteralPath $lockPath -Raw -Encoding UTF8 |
-    ConvertFrom-Json
 $toolsRoot = if ($Destination) {
     [System.IO.Path]::GetFullPath($Destination)
 } else {
     Join-Path $projectRoot '.tools'
 }
 $cacheRoot = Join-Path $toolsRoot 'cache'
+$resolvedPath = if ($ResolvedToolchainPath) {
+    [System.IO.Path]::GetFullPath($ResolvedToolchainPath)
+} else {
+    Join-Path $toolsRoot 'toolchain.resolved.json'
+}
 New-Item -ItemType Directory -Force -Path $cacheRoot | Out-Null
+
+if ($RefreshBuildTools -or
+    -not (Test-Path -LiteralPath $resolvedPath -PathType Leaf)) {
+    $resolution = & (Join-Path $PSScriptRoot 'resolve-toolchain.ps1') `
+        -OutputPath $resolvedPath -Destination $toolsRoot
+    $resolvedPath = $resolution.ResolvedToolchainPath
+}
+$resolved = Get-Content -LiteralPath $resolvedPath -Raw -Encoding UTF8 |
+    ConvertFrom-Json
+if ($resolved.schemaVersion -ne 2) {
+    throw "Unsupported resolved toolchain schema: $($resolved.schemaVersion)"
+}
+foreach ($requiredTool in @('autoHotkey', 'ahk2Exe', 'actionlint', 'gitleaks')) {
+    if ($resolved.tools.PSObject.Properties.Name -notcontains $requiredTool) {
+        throw "Resolved toolchain is missing $requiredTool."
+    }
+}
 
 function Assert-PathUnderRoot {
     param([string]$Path, [string]$Root)
@@ -30,27 +55,52 @@ function Assert-PathUnderRoot {
     return $fullPath
 }
 
+function Get-UniqueInstalledFile {
+    param(
+        [string]$Root,
+        [string]$Name,
+        [string]$DisplayName
+    )
+
+    $matches = @(Get-ChildItem -LiteralPath $Root -Recurse -File `
+        -Filter $Name)
+    if ($matches.Count -ne 1) {
+        throw "$DisplayName installation must contain exactly one $Name."
+    }
+    return $matches[0].FullName
+}
+
 function Install-Tool {
     param([string]$Name, [pscustomobject]$Definition)
 
     $installPath = Assert-PathUnderRoot `
         (Join-Path $toolsRoot "$Name-$($Definition.version)") $toolsRoot
-    $executablePath = Join-Path $installPath $Definition.executable
-    $installedExecutableValid =
-        (Test-Path -LiteralPath $executablePath -PathType Leaf) -and
-        ((Get-FileHash -Algorithm SHA256 -LiteralPath $executablePath).Hash `
-            -eq $Definition.executableSha256)
-    $installedLicenseValid = $true
-    if ($Definition.PSObject.Properties.Name -contains 'licenseFile') {
-        $installedLicensePath = Join-Path $installPath $Definition.licenseFile
-        $installedLicenseValid =
-            (Test-Path -LiteralPath $installedLicensePath -PathType Leaf) -and
-            ((Get-FileHash -Algorithm SHA256 `
-                -LiteralPath $installedLicensePath).Hash `
-                -eq $Definition.licenseSha256)
+    $installedExecutable = ""
+    if (Test-Path -LiteralPath $installPath -PathType Container) {
+        try {
+            $installedExecutable = Get-UniqueInstalledFile $installPath `
+                $Definition.executable $Name
+        } catch {
+            $installedExecutable = ""
+        }
     }
-    if ($installedExecutableValid -and $installedLicenseValid) {
-        return $executablePath
+    $installationValid = $installedExecutable -and
+        ((Get-FileHash -Algorithm SHA256 `
+            -LiteralPath $installedExecutable).Hash `
+            -eq $Definition.executableSha256)
+    if ($installationValid -and
+        $Definition.PSObject.Properties.Name -contains 'licenseFile') {
+        try {
+            $licensePath = Get-UniqueInstalledFile $installPath `
+                $Definition.licenseFile "$Name license"
+            $installationValid = (Get-FileHash -Algorithm SHA256 `
+                -LiteralPath $licensePath).Hash -eq $Definition.licenseSha256
+        } catch {
+            $installationValid = $false
+        }
+    }
+    if ($installationValid) {
+        return $installedExecutable
     }
 
     $archivePath = Assert-PathUnderRoot `
@@ -64,7 +114,7 @@ function Install-Tool {
         }
         Write-Host "Downloading $Name $($Definition.version)..."
         Invoke-WebRequest -UseBasicParsing -Uri $Definition.url `
-            -OutFile $archivePath
+            -OutFile $archivePath -TimeoutSec 180
     }
     $actualHash = (Get-FileHash -Algorithm SHA256 `
         -LiteralPath $archivePath).Hash
@@ -79,9 +129,8 @@ function Install-Tool {
     }
     New-Item -ItemType Directory -Force -Path $installPath | Out-Null
     Expand-Archive -LiteralPath $archivePath -DestinationPath $installPath
-    if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
-        throw "$Name archive did not contain $($Definition.executable)."
-    }
+    $executablePath = Get-UniqueInstalledFile $installPath `
+        $Definition.executable $Name
     $executableHash = (Get-FileHash -Algorithm SHA256 `
         -LiteralPath $executablePath).Hash
     if ($executableHash -ne $Definition.executableSha256) {
@@ -89,11 +138,8 @@ function Install-Tool {
         throw "$Name executable hash mismatch: $executableHash"
     }
     if ($Definition.PSObject.Properties.Name -contains 'licenseFile') {
-        $licensePath = Join-Path $installPath $Definition.licenseFile
-        if (-not (Test-Path -LiteralPath $licensePath -PathType Leaf)) {
-            Remove-Item -LiteralPath $installPath -Recurse -Force
-            throw "$Name archive did not contain $($Definition.licenseFile)."
-        }
+        $licensePath = Get-UniqueInstalledFile $installPath `
+            $Definition.licenseFile "$Name license"
         $licenseHash = (Get-FileHash -Algorithm SHA256 `
             -LiteralPath $licensePath).Hash
         if ($licenseHash -ne $Definition.licenseSha256) {
@@ -104,7 +150,7 @@ function Install-Tool {
     return $executablePath
 }
 
-function Get-PinnedArchive {
+function Get-ResolvedArchive {
     param(
         [string]$Name,
         [string]$Archive,
@@ -122,7 +168,8 @@ function Get-PinnedArchive {
             Remove-Item -LiteralPath $archivePath -Force
         }
         Write-Host "Downloading $Name..."
-        Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $archivePath
+        Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $archivePath `
+            -TimeoutSec 180
     }
     $actualHash = (Get-FileHash -Algorithm SHA256 `
         -LiteralPath $archivePath).Hash
@@ -133,13 +180,14 @@ function Get-PinnedArchive {
     return $archivePath
 }
 
-$autoHotkeyPath = Install-Tool 'AutoHotkey' $lock.tools.autoHotkey
-$compilerPath = Install-Tool 'Ahk2Exe' $lock.tools.ahk2Exe
-$actionlintPath = Install-Tool 'actionlint' $lock.tools.actionlint
-$gitleaksPath = Install-Tool 'gitleaks' $lock.tools.gitleaks
-$autoHotkeySourcePath = Get-PinnedArchive 'AutoHotkey source' `
-    $lock.tools.autoHotkey.sourceArchive $lock.tools.autoHotkey.sourceUrl `
-    $lock.tools.autoHotkey.sourceSha256
+$autoHotkeyPath = Install-Tool 'AutoHotkey' $resolved.tools.autoHotkey
+$compilerPath = Install-Tool 'Ahk2Exe' $resolved.tools.ahk2Exe
+$actionlintPath = Install-Tool 'actionlint' $resolved.tools.actionlint
+$gitleaksPath = Install-Tool 'gitleaks' $resolved.tools.gitleaks
+$autoHotkeySourcePath = Get-ResolvedArchive 'AutoHotkey source' `
+    $resolved.tools.autoHotkey.sourceArchive `
+    $resolved.tools.autoHotkey.sourceUrl `
+    $resolved.tools.autoHotkey.sourceSha256
 
 [pscustomobject]@{
     AutoHotkeyPath = $autoHotkeyPath
@@ -147,5 +195,6 @@ $autoHotkeySourcePath = Get-PinnedArchive 'AutoHotkey source' `
     CompilerPath = $compilerPath
     ActionlintPath = $actionlintPath
     GitleaksPath = $gitleaksPath
+    ResolvedToolchainPath = $resolvedPath
     ToolsRoot = $toolsRoot
 }

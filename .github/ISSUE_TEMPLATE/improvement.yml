@@ -1,0 +1,60 @@
+# 中文改进建议表单。
+# 用当前行为、期望行为和可验证收益描述对既有功能的优化，性能问题还应附带
+# 可比较的数据，便于维护者复现并判断改动是否真正改善用户体验。
+name: 改进建议（简体中文）
+description: 优化已有功能、界面、性能、兼容性或开发设计
+title: "[IMPROVEMENT] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: 改进概要
+      description: 请说明希望优化的现有功能、行为或设计。
+    validations:
+      required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: 当前情况
+      description: 请描述现有行为、限制和出现条件。性能问题请提供可比较的耗时、频率或资源数据。
+    validations:
+      required: true
+
+  - type: textarea
+    id: change
+    attributes:
+      label: 建议改动
+      description: 请描述期望的交互或行为，并尽量覆盖异常、取消、重载和多窗口等边界情况。
+    validations:
+      required: true
+
+  - type: textarea
+    id: benefit
+    attributes:
+      label: 预期收益与验收方式
+      description: 请说明如何判断改进有效，例如准确性、响应时间、资源占用、可访问性、清晰度或维护成本。
+    validations:
+      required: true
+
+  - type: textarea
+    id: risk
+    attributes:
+      label: 兼容性与风险
+      description: 请说明是否可能影响配置格式、守护正确性、升级保护、DPI、暗色模式、窗口生命周期或原生资源。
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 截图、日志或性能数据
+      description: 可提供经过脱敏的前后对比、诊断包、录屏或测量结果。
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: 提交确认
+      options:
+        - label: 我已搜索现有 Issue，并确认建议针对已有功能或设计。
+          required: true

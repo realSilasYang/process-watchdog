@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证单目标控制器的代际、阶段转换、任务槽和冷却恢复。
+; 暂停、删除或维护阻塞后，旧任务即使到期也必须被拒绝且不能重新启动目标。
+
 #Include ..\..\src\Core\GuardTypes.ahk
 #Include ..\..\src\Core\GuardStateMachine.ahk
 #Include ..\..\src\Maintenance\MaintenanceStateMachine.ahk
@@ -19,6 +22,22 @@ class FakeSupervisorClock {
 
     Advance(elapsedMs) {
         this.NowTicks += elapsedMs
+    }
+}
+
+class FailingArmWatchdogScheduler extends WatchdogScheduler {
+    __New(parameters*) {
+        super.__New(parameters*)
+        this.FailPositiveArm := false
+        this.PositiveArmAttempts := 0
+    }
+
+    SetSharedTimer(period) {
+        if period < 0 && this.FailPositiveArm {
+            this.PositiveArmAttempts++
+            throw Error("模拟共享定时器重新挂载失败")
+        }
+        return super.SetSharedTimer(period)
     }
 }
 
@@ -48,6 +67,10 @@ RecordScheduledValue(values, value) {
 
 IncrementScheduledCounter(counter) {
     counter.Count++
+}
+
+RecordSchedulerFailure(failures, taskError, task) {
+    failures.Push({Error: taskError, Task: task})
 }
 
 ScheduleNestedTask(scheduler, clock, values) {
@@ -87,6 +110,15 @@ RunTargetSupervisorTests() {
     AssertSupervisor(restartTask.Cancelled, "取消时没有作废重启任务令牌")
     AssertSupervisor(supervisor.Generation > initialGeneration,
         "取消任务没有推进控制器代际")
+    supervisor.BeginSnapshotWait("Restart", 1000, 11000)
+    supervisor.CancelScheduledTasks()
+    AssertSupervisor(!supervisor.IsSnapshotWaitCurrent()
+        && supervisor.SnapshotRequestTicks == 0,
+        "取消任务没有清理尚未完成的快照握手")
+    supervisor.StoreSnapshotEvidence("Restart", {CapturedAtTicks: 1200})
+    supervisor.CancelScheduledTasks()
+    AssertSupervisor(supervisor.TakeSnapshotEvidence("Restart") == "",
+        "取消任务后仍可消费旧代际的快照证据")
     fakeClock.Advance(80)
     scheduler.RunDue()
     AssertSupervisorEqual(0, supervisor.RestartProbeRuns,
@@ -112,11 +144,47 @@ RunTargetSupervisorTests() {
     AssertSupervisorEqual(GuardPhase.Paused, pausedSupervisor.Phase,
         "禁用目标的初始守护阶段错误")
 
+    pausedSupervisor.Pending := true
+    pausedSupervisor.TargetStartTicks := 9000
+    pausedSupervisor.FailCount := 4
+    pausedSupervisor.VerifyAttempts := 3
+    pausedSupervisor.UncertainObservationCount := 2
+    pausedSupervisor.IsRestarting := true
+    pausedSupervisor.ManualRestartRequested := true
+    pausedSupervisor.StoppedEvidenceTicks := 8000
+    pausedSupervisor.ResetGuardAttemptState()
+    AssertSupervisor(!pausedSupervisor.Pending
+        && pausedSupervisor.TargetStartTicks == 0
+        && pausedSupervisor.FailCount == 0
+        && pausedSupervisor.VerifyAttempts == 0
+        && pausedSupervisor.UncertainObservationCount == 0
+        && !pausedSupervisor.IsRestarting
+        && !pausedSupervisor.ManualRestartRequested
+        && pausedSupervisor.StoppedEvidenceTicks == 0,
+        "新守护轮次仍继承了上一轮的瞬态状态")
+
     invalidRejected := false
     try pausedSupervisor.TransitionTo("Not-A-Guard-Phase")
     catch ValueError
         invalidRejected := true
     AssertSupervisor(invalidRejected, "状态机接受了未知守护阶段")
+
+    stoppedScheduler := WatchdogScheduler(fakeClock, false)
+    stoppedScheduler.Shutdown()
+    schedulingFailureSupervisor := TargetSupervisor({Enabled: 1,
+        Scheduler: stoppedScheduler})
+    schedulingFailed := false
+    try schedulingFailureSupervisor.ScheduleRestart(
+        "C:\Apps\Unavailable.exe", RunRestartProbe, 100,
+        fakeClock.Call())
+    catch
+        schedulingFailed := true
+    AssertSupervisor(schedulingFailed
+        && !schedulingFailureSupervisor.Pending
+        && schedulingFailureSupervisor.RestartTask == ""
+        && schedulingFailureSupervisor.VerifyTask == ""
+        && schedulingFailureSupervisor.Phase == GuardPhase.Initializing,
+        "调度器已停止时控制器仍残留假任务或 Pending")
 
     fastRetry := RestartPolicy.NextAfterFailure(1, [1000, 3000, 5000])
     AssertSupervisorEqual(3000, fastRetry.DelayMs,
@@ -190,6 +258,37 @@ RunTargetSupervisorTests() {
         && !shutdownScheduler.Running
         && shutdownScheduler.Queue.Length == 0,
         "回调内关闭后调度器没有进入稳定停止状态")
+
+    failingClock := FakeSupervisorClock(9000)
+    armFailures := []
+    failingScheduler := FailingArmWatchdogScheduler(failingClock, false,
+        RecordSchedulerFailure.Bind(armFailures))
+    firstStrandedTask := TargetScheduledTask("First", 1)
+    secondStrandedTask := TargetScheduledTask("Second", 1)
+    failingScheduler.Schedule(firstStrandedTask,
+        IncrementScheduledCounter.Bind({Count: 0}), 9100)
+    failingScheduler.Schedule(secondStrandedTask,
+        IncrementScheduledCounter.Bind({Count: 0}), 9200)
+    failingScheduler.AutoArm := true
+    failingScheduler.FailPositiveArm := true
+    AssertSupervisor(!failingScheduler.ArmNext()
+        && failingScheduler.Queue.Length == 0
+        && firstStrandedTask.Cancelled && secondStrandedTask.Cancelled,
+        "共享定时器重新挂载失败后仍遗留无法唤醒的任务")
+    AssertSupervisor(armFailures.Length == 2
+        && armFailures[1].Task == firstStrandedTask
+        && armFailures[2].Task == secondStrandedTask,
+        "共享定时器失败没有逐项通知任务所有者")
+    failingScheduler.FailPositiveArm := false
+    recoveryCounter := {Count: 0}
+    failingScheduler.Schedule(TargetScheduledTask("Recovery", 1),
+        IncrementScheduledCounter.Bind(recoveryCounter),
+        failingClock.Call() + 20)
+    failingClock.Advance(20)
+    failingScheduler.RunDue()
+    AssertSupervisorEqual(1, recoveryCounter.Count,
+        "一次共享定时器失败后调度器无法恢复接单")
+    failingScheduler.Shutdown()
 
     bulkClock := FakeSupervisorClock(10000)
     bulkScheduler := WatchdogScheduler(bulkClock, false)

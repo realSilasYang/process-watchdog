@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证启动、探测和维护规格对象的字段归一化与默认语义。
+; 快捷方式启动入口和真实进程身份必须保持分离，防止安装器升级后识别错目标。
+
 #Include ..\..\src\Core\TargetSpecs.ahk
 #Include ..\..\src\Inspection\ShortcutResolver.ahk
 

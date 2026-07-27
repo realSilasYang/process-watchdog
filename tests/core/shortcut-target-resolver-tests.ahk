@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证标准及安装器间接快捷方式的真实目标解析。
+; 多候选、循环、目标缺失和保存身份冲突时必须保持歧义，不能随意绑定某个 EXE。
+
 #Include ..\..\src\Platform\Win32.ahk
 #Include ..\..\src\Core\TargetSpecs.ahk
 #Include ..\..\src\Inspection\ShortcutResolver.ahk
@@ -19,6 +22,53 @@ class ShortcutTargetTestSnapshots {
 
     HasFreshSnapshot(*) {
         return this.Fresh
+    }
+}
+
+class InstallerProxyShortcutTargetResolver extends ShortcutTargetResolver {
+    __New(snapshotService, callbacks, proxyPath, workingDirectory) {
+        super.__New(snapshotService, callbacks)
+        this.ProxyPath := proxyPath
+        this.TestWorkingDirectory := workingDirectory
+    }
+
+    ResolveMsiTarget(*) {
+        return this.ProxyPath
+    }
+
+    Read(path) {
+        return ShortcutDescriptor(path, true, this.ProxyPath,
+            this.TestWorkingDirectory, "")
+    }
+}
+
+class UnreadableMsiShortcutTargetResolver extends ShortcutTargetResolver {
+    __New(snapshotService, callbacks, msiTarget) {
+        super.__New(snapshotService, callbacks)
+        this.MsiTarget := msiTarget
+    }
+
+    ResolveMsiTarget(*) {
+        return this.MsiTarget
+    }
+
+    Read(path) {
+        return ShortcutDescriptor(path, false, "", "", "",
+            "测试模拟快捷方式不可读")
+    }
+}
+
+class PortableShortcutTargetResolver extends ShortcutTargetResolver {
+    __New(snapshotService, callbacks, versionValues) {
+        super.__New(snapshotService, callbacks)
+        this.TestVersionValues := versionValues
+    }
+
+    GetExecutableVersionValues(path) {
+        SplitPath(path, &fileName)
+        if this.TestVersionValues.Has(fileName)
+            return this.TestVersionValues[fileName]
+        return super.GetExecutableVersionValues(path)
     }
 }
 
@@ -73,12 +123,18 @@ RunShortcutTargetResolverTests() {
     candidateRoot := testRoot "\candidates"
     auxiliaryRoot := testRoot "\auxiliary"
     ambiguousRoot := testRoot "\ambiguous"
+    proxyRoot := testRoot "\installer-proxy"
+    portableRoot := testRoot "\portable"
+    portableAppRoot := portableRoot "\App\Bandicam"
+    portableShortcut := testRoot "\Bandicam.lnk"
     try {
         try DirDelete(testRoot, true)
         DirCreate(testRoot)
         DirCreate(candidateRoot)
         DirCreate(auxiliaryRoot)
         DirCreate(ambiguousRoot)
+        DirCreate(proxyRoot)
+        DirCreate(portableAppRoot)
         FileAppend("#Requires AutoHotkey v2.0`n", scriptPath, "UTF-8")
         FileCreateShortcut(A_AhkPath, directShortcut, testRoot)
         FileCreateShortcut(A_AhkPath, argumentShortcut, testRoot,
@@ -173,6 +229,61 @@ RunShortcutTargetResolverTests() {
         AssertShortcutTargetResolver(
             resolver.ResolveMsiTarget(directShortcut) == "",
             "普通非 MSI 快捷方式被错误识别为广告快捷方式")
+
+        portableLauncher := portableRoot "\BandicamPortable.exe"
+        portableResident := portableAppRoot "\bdcam.exe"
+        portableHelper := portableAppRoot "\bdfix.exe"
+        FileCopy(A_AhkPath, portableLauncher)
+        FileCopy(A_AhkPath, portableResident)
+        FileCopy(A_AhkPath, portableHelper)
+        FileCreateShortcut(portableLauncher, portableShortcut, portableRoot)
+        portableVersions := Map(
+            "BandicamPortable.exe", Map(
+                "ProductName", "Bandicam Portable",
+                "FileDescription", "Bandicam Portable"),
+            "bdcam.exe", Map(
+                "ProductName", "Bandicam 2025",
+                "FileDescription", "Bandicam - bdcam.exe"),
+            "bdfix.exe", Map(
+                "ProductName", "BandiFix",
+                "FileDescription", "BandiFix"))
+        portableResolver := PortableShortcutTargetResolver(snapshots,
+            resolver.Callbacks, portableVersions)
+        resolvedPortableTarget := portableResolver.ResolveEffective(
+            portableShortcut, true, &portableSource)
+        AssertShortcutTargetResolver(
+            portableResolver.IsPortableLauncher(portableLauncher)
+            && ShortcutTargetTestCanonical(resolvedPortableTarget)
+                == ShortcutTargetTestCanonical(portableResident)
+            && portableSource == "安装目录特征",
+            "便携启动器没有解析到有强版本证据的真实常驻程序"
+                . "（target=" resolvedPortableTarget "，source="
+                    portableSource "）")
+
+        installerProxy := "C:\Windows\Installer\{12345678-1234-1234-1234-1234567890AB}\_E8A816F7FAA0F313565BDA.exe"
+        proxyCandidate := proxyRoot "\OneCommander.exe"
+        FileCopy(A_AhkPath, proxyCandidate, true)
+        proxyResolver := InstallerProxyShortcutTargetResolver(snapshots,
+            resolver.Callbacks, installerProxy, proxyRoot)
+        resolvedProxyTarget := proxyResolver.ResolveEffective(
+            testRoot "\OneCommander.lnk", true, &proxySource)
+        AssertShortcutTargetResolver(
+            proxyResolver.IsInstallerCacheProxy(installerProxy)
+            && !proxyResolver.IsInstallerCacheProxy(A_AhkPath),
+            "Windows Installer 广告快捷方式代理分类错误")
+        AssertShortcutTargetResolver(
+            ShortcutTargetTestCanonical(resolvedProxyTarget)
+                == ShortcutTargetTestCanonical(proxyCandidate)
+            && proxySource == "安装目录特征",
+            "广告快捷方式错误优先采用安装器缓存代理，而非工作目录中的真实主程序"
+                . "（target=" resolvedProxyTarget "，source=" proxySource "）")
+        unreadableMsiResolver := UnreadableMsiShortcutTargetResolver(
+            snapshots, resolver.Callbacks, A_AhkPath)
+        unreadableMsiTarget := unreadableMsiResolver.ResolveEffective(
+            testRoot "\UnreadableMsi.lnk", true, &unreadableMsiSource)
+        AssertShortcutTargetResolver(unreadableMsiTarget == A_AhkPath
+            && unreadableMsiSource == "Windows Installer",
+            "快捷方式不可读时解析到的 MSI 目标没有保留来源")
     } finally {
         try DirDelete(testRoot, true)
     }

@@ -1,3 +1,15 @@
+; 主窗口守护列表的命令与配置投影。
+; 添加、编辑、暂停、撤销和重做都先更新受控的运行态，再以差量方式同步列表与配置；
+; 路径始终保存在隐藏身份列中，显示名称、图标和状态文案不参与目标身份判断。
+
+GetGuardActivationStatus(enabled) {
+    return enabled ? Tr("初始化...") : Tr("⏸️ 已暂停")
+}
+
+GetGuardActivationStatusKind(enabled) {
+    return enabled ? GuardStatusKind.Initializing : GuardStatusKind.Paused
+}
+
 RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", arguments := "", environment := "", maintenanceConfig := "", storedResolvedTarget := "", resolvedTargetManual := false, shortcutArguments := "", displayConfig := "") {
     path := NormalizeTargetPath(path)
     if (path == "")
@@ -45,8 +57,11 @@ RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", argumen
     currentFingerprint := App.targetFileInspector.GetFingerprint(
         fingerprintTarget)
     displayConfig := App.displayConfigCodec.Normalize(displayConfig)
-    App.appStates[path] := TargetSupervisor({
-        State: "初始化...", FailCount: 0, Pending: false, Enabled: enabled ? 1 : 0,
+    initialStatus := GetGuardActivationStatus(enabled)
+    stateObj := TargetSupervisor({
+        State: initialStatus, StatusKind: GetGuardActivationStatusKind(enabled),
+        FailCount: 0, Pending: false,
+        Enabled: enabled ? 1 : 0,
         TargetStartTicks: 0, RunAsAdmin: runAsAdmin ? 1 : 0, WorkDir: workingDirectory,
         Args: arguments, ShortcutArgs: shortcutArguments, EnvVars: environment,
         PID: 0, LastKnownPID: 0, PIDCreationIdentity: "", PIDImagePath: "",
@@ -63,7 +78,8 @@ RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", argumen
         ArbitrationSnapshotRequestTicks: 0, ArbitrationSignalBaselineTicks: 0,
         MaintenanceFileChanged: false, ExplicitMaintenance: false,
         MaintenanceWatcherRoot: "", MaintenanceWatcherPath: "", KnownActorIdentities: Map(),
-        TransientActorIdentities: Map(), LastActorSeenTicks: 0, LastFileActivityTicks: 0,
+        TransientActorIdentities: Map(), LastActorSeenTicks: 0,
+        MaintenanceActorCheckedTicks: 0, LastFileActivityTicks: 0,
         MaintenanceFingerprintCheckedTicks: 0,
         MaintenanceReadyCheckedTicks: 0, MaintenanceLastReady: true,
         SafetyFingerprint: currentFingerprint, SafetyStableSince: GetTickCount64(),
@@ -71,78 +87,143 @@ RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", argumen
         DisplayConfig: displayConfig, TargetSpecs: "", TargetSpecsFingerprint: "",
         Scheduler: App.scheduler
     })
-    App.targetSpecsService.Get(path, App.appStates[path], true)
-    App.appOrder.Push(path)
-    if enabled
-        App.maintenanceCoordinator.EnsureWatcher(path, App.appStates[path])
+    App.appStates[path] := stateObj
     try {
-        stateObj := App.appStates[path]
+        App.targetSpecsService.Get(path, stateObj, true)
+        App.appOrder.Push(path)
+        if enabled
+            App.maintenanceCoordinator.EnsureWatcher(path, stateObj)
         iconIdx := GetMainListIconIndex(path, stateObj, Main.lv.IL)
-        statusText := enabled ? "初始化..." : "⏸️ 已暂停"
         row := Main.lv.Add("Icon" iconIdx,
             FormatMainListLabel(GetMainDisplayName(path, stateObj), runAsAdmin),
-            FormatMainStatusLabel(statusText), path)
+            FormatMainStatusLabel(initialStatus), path, Main.lv.GetCount() + 1)
         Main.listProjection.Remember(path, row)
-        SetMainListStatus(row, statusText)
+        SetMainListStatus(row, initialStatus)
+        SetMainListAdminOverlay(row, runAsAdmin)
+        ScheduleMainListTemporarySortRefresh()
         return true
     } catch as projectionErr {
-        App.maintenanceCoordinator.CloseWatcher(App.appStates[path])
-        App.appStates.Delete(path)
+        App.maintenanceCoordinator.CloseWatcher(stateObj)
+        if App.appStates.Has(path) && App.appStates[path] == stateObj
+            App.appStates.Delete(path)
         RemoveAppOrderPath(path)
-        LogMsg("添加监控项失败，已回滚内存状态: " projectionErr.Message)
+        row := Main.lv.GetCount()
+        while row > 0 {
+            try {
+                if PathsEquivalent(Main.lv.GetText(row, 3), path)
+                    Main.lv.Delete(row)
+            }
+            row--
+        }
+        try Main.listProjection.Rebuild(Main.lv)
+        try Main.listProjection.RefreshSequenceFromOrder(Main.lv, App.appOrder)
+        try RefreshMainStatusSortKeys()
+        LogMsg(Tr("添加监控项失败，已回滚内存状态：{1}",
+            TrDiagnostic(projectionErr.Message)))
         return false
     }
 }
 
-ToggleItemPause(*) {
-    if (Main.lv.GetNext(0) == 0)
-        return
+HandleGuardMutationError(operationError, description := "") {
+    LogMsg(Tr("保存监控配置失败：{1}",
+        TrDiagnostic(operationError.Message)))
+}
 
-    App.editSessionId++
-    undoState := CaptureAppConfigState()
+QueueGuardMutation(callback, description := "") {
+    if App.shutdownStarted
+        return false
+    queued := App.guardMutationQueue.Enqueue(callback, description)
+    return queued
+}
+
+QueueExclusiveGuardMutation(owner, operationKey, callback,
+    description := "") {
+    if App.shutdownStarted
+        return false
+    return App.guardMutationQueue.EnqueueExclusive(owner, operationKey,
+        callback, description)
+}
+
+CaptureSelectedWatchPaths(includeContextTarget := false) {
+    paths := []
+    seen := Map()
+    seen.CaseSense := "Off"
     row := 0
-    changedAny := false
-
     Loop {
         row := Main.lv.GetNext(row)
-        if (row == 0)
+        if !row
             break
+        rawPath := Main.lv.GetText(row, 3)
+        if !App.appStates.Has(rawPath)
+            continue
+        path := NormalizeTargetPath(rawPath)
+        if path != "" && App.appStates.Has(path) && !seen.Has(path) {
+            seen[path] := true
+            paths.Push(path)
+        }
+    }
+    if !paths.Length && includeContextTarget && Main.contextTargetRow > 0 {
+        path := NormalizeTargetPath(
+            Main.lv.GetText(Main.contextTargetRow, 3))
+        if path != "" && App.appStates.Has(path)
+            paths.Push(path)
+    }
+    return paths
+}
 
-        chkPath := Main.lv.GetText(row, 3)
+ToggleItemPause(*) {
+    paths := CaptureSelectedWatchPaths()
+    if !paths.Length
+        return
+    QueueGuardMutation(ToggleItemPauseCore.Bind(paths))
+}
+
+ToggleItemPauseCore(paths) {
+    App.editSessionId++
+    undoState := CaptureAppConfigState()
+    changedAny := false
+
+    for chkPath in paths {
         if App.appStates.Has(chkPath) {
-            newState := !App.appStates[chkPath].Enabled
-            App.appStates[chkPath].Enabled := newState
-            if (!newState) {
-                App.appStates[chkPath].CancelScheduledTasks()
-                App.appStates[chkPath].TransitionTo(GuardPhase.Paused)
-                App.maintenanceCoordinator.CleanupTarget(chkPath, App.appStates[chkPath], true)
-                UpdateState(chkPath, "⏸️ 已暂停")
-                App.appStates[chkPath].Pending := false
-                App.appStates[chkPath].TargetStartTicks := 0
-                App.appStates[chkPath].FailCount := 0
-                ClearStateProcessIdentity(App.appStates[chkPath])
+            stateObj := App.appStates[chkPath]
+            newEnabled := !stateObj.Enabled
+            stateObj.Enabled := newEnabled
+            stateObj.CancelScheduledTasks()
+            operationGeneration := stateObj.Generation
+            stateObj.ResetGuardAttemptState()
+            ClearStateProcessIdentity(stateObj)
+            if (!newEnabled) {
+                stateObj.TransitionTo(GuardPhase.Paused)
+                ; 强制同步一次投影：这也能自愈旧版本曾产生的“控制器文本是
+                ; 初始化、列表文本却是已暂停”分裂状态。
+                UpdateState(chkPath, GetGuardActivationStatus(false),
+                    stateObj, operationGeneration, true,
+                    GuardStatusKind.Paused)
+                App.maintenanceCoordinator.CleanupTarget(chkPath,
+                    stateObj, false)
             } else {
-                App.appStates[chkPath].CancelScheduledTasks()
-                App.appStates[chkPath].TransitionTo(GuardPhase.Initializing)
-                App.maintenanceCoordinator.ResetSession(chkPath, App.appStates[chkPath], false)
-                App.maintenanceCoordinator.EnsureWatcher(chkPath, App.appStates[chkPath])
-                App.appStates[chkPath].Pending := false
-                App.appStates[chkPath].TargetStartTicks := 0
-                App.appStates[chkPath].FailCount := 0
-                ClearStateProcessIdentity(App.appStates[chkPath])
-                UpdateState(chkPath, "初始化...")
+                stateObj.TransitionTo(GuardPhase.Initializing)
+                UpdateState(chkPath, GetGuardActivationStatus(true),
+                    stateObj, operationGeneration, true,
+                    GuardStatusKind.Initializing)
+                App.maintenanceCoordinator.ResetSession(chkPath, stateObj,
+                    false)
+                App.maintenanceCoordinator.EnsureWatcher(chkPath, stateObj)
             }
-            LogMsg((newState ? "恢复" : "暂停") "守护: " chkPath)
+            LogMsg(newEnabled ? Tr("恢复守护：{1}", chkPath)
+                : Tr("暂停守护：{1}", chkPath))
             changedAny := true
         }
     }
 
     if (changedAny) {
-        CommitUndoState(undoState)
+        App.maintenanceCoordinator.SaveJournal()
+        CommitUndoState(undoState,
+            CreateAppHistoryAction("toggle-pause", paths))
         SaveAppsToIni()
         OnLVSelectChange() ; 刷新按钮显示状态
     }
-    ControlFocus(Main.lv) ; 保持选中行使用活动焦点配色
+    try ControlFocus(Main.lv) ; 保持选中行使用活动焦点配色
 }
 
 OnDoubleClick(GuiCtrlObj, Item) {
@@ -157,9 +238,11 @@ TriggerEdit(GuiCtrlObj, Item) {
         row := GuiCtrlObj.GetNext(row)
         if (!row)
             break
-        rows.Push(row)
+        if App.appStates.Has(GuiCtrlObj.GetText(row, 3))
+            rows.Push(row)
     }
-    if (rows.Length == 0 && Item > 0)
+    if (rows.Length == 0 && Item > 0
+            && App.appStates.Has(GuiCtrlObj.GetText(Item, 3)))
         rows.Push(Item)
 
     if (rows.Length == 0)
@@ -219,6 +302,17 @@ CheckEditMonitor(GuiCtrlObj, sessionId := 0) {
 ProcessEditFinish(GuiCtrlObj, Item, sessionId := 0) {
     if (sessionId && sessionId != App.editSessionId)
         return
+    if !App.guardWorkGate.TryEnter() {
+        SetTimer(ProcessEditFinish.Bind(GuiCtrlObj, Item, sessionId), -25)
+        return
+    }
+    try ProcessEditFinishCore(GuiCtrlObj, Item, sessionId)
+    finally App.guardWorkGate.Leave()
+}
+
+ProcessEditFinishCore(GuiCtrlObj, Item, sessionId := 0) {
+    if (sessionId && sessionId != App.editSessionId)
+        return
     try {
         newPath := NormalizeTargetPath(GuiCtrlObj.GetText(Item, 1))
         previousPath := GuiCtrlObj.GetText(Item, 3)
@@ -250,62 +344,41 @@ ProcessEditFinish(GuiCtrlObj, Item, sessionId := 0) {
                 ; 状态已被其它操作移除时，不能只改 ListView 而留下无状态孤儿行。
                 newPath := previousPath
             } else if App.appStates.Has(newPath) {
-                LogMsg("拒绝将应用路径改为已存在的监控项: " newPath)
+                LogMsg(Tr("拒绝将应用路径改为已存在的监控项：{1}", newPath))
                 newPath := previousPath
             } else if (identityConflict != "") {
-                LogMsg("拒绝修改路径，真实进程已由其它项目守护: " identityConflict)
+                LogMsg(Tr("拒绝修改路径，真实进程已由其它项目守护：{1}",
+                    identityConflict))
                 newPath := previousPath
             } else {
                 undoState := CaptureAppConfigState()
-                stateObj := App.appStates[previousPath]
-                stateObj.CancelScheduledTasks()
-                App.maintenanceCoordinator.CleanupTarget(previousPath, stateObj, true)
-                stateObj.Pending := false
-                stateObj.TargetStartTicks := 0
-                stateObj.FailCount := 0
-                ClearStateProcessIdentity(stateObj)
-                stateObj.VerifyAttempts := 0
-                stateObj.ResolvedTarget := ""
-                stateObj.ResolvedTargetManual := false
-                stateObj.ShortcutTargetSource := ""
-                stateObj.ShortcutArgs := ""
-                SplitPath(newPath, , , &newExtension)
-                if (StrLower(newExtension) == "lnk") {
-                    stateObj.ResolvedTarget := prospectiveResolvedTarget
-                    stateObj.ShortcutTargetSource := prospectiveResolutionSource
-                    stateObj.ShortcutArgs := prospectiveShortcutArgs
+                if Type(undoState) != "Array"
+                    throw Error(Tr("监控项路径无效：{1}", previousPath))
+                targetState := App.appConfigSnapshotService
+                    .PrepareState(undoState).Items
+                pathChanged := false
+                for targetItem in targetState {
+                    if !PathsEquivalent(targetItem.Path, previousPath)
+                        continue
+                    targetItem.Path := newPath
+                    targetItem.ResolvedTarget := prospectiveResolvedTarget
+                    targetItem.ResolvedTargetManual := false
+                    targetItem.ShortcutArgs := prospectiveShortcutArgs
                     if (prospectiveWorkingDirectory != "")
-                        stateObj.WorkDir := prospectiveWorkingDirectory
+                        targetItem.WorkDir := prospectiveWorkingDirectory
+                    targetItem.Maintenance := App.maintenanceConfigCodec
+                        .NormalizeSnapshot(targetItem.Maintenance, newPath,
+                            prospectiveResolvedTarget)
+                    pathChanged := true
+                    break
                 }
-                stateObj.ShortcutResolveCheckedTicks := GetTickCount64()
-                stateObj.OneShot := IsOneShotTarget(newPath, stateObj.ResolvedTarget)
-                App.targetSpecsService.Get(newPath, stateObj, true)
-                stateObj.MaintenanceConfig := App.maintenanceConfigCodec.Normalize(
-                    stateObj.MaintenanceConfig, newPath)
-                fingerprintTarget := stateObj.ResolvedTarget != "" ? stateObj.ResolvedTarget : newPath
-                stateObj.MaintenanceBaselineFingerprint := App
-                    .targetFileInspector.GetFingerprint(fingerprintTarget)
-                stateObj.SafetyFingerprint := stateObj.MaintenanceBaselineFingerprint
-                stateObj.SafetyStableSince := GetTickCount64()
-                stateObj.KnownActorIdentities := Map()
-                stateObj.TransientActorIdentities := Map()
-                stateObj.LastActorSeenTicks := 0
-                stateObj.LastFileActivityTicks := 0
-                stateObj.State := "初始化..."
-                stateObj.TransitionTo(GuardPhase.Initializing)
-                App.appStates.Delete(previousPath)
-                App.appStates[newPath] := stateObj
-                ReplaceAppOrderPath(previousPath, newPath)
-                App.maintenanceCoordinator.EnsureWatcher(newPath, stateObj)
-                GuiCtrlObj.Modify(Item, "Col3", newPath)
-                SetMainListStatus(Item, "初始化...")
-                iconIdx := GetMainListIconIndex(newPath, stateObj, GuiCtrlObj.IL)
-                if iconIdx
-                    GuiCtrlObj.Modify(Item, "Icon" iconIdx)
-                Main.listProjection.Rebuild(GuiCtrlObj)
-                CommitUndoState(undoState)
-                SaveAppsToIni()
-                LogMsg("更新了应用程序路径。")
+                if !pathChanged
+                    throw Error(Tr("监控项路径无效：{1}", previousPath))
+                ApplyState(targetState, undoState)
+                App.appConfigHistoryService.Commit(undoState, targetState,
+                    CreateAppHistoryAction("edit-path",
+                        [previousPath, newPath]))
+                LogMsg(Tr("已更新应用程序路径。"))
             }
         }
 
@@ -314,7 +387,9 @@ ProcessEditFinish(GuiCtrlObj, Item, sessionId := 0) {
         isAdmin := stateObj && stateObj.HasOwnProp("RunAsAdmin") ? stateObj.RunAsAdmin : 0
         GuiCtrlObj.Modify(Item, "Col1", FormatMainListLabel(
             GetMainDisplayName(realPath, stateObj), isAdmin)) ; 恢复显示应用名
-    } catch {
+    } catch as editError {
+        LogMsg(Tr("保存监控配置失败：{1}",
+            TrDiagnostic(editError.Message)))
         realPath := GuiCtrlObj.GetText(Item, 3)
         stateObj := App.appStates.Has(realPath) ? App.appStates[realPath] : ""
         isAdmin := stateObj && stateObj.HasOwnProp("RunAsAdmin") ? stateObj.RunAsAdmin : 0
@@ -329,50 +404,266 @@ CaptureAppConfigState() {
     try {
         Loop Main.lv.GetCount() {
             savePath := Main.lv.GetText(A_Index, 3)
-            stateObj := App.appStates.Has(savePath)
-                ? App.appStates[savePath] : ""
+            if !App.appStates.Has(savePath)
+                continue
+            stateObj := App.appStates[savePath]
             snapshot := App.appConfigSnapshotService.CreateSnapshot(savePath,
                 stateObj)
             if !snapshot
-                throw Error("监控项路径无效: " savePath)
+                throw Error(Tr("监控项路径无效：{1}", savePath))
             state.Push(snapshot)
         }
     } catch as snapshotError {
-        LogMsg("捕获监控项历史失败: " snapshotError.Message)
+        LogMsg(Tr("捕获监控项历史失败：{1}",
+            TrDiagnostic(snapshotError.Message)))
         return ""
     }
     return state
 }
 
 AppConfigStateOrderMatchesCurrent(state) {
-    if (Type(state) != "Array" || state.Length != Main.lv.GetCount())
+    if Type(state) != "Array"
+        return false
+    currentPaths := []
+    Loop Main.lv.GetCount() {
+        path := Main.lv.GetText(A_Index, 3)
+        if App.appStates.Has(path)
+            currentPaths.Push(path)
+    }
+    if state.Length != currentPaths.Length
         return false
     for index, item in state {
         if !item.HasOwnProp("Path")
             return false
-        if !PathsEquivalent(item.Path, Main.lv.GetText(index, 3))
+        if !PathsEquivalent(item.Path, currentPaths[index])
             return false
     }
     return true
 }
 
-CommitUndoState(beforeState) {
+CreateAppHistoryAction(kind, paths := "", fields := "") {
+    normalizedPaths := []
+    if Type(paths) == "Array" {
+        for path in paths
+            normalizedPaths.Push(path)
+    } else if paths != "" {
+        normalizedPaths.Push(paths)
+    }
+    normalizedFields := []
+    if Type(fields) == "Array" {
+        for field in fields
+            normalizedFields.Push(field)
+    }
+    return {Kind: kind, Paths: normalizedPaths, Fields: normalizedFields}
+}
+
+CommitUndoState(beforeState, action := "") {
     if (Type(beforeState) != "Array")
         return false
     afterState := CaptureAppConfigState()
-    return App.appConfigHistoryService.Commit(beforeState, afterState)
+    return App.appConfigHistoryService.Commit(beforeState, afterState, action)
+}
+
+CloneRuntimeSettingsHistoryState(settings) {
+    clone := {}
+    for propertyName in ["UiLanguage", "UiFont", "Theme", "CheckInterval",
+            "RetrySequence", "ShowAtStartup", "CheckUpdatesOnStartup",
+            "RecursiveBatchImport", "LogMaxEntries", "LogDirectory",
+            "LogRetentionDays", "ClearLogsOnStartup", "GracefulStopSeconds",
+            "CtrlCWaitSeconds", "AllowForceTerminate"]
+        clone.%propertyName% := settings.%propertyName%
+    clone.RetryDelayArray := []
+    for delay in settings.RetryDelayArray
+        clone.RetryDelayArray.Push(delay)
+    return clone
+}
+
+GetRuntimeSettingsHistoryFields(beforeState, afterState) {
+    fieldSpecs := [
+        {Property: "UiLanguage", Label: "界面语言："},
+        {Property: "UiFont", Label: "界面内容字体："},
+        {Property: "Theme", Label: "主题："},
+        {Property: "ShowAtStartup", Label: "启动时显示主窗口"},
+        {Property: "CheckUpdatesOnStartup", Label: "启动时检查小助手更新"},
+        {Property: "CheckInterval", Label: "进程状态检查间隔（毫秒）："},
+        {Property: "RetrySequence", Label: "崩溃自动重启延迟序列（秒）："},
+        {Property: "RecursiveBatchImport", Label: "导入文件夹时包含子目录"},
+        {Property: "GracefulStopSeconds", Label: "GUI 程序关闭超时（秒）："},
+        {Property: "CtrlCWaitSeconds", Label: "CLI 程序关闭超时（秒）："},
+        {Property: "AllowForceTerminate", Label: "正常关闭超时后允许强制终止"},
+        {Property: "LogMaxEntries", Label: "运行日志显示上限（条）："},
+        {Property: "LogDirectory", Label: "批处理日志保存路径："},
+        {Property: "LogRetentionDays", Label: "批处理日志保留天数："},
+        {Property: "ClearLogsOnStartup", Label: "启动时清空批处理日志"}
+    ]
+    changedFields := []
+    for fieldSpec in fieldSpecs {
+        propertyName := fieldSpec.Property
+        if beforeState.%propertyName% != afterState.%propertyName%
+            changedFields.Push(fieldSpec.Label)
+    }
+    return changedFields
+}
+
+CommitRuntimeSettingsUndoState(beforeState, afterState) {
+    fields := GetRuntimeSettingsHistoryFields(beforeState, afterState)
+    if !fields.Length
+        return false
+    return App.appConfigHistoryService.CommitCustom(
+        CloneRuntimeSettingsHistoryState(beforeState),
+        CloneRuntimeSettingsHistoryState(afterState),
+        ApplyRuntimeSettingsHistoryTransition,
+        CreateAppHistoryAction("runtime-settings", "", fields))
+}
+
+ApplyRuntimeSettingsSnapshot(settings) {
+    priorInterval := App.checkInterval
+    displayChanged := settings.UiLanguage != App.uiLanguage
+        || settings.UiFont != App.uiFont || settings.Theme != App.uiTheme
+    if displayChanged
+        ApplyDisplaySettingsHot(settings.UiLanguage, settings.UiFont,
+            settings.Theme)
+    App.runtimeSettingsService.Apply(App, settings)
+    while (App.logMessages.Length > App.logMaxEntries)
+        App.logMessages.Pop()
+    if App.checkInterval != priorInterval
+        App.guardRuntime.RestartMonitorTimer()
+}
+
+ApplyRuntimeSettingsHistoryTransition(targetState, sourceState) {
+    try {
+        savedTarget := App.runtimeSettingsService.Save(targetState)
+        ApplyRuntimeSettingsSnapshot(savedTarget)
+    } catch as applyError {
+        try {
+            restoredSource := App.runtimeSettingsService.Save(sourceState)
+            ApplyRuntimeSettingsSnapshot(restoredSource)
+        } catch as rollbackError {
+            throw Error(applyError.Message " | " rollbackError.Message)
+        }
+        throw applyError
+    }
+    return true
+}
+
+FindHistorySnapshot(items, path) {
+    if Type(items) != "Array"
+        return ""
+    for item in items {
+        if item.HasOwnProp("Path") && PathsEquivalent(item.Path, path)
+            return item
+    }
+    return ""
+}
+
+GetHistoryTargetName(entry, path) {
+    for items in [entry.After, entry.Before] {
+        item := FindHistorySnapshot(items, path)
+        if !item
+            continue
+        if item.HasOwnProp("Display") && IsObject(item.Display)
+            && item.Display.HasOwnProp("Name") && Trim(item.Display.Name) != ""
+            return Trim(item.Display.Name)
+    }
+    return GetDefaultMainDisplayName(path)
+}
+
+FormatHistoryTargetList(entry, paths) {
+    if Type(paths) != "Array" || !paths.Length
+        return ""
+    names := []
+    maximumNames := Min(paths.Length, 3)
+    Loop maximumNames
+        names.Push(GetHistoryTargetName(entry, paths[A_Index]))
+    language := LocalizationService.GetLanguage()
+    separator := RegExMatch(language, "^(?:zh-|ja-JP)") ? "、" : ", "
+    text := ""
+    for index, name in names
+        text .= (index > 1 ? separator : "") name
+    if paths.Length > maximumNames
+        text .= "…（" paths.Length "）"
+    return text
+}
+
+GetHistoryPauseActionLabel(entry, paths) {
+    enabledValue := -1
+    mixed := false
+    for path in paths {
+        item := FindHistorySnapshot(entry.After, path)
+        if !item || !item.HasOwnProp("Enabled")
+            continue
+        currentEnabled := !!item.Enabled
+        if enabledValue == -1
+            enabledValue := currentEnabled
+        else if enabledValue != currentEnabled
+            mixed := true
+    }
+    if mixed || enabledValue == -1
+        return Tr("反转状态")
+    return enabledValue ? Tr("恢复") : Tr("暂停")
+}
+
+FormatHistoryAction(entry) {
+    action := entry.HasOwnProp("Action") && IsObject(entry.Action)
+        ? entry.Action : CreateAppHistoryAction("config")
+    paths := action.HasOwnProp("Paths") ? action.Paths : []
+    targetText := FormatHistoryTargetList(entry, paths)
+    switch action.Kind {
+        case "add": label := Tr("添加监控项")
+        case "delete": label := Tr("删除")
+        case "toggle-pause": label := GetHistoryPauseActionLabel(entry, paths)
+        case "edit-path": label := Tr("编辑完整路径")
+        case "reorder": label := Tr("调整守护顺序")
+        case "run-as-admin": label := Tr("管理员运行状态")
+        case "display": label := Tr("自定义名称和图标")
+        case "environment": label := Tr("进程识别与启动设置")
+        case "maintenance": label := Tr("软件升级保护")
+        case "runtime-settings":
+            label := Tr("小助手设置")
+            fieldLabels := []
+            if action.HasOwnProp("Fields") {
+                actionFields := action.Fields
+                for fieldKey in actionFields
+                    fieldLabels.Push(RTrim(Tr(fieldKey), "：: "))
+            }
+            targetText := ""
+            language := LocalizationService.GetLanguage()
+            separator := RegExMatch(language, "^(?:zh-|ja-JP)") ? "、" : ", "
+            for index, fieldLabel in fieldLabels
+                targetText .= (index > 1 ? separator : "") fieldLabel
+        default: label := Tr("监控配置")
+    }
+    return targetText != "" ? label "：" targetText : label
+}
+
+ShowHistoryResult(entry, isUndo) {
+    detail := FormatHistoryAction(entry)
+    message := isUndo ? Tr("已撤销：{1}", detail) : Tr("已重做：{1}", detail)
+    LogMsg(message)
+    if IsSet(GuiModules)
+        GuiModules.historyToast.Show(message)
 }
 
 PerformUndo() {
+    QueueGuardMutation(PerformUndoCore)
+}
+
+PerformUndoCore() {
     if App.appConfigHistoryService.Undo(
-        (targetState, sourceState) => ApplyState(targetState, sourceState))
-        LogMsg("已撤销上一步操作。")
+            (targetState, sourceState) => ApplyState(targetState, sourceState),
+            &entry)
+        ShowHistoryResult(entry, true)
 }
 
 PerformRedo() {
+    QueueGuardMutation(PerformRedoCore)
+}
+
+PerformRedoCore() {
     if App.appConfigHistoryService.Redo(
-        (targetState, sourceState) => ApplyState(targetState, sourceState))
-        LogMsg("已重做操作。")
+            (targetState, sourceState) => ApplyState(targetState, sourceState),
+            &entry)
+        ShowHistoryResult(entry, false)
 }
 
 CaptureMainListInteraction() {
@@ -480,10 +771,7 @@ ApplyAppConfigTransition(path, stateObj, sourceItem, targetItem) {
     stateObj.Enabled := nextEnabled ? 1 : 0
     App.targetSpecsService.Get(path, stateObj, true)
     if (identityChanged || enabledChanged) {
-        stateObj.Pending := false
-        stateObj.TargetStartTicks := 0
-        stateObj.FailCount := 0
-        stateObj.VerifyAttempts := 0
+        stateObj.ResetGuardAttemptState()
         ClearStateProcessIdentity(stateObj)
         fingerprintTarget := nextResolvedTarget != "" ? nextResolvedTarget : path
         refreshedFingerprint := App.targetFileInspector.GetFingerprint(
@@ -493,7 +781,8 @@ ApplyAppConfigTransition(path, stateObj, sourceItem, targetItem) {
         stateObj.SafetyStableSince := GetTickCount64()
         stateObj.MaintenanceFingerprintCheckedTicks := 0
         stateObj.MaintenanceReadyCheckedTicks := 0
-        stateObj.State := nextEnabled ? "初始化..." : "⏸️ 已暂停"
+        stateObj.State := GetGuardActivationStatus(nextEnabled)
+        stateObj.StatusKind := GetGuardActivationStatusKind(nextEnabled)
         stateObj.TransitionTo(nextEnabled ? GuardPhase.Initializing
             : GuardPhase.Paused)
         if nextEnabled
@@ -506,7 +795,8 @@ ApplyAppConfigTransition(path, stateObj, sourceItem, targetItem) {
         else
             App.maintenanceCoordinator.CloseWatcher(stateObj)
         if (previousProtectionEnabled && !nextMaintenance.Enabled && stateObj.Enabled) {
-            stateObj.State := "初始化..."
+            stateObj.State := Tr("初始化...")
+            stateObj.StatusKind := GuardStatusKind.Initializing
             stateObj.TransitionTo(GuardPhase.Initializing)
             App.guardRuntime.ScheduleRestart(path, 200)
         }
@@ -519,6 +809,7 @@ ApplyAppConfigTransition(path, stateObj, sourceItem, targetItem) {
 }
 
 SyncMainListToConfigState(items) {
+    ClearMainListTemporarySort()
     targetPaths := Map()
     targetPaths.CaseSense := "Off"
     for item in items
@@ -557,8 +848,9 @@ SyncMainListToConfigState(items) {
                 Main.lv.Delete(currentRow)
             iconIndex := GetMainListIconIndex(item.Path, stateObj, Main.lv.IL)
             insertedRow := Main.lv.Insert(projectedRow, "Icon" iconIndex,
-                displayName, displayStatus, item.Path)
+                displayName, displayStatus, item.Path, projectedRow)
             SetMainListStatus(insertedRow, stateObj.State)
+            SetMainListAdminOverlay(insertedRow, stateObj.RunAsAdmin)
         } else {
             if (Main.lv.GetText(currentRow, 1) != displayName)
                 Main.lv.Modify(currentRow, "Col1", displayName)
@@ -567,6 +859,7 @@ SyncMainListToConfigState(items) {
             iconIndex := GetMainListIconIndex(item.Path, stateObj, Main.lv.IL)
             if iconIndex
                 Main.lv.Modify(currentRow, "Icon" iconIndex)
+            SetMainListAdminOverlay(currentRow, stateObj.RunAsAdmin)
         }
     }
 
@@ -576,9 +869,11 @@ SyncMainListToConfigState(items) {
             App.appOrder.Push(item.Path)
     }
     Main.listProjection.Rebuild(Main.lv)
+    Main.listProjection.RefreshSequenceFromOrder(Main.lv, App.appOrder)
+    RefreshMainStatusSortKeys()
 }
 
-ApplyState(stateArr, sourceStateArr := "") {
+ApplyState(stateArr, sourceStateArr := "", rollbackOnFailure := true) {
     App.editSessionId++
     App.batchEditRows := []
     App.editMonitorItem := 0
@@ -636,9 +931,11 @@ ApplyState(stateArr, sourceStateArr := "") {
             shouldAdd := !App.appStates.Has(item.Path)
                 && (!isTransition || !sourceState.Index.Has(item.Path))
             if shouldAdd {
-                RegisterApp(item.Path, item.Enabled, item.RunAsAdmin, item.WorkDir, item.Args,
+                if !RegisterApp(item.Path, item.Enabled, item.RunAsAdmin, item.WorkDir, item.Args,
                     item.EnvVars, item.Maintenance, item.ResolvedTarget,
-                    item.ResolvedTargetManual, item.ShortcutArgs, item.Display)
+                    item.ResolvedTargetManual, item.ShortcutArgs, item.Display) {
+                    throw Error(Tr("监控项路径无效：{1}", item.Path))
+                }
             }
         }
         projectedItems := isTransition
@@ -649,11 +946,21 @@ ApplyState(stateArr, sourceStateArr := "") {
         if journalChanged
             App.maintenanceCoordinator.SaveJournal()
         SaveAppsToIni()
+    } catch as applyError {
+        if rollbackOnFailure && Type(currentState) == "Array" {
+            try ApplyState(currentState, "", false)
+            catch as rollbackError {
+                LogMsg(Tr("保存监控配置失败：{1}",
+                    TrDiagnostic(rollbackError.Message)))
+            }
+        }
+        throw applyError
     } finally {
         try Main.lv.Opt("+Redraw")
         try RestoreMainListInteraction(interaction)
     }
     OnLVSelectChange()
+    return true
 }
 
 SaveAppsToIni() {
@@ -665,6 +972,7 @@ SaveAppsToIni() {
         return false
     }
     isSaving := true
+    Critical(previousCritical ? previousCritical : "Off")
     try {
         saveResult := App.watchlistPersistenceService.Save(App.appOrder,
             App.appStates, App.configRecoveryEntries)
@@ -675,10 +983,12 @@ SaveAppsToIni() {
         return true
     } catch as saveErr {
         App.appsDirty := true
-        LogMsg("保存监控配置失败: " saveErr.Message)
+        LogMsg(Tr("保存监控配置失败：{1}",
+            TrDiagnostic(saveErr.Message)))
         nowTicks := GetTickCount64()
         if (nowTicks - App.lastSaveWarningTicks > 10000) {
-            try TrayTip("监控配置尚未保存，请查看运行日志。", "进程守护小助手", 3)
+            try TrayTip(Tr("监控配置尚未保存，请查看运行日志。"),
+                Tr("进程守护小助手"), 3)
             App.lastSaveWarningTicks := nowTicks
         }
         retryDelayMs := App.configSaveRetryDelayMs
@@ -686,8 +996,10 @@ SaveAppsToIni() {
         try SetTimer(App.configSaveRetryTimer, -retryDelayMs)
         return false
     } finally {
-        isSaving := false
-        Critical(previousCritical ? previousCritical : "Off")
+        finishCritical := A_IsCritical
+        Critical("On")
+        try isSaving := false
+        finally Critical(finishCritical ? finishCritical : "Off")
     }
 }
 
@@ -699,6 +1011,93 @@ SyncAppOrderFromListView() {
             newOrder.Push(path)
     }
     App.appOrder := newOrder
+}
+
+ApplyMainListReorder(selectedPaths, anchorCandidates, appendToEnd := false) {
+    if Type(selectedPaths) != "Array" || !selectedPaths.Length
+        return false
+
+    selectedSet := Map()
+    selectedSet.CaseSense := "Off"
+    movingPaths := []
+    for path in selectedPaths {
+        path := NormalizeTargetPath(path)
+        if path != "" && App.appStates.Has(path) && !selectedSet.Has(path) {
+            selectedSet[path] := true
+            movingPaths.Push(path)
+        }
+    }
+    if !movingPaths.Length
+        return false
+
+    currentPaths := []
+    remainingPaths := []
+    Loop Main.lv.GetCount() {
+        path := NormalizeTargetPath(Main.lv.GetText(A_Index, 3))
+        if path == "" || !App.appStates.Has(path)
+            continue
+        currentPaths.Push(path)
+        if !selectedSet.Has(path)
+            remainingPaths.Push(path)
+    }
+
+    insertionIndex := remainingPaths.Length + 1
+    if !appendToEnd && Type(anchorCandidates) == "Array" {
+        for anchorPath in anchorCandidates {
+            for index, remainingPath in remainingPaths {
+                if PathsEquivalent(anchorPath, remainingPath) {
+                    insertionIndex := index
+                    break 2
+                }
+            }
+        }
+        if !anchorCandidates.Length
+            insertionIndex := 1
+    }
+
+    desiredPaths := remainingPaths.Clone()
+    for offset, path in movingPaths
+        desiredPaths.InsertAt(insertionIndex + offset - 1, path)
+    if desiredPaths.Length != currentPaths.Length
+        return false
+    orderChanged := false
+    for index, path in desiredPaths {
+        if !PathsEquivalent(path, currentPaths[index]) {
+            orderChanged := true
+            break
+        }
+    }
+    if !orderChanged
+        return false
+
+    App.editSessionId++
+    undoState := CaptureAppConfigState()
+    selectedMap := Map()
+    selectedMap.CaseSense := "Off"
+    for path in movingPaths
+        selectedMap[path] := true
+    interaction := {
+        SelectedPaths: selectedMap,
+        FocusedPath: movingPaths[1],
+        HadKeyboardFocus: DllCall("user32\GetFocus", "Ptr") == Main.lv.Hwnd
+    }
+    projectedItems := []
+    for path in desiredPaths
+        projectedItems.Push({Path: path})
+
+    Main.lv.Opt("-Redraw")
+    try {
+        SyncMainListToConfigState(projectedItems)
+        if !AppConfigStateOrderMatchesCurrent(undoState)
+            CommitUndoState(undoState,
+                CreateAppHistoryAction("reorder", movingPaths))
+        SaveAppsToIni()
+    } finally {
+        try Main.lv.Opt("+Redraw")
+        try RestoreMainListInteraction(interaction)
+    }
+    OnLVSelectChange()
+    return true
 }
 
 RemoveAppOrderPath(path) {

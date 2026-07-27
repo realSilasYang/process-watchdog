@@ -1,0 +1,59 @@
+# 英文改进建议表单，以当前行为、期望改动和可验证收益描述既有功能优化。
+# 性能问题要求可比较证据，便于复现并确认改动没有只转移开销。
+name: Improvement (English)
+description: Improve existing behavior, UI, performance, compatibility, or design
+title: "[IMPROVEMENT] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Identify the existing feature, behavior, or design to improve.
+    validations:
+      required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behavior
+      description: Describe current behavior, limitations, and conditions. Include comparable timing, frequency, or resource data for performance issues.
+    validations:
+      required: true
+
+  - type: textarea
+    id: change
+    attributes:
+      label: Proposed change
+      description: Describe the desired interaction or behavior, including failure, cancellation, reload, and multi-window edge cases.
+    validations:
+      required: true
+
+  - type: textarea
+    id: benefit
+    attributes:
+      label: Benefit and acceptance
+      description: Explain how to verify accuracy, latency, resource use, accessibility, clarity, or maintenance improvement.
+    validations:
+      required: true
+
+  - type: textarea
+    id: risk
+    attributes:
+      label: Compatibility and risk
+      description: Consider configuration, monitoring correctness, update protection, DPI, dark mode, window lifecycle, and native resources.
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots, logs, or measurements
+      description: Attach redacted before/after evidence, diagnostics, recordings, or measurements.
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmation
+      options:
+        - label: I searched existing issues and confirmed this improves an existing feature or design.
+          required: true

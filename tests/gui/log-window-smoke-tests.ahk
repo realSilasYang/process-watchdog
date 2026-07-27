@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证运行日志窗口的独立所有权、增量刷新、滚动条和诊断包导出。
+; 最小化或关闭日志窗口不得改变主窗口状态，文本可选择复制但不能编辑。
+
 try {
     RunLogWindowSmokeTests()
     ExitApp(0)
@@ -38,6 +41,8 @@ RunLogWindowSmokeTests() {
     App := {
         uiInteractions: UiInteractionRegistry(),
         iconResources: IconResourceRegistry(),
+        svgRenderer: SvgRenderLibrary(
+            A_ScriptDir "\..\..\third_party\resvg\resvg.dll"),
         logMessages: [],
         logRevision: 0,
         logMaxEntries: 500
@@ -71,6 +76,10 @@ RunLogWindowSmokeTests() {
         logWindowInstance.Show()
         AssertLogWindowSmoke(logWindowInstance.IsOpen(),
             "日志窗口没有成功创建")
+        AssertLogWindowSmoke(logWindowInstance.contentPixelWidth == 0
+            && logWindowInstance.contentPixelHeight == 0
+            && logWindowInstance.CompleteInitialLayout(),
+            "日志窗口没有把逐行测量延迟到首屏显示之后")
         try WinHide("ahk_id " logWindowInstance.gui.Hwnd)
 
         AssertLogWindowSmoke(App.uiInteractions.HasButton(
@@ -79,6 +88,11 @@ RunLogWindowSmokeTests() {
             logWindowInstance.exportButton.Hwnd)
         AssertLogWindowSmoke(exportState.HasOwnProp("clickCallback"),
             "诊断包按钮没有绑定点击回调")
+        AssertLogWindowSmoke(exportState.HasOwnProp("buttonImage")
+            && exportState.buttonImage.sourcePath
+                == GetApplicationAssetPath(
+                    "ui-icons\lucide\package-open.svg"),
+            "诊断包按钮没有使用统一的 SVG 图标")
         AssertLogWindowSmoke(App.uiInteractions.HasTextInput(
             logWindowInstance.textEdit.Hwnd), "日志文本区没有注册光标策略")
 
@@ -133,6 +147,7 @@ RunLogWindowSmokeTests() {
         OnMessage(Win32.WM_SETFOCUS, OnRoundedButtonFocusChanged, 0)
         OnMessage(Win32.WM_KILLFOCUS, OnRoundedButtonFocusChanged, 0)
         try ShutdownRoundedButtonRenderer()
+        try App.svgRenderer.Shutdown()
         try DirDelete(testRoot, true)
     }
     FileAppend("LOG_WINDOW_SMOKE|PASS`n", "*")

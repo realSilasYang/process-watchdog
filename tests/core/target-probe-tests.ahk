@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证目标探测器对路径、命令行、快捷方式身份和权限证据的聚合。
+; 证据不足必须返回未知，只有明确排除全部候选后才能报告停止。
+
 #Include ..\..\src\Core\GuardTypes.ahk
 #Include ..\..\src\Core\TargetSpecs.ahk
 #Include ..\..\src\Inspection\ProcessSnapshotIndex.ahk
@@ -21,6 +24,13 @@ ProvideTestSnapshot(providerState, maximumAgeMs) {
 ProvideNativeTestSnapshot(providerState) {
     if providerState.ShouldThrow
         throw Error("原生快照提供器失败")
+    return providerState.Result
+}
+
+ProvideAutoHotkeyTestSnapshot(providerState, maximumAgeMs) {
+    providerState.RequestedAge := maximumAgeMs
+    if providerState.ShouldThrow
+        throw Error("AutoHotkey 主窗口快照提供器失败")
     return providerState.Result
 }
 
@@ -46,11 +56,15 @@ RunTargetProbeTests() {
     snapshotProvider := {Index: "", RequestedAge: -1, ShouldThrow: false}
     nativeProvider := {Result: {Ready: true, Processes: [],
         CapturedAtTicks: 12000}, ShouldThrow: false}
+    autoHotkeyProvider := {Result: {Ready: true, Complete: true,
+        Scripts: [], CapturedAtTicks: 12000, Reason: ""},
+        RequestedAge: -1, ShouldThrow: false}
     imagePaths := Map()
     probe := TargetProbe(ProvideTestSnapshot.Bind(snapshotProvider),
         ProvideNativeTestSnapshot.Bind(nativeProvider),
         ResolveTestImagePath.Bind(imagePaths), ResolveTestCreationIdentity,
-        CanonicalizeTestPath, ReadTestClock)
+        CanonicalizeTestPath,
+        ProvideAutoHotkeyTestSnapshot.Bind(autoHotkeyProvider), ReadTestClock)
 
     nameObservation := probe.Observe(ProbeSpec(TargetProbeKind.ProcessName,
         processName))
@@ -71,6 +85,23 @@ RunTargetProbeTests() {
         TargetProbeKind.ImagePath, "C:\Apps\Sample.exe"))
     AssertTargetProbe(inaccessibleObservation.IsUnknown(),
         "同名进程镜像路径不可读时没有返回 Unknown")
+
+    autoHotkeyProvider.Result := {Ready: true, Complete: true,
+        Scripts: [{PID: currentPid, Path: "C:\Jobs\hotkey.ahk"}],
+        CapturedAtTicks: 12001, Reason: ""}
+    autoHotkeyRunning := probe.Observe(ProbeSpec(
+        TargetProbeKind.CommandTarget, "C:\Jobs\hotkey.ahk"), "", 900)
+    AssertTargetProbe(autoHotkeyRunning.IsRunning()
+        && autoHotkeyRunning.PID == currentPid
+        && autoHotkeyProvider.RequestedAge == 900,
+        "AutoHotkey 主窗口路径没有优先识别正在运行的脚本")
+    autoHotkeyProvider.Result := {Ready: true, Complete: true,
+        Scripts: [{PID: currentPid, Path: "C:\Jobs\other.ahk"}],
+        CapturedAtTicks: 12002, Reason: ""}
+    AssertTargetProbe(probe.Observe(ProbeSpec(
+        TargetProbeKind.CommandTarget,
+        "C:\Jobs\missing.ahk")).IsStopped(),
+        "完整 AutoHotkey 主窗口快照没有排除未运行的脚本")
 
     nativeProvider.Result := {Ready: true, Processes: [],
         CapturedAtTicks: 12002}
@@ -101,7 +132,8 @@ RunTargetProbeTests() {
     snapshotProvider.ShouldThrow := true
     providerFailure := probe.Observe(ProbeSpec(TargetProbeKind.CommandTarget,
         "C:\Jobs\worker.py"), "", 777)
-    AssertTargetProbe(providerFailure.IsUnknown(),
+    AssertTargetProbe(providerFailure.IsUnknown()
+        && providerFailure.NeedsFreshSnapshot(),
         "快照提供器异常时没有返回 Unknown")
     AssertTargetProbe(snapshotProvider.RequestedAge == 777,
         "探活引擎没有传递快照最大年龄")

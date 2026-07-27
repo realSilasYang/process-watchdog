@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证本地诊断包包含定位问题所需的环境与守护摘要。
+; 同时检查敏感字段脱敏、输出编码和失败清理，测试不会上传任何内容。
+
 #Include ..\..\src\Diagnostics\DiagnosticBundleService.ahk
 
 AssertDiagnosticBundle(condition, message) {

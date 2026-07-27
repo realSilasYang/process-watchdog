@@ -1,18 +1,27 @@
+; 短生命周期窗口注册表与应用关闭协调器。
+; 各对话框由注册表实例持有，窗口销毁后由自身清空控件引用；关闭流程则按
+; “停止守护任务、关闭界面、释放绘图与图标资源”的顺序收敛，保证重复调用仍安全。
+
 class GuiModuleRegistry {
     __New(mainGui) {
         this.display := CustomDisplayDialog(mainGui)
         this.environment := EnvironmentSettingsDialog(mainGui)
         this.maintenance := MaintenanceSettingsDialog(mainGui)
         this.log := LogWindow(mainGui)
+        this.batchOutputLogNotice := BatchOutputLogNoticeWindow(mainGui)
         this.settings := SettingsWindow(mainGui)
         this.help := HelpWindow(mainGui)
+        this.supportInfo := SupportInfoWindow(mainGui)
+        this.donation := DonationWindow(mainGui)
         this.addItem := AddItemDialog(mainGui)
         this.tooltip := DarkTooltipWindow()
+        this.historyToast := HistoryToastWindow()
         this.stopped := false
     }
 
     HideTransientWindows() {
         this.tooltip.Hide()
+        this.historyToast.Hide()
         this.addItem.HideTransientWindows()
     }
 
@@ -23,12 +32,16 @@ class GuiModuleRegistry {
         ; 先关闭可能拥有后台工作器的窗口，再清理其独立提示窗。
         try this.addItem.Shutdown()
         try this.log.Close()
+        try this.batchOutputLogNotice.Close()
         try this.settings.Close()
         try this.help.Close()
+        try this.supportInfo.Close()
+        try this.donation.Close()
         try this.display.Close()
         try this.environment.Close()
         try this.maintenance.Close()
         try this.tooltip.Close()
+        try this.historyToast.Close()
     }
 }
 
@@ -41,23 +54,25 @@ ShutdownApplication(*) {
     }
 
     try {
-        if IsSet(App)
+        if IsSet(App) {
+            App.guardMutationQueue.Shutdown()
             App.guardRuntime.Shutdown()
+        }
     } catch as shutdownError {
-        ReportShutdownFailure("核心守护", shutdownError)
+        ReportShutdownFailure(Tr("核心守护"), shutdownError)
     }
     try ShutdownApplicationUi()
     catch as shutdownError
-        ReportShutdownFailure("界面资源", shutdownError)
+        ReportShutdownFailure(Tr("界面资源"), shutdownError)
     try ShutdownRoundedButtonRenderer()
     catch as shutdownError
-        ReportShutdownFailure("按钮绘制器", shutdownError)
+        ReportShutdownFailure(Tr("按钮绘制器"), shutdownError)
     try ShutdownIconResampler()
     catch as shutdownError
-        ReportShutdownFailure("图标缩放器", shutdownError)
+        ReportShutdownFailure(Tr("图标缩放器"), shutdownError)
     try ShutdownApplicationResources()
     catch as shutdownError
-        ReportShutdownFailure("应用资源", shutdownError)
+        ReportShutdownFailure(Tr("应用资源"), shutdownError)
 
     if IsSet(App)
         App.shutdownCompleted := true
@@ -72,7 +87,7 @@ ExitApplication(exitCode := 0) {
 
 ReportShutdownFailure(stageName, shutdownError) {
     details := FormatRuntimeErrorDetails(shutdownError)
-    message := "退出清理异常（" stageName "）：" details
+    message := Tr("退出清理异常（{1}）：{2}", stageName, details)
     try LogMsg(message)
     try FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") " " message "`r`n",
         A_Temp "\ProcessWatchdogShutdownErrors.log", "UTF-8")
@@ -81,23 +96,24 @@ ReportShutdownFailure(stageName, shutdownError) {
 FormatRuntimeErrorDetails(runtimeError) {
     if !IsObject(runtimeError)
         return String(runtimeError)
-    details := runtimeError.Message
+    details := TrDiagnostic(runtimeError.Message)
     try {
         if runtimeError.File != "" {
             details .= "`n" runtimeError.File
             if runtimeError.Line
-                details .= "（第 " runtimeError.Line " 行）"
+                details .= Tr("（第 {1} 行）", runtimeError.Line)
         }
     }
     try {
         if runtimeError.What != ""
-            details .= "`n位置：" runtimeError.What
+            details .= Tr("`n位置：{1}", runtimeError.What)
     }
     return details
 }
 
 ShutdownApplicationUi(*) {
     try SetTimer(UpdateCountdownUI, 0)
+    try ShutdownContextMenuPresenter()
     if IsSet(App) {
         dpiRebuildTimer := App.iconResources.CancelDpiRebuild()
         if dpiRebuildTimer
@@ -109,6 +125,8 @@ ShutdownApplicationUi(*) {
         try App.fileScanner.Shutdown()
     if !IsSet(Main)
         return
+    if Main.listSelectionPresenter
+        try Main.listSelectionPresenter.Dispose()
     try UnregisterGuiControls(Main.gui.Hwnd)
     try ReleaseWindowIcons(Main.gui.Hwnd)
     if Main.appIcons {
@@ -126,7 +144,7 @@ AcquireApplicationMutex(&alreadyExists := false) {
     mutexHandle := DllCall("kernel32\CreateMutexW", "Ptr", 0, "Int", false,
         "WStr", "Global\Watchdog_Mutex_Strict", "Ptr")
     lastError := DllCall("kernel32\GetLastError", "UInt")
-    alreadyExists := mutexHandle && lastError == 183 ; ERROR_ALREADY_EXISTS
+    alreadyExists := mutexHandle && lastError == 183 ; ERROR_ALREADY_EXISTS：同名单实例锁已经存在。
     return mutexHandle
 }
 
@@ -155,7 +173,10 @@ ShutdownApplicationResources(*) {
     if App.appsDirty
         try SaveAppsToIni()
     try SetTimer(App.configSaveRetryTimer, 0)
+    try App.ClearPendingProcessSnapshot()
+    try App.applicationUpdateService.Shutdown()
     try App.svgRenderer.Shutdown()
+    try LocalizationService.ShutdownUiFonts()
     ReleaseApplicationMutex()
     try ReleaseWindowIcons(A_ScriptHwnd)
 }

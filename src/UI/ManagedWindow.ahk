@@ -1,3 +1,7 @@
+; 短生命周期 GUI 的统一所有权与关闭基类。
+; 创建下级窗口时申请层级租约，关闭时先恢复直接上级，再销毁当前窗口并清理控件注册；
+; 原生窗口被外部销毁和显式 Close 最终都汇合到同一幂等收尾路径。
+
 class ManagedWindowLifecycle {
     __New(callbacks, hierarchy, guiFactory := "", windowValidator := "") {
         if !IsObject(hierarchy)

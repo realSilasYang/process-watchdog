@@ -1,3 +1,7 @@
+; 守护项配置快照与差量合并服务。
+; 快照只保存可持久化的业务字段，不复制控件和运行中任务；恢复时按目标路径合并
+; 当前运行态，确保撤销旧操作不会抹掉随后学习到的升级特征或重新引入过期控制器。
+
 class AppConfigSnapshotService {
     __New(maintenanceConfigCodec, displayConfigCodec, normalizePath,
         pathsEquivalent) {

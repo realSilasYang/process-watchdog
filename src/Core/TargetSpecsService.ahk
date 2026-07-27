@@ -1,3 +1,7 @@
+; 从持久化状态构建目标规格并管理缓存。
+; 快捷方式元数据、手动真实目标和启动参数共同决定缓存身份；
+; 只有会改变语义的证据才使缓存失效，单纯的读取时间变化不会触发重复解析。
+
 class TargetSpecsService {
     __New(shortcutTargetResolver, normalizeTargetPath) {
         this.ShortcutTargetResolver := shortcutTargetResolver

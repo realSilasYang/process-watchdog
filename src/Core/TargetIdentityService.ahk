@@ -1,3 +1,7 @@
+; 守护目标身份冲突检测与快捷方式身份刷新服务。
+; 目标身份以规范化启动入口、解析后的真实目标和必要参数共同判定；
+; 快捷方式变化只有在重新验证控制器所有权且不与现有目标冲突后才能提交。
+
 class TargetIdentityService {
     static ShortcutRefreshIntervalMs := 30000
 
@@ -88,15 +92,15 @@ class TargetIdentityService {
             } finally Critical(previousCritical ? previousCritical : "Off")
             if shortcutArgsChanged {
                 this.Runtime.targetSpecsService.Get(path, stateObj, true)
-                this.Log("已刷新快捷方式内置参数: " path)
+                this.Log(this.Text("已刷新快捷方式内置参数：{1}", path))
             }
             return shortcutArgsChanged
         }
 
         conflictPath := this.FindConflict(freshTarget, path)
         if (conflictPath != "") {
-            this.Log("快捷方式真实进程刷新被拒绝，目标已由其它项目守护: "
-                path " -> " conflictPath)
+            this.Log(this.Text("快捷方式真实进程刷新被拒绝，目标已由其它项目守护：{1} -> {2}",
+                path, conflictPath))
             return false
         }
         if !this.IsCurrent(path, stateObj)
@@ -120,6 +124,16 @@ class TargetIdentityService {
             .GetFingerprint(freshTarget)
         if !this.IsCurrent(path, stateObj)
             return false
+
+        ; 快捷方式在升级后可能改指向全新的可执行文件。提交新身份之前必须推进
+        ; 控制器代际并清除旧 PID，避免旧目标的重启、验证或停止回调落到新目标上。
+        if this.Callbacks.HasOwnProp("InvalidateRuntimeIdentity")
+            && IsObject(this.Callbacks.InvalidateRuntimeIdentity) {
+            if !this.Callbacks.InvalidateRuntimeIdentity.Call(path, stateObj)
+                return false
+            if !this.IsCurrent(path, stateObj)
+                return false
+        }
 
         previousCritical := A_IsCritical
         Critical("On")
@@ -146,14 +160,20 @@ class TargetIdentityService {
             this.Runtime.maintenanceCoordinator.EnsureWatcher(path, stateObj)
         }
         this.Runtime.targetSpecsService.Get(path, stateObj, true)
-        this.Log("已刷新快捷方式真实进程（" resolutionSource "）: "
-            path " -> " freshTarget)
+        this.Log(this.Text("已刷新快捷方式真实进程（{1}）：{2} -> {3}",
+            this.Text(resolutionSource), path, freshTarget))
         return true
     }
 
     TargetReferenceExists(path, stateObj := "") {
         return this.Runtime.targetSpecsService.Get(path, stateObj)
             .Launch.Available
+    }
+
+    TargetSubjectExists(path, stateObj := "") {
+        subjectPath := this.GetMaintenanceSubjectPath(path)
+        return subjectPath != "" && FileExist(subjectPath)
+            && !DirExist(subjectPath)
     }
 
     GetMaintenanceSubjectPath(path) {
@@ -166,5 +186,13 @@ class TargetIdentityService {
 
     Log(message) {
         try this.Callbacks.Log.Call(message)
+    }
+
+    Text(template, values*) {
+        if this.Callbacks.HasOwnProp("Localize")
+            && IsObject(this.Callbacks.Localize) {
+            return this.Callbacks.Localize.Call(template, values*)
+        }
+        return values.Length ? Format(template, values*) : template
     }
 }

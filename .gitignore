@@ -14,13 +14,13 @@ watchdog.maintenance.ini.*
 *.key
 *.snk
 _codex_*
+.process-watchdog-update-backup-*/
 
 # Logs
 *.log
 ProcessWatchdogLogs/
 
 # Build, test and packaged outputs
-artifacts/
 dist/
 test-results/
 coverage/

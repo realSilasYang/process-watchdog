@@ -1,10 +1,14 @@
+; 应用图标与图像列表资源注册表。
+; 统一记录缓存位图、临时图标、DPI 指标和延迟重建代际；替换图像列表时先完成
+; 新资源构建与附着，再退休旧资源，防止控件短暂引用已释放句柄。
+
 class IconResourceRegistry {
     __New() {
         this.IconCache := Map()
         this.IconCache.CaseSense := "Off"
         this.WindowIconPairs := Map()
-        this.MainImageListUsers := Map()
-        this.RetiredMainImageLists := Map()
+        this.ImageListUsers := Map()
+        this.RetiredImageLists := Map()
         this.ResamplerFactory := 0
         this.MainDpi := 96
         this.MainIconPixelSize := 28
@@ -70,40 +74,40 @@ class IconResourceRegistry {
         return iconPair
     }
 
-    AcquireMainImageList(imageList, activeImageList) {
+    AcquireImageList(imageList, activeImageList) {
         if !imageList
             return 0
         previousCritical := A_IsCritical
         Critical("On")
         try {
             if (imageList != activeImageList
-                && !this.RetiredMainImageLists.Has(imageList))
+                && !this.RetiredImageLists.Has(imageList))
                 return 0
-            this.MainImageListUsers[imageList] :=
-                this.MainImageListUsers.Get(imageList, 0) + 1
+            this.ImageListUsers[imageList] :=
+                this.ImageListUsers.Get(imageList, 0) + 1
             return imageList
         } finally {
             Critical(previousCritical ? previousCritical : "Off")
         }
     }
 
-    ReleaseMainImageList(imageList) {
+    ReleaseImageList(imageList) {
         if !imageList
             return false
         destroyNow := false
         previousCritical := A_IsCritical
         Critical("On")
         try {
-            if !this.MainImageListUsers.Has(imageList)
+            if !this.ImageListUsers.Has(imageList)
                 return false
-            remainingUsers := this.MainImageListUsers[imageList] - 1
+            remainingUsers := this.ImageListUsers[imageList] - 1
             if (remainingUsers > 0) {
-                this.MainImageListUsers[imageList] := remainingUsers
+                this.ImageListUsers[imageList] := remainingUsers
                 return false
             }
-            this.MainImageListUsers.Delete(imageList)
-            if this.RetiredMainImageLists.Has(imageList) {
-                this.RetiredMainImageLists.Delete(imageList)
+            this.ImageListUsers.Delete(imageList)
+            if this.RetiredImageLists.Has(imageList) {
+                this.RetiredImageLists.Delete(imageList)
                 destroyNow := true
             }
         } finally {
@@ -112,7 +116,7 @@ class IconResourceRegistry {
         return destroyNow
     }
 
-    RetireMainImageList(imageList, activeImageList) {
+    RetireImageList(imageList, activeImageList) {
         if !imageList
             return false
         destroyNow := false
@@ -121,14 +125,14 @@ class IconResourceRegistry {
         try {
             if (imageList == activeImageList)
                 return false
-            if (this.MainImageListUsers.Has(imageList)
-                && this.MainImageListUsers[imageList] > 0) {
-                this.RetiredMainImageLists[imageList] := true
+            if (this.ImageListUsers.Has(imageList)
+                && this.ImageListUsers[imageList] > 0) {
+                this.RetiredImageLists[imageList] := true
             } else {
-                if this.MainImageListUsers.Has(imageList)
-                    this.MainImageListUsers.Delete(imageList)
-                if this.RetiredMainImageLists.Has(imageList)
-                    this.RetiredMainImageLists.Delete(imageList)
+                if this.ImageListUsers.Has(imageList)
+                    this.ImageListUsers.Delete(imageList)
+                if this.RetiredImageLists.Has(imageList)
+                    this.RetiredImageLists.Delete(imageList)
                 destroyNow := true
             }
         } finally {
@@ -137,18 +141,18 @@ class IconResourceRegistry {
         return destroyNow
     }
 
-    IsMainImageListTracked(imageList, activeImageList) {
+    IsImageListTracked(imageList, activeImageList) {
         return imageList && (imageList == activeImageList
-            || this.MainImageListUsers.Has(imageList)
-            || this.RetiredMainImageLists.Has(imageList))
+            || this.ImageListUsers.Has(imageList)
+            || this.RetiredImageLists.Has(imageList))
     }
 
-    GetMainImageListUseCount(imageList) {
-        return this.MainImageListUsers.Get(imageList, 0)
+    GetImageListUseCount(imageList) {
+        return this.ImageListUsers.Get(imageList, 0)
     }
 
-    IsMainImageListRetired(imageList) {
-        return imageList && this.RetiredMainImageLists.Has(imageList)
+    IsImageListRetired(imageList) {
+        return imageList && this.RetiredImageLists.Has(imageList)
     }
 
     GetMainIconMetrics() {

@@ -1,9 +1,14 @@
+﻿# Windows x64 发行包构建脚本。
+# 从本次发布解析出的工具链快照编译主程序，整理运行依赖、许可证、源码归档、
+# 可更新源码包、校验和、SBOM 与构建溯源。
+
 [CmdletBinding()]
 param(
     [string]$OutputDirectory = "",
     [string]$AutoHotkeyPath = "",
     [string]$CompilerPath = "",
     [string]$AutoHotkeySourcePath = "",
+    [string]$ResolvedToolchainPath = "",
     [switch]$SkipStartupValidation
 )
 
@@ -14,17 +19,23 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $outputRoot = if ($OutputDirectory) {
     [System.IO.Path]::GetFullPath($OutputDirectory)
 } else {
-    Join-Path $projectRoot 'artifacts\release'
+    Join-Path $projectRoot 'dist'
 }
 $version = (Get-Content -LiteralPath (Join-Path $projectRoot 'VERSION') `
     -Raw -Encoding UTF8).Trim()
-if ($version -notmatch '^\d+\.\d+\.\d+$') {
+if ($version -notmatch `
+    '^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$') {
     throw "Invalid VERSION value: $version"
 }
 
 if (-not $AutoHotkeyPath -or -not $CompilerPath -or
-    -not $AutoHotkeySourcePath) {
-    $toolchain = & (Join-Path $PSScriptRoot 'bootstrap-toolchain.ps1')
+    -not $AutoHotkeySourcePath -or -not $ResolvedToolchainPath) {
+    $bootstrapArguments = @{}
+    if ($ResolvedToolchainPath) {
+        $bootstrapArguments.ResolvedToolchainPath = $ResolvedToolchainPath
+    }
+    $toolchain = & (Join-Path $PSScriptRoot 'bootstrap-toolchain.ps1') `
+        @bootstrapArguments
     if (-not $AutoHotkeyPath) {
         $AutoHotkeyPath = $toolchain.AutoHotkeyPath
     }
@@ -34,6 +45,9 @@ if (-not $AutoHotkeyPath -or -not $CompilerPath -or
     if (-not $AutoHotkeySourcePath) {
         $AutoHotkeySourcePath = $toolchain.AutoHotkeySourcePath
     }
+    if (-not $ResolvedToolchainPath) {
+        $ResolvedToolchainPath = $toolchain.ResolvedToolchainPath
+    }
 }
 foreach ($toolPath in @($AutoHotkeyPath, $CompilerPath)) {
     if (-not (Test-Path -LiteralPath $toolPath -PathType Leaf)) {
@@ -41,10 +55,18 @@ foreach ($toolPath in @($AutoHotkeyPath, $CompilerPath)) {
     }
 }
 
-$toolLockPath = Join-Path $PSScriptRoot 'toolchain.lock.json'
-$toolLock = Get-Content -LiteralPath $toolLockPath -Raw -Encoding UTF8 |
+$resolvedToolchainPath = [System.IO.Path]::GetFullPath(
+    $ResolvedToolchainPath)
+if (-not (Test-Path -LiteralPath $resolvedToolchainPath -PathType Leaf)) {
+    throw "Resolved toolchain snapshot is missing: $resolvedToolchainPath"
+}
+$toolLock = Get-Content -LiteralPath $resolvedToolchainPath -Raw `
+    -Encoding UTF8 |
     ConvertFrom-Json
-function Assert-PinnedBuildTool {
+if ($toolLock.schemaVersion -ne 2) {
+    throw 'Resolved toolchain snapshot schema is invalid.'
+}
+function Assert-ResolvedBuildTool {
     param(
         [string]$Name,
         [string]$Path,
@@ -55,18 +77,18 @@ function Assert-PinnedBuildTool {
     $actualHash = (Get-FileHash -Algorithm SHA256 `
         -LiteralPath $fullPath).Hash
     if ($actualHash -ne $Definition.executableSha256) {
-        throw "$Name executable does not match the pinned toolchain: $actualHash"
+        throw "$Name executable does not match the resolved toolchain: $actualHash"
     }
     return $fullPath
 }
-$AutoHotkeyPath = Assert-PinnedBuildTool 'AutoHotkey' $AutoHotkeyPath `
+$AutoHotkeyPath = Assert-ResolvedBuildTool 'AutoHotkey' $AutoHotkeyPath `
     $toolLock.tools.autoHotkey
-$CompilerPath = Assert-PinnedBuildTool 'Ahk2Exe' $CompilerPath `
+$CompilerPath = Assert-ResolvedBuildTool 'Ahk2Exe' $CompilerPath `
     $toolLock.tools.ahk2Exe
 $autoHotkeyLicensePath = Join-Path (Split-Path -Parent $AutoHotkeyPath) `
     $toolLock.tools.autoHotkey.licenseFile
 if (-not (Test-Path -LiteralPath $autoHotkeyLicensePath -PathType Leaf)) {
-    throw "Pinned AutoHotkey license is missing: $autoHotkeyLicensePath"
+    throw "Resolved AutoHotkey license is missing: $autoHotkeyLicensePath"
 }
 $autoHotkeyLicenseHash = (Get-FileHash -Algorithm SHA256 `
     -LiteralPath $autoHotkeyLicensePath).Hash
@@ -76,7 +98,7 @@ if ($autoHotkeyLicenseHash -ne $toolLock.tools.autoHotkey.licenseSha256) {
 $AutoHotkeySourcePath = [System.IO.Path]::GetFullPath(
     $AutoHotkeySourcePath)
 if (-not (Test-Path -LiteralPath $AutoHotkeySourcePath -PathType Leaf)) {
-    throw "Pinned AutoHotkey source archive is missing: $AutoHotkeySourcePath"
+    throw "Resolved AutoHotkey source archive is missing: $AutoHotkeySourcePath"
 }
 $autoHotkeySourceHash = (Get-FileHash -Algorithm SHA256 `
     -LiteralPath $AutoHotkeySourcePath).Hash
@@ -102,10 +124,18 @@ New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
 $packageName = "process-watchdog-$version-windows-x64"
 $packageDirectory = Assert-OutputPath (Join-Path $outputRoot $packageName)
 $zipPath = Assert-OutputPath (Join-Path $outputRoot "$packageName.zip")
+$standaloneExecutablePath = Assert-OutputPath `
+    (Join-Path $outputRoot "$packageName.exe")
+$sourcePackageName = "process-watchdog-$version-source"
+$sourcePackageDirectory = Assert-OutputPath `
+    (Join-Path $outputRoot $sourcePackageName)
+$sourceZipPath = Assert-OutputPath `
+    (Join-Path $outputRoot "$sourcePackageName.zip")
 $standaloneSbomPath = Assert-OutputPath `
     (Join-Path $outputRoot "$packageName.spdx.json")
 $checksumsPath = Assert-OutputPath (Join-Path $outputRoot 'SHA256SUMS.txt')
-foreach ($path in @($packageDirectory, $zipPath, $standaloneSbomPath,
+foreach ($path in @($packageDirectory, $zipPath, $standaloneExecutablePath,
+        $sourcePackageDirectory, $sourceZipPath, $standaloneSbomPath,
         $checksumsPath)) {
     if (Test-Path -LiteralPath $path) {
         [void](Assert-OutputPath $path)
@@ -129,8 +159,10 @@ Copy-Item -LiteralPath (Join-Path $projectRoot 'src') `
     -Destination $scratchRoot -Recurse
 Copy-Item -LiteralPath (Join-Path $projectRoot 'app') `
     -Destination $scratchRoot -Recurse
-Copy-Item -LiteralPath (Join-Path $projectRoot 'watchdog.ico') `
-    -Destination $scratchRoot
+$scratchAppAssetDirectory = Join-Path $scratchRoot 'assets\app'
+New-Item -ItemType Directory -Force -Path $scratchAppAssetDirectory | Out-Null
+Copy-Item -LiteralPath (Join-Path $projectRoot 'assets\app\watchdog.ico') `
+    -Destination $scratchAppAssetDirectory
 $mainScript = Get-ChildItem -LiteralPath $projectRoot -Filter '*.ahk' -File |
     Where-Object { $_.Name -notlike '_*' } |
     Select-Object -First 1
@@ -140,6 +172,17 @@ if (-not $mainScript) {
 $asciiSourcePath = Join-Path $scratchRoot 'ProcessWatchdog.ahk'
 Copy-Item -LiteralPath $mainScript.FullName `
     -Destination $asciiSourcePath
+# Ahk2Exe 的 SetVersion 是源码编译指令而不是命令行参数。构建副本在这里直接从
+# VERSION 注入，既兼容最新上游编译器，也避免发行元数据依赖开发者手工改写。
+$stagedSource = Get-Content -LiteralPath $asciiSourcePath -Raw -Encoding UTF8
+$versionDirectivePattern = '(?m)^;@Ahk2Exe-SetVersion\s+[^\r\n]+(?=\r?$)'
+if ([regex]::Matches($stagedSource, $versionDirectivePattern).Count -ne 1) {
+    throw 'The main source must contain exactly one Ahk2Exe SetVersion directive.'
+}
+$stagedSource = [regex]::Replace($stagedSource, $versionDirectivePattern,
+    ";@Ahk2Exe-SetVersion $version.0")
+Set-Content -LiteralPath $asciiSourcePath -Value $stagedSource -Encoding UTF8 `
+    -NoNewline
 $scratchExecutablePath = Join-Path $scratchRoot 'ProcessWatchdog.exe'
 
 $substituteDrive = $null
@@ -183,7 +226,8 @@ function ConvertTo-CompilerPath {
 
 $compilerSourcePath = ConvertTo-CompilerPath $asciiSourcePath
 $compilerOutputPath = ConvertTo-CompilerPath $scratchExecutablePath
-$compilerIconPath = ConvertTo-CompilerPath (Join-Path $scratchRoot 'watchdog.ico')
+$compilerIconPath = ConvertTo-CompilerPath `
+    (Join-Path $scratchAppAssetDirectory 'watchdog.ico')
 $compilerBasePath = ConvertTo-CompilerPath $AutoHotkeyPath
 if (-not (Test-Path -LiteralPath $asciiSourcePath -PathType Leaf)) {
     throw "ASCII staging source was not created: $asciiSourcePath"
@@ -199,20 +243,45 @@ $compilerArguments = @(
     '/base', $compilerBasePath,
     '/silent', 'verbose'
 )
+$compilerProcess = $null
 try {
-    $compilerProcess = Start-Process -FilePath $CompilerPath `
-        -ArgumentList $compilerArguments -PassThru -WindowStyle Hidden
+    $compilerStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $compilerStartInfo.FileName = $CompilerPath
+    $compilerStartInfo.Arguments = ($compilerArguments | ForEach-Object {
+        '"' + ([string]$_).Replace('"', '\"') + '"'
+    }) -join ' '
+    $compilerStartInfo.WorkingDirectory = $projectRoot
+    $compilerStartInfo.UseShellExecute = $false
+    $compilerStartInfo.CreateNoWindow = $true
+    $compilerStartInfo.RedirectStandardOutput = $true
+    $compilerStartInfo.RedirectStandardError = $true
+    $compilerProcess = [System.Diagnostics.Process]::Start($compilerStartInfo)
+    $standardOutputTask = $compilerProcess.StandardOutput.ReadToEndAsync()
+    $standardErrorTask = $compilerProcess.StandardError.ReadToEndAsync()
     if (-not $compilerProcess.WaitForExit(120000)) {
         try { $compilerProcess.Kill() } catch {}
         throw 'Ahk2Exe timed out after 120 seconds.'
     }
-    if ($compilerProcess.ExitCode -ne 0 -or
+    $compilerProcess.WaitForExit()
+    $compilerExitCode = $compilerProcess.ExitCode
+    $compilerStandardOutput = $standardOutputTask.GetAwaiter().GetResult()
+    $compilerStandardError = $standardErrorTask.GetAwaiter().GetResult()
+    if ($compilerExitCode -ne 0 -or
         -not (Test-Path -LiteralPath $scratchExecutablePath -PathType Leaf)) {
-        throw "Ahk2Exe failed with exit code $($compilerProcess.ExitCode)."
+        $compilerDiagnostics = @($compilerStandardError,
+            $compilerStandardOutput) -join "`n"
+        throw ("Ahk2Exe failed with exit code {0}.{1}" -f `
+            $compilerExitCode,
+            $(if ($compilerDiagnostics.Trim()) {
+                "`n$($compilerDiagnostics.Trim())"
+            } else { '' }))
     }
     Copy-Item -LiteralPath $scratchExecutablePath `
         -Destination $executablePath
 } finally {
+    if ($compilerProcess) {
+        $compilerProcess.Dispose()
+    }
     if ($substituteDrive) {
         $removeDrive = Start-Process -FilePath 'subst.exe' `
             -ArgumentList $substituteDrive, '/D' -PassThru -Wait `
@@ -221,20 +290,22 @@ try {
             Write-Warning "Unable to remove temporary build drive $substituteDrive."
         }
     }
+    # 编译中间目录不属于交付物；无论成功还是失败都立即清理，避免根目录长期堆积
+    # 已经过时的源码副本和 EXE。
+    if (Test-Path -LiteralPath $scratchRoot) {
+        Remove-Item -LiteralPath $scratchRoot -Recurse -Force
+    }
+    $scratchParent = Split-Path -Parent $scratchRoot
+    if ((Test-Path -LiteralPath $scratchParent -PathType Container) -and
+        -not (Get-ChildItem -LiteralPath $scratchParent -Force)) {
+        Remove-Item -LiteralPath $scratchParent -Force
+    }
 }
 
 foreach ($file in @(
-    'watchdog.ico',
-    'watchdog.example.ini',
     'README.md',
     'CHANGELOG.md',
-    'CONTRIBUTING.md',
-    'CODE_OF_CONDUCT.md',
-    'SECURITY.md',
-    'SUPPORT.md',
-    'GOVERNANCE.md',
     'LICENSE',
-    'THIRD_PARTY_NOTICES.md',
     'VERSION'
 )) {
     Copy-Item -LiteralPath (Join-Path $projectRoot $file) `
@@ -251,38 +322,41 @@ Copy-Item -LiteralPath $AutoHotkeySourcePath `
     -Destination (Join-Path $sourceDirectory $packagedAutoHotkeySource)
 $buildMetadataDirectory = Join-Path $packageDirectory 'build-metadata'
 New-Item -ItemType Directory -Force -Path $buildMetadataDirectory | Out-Null
-Copy-Item -LiteralPath $toolLockPath `
-    -Destination (Join-Path $buildMetadataDirectory 'toolchain.lock.json')
-foreach ($directory in @('assets', 'third_party')) {
+Copy-Item -LiteralPath $resolvedToolchainPath `
+    -Destination (Join-Path $buildMetadataDirectory 'toolchain.resolved.json')
+foreach ($directory in @('assets', 'config', 'docs', 'runtime',
+        'third_party')) {
     Copy-Item -LiteralPath (Join-Path $projectRoot $directory) `
         -Destination $packageDirectory -Recurse
 }
-$packageDocumentationDirectory = Join-Path $packageDirectory 'docs'
+$packageCommunityDirectory = Join-Path $packageDirectory '.github'
 New-Item -ItemType Directory -Force `
-    -Path $packageDocumentationDirectory | Out-Null
-foreach ($documentationFile in @(
-    'quick-start.md',
-    'installation.md',
-    'configuration.md',
-    'troubleshooting.md',
-    'compatibility.md',
-    'diagnostics.md',
-    'architecture.md',
-    'release-process.md',
-    'publication-checklist.md'
+    -Path $packageCommunityDirectory | Out-Null
+foreach ($communityFile in @(
+    'CONTRIBUTING.md',
+    'CONTRIBUTING.en.md',
+    'CODE_OF_CONDUCT.md',
+    'CODE_OF_CONDUCT.en.md',
+    'SECURITY.md',
+    'SECURITY.en.md',
+    'SUPPORT.md',
+    'SUPPORT.en.md'
 )) {
     Copy-Item -LiteralPath (Join-Path $projectRoot `
-        ("docs\" + $documentationFile)) `
-        -Destination $packageDocumentationDirectory
+        ('.github\' + $communityFile)) `
+        -Destination $packageCommunityDirectory
 }
 $manualRegressionDirectory = Join-Path $packageDirectory 'tests\gui'
 New-Item -ItemType Directory -Force `
     -Path $manualRegressionDirectory | Out-Null
 Copy-Item -LiteralPath (Join-Path $projectRoot `
     'tests\gui\MANUAL-REGRESSION.md') -Destination $manualRegressionDirectory
+Copy-Item -LiteralPath (Join-Path $projectRoot `
+    'tests\gui\MANUAL-REGRESSION.en.md') -Destination $manualRegressionDirectory
 
 $buildManifest = [ordered]@{
-    schemaVersion = 3
+    schemaVersion = 4
+    packageKind = 'compiled'
     version = $version
     platform = 'windows-x64'
     autoHotkey = $toolLock.tools.autoHotkey.version
@@ -292,18 +366,61 @@ $buildManifest = [ordered]@{
     autoHotkeySourceSha256 = $toolLock.tools.autoHotkey.sourceSha256
     ahk2Exe = $toolLock.tools.ahk2Exe.version
     ahk2ExeExecutableSha256 = $toolLock.tools.ahk2Exe.executableSha256
-    # Derive the Unicode entry name from the filesystem. Windows PowerShell
-    # 5.1 parses UTF-8-without-BOM scripts through the active ANSI code page,
-    # so embedding the Chinese filename here corrupts release metadata.
+    # 直接沿用前面发现并校验过的唯一入口文件名，避免在构建元数据中重复维护中文文件名。
     sourceEntry = $mainScript.Name
 }
 $manifestPath = Join-Path $packageDirectory 'build-manifest.json'
 $buildManifest | ConvertTo-Json -Depth 4 |
     Set-Content -LiteralPath $manifestPath -Encoding UTF8
+$executableName = Split-Path -Leaf $executablePath
+$compiledUpdateManifest = [ordered]@{
+    schemaVersion = 1
+    packageKind = 'compiled'
+    version = $version
+    entry = $executableName
+    managedPaths = @(
+        $executableName,
+        'README.md', 'CHANGELOG.md', 'LICENSE', 'VERSION',
+        '.github', 'assets', 'build-manifest.json', 'build-metadata', 'config',
+        'docs', 'licenses', 'runtime', 'SBOM.spdx.json', 'tests',
+        'third_party', 'update-manifest.json'
+    )
+}
+$compiledUpdateManifest | ConvertTo-Json -Depth 5 |
+    Set-Content -LiteralPath (Join-Path $packageDirectory `
+        'update-manifest.json') -Encoding UTF8
 $packageSbomPath = Join-Path $packageDirectory 'SBOM.spdx.json'
 & (Join-Path $PSScriptRoot 'generate-sbom.ps1') `
-    -OutputPath $packageSbomPath
+    -OutputPath $packageSbomPath `
+    -ResolvedToolchainPath $resolvedToolchainPath
 Copy-Item -LiteralPath $packageSbomPath -Destination $standaloneSbomPath
+
+# 源码发行包使用与仓库相同的可运行布局，供非 Git 源码安装执行校验更新。
+New-Item -ItemType Directory -Force -Path $sourcePackageDirectory | Out-Null
+foreach ($file in @('README.md', 'CHANGELOG.md', 'LICENSE', 'VERSION',
+        $mainScript.Name)) {
+    Copy-Item -LiteralPath (Join-Path $projectRoot $file) `
+        -Destination $sourcePackageDirectory
+}
+foreach ($directory in @('.github', 'app', 'assets', 'config', 'docs',
+        'runtime', 'src', 'tests', 'third_party', 'tools')) {
+    Copy-Item -LiteralPath (Join-Path $projectRoot $directory) `
+        -Destination $sourcePackageDirectory -Recurse
+}
+$sourceUpdateManifest = [ordered]@{
+    schemaVersion = 1
+    packageKind = 'source'
+    version = $version
+    entry = $mainScript.Name
+    managedPaths = @(
+        $mainScript.Name, 'README.md', 'CHANGELOG.md', 'LICENSE', 'VERSION',
+        '.github', 'app', 'assets', 'config', 'docs', 'runtime', 'src',
+        'tests', 'third_party', 'tools', 'update-manifest.json'
+    )
+}
+$sourceUpdateManifest | ConvertTo-Json -Depth 5 |
+    Set-Content -LiteralPath (Join-Path $sourcePackageDirectory `
+        'update-manifest.json') -Encoding UTF8
 
 if (-not $SkipStartupValidation) {
     $process = Start-Process -FilePath $executablePath `
@@ -316,57 +433,87 @@ if (-not $SkipStartupValidation) {
 
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$archiveStream = [System.IO.File]::Open($zipPath,
-    [System.IO.FileMode]::CreateNew)
-try {
-    $archive = [System.IO.Compression.ZipArchive]::new($archiveStream,
-        [System.IO.Compression.ZipArchiveMode]::Create, $false,
-        [System.Text.Encoding]::UTF8)
+function New-DeterministicArchive {
+    param(
+        [string]$SourceDirectory,
+        [string]$ArchivePath
+    )
+
+    $archiveStream = [System.IO.File]::Open($ArchivePath,
+        [System.IO.FileMode]::CreateNew)
     try {
-        $files = Get-ChildItem -LiteralPath $packageDirectory -Recurse -File |
-            Sort-Object { $_.FullName.Substring($packageDirectory.Length + 1) }
-        foreach ($file in $files) {
-            $relativePath = $file.FullName.Substring(
-                $packageDirectory.Length + 1).Replace('\', '/')
-            $entry = $archive.CreateEntry($relativePath,
-                [System.IO.Compression.CompressionLevel]::Optimal)
-            $entry.LastWriteTime = [DateTimeOffset]::new(1980, 1, 1,
-                0, 0, 0, [TimeSpan]::Zero)
-            $inputStream = [System.IO.File]::OpenRead($file.FullName)
-            $entryStream = $entry.Open()
-            try {
-                $inputStream.CopyTo($entryStream)
-            } finally {
-                $entryStream.Dispose()
-                $inputStream.Dispose()
+        $archive = [System.IO.Compression.ZipArchive]::new($archiveStream,
+            [System.IO.Compression.ZipArchiveMode]::Create, $false,
+            [System.Text.Encoding]::UTF8)
+        try {
+            $files = Get-ChildItem -LiteralPath $SourceDirectory `
+                -Recurse -File | Sort-Object {
+                    $_.FullName.Substring($SourceDirectory.Length + 1)
+                }
+            foreach ($file in $files) {
+                $relativePath = $file.FullName.Substring(
+                    $SourceDirectory.Length + 1).Replace('\', '/')
+                $entry = $archive.CreateEntry($relativePath,
+                    [System.IO.Compression.CompressionLevel]::Optimal)
+                $entry.LastWriteTime = [DateTimeOffset]::new(1980, 1, 1,
+                    0, 0, 0, [TimeSpan]::Zero)
+                $inputStream = [System.IO.File]::OpenRead($file.FullName)
+                $entryStream = $entry.Open()
+                try {
+                    $inputStream.CopyTo($entryStream)
+                } finally {
+                    $entryStream.Dispose()
+                    $inputStream.Dispose()
+                }
             }
+        } finally {
+            $archive.Dispose()
         }
     } finally {
-        $archive.Dispose()
+        $archiveStream.Dispose()
     }
-} finally {
-    $archiveStream.Dispose()
 }
 
+New-DeterministicArchive $packageDirectory $zipPath
+New-DeterministicArchive $sourcePackageDirectory $sourceZipPath
+# Release 附件保留一份与 ZIP 内完全相同的 EXE，便于独立留档、核验和生成溯源
+# 证明；它仍依赖完整发行包中的资源和 DLL，不作为单文件安装包使用。
+Copy-Item -LiteralPath $executablePath -Destination $standaloneExecutablePath
+
 $zipHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zipPath).Hash
+$executableHash = (Get-FileHash -Algorithm SHA256 `
+    -LiteralPath $standaloneExecutablePath).Hash
+$sourceZipHash = (Get-FileHash -Algorithm SHA256 `
+    -LiteralPath $sourceZipPath).Hash
 $sbomHash = (Get-FileHash -Algorithm SHA256 `
     -LiteralPath $standaloneSbomPath).Hash
 @(
     "$zipHash  $([System.IO.Path]::GetFileName($zipPath))"
+    "$executableHash  $([System.IO.Path]::GetFileName($standaloneExecutablePath))"
+    "$sourceZipHash  $([System.IO.Path]::GetFileName($sourceZipPath))"
     "$sbomHash  $([System.IO.Path]::GetFileName($standaloneSbomPath))"
 ) |
     Set-Content -LiteralPath $checksumsPath -Encoding ASCII
 
 Write-Host "Release package: $zipPath"
+Write-Host "Standalone executable: $standaloneExecutablePath"
+Write-Host "Source package: $sourceZipPath"
 Write-Host "Release SBOM: $standaloneSbomPath"
 Write-Host "ZIP SHA-256: $zipHash"
+Write-Host "EXE SHA-256: $executableHash"
+Write-Host "Source ZIP SHA-256: $sourceZipHash"
 Write-Host "SBOM SHA-256: $sbomHash"
 [pscustomobject]@{
     Version = $version
     PackageDirectory = $packageDirectory
     ZipPath = $zipPath
+    ExecutablePath = $standaloneExecutablePath
+    SourcePackageDirectory = $sourcePackageDirectory
+    SourceZipPath = $sourceZipPath
     SbomPath = $standaloneSbomPath
     ChecksumsPath = $checksumsPath
     Sha256 = $zipHash
+    ExecutableSha256 = $executableHash
+    SourceSha256 = $sourceZipHash
     SbomSha256 = $sbomHash
 }

@@ -1,22 +1,91 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证主脚本装配后的关键集成契约，不启动真实守护循环。
+; 覆盖配置、目标规格、重载命令和界面适配，防止迁移后入口仍调用旧实现。
+
 try {
     RunMainIntegrationTests()
     ExitApp(0)
 } catch as testError {
-    FileAppend(testError.Message "`n", "**")
+    FileAppend(testError.File " (" testError.Line "): " testError.Message
+        "`n" testError.Stack "`n", "**")
     ExitApp(1)
 }
 
 #Include ..\..\进程守护小助手.ahk
 
+class SnapshotDeliveryTestSink {
+    __New() {
+        this.Count := 0
+    }
+
+    OnSnapshotPublished(*) {
+        this.Count++
+        return true
+    }
+}
+
+class UnavailableIdentityTestInspector {
+    GetCreationIdentity(*) {
+        return ""
+    }
+
+    GetImagePath(*) {
+        return "C:\observed.exe"
+    }
+}
+
 RunMainIntegrationTests() {
     global App
+    ; 本用例校验中文界面的全角标点契约，不依赖执行测试的 Windows 语言。
+    LocalizationService.Configure("zh-CN")
     App := ApplicationState()
+    maintenanceSink := SnapshotDeliveryTestSink()
+    guardSink := SnapshotDeliveryTestSink()
+    originalMaintenanceCoordinator := App.maintenanceCoordinator
+    originalGuardRuntime := App.guardRuntime
+    App.maintenanceCoordinator := maintenanceSink
+    App.guardRuntime := guardSink
+    deliverySnapshot := []
+    deliveryIndex := ProcessSnapshotIndex([], GetTickCount64(), true)
+    if !App.guardWorkGate.TryEnter()
+        throw Error("快照串行交付测试无法占用共享工作门")
+    try {
+        if App.OnProcessSnapshotPublished(deliverySnapshot, deliveryIndex)
+            throw Error("共享工作门繁忙时后台快照越过串行边界修改了核心状态")
+        if maintenanceSink.Count || guardSink.Count
+            throw Error("共享工作门繁忙时后台快照已被提前交付")
+    } finally App.guardWorkGate.Leave()
+    if !App.DeliverPendingProcessSnapshot()
+        || maintenanceSink.Count != 1 || guardSink.Count != 1 {
+        throw Error("共享工作门释放后待处理快照没有且仅有一次串行交付")
+    }
+    App.maintenanceCoordinator := originalMaintenanceCoordinator
+    App.guardRuntime := originalGuardRuntime
+    if GetGuardActivationStatus(true) != Tr("初始化...")
+        || GetGuardActivationStatus(false) != Tr("⏸️ 已暂停") {
+        throw Error("启用和暂停目标没有使用唯一的初始状态映射")
+    }
     if FormatMainStatusLabel("⚠️ 运行中 (权限不符)")
         != "运行中（权限不符）" {
         throw Error("主列表没有规范化空格加半角括号")
+    }
+    if FormatMainListLabel("uTools", true)
+            != FormatMainListLabel("uTools", false)
+        || InStr(FormatMainListLabel("uTools", true), "🛡️")
+        || !InStr(FileRead(A_ScriptDir
+            "\..\..\app\UI\MainVisualPipeline.ahk", "UTF-8"),
+            "Win32.SIID_SHIELD") {
+        throw Error("主列表管理员状态没有使用 Windows 原生 UAC 盾牌")
+    }
+    systemIntegrationSource := FileRead(A_ScriptDir
+        "\..\..\app\SystemIntegration.ahk", "UTF-8")
+    if InStr(systemIntegrationSource, "计划任务状态已更新。")
+        throw Error("计划任务成功后仍会显示多余的状态更新弹窗")
+    if InStr(systemIntegrationSource,
+            "桌面与开始菜单快捷方式创建成功！") {
+        throw Error("创建快捷方式成功后仍会显示多余的成功弹窗")
     }
     normalizedText := NormalizeUserVisibleParentheses(
         "操作失败 (错误 5)，稍后重试 (文件忙)")
@@ -78,6 +147,23 @@ RunMainIntegrationTests() {
         A_ScriptFullPath) != expectedCompiledHandoff {
         throw Error("编译程序重载交接命令拼接错误")
     }
+    readyDirectory := A_Temp "\ProcessWatchdogUpdateApply-"
+        . currentPid "-integration"
+    readyPath := readyDirectory "\application-ready.signal"
+    DirCreate(readyDirectory)
+    try {
+        if ValidateApplicationUpdateReadyPath(readyPath) == ""
+            throw Error("合法更新就绪信号路径被拒绝")
+        if ValidateApplicationUpdateReadyPath(
+                A_Temp "\outside-ready.signal") != ""
+            throw Error("安装助手目录外的就绪信号路径被接受")
+        if !WriteApplicationUpdateReadySignal(readyPath, "9.8.7")
+            throw Error("更新就绪信号无法原子写入")
+        if Trim(FileRead(readyPath, "UTF-8")) != "READY|9.8.7"
+            throw Error("更新就绪信号内容与目标版本不一致")
+    } finally {
+        try DirDelete(readyDirectory, true)
+    }
     projectRoot := A_ScriptDir "\..\.."
     projectMainScript := projectRoot "\进程守护小助手.ahk"
     executableValidationCommand := BuildReloadValidationCommand(A_AhkPath,
@@ -100,6 +186,19 @@ RunMainIntegrationTests() {
     SetStateProcessIdentity(stateObj, currentPid)
     if (currentCreation != "" && stateObj.PIDCreationIdentity != currentCreation)
         throw Error("相同数字的复用 PID 没有刷新创建身份")
+    originalProcessInspector := App.processInspector
+    App.processInspector := UnavailableIdentityTestInspector()
+    try {
+        observedState := {
+            PID: 0, LastKnownPID: 0, PIDCreationIdentity: "",
+            PIDImagePath: "", LastKnownPIDCreationIdentity: "",
+            PIDElevationState: -1, PIDElevationChecked: false
+        }
+        SetStateProcessIdentity(observedState, currentPid,
+            "OBSERVED-CREATION-ID")
+        if observedState.PIDCreationIdentity != "OBSERVED-CREATION-ID"
+            throw Error("进程身份二次查询失败时丢失了探测层已核验的创建身份")
+    } finally App.processInspector := originalProcessInspector
 
     fakeShortcut := A_Temp "\codex-missing-shortcut.lnk"
     App.appStates[fakeShortcut] := TargetSupervisor({

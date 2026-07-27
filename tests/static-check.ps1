@@ -1,10 +1,13 @@
+﻿# 源码结构、架构边界和高风险回归的静态门禁。
+# 检查结果基于明确语义钩子而非格式化风格，新增规则应说明它保护的真实故障模式。
+
 $ErrorActionPreference = 'Stop'
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $sourcePath = Get-ChildItem -LiteralPath $projectRoot -Filter '*.ahk' -File |
     Where-Object { $_.Name -notlike '_*' } |
     Select-Object -First 1 -ExpandProperty FullName
-$iniPath = Join-Path $projectRoot 'watchdog.example.ini'
+$iniPath = Join-Path $projectRoot 'config\watchdog.example.ini'
 $mainSource = Get-Content -LiteralPath $sourcePath -Raw -Encoding UTF8
 $appModuleFiles = Get-ChildItem -LiteralPath (Join-Path $projectRoot 'app') `
     -Recurse -Filter '*.ahk' -File | Sort-Object {
@@ -15,21 +18,27 @@ $appModuleFiles = Get-ChildItem -LiteralPath (Join-Path $projectRoot 'app') `
 $appModuleSource = ($appModuleFiles | ForEach-Object {
         Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8
     }) -join "`n"
-# App modules are expanded at the root include directives before executable
-# main-script statements. Preserve that order so a call in the composition
-# root cannot be mistaken for a later module function definition.
+# app 模块在组合根的包含指令处展开，位置早于主脚本中的可执行语句。
+# 必须保留这个顺序，否则组合根里的函数调用可能被误判为随后模块中的函数定义。
 $source = $appModuleSource + "`n" + $mainSource
+$applicationTelemetrySource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\ApplicationTelemetry.ahk') -Raw -Encoding UTF8
+$mainVisualPipelineSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\UI\MainVisualPipeline.ahk') -Raw -Encoding UTF8
 $iniFieldCodecSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Config\IniFieldCodec.ahk') -Raw -Encoding UTF8
 $displayConfigCodecSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Config\DisplayConfigCodec.ahk') -Raw -Encoding UTF8
 $maintenanceConfigCodecSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Config\MaintenanceConfigCodec.ahk') -Raw -Encoding UTF8
 $appConfigSnapshotServiceSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Config\AppConfigSnapshotService.ahk') -Raw -Encoding UTF8
 $runtimeSettingsServiceSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Config\RuntimeSettingsService.ahk') -Raw -Encoding UTF8
+$applicationUpdateSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Update\ApplicationUpdateService.ahk') -Raw -Encoding UTF8
+$applicationUpdateHelperSource = Get-Content -LiteralPath (Join-Path $projectRoot 'runtime\application-update.ps1') -Raw -Encoding UTF8
 $windowLayoutServiceSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Config\WindowLayoutService.ahk') -Raw -Encoding UTF8
 $watchlistPersistenceServiceSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Config\WatchlistPersistenceService.ahk') -Raw -Encoding UTF8
 $configRepositorySource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Config\WatchdogConfigRepository.ahk') -Raw -Encoding UTF8
 $guardTypesSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\GuardTypes.ahk') -Raw -Encoding UTF8
 $guardStateMachineSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\GuardStateMachine.ahk') -Raw -Encoding UTF8
 $guardWorkGateSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\GuardWorkGate.ahk') -Raw -Encoding UTF8
+$guardMutationQueueSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\GuardMutationQueue.ahk') -Raw -Encoding UTF8
 $schedulerSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\WatchdogScheduler.ahk') -Raw -Encoding UTF8
 $restartPolicySource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\RestartPolicy.ahk') -Raw -Encoding UTF8
 $targetSupervisorSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\TargetSupervisor.ahk') -Raw -Encoding UTF8
@@ -37,6 +46,8 @@ $targetSpecsSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\
 $targetSpecsServiceSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\TargetSpecsService.ahk') -Raw -Encoding UTF8
 $targetIdentityServiceSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\TargetIdentityService.ahk') -Raw -Encoding UTF8
 $appConfigHistoryServiceSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\AppConfigHistoryService.ahk') -Raw -Encoding UTF8
+$historyToastSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\Windows\HistoryToastWindow.ahk') -Raw -Encoding UTF8
 $guardRuntimeSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\GuardRuntime.ahk') -Raw -Encoding UTF8
 $targetLauncherSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Execution\TargetLauncher.ahk') -Raw -Encoding UTF8
 $targetStopperSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Execution\TargetStopper.ahk') -Raw -Encoding UTF8
@@ -57,9 +68,45 @@ $iconResourceRegistrySource = Get-Content -LiteralPath (Join-Path $projectRoot '
 $svgRenderLibrarySource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\UI\SvgRenderLibrary.ahk') -Raw -Encoding UTF8
 $uiInteractionRegistrySource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\UI\UiInteractionRegistry.ahk') -Raw -Encoding UTF8
 $mainListProjectionSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\UI\MainListProjection.ahk') -Raw -Encoding UTF8
+$listViewPseudoHeaderSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'src\UI\ListViewPseudoHeader.ahk') -Raw -Encoding UTF8
 $windowHierarchySource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\UI\WindowHierarchy.ahk') -Raw -Encoding UTF8
 $managedWindowSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\UI\ManagedWindow.ahk') -Raw -Encoding UTF8
+$uiThemeServiceSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'src\UI\UiThemeService.ahk') -Raw -Encoding UTF8
+$localizationServiceSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'src\Localization\LocalizationService.ahk') `
+    -Raw -Encoding UTF8
+$settingsWindowSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\Windows\SettingsWindow.ahk') `
+    -Raw -Encoding UTF8
+$customDisplayDialogSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\Windows\CustomDisplayDialog.ahk') `
+    -Raw -Encoding UTF8
+$environmentSettingsDialogSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\Windows\EnvironmentSettingsDialog.ahk') `
+    -Raw -Encoding UTF8
+$maintenanceSettingsDialogSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\Windows\MaintenanceSettingsDialog.ahk') `
+    -Raw -Encoding UTF8
+$darkMessageBoxSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\UI\DarkMessageBox.ahk') `
+    -Raw -Encoding UTF8
+$interactionPresenterSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\UI\InteractionPresenter.ahk') `
+    -Raw -Encoding UTF8
+$contextMenuPresenterSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\UI\ContextMenuPresenter.ahk') `
+    -Raw -Encoding UTF8
+$listViewSelectionPresenterSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\UI\ListViewSelectionPresenter.ahk') `
+    -Raw -Encoding UTF8
 $coreTestRunnerSource = Get-Content -LiteralPath (Join-Path $projectRoot 'tests\run-core-tests.ps1') -Raw -Encoding UTF8
+$guiTestRunnerSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'tests\run-gui-tests.ps1') -Raw -Encoding UTF8
+$displayHotSwitchTestSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'tests\gui\display-hot-switch-tests.ahk') `
+    -Raw -Encoding UTF8
 $readmeSource = Get-Content -LiteralPath (Join-Path $projectRoot 'README.md') -Raw -Encoding UTF8
 $allModuleSource = (Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src') -Recurse -Filter '*.ahk' -File |
     ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 }) -join "`n"
@@ -77,9 +124,284 @@ foreach ($temporaryPreviewPattern in $temporaryPreviewPatterns) {
         throw "Temporary preview fixture remains in production source: $temporaryPreviewPattern"
     }
 }
+
 $iniLines = Get-Content -LiteralPath $iniPath -Encoding Unicode
 
 $failures = New-Object 'System.Collections.Generic.List[string]'
+
+# 两个布尔状态使用菜单文本的快捷键栏统一右对齐，不能再退回 Windows 原生左侧
+# 勾选位；打开窗口的菜单文案也不应保留会被误认为截断提示的字面省略号。
+if (-not $source.Contains('FormatContextMenuToggleLabel(label, checked)') -or
+    -not $source.Contains('return checked ? label "`t✓" : label') -or
+    -not $source.Contains('ConfigureMainContextMenu(isAdmin := false, maintenanceEnabled := false,') -or
+    -not $source.Contains('maintenanceSupported := true, batchLogSupported := false)') -or
+    -not $source.Contains('if batchLogSupported {') -or
+    -not $source.Contains('Tr("📄 查看批处理输出日志")') -or
+    -not $source.Contains('GuiModules.batchOutputLogNotice.Show(logPath)') -or
+    -not $source.Contains('this.batchOutputLogNotice := BatchOutputLogNoticeWindow(mainGui)') -or
+    -not $mainSource.Contains('#Include app\Windows\BatchOutputLogNoticeWindow.ahk') -or
+    -not $source.Contains('Tr("🛡️ 以管理员身份运行")') -or
+    -not $source.Contains('SuppressNativeMenuCheckGutter(contextMenu)') -or
+    -not $source.Contains('ContextMenuPresenter.Detach(contextMenu.Handle)') -or
+    -not $source.Contains('ContextMenuPresenter.Attach(contextMenu, Main.gui.Hwnd)') -or
+    -not $mainSource.Contains('OnMessage(Win32.WM_MEASUREITEM, OnMeasureApplicationControl)') -or
+    -not $contextMenuPresenterSource.Contains('static FontSizePt := 10') -or
+    -not $contextMenuPresenterSource.Contains('static ItemHeightDip := 30') -or
+    -not $contextMenuPresenterSource.Contains('static OuterVerticalPaddingDip := 5') -or
+    -not $contextMenuPresenterSource.Contains('static SeparatorHeightDip := 10') -or
+    -not $contextMenuPresenterSource.Contains('Win32.MFT_OWNERDRAW') -or
+    -not $contextMenuPresenterSource.Contains('HandleMeasure(lParam)') -or
+    -not $contextMenuPresenterSource.Contains('HandleDraw(lParam)') -or
+    -not $contextMenuPresenterSource.Contains('SetWinEventHook') -or
+    -not $contextMenuPresenterSource.Contains('EVENT_OBJECT_SHOW') -or
+    -not $contextMenuPresenterSource.Contains('CreateRoundedWindowRegion(width, height, dpi)') -or
+    -not $contextMenuPresenterSource.Contains('SetWindowRgn') -or
+    -not $contextMenuPresenterSource.Contains('FillRoundedRectangle(hdc,') -or
+    -not $contextMenuPresenterSource.Contains('static Show(menuObj, coordinates*)') -or
+    -not $source.Contains('ContextMenuPresenter.Show(Main.contextMenu)') -or
+    -not $contextMenuPresenterSource.Contains('StopPopupWindowHook()') -or
+    -not $source.Contains('if Main.contextMenu is Menu') -or
+    -not $source.Contains('contextMenu.Delete()') -or
+    -not $source.Contains('if currentStyle & Win32.MNS_NOCHECK') -or
+    -not $source.Contains('currentStyle | Win32.MNS_NOCHECK') -or
+    -not $source.Contains('contextMenu.Disable(maintenanceLabel)') -or
+    $source -match '\.contextMenu\.(?:Check|Uncheck)\(' -or
+    $source.Contains('SetWindowsStockMenuIcon(')) {
+    $failures.Add('Main context-menu toggles must rebuild with right-aligned text checks and no native left gutter')
+}
+if (-not $mainSource.Contains('#Include app\UI\ListViewSelectionPresenter.ahk') -or
+    -not $mainSource.Contains('Main.listSelectionPresenter := ListViewSelectionPresenter(Main.lv)') -or
+    -not $listViewSelectionPresenterSource.Contains('Win32.NM_CUSTOMDRAW') -or
+    -not $listViewSelectionPresenterSource.Contains('Win32.CDDS_ITEMPREPAINT') -or
+    -not $listViewSelectionPresenterSource.Contains('Win32.CDDS_ITEMPOSTPAINT') -or
+    -not $listViewSelectionPresenterSource.Contains('Win32.CDRF_NOTIFYPOSTPAINT') -or
+    -not $listViewSelectionPresenterSource.Contains('Win32.LVM_GETITEMSTATE') -or
+    -not $listViewSelectionPresenterSource.Contains('Win32.LVIS_SELECTED') -or
+    -not $listViewSelectionPresenterSource.Contains('Win32.LVM_REDRAWITEMS') -or
+    -not $listViewSelectionPresenterSource.Contains('MaskOutsideRoundedRectangle(hdc,') -or
+    -not $source.Contains('Main.listSelectionPresenter.RefreshItem(Item)') -or
+    -not $source.Contains('Main.listSelectionPresenter.Dispose()')) {
+    $failures.Add('Main ListView selection must use a DPI-aware rounded background while preserving native item content and cleanup')
+}
+foreach ($obsoleteContextMenuText in @(
+    '🎨 自定义名称和图标…',
+    '🔄 软件升级保护…'
+)) {
+    if ($productionSource.Contains($obsoleteContextMenuText)) {
+        $failures.Add("Obsolete context-menu ellipsis remains: $obsoleteContextMenuText")
+    }
+}
+
+# 语言和字体必须在当前进程内事务式刷新；设置保存不得再走脚本重载，也不能借
+# 显示切换停止核心守护。真实 GUI 回归同时锁定长期对象身份、动态状态和资源增量。
+$hotDisplayStart = $mainSource.IndexOf('ApplyDisplaySettingsHot(requestedLanguage, requestedFont,',
+    [System.StringComparison]::Ordinal)
+$hotDisplayEnd = if ($hotDisplayStart -ge 0) {
+    $mainSource.IndexOf('OpenEnvSettings(*) {', $hotDisplayStart,
+        [System.StringComparison]::Ordinal)
+} else {
+    -1
+}
+$hotDisplaySource = if ($hotDisplayStart -ge 0 -and
+    $hotDisplayEnd -gt $hotDisplayStart) {
+    $mainSource.Substring($hotDisplayStart,
+        $hotDisplayEnd - $hotDisplayStart)
+} else {
+    ''
+}
+foreach ($hotDisplayHook in @(
+        'oldActualLanguage := LocalizationService.GetLanguage()',
+        'oldRequestedTheme := UiThemeService.GetRequestedTheme()',
+        'oldStateTexts := CaptureMainStateTexts()',
+        'TranslateMainStateTexts(oldActualLanguage, newActualLanguage)',
+        'RefreshMainWindowDisplay()',
+        'oldModules.Shutdown()',
+        'GuiModules := GuiModuleRegistry(Main.gui)',
+        'RestoreMainStateTexts(oldStateTexts)',
+        'LocalizationService.Configure(oldRequestedLanguage)',
+        'UiThemeService.Configure(oldRequestedTheme)',
+        'Critical("On")')) {
+    if (-not $hotDisplaySource.Contains($hotDisplayHook)) {
+        $failures.Add("Missing transactional display hot-switch hook: $hotDisplayHook")
+    }
+}
+if ($hotDisplaySource -match 'guardRuntime\.(?:Start|Shutdown|RestartMonitorTimer)' -or
+    $hotDisplaySource -match '\b(?:ReloadScript|ExitApp)\s*\(') {
+    $failures.Add('Display hot-switch must not restart the script or mutate the guard runtime')
+}
+if ($settingsWindowSource -match '\bReloadScript\s*\(' -or
+    -not $settingsWindowSource.Contains(
+        'ApplyDisplaySettingsHot(savedSettings.UiLanguage,') -or
+    $settingsWindowSource -notmatch 'if\s+App\.checkInterval\s*!=\s*priorCheckInterval\s*[\r\n]+\s*App\.guardRuntime\.RestartMonitorTimer\(\)') {
+    $failures.Add('Settings save must hot-apply display changes and only reset the monitor timer when its interval changes')
+}
+if ($localizationServiceSource -notmatch
+        'TranslateRenderedTextBetweenLanguages\(renderedText,[\s\S]{0,5000}BuildRenderedTemplatePattern\(template\)' -or
+    -not $guiTestRunnerSource.Contains('gui\display-hot-switch-tests.ahk') -or
+    $displayHotSwitchTestSource -notmatch 'AssertDisplayHotSwitchIdentity\(expected\)' -or
+    $displayHotSwitchTestSource -notmatch 'GetDisplayHotSwitchResourceCount\(0\)' -or
+    $displayHotSwitchTestSource -notmatch 'LocalizationService\.GetSupportedLanguageCodes\(\)') {
+    $failures.Add('Display hot-switch must retain rendered-state conversion and full-language real-GUI identity/resource coverage')
+}
+foreach ($fontLifecycleHook in @(
+        'GetLanguageUiFontSpec(language := "")',
+        'GetLanguageSystemUiFontName(language := "")',
+        'AddFontResourceExW',
+        'RemoveFontResourceExW',
+        'GetUiFontAssetDirectory()',
+        'GetLoadedPrivateUiFontResourceCount()')) {
+    if (-not $localizationServiceSource.Contains($fontLifecycleHook)) {
+        $failures.Add("Missing language-default font lifecycle hook: $fontLifecycleHook")
+    }
+}
+if (-not $source.Contains('LocalizationService.ShutdownUiFonts()')) {
+    $failures.Add('Application shutdown must release process-private UI fonts')
+}
+
+# 用户选择的内容字体不得重新覆盖界面骨架。所有交互按钮都从统一注册入口取得
+# 当前语言的系统 UI 粗体；主窗口热切换则分别刷新按钮、列表和底部状态栏。
+if ($interactionPresenterSource -notmatch
+        'RegisterHoverButton\(ctrl,[\s\S]{0,1000}ctrl\.SetFont\("norm bold",\s*LocalizationService\.GetLanguageSystemUiFontName\(\)\)') {
+    $failures.Add('All registered buttons must use the language-specific Windows UI font in bold')
+}
+if ($mainSource -notmatch
+        'RefreshMainWindowDisplay\(\)\s*\{[\s\S]{0,1200}button\.SetFont\("s10 bold", systemFontName\)[\s\S]{0,500}Main\.lv\.SetFont\("s12 c" UiThemeService\.Color\("Text"\), fontName\)[\s\S]{0,500}Main\.statsText\.SetFont\("s10 bold c"') {
+    $failures.Add('Main display refresh must keep buttons and status bold-system-font while the ListView follows content font')
+}
+if ($mainSource -notmatch
+        'Main\.btnPause\s*:=\s*Main\.gui\.Add\([\s\S]{0,180}UiThemeService\.Color\("PauseDisabled"\)[\s\S]{0,180}DisabledButtonText' -or
+    $mainSource -notmatch
+        'Main\.btnDel\s*:=\s*Main\.gui\.Add\([\s\S]{0,180}UiThemeService\.Color\("DeleteDisabled"\)[\s\S]{0,180}DisabledButtonText' -or
+    $mainSource -notmatch
+        'LoadWatchlistFromConfig\(\)[\s\S]{0,260}RefreshMainCommandState\(true\)') {
+    $failures.Add('Main pause/delete commands must start disabled and synchronize once after watchlist loading')
+}
+if ($mainSource -notmatch
+        'RefreshMainWindowTheme\(\)\s*\{[\s\S]{0,1000}RefreshMainCommandState\(true\)' -or
+    $mainSource -notmatch
+        'themeStatePrefix\s*:=\s*UiThemeService\.GetActualTheme\(\)') {
+    $failures.Add('Every main theme refresh must resynchronize theme-aware pause/delete command state')
+}
+if ($settingsWindowSource -notmatch
+        'CreateTabButton\(index,[\s\S]{0,500}RegisterHoverButton\(button,') {
+    $failures.Add('Settings tabs must pass through the centralized system-font button registration')
+}
+
+# 表单确认／取消操作保持纯文字，普通功能动作使用共享 Lucide SVG 管线。
+# 主窗口添加、暂停／恢复、删除是既有产品视觉的明确例外，保留彩色字符图标。
+foreach ($retiredButtonEmoji in @(
+    'Tr("✔️ 确 定")',
+    'Tr("❌ 取 消")',
+    'Tr("🔍 搜索...")',
+    'Tr("📂 选择...")'
+)) {
+    if ($source.Contains($retiredButtonEmoji)) {
+        $failures.Add("Retired Emoji button text remains: $retiredButtonEmoji")
+    }
+}
+foreach ($requiredMainCommandText in @(
+    'Tr("➕ 添加")',
+    'Tr("🗑️ 删除")',
+    'Tr("⏸️ 暂停")',
+    'Tr("▶️ 恢复")',
+    'Tr("🔄 反转状态")'
+)) {
+    if (-not $mainSource.Contains($requiredMainCommandText)) {
+        $failures.Add("Missing main command character icon contract: $requiredMainCommandText")
+    }
+}
+if ($mainSource -match
+        'SetButtonLucideIcon\(Main\.btn(?:Add|Pause|Del)\s*,') {
+    $failures.Add('Main add/pause/delete commands must not be rebound to Lucide SVG icons')
+}
+if ($interactionPresenterSource -notmatch
+        'SetButtonLucideIcon\(ctrl, iconName,[\s\S]{0,500}GetApplicationAssetPath\([\s\S]{0,160}ui-icons\\lucide\\') {
+    $failures.Add('Functional buttons must resolve Lucide assets through one shared helper')
+}
+foreach ($requiredFunctionalIcon in @(
+    'SetButtonLucideIcon(this.searchButton, "search.svg"',
+    'SetButtonLucideIcon(this.browseButton, "folder-open.svg"',
+    'SetButtonLucideIcon(btnBrowseWorkDir, "folder-open.svg"',
+    'SetButtonLucideIcon(this.exportButton, "package-open.svg"',
+    'SetButtonLucideIcon(btnAutoRoot, "wand-sparkles.svg"',
+    'SetButtonLucideIcon(btnClearLearned, "trash-2.svg"',
+    'SetButtonLucideIcon(this.checkUpdateButton,',
+    '"refresh-cw-action.svg"'
+)) {
+    if (-not $source.Contains($requiredFunctionalIcon)) {
+        $failures.Add("Missing semantic SVG button hook: $requiredFunctionalIcon")
+    }
+}
+if ($customDisplayDialogSource -match
+        'SetButton(?:Lucide|Svg)Icon\(this\.default(?:Name|Icon)Button') {
+    $failures.Add('Custom display restore-default buttons must remain text-only')
+}
+
+# 小助手自身更新必须保持在独立进程中，并把个人配置、入口重命名和失败回滚作为
+# 显式边界；这些钩子缺失时，最容易退化为阻塞 GUI 或覆盖用户状态。
+foreach ($updateHook in @(
+        'Run(command, this.InstallRoot, "Hide", &workerPid)',
+        'SetTimer(this.PollTimer, 250)',
+        'this.WorkerHandle',
+        '"-PackageKind", this.GetPackageKind()',
+        '"-UiLanguage", this.UiLanguage',
+        'application-update.strings.json',
+        'ProcessWatchdogUpdateApply-',
+        'DirDelete(helperDirectory, true)')) {
+    if (-not $applicationUpdateSource.Contains($updateHook)) {
+        $failures.Add("Missing asynchronous application-update hook: $updateHook")
+    }
+}
+foreach ($helperHook in @(
+        'Wait-ForParentExit',
+        'Get-ExpectedChecksum',
+        'Get-FileHash -Algorithm SHA256',
+        'Assert-NoOverlappingPaths',
+        'Get-MinimalManagedPaths',
+        'Restore-ArchiveTransaction',
+        'New-PersonalStateSnapshot',
+        'Restore-PersonalStateSnapshot',
+        'Complete-PersonalStateSnapshot',
+        '[System.IO.File]::Replace',
+        'Test-UpdatedApplication',
+        'Wait-ForUpdatedApplicationReady',
+        "'--unshallow'",
+        'update-manifest.json',
+        "@('watchdog.ini', 'watchdog.maintenance.ini')",
+        "'--error-unmatch'",
+        "'merge-base'",
+        "'--ff-only'",
+        'Remove-ApplyHelperDirectory')) {
+    if (-not $applicationUpdateHelperSource.Contains($helperHook)) {
+        $failures.Add("Missing application-update helper boundary: $helperHook")
+    }
+}
+if ($applicationUpdateSource -notmatch
+        'if\s+!this\.WorkerHandle[\s\S]{0,260}this\.CleanupCheck\(\)' -or
+    $applicationUpdateSource -match
+        'IsWorkerAlive\(\)[\s\S]{0,220}ProcessExist\(this\.WorkerPid\)') {
+    $failures.Add('Application update checks must require a real process handle instead of falling back to a reusable PID')
+}
+if ($source -notmatch
+        'guardRuntimeStarted\s*:=\s*App\.guardRuntime\.Start\(\)' -or
+    $source -notmatch
+        'if\s+applicationUpdateReadyPath\s*\{[\s\S]{0,320}if\s+!guardRuntimeStarted[\s\S]{0,180}WriteApplicationUpdateReadySignal') {
+    $failures.Add('Application update readiness must require the core guard runtime to start successfully')
+}
+if ($applicationUpdateSource -match 'Invoke-(?:WebRequest|RestMethod)' -or
+    $applicationUpdateSource -match 'Expand-Archive|Get-FileHash') {
+    $failures.Add('Application update network, archive, and hash work must not run in the AHK GUI process')
+}
+
+# 运行时仓库和示例配置必须共用同一套中文就地说明。否则源码新增或修改字段后，
+# 用户查看示例得到的约束会与程序实际生成的 watchdog.ini 不一致。
+foreach ($commentMatch in [regex]::Matches($configRepositorySource,
+        'this\.Text\("(;(?:``.|[^"\r\n])*)"\)')) {
+    $managedComment = $commentMatch.Groups[1].Value -replace '``"', '"'
+    if (-not $iniText.Contains($managedComment)) {
+        $failures.Add("config/watchdog.example.ini is missing managed comment: $managedComment")
+    }
+}
 
 # 中文用户界面字符串不允许保留英文排版的“空格 + 半角左括号”。
 # 逐行提取 AHK 字符串字面量，避免把函数调用和正则表达式误判为文案。
@@ -96,7 +418,7 @@ foreach ($line in ($source + "`n" + $allModuleSource) -split "`r?`n") {
 }
 if ($userTextViolations.Count -gt 0) {
     $samples = ($userTextViolations | Select-Object -First 3 |
-        ForEach-Object { $_.Value }) -join ' | '
+        ForEach-Object { $_ }) -join ' | '
     $failures.Add("User-visible Chinese text uses space plus half-width parenthesis: $samples")
 }
 if ($readmeSource -match '(?m)[\u3400-\u9fff][^\r\n]* \(') {
@@ -126,6 +448,72 @@ try {
     }
 } catch {
     $failures.Add("Third-party dependency lock is unreadable: $($_.Exception.Message)")
+}
+# 随包字体属于输入资源而不是本机安装前提；仓库门禁必须验证固定数量、哈希和 OFL，
+# 这样源码运行、编译包及自动更新使用的是同一组可追溯文件。
+$fontMetadataPath = Join-Path $projectRoot 'assets\fonts\metadata.json'
+try {
+    $fontMetadata = Get-Content -LiteralPath $fontMetadataPath -Raw `
+        -Encoding UTF8 | ConvertFrom-Json
+    if ($fontMetadata.schemaVersion -ne 1 -or $fontMetadata.fonts.Count -ne 7) {
+        $failures.Add('Packaged font metadata must contain the preferred and fallback resources')
+    }
+    foreach ($font in $fontMetadata.fonts) {
+        $fontPath = Join-Path $projectRoot `
+            ([string]$font.path -replace '/', '\')
+        if (-not (Test-Path -LiteralPath $fontPath -PathType Leaf)) {
+            $failures.Add("Missing packaged font: $($font.name)")
+            continue
+        }
+        $fontHash = (Get-FileHash -Algorithm SHA256 `
+            -LiteralPath $fontPath).Hash
+        $fontLicense = [string]$font.license
+        if ($fontHash -ne [string]$font.sha256 -or
+            $fontLicense -notin @('OFL-1.1',
+                'LicenseRef-Commercial-Apple-Fonts') -or
+            ($fontLicense -eq 'LicenseRef-Commercial-Apple-Fonts' -and
+                [string]::IsNullOrWhiteSpace([string]$font.authorization))) {
+            $failures.Add("Packaged font metadata mismatch: $($font.name)")
+        }
+    }
+} catch {
+    $failures.Add("Packaged font metadata is unreadable: $($_.Exception.Message)")
+}
+foreach ($fontDocument in @(
+        'assets\fonts\COMMERCIAL-LICENSE-NOTICE.md',
+        'assets\fonts\COMMERCIAL-LICENSE-NOTICE.en.md',
+        'assets\fonts\OFL-1.1.txt',
+        'assets\fonts\README.md',
+        'assets\fonts\README.en.md')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $projectRoot $fontDocument) `
+            -PathType Leaf)) {
+        $failures.Add("Missing packaged font provenance file: $fontDocument")
+    }
+}
+$expectedFontAssetNames = @(
+    'AppleSDGothicNeo-Regular.ttf',
+    'COMMERCIAL-LICENSE-NOTICE.en.md',
+    'COMMERCIAL-LICENSE-NOTICE.md',
+    'HaranoAjiGothic-Regular.otf',
+    'NotoSans-Variable.ttf',
+    'NotoSansCJK.ttc',
+    'PingFang.ttc',
+    'SF-Pro-Text-Bold.otf',
+    'SF-Pro-Text-Regular.otf',
+    'metadata.json',
+    'OFL-1.1.txt',
+    'README.en.md',
+    'README.md'
+)
+$actualFontAssetNames = @(Get-ChildItem -LiteralPath `
+    (Join-Path $projectRoot 'assets\fonts') -File | ForEach-Object Name |
+    Sort-Object)
+$fontAssetDifference = @(Compare-Object -CaseSensitive `
+    -ReferenceObject ($expectedFontAssetNames | Sort-Object) `
+    -DifferenceObject $actualFontAssetNames)
+if ($fontAssetDifference.Count -ne 0 -or
+    $actualFontAssetNames.Count -ne $expectedFontAssetNames.Count) {
+    $failures.Add('Packaged font directory contains a missing or unapproved file')
 }
 if (Test-Path -LiteralPath (Join-Path $projectRoot 'Everything64.dll')) {
     $failures.Add('Everything64.dll must not remain at the project root')
@@ -158,15 +546,15 @@ foreach ($notificationRequirement in @(
         $failures.Add("Missing actionable notification behavior: $notificationRequirement")
     }
 }
-if ($source -notmatch 'SetCurrentProcessExplicitAppUserModelID",\s*"WStr",\s*"\u8FDB\u7A0B\u5B88\u62A4\u5C0F\u52A9\u624B"') {
-    $failures.Add('Notification AppUserModelID must use the stable Chinese application name')
+if ($source -notmatch 'SetCurrentProcessExplicitAppUserModelID",\s*"WStr",\s*Tr\("\u8FDB\u7A0B\u5B88\u62A4\u5C0F\u52A9\u624B"\)') {
+    $failures.Add('Notification AppUserModelID must use the localized stable application name')
 }
 if ($source -match 'ProcessWatchdog_\s*"?\s*\.\s*A_ScriptHwnd') {
     $failures.Add('Notification AppUserModelID must not contain a per-process window handle')
 }
 
 if ($iniLines.Count -eq 0 -or $iniLines[0] -ne '[Settings]') {
-    $failures.Add('watchdog.example.ini documentation must stay with its sections instead of a top-level block')
+    $failures.Add('config/watchdog.example.ini documentation must stay with its sections instead of a top-level block')
 }
 
 $rootGlobals = [regex]::Matches($source, '(?m)^global\s+([A-Za-z_][A-Za-z0-9_]*)\s*:=' ) |
@@ -242,7 +630,7 @@ foreach ($svgLibraryHook in @(
 if ($source -notmatch '#Include src\\UI\\SvgRenderLibrary\.ahk' -or
     $source -notmatch 'this\.svgRenderer\s*:=\s*SvgRenderLibrary\([\s\S]{0,120}third_party\\resvg\\resvg\.dll' -or
     $source -notmatch 'CreateSvgPaddedIcon\([\s\S]{0,500}svgRenderer\.RenderFile\([\s\S]{0,500}CreateShellSvgPaddedIcon\(' -or
-    $source -notmatch 'ShutdownApplicationResources\(\*\)[\s\S]{0,180}App\.svgRenderer\.Shutdown\(\)') {
+    $source -notmatch 'ShutdownApplicationResources\(\*\)[\s\S]{0,360}App\.svgRenderer\.Shutdown\(\)') {
     $failures.Add('ApplicationState must own resvg and preserve Shell fallback plus explicit shutdown')
 }
 if (($source + "`n" + $allModuleSource) -match
@@ -254,14 +642,14 @@ foreach ($sectionName in @('Settings', 'Layout', 'Apps', 'Maintenance')) {
     $headerIndex = [Array]::IndexOf($iniLines, "[$sectionName]")
     if ($headerIndex -lt 0 -or $headerIndex + 1 -ge $iniLines.Count -or
         -not $iniLines[$headerIndex + 1].StartsWith(';')) {
-        $failures.Add("watchdog.example.ini section $sectionName must begin with documentation comments")
+        $failures.Add("config/watchdog.example.ini section $sectionName must begin with documentation comments")
     }
 }
 $displayHeaderIndex = [Array]::IndexOf($iniLines, '[Display]')
 if ($displayHeaderIndex -ge 0 -and
     ($displayHeaderIndex + 1 -ge $iniLines.Count -or
         -not $iniLines[$displayHeaderIndex + 1].StartsWith(';'))) {
-    $failures.Add('watchdog.example.ini section Display must begin with documentation comments when present')
+    $failures.Add('config/watchdog.example.ini section Display must begin with documentation comments when present')
 }
 
 if ($configRepositorySource -notmatch 'EnsureDocumentation\(iniPath\)') {
@@ -278,7 +666,7 @@ for ($lineIndex = 0; $lineIndex -lt $iniLines.Count; $lineIndex++) {
     }
     if ($currentIniSection -in $documentedKeySections -and $line -match '^[^;=]+=' -and
         ($lineIndex -eq 0 -or -not $iniLines[$lineIndex - 1].StartsWith(';'))) {
-        $failures.Add("watchdog.example.ini key $currentIniSection/$($line.Split('=', 2)[0]) must have an adjacent comment")
+        $failures.Add("config/watchdog.example.ini key $currentIniSection/$($line.Split('=', 2)[0]) must have an adjacent comment")
     }
 }
 
@@ -445,6 +833,7 @@ if ($source -match 'requestedMaintenance\s*:=\s*true') {
 foreach ($processInspectorHook in @(
     'class ProcessInspector',
     'CaptureNativeSnapshot()',
+    'CaptureAutoHotkeyScriptSnapshot(maximumAgeMs := 0)',
     'GetImagePath(pid)',
     'GetCreationIdentity(pid)',
     'GetElevationState(pid)',
@@ -624,6 +1013,7 @@ foreach ($architectureHook in @(
     '#Include src\Core\GuardTypes.ahk',
     '#Include src\Core\GuardStateMachine.ahk',
     '#Include src\Core\GuardWorkGate.ahk',
+    '#Include src\Core\GuardMutationQueue.ahk',
     '#Include src\Core\WatchdogScheduler.ahk',
     '#Include src\Core\RestartPolicy.ahk',
     '#Include src\Core\TargetSupervisor.ahk',
@@ -660,6 +1050,7 @@ foreach ($architectureHook in @(
     'this.watchlistPersistenceService := WatchlistPersistenceService(',
     'this.fileScanner := FileScanService(',
     'this.processSnapshots := ProcessSnapshotService(',
+    'this.guardMutationQueue := GuardMutationQueue(this.guardWorkGate,',
     'App.processInspector.GetCreationIdentity(pid)'
 )) {
     if (-not $source.Contains($architectureHook)) {
@@ -881,10 +1272,10 @@ foreach ($stopperHook in @(
     'class TargetStopResult',
     'class TargetStopper',
     'Stop(pid, gracefulWaitSeconds, ctrlCWaitSeconds, allowForceTerminate,',
-    'WaitUntilStopped(pid, timeoutSeconds)',
+    'WaitUntilStopped(pid, timeoutSeconds, expectedCreationIdentity := "")',
     'return !ProcessWaitClose(pid, Max(0, timeoutSeconds))',
-    'RequestWindowClose(pid)',
-    'ProcessClose(pid)'
+    'RequestWindowClose(pid, expectedCreationIdentity := "")',
+    'TerminateVerifiedProcess(pid, expectedCreationIdentity,'
 )) {
     if (-not $targetStopperSource.Contains($stopperHook)) {
         $failures.Add("Missing target stopper hook: $stopperHook")
@@ -892,7 +1283,7 @@ foreach ($stopperHook in @(
 }
 foreach ($executionOwnerHook in @(
     'this.targetLauncher := TargetLauncher()',
-    'this.targetStopper := TargetStopper()'
+    'this.targetStopper := TargetStopper(ObjBindMethod('
 )) {
     if (-not $source.Contains($executionOwnerHook)) {
         $failures.Add("ApplicationState must own execution service: $executionOwnerHook")
@@ -903,6 +1294,7 @@ foreach ($maintenanceStateHook in @(
     'class MaintenanceStateMachine',
     'static AllowedTransitions := Map(',
     'Transition(nextPhase)',
+    'Restore(restoredPhase)',
     'IsBlocking()'
 )) {
     if (-not $maintenanceStateMachineSource.Contains($maintenanceStateHook)) {
@@ -952,7 +1344,8 @@ if ($maintenanceCoordinatorSource -match '\bApp\.') {
     $failures.Add('MaintenanceCoordinator must not recover dependencies from global App state')
 }
 if ($source -notmatch 'this\.maintenanceCoordinator\s*:=\s*MaintenanceCoordinator\(this,' -or
-    $source -notmatch 'this\.processSnapshots\.SnapshotPublishedCallback\s*:=\s*ObjBindMethod\([\s\S]{0,120}this\.maintenanceCoordinator,\s*"OnSnapshotPublished"\)') {
+    $source -notmatch 'this\.processSnapshots\.SnapshotPublishedCallback\s*:=\s*ObjBindMethod\([\s\S]{0,100}this,\s*"OnProcessSnapshotPublished"\)' -or
+    $source -notmatch 'OnProcessSnapshotPublished\(snapshot, snapshotIndex\)[\s\S]{0,1800}maintenanceCoordinator[\s\S]{0,100}OnSnapshotPublished[\s\S]{0,500}guardRuntime\.OnSnapshotPublished') {
     $failures.Add('ApplicationState must own and connect one maintenance coordinator')
 }
 foreach ($legacyMaintenanceOwner in @(
@@ -989,8 +1382,20 @@ if ($guardWorkGateSource -notmatch 'class GuardWorkGate' -or
         'this\.Runtime\.guardWorkGate\.Leave\(\)').Count -lt 2) {
     $failures.Add('Main monitoring and both maintenance loops must share the explicit guard work gate')
 }
+if ($guardMutationQueueSource -notmatch 'class GuardMutationQueue' -or
+    $guardMutationQueueSource -notmatch 'Drain\(\*\)[\s\S]{0,700}this\.WorkGate\.TryEnter\(\)' -or
+    $guardMutationQueueSource -notmatch 'finally[\s\S]{0,180}this\.WorkGate\.Leave\(\)' -or
+    $guardMutationQueueSource -match '\bSleep\(' -or
+    $source -notmatch 'QueueGuardMutation\(ApplyMainListReorder\.Bind\(' -or
+    $source -notmatch 'ApplyMainListReorder\(selectedPaths, anchorCandidates,[\s\S]{0,2600}SaveAppsToIni\(\)') {
+    $failures.Add('User configuration changes and drag ordering must drain asynchronously through the shared guard work gate')
+}
 if ($maintenanceCoordinatorSource -match 'TryEnterGuardGate|LeaveGuardGate') {
     $failures.Add('Maintenance coordinator must not wrap the shared guard work gate')
+}
+if ($maintenanceCoordinatorSource -match 'fallbackDecisionMs|fastDecisionMs' -or
+    $maintenanceCoordinatorSource -notmatch 'if \(elapsedMs >= detectionMs\)') {
+    $failures.Add('Maintenance arbitration must observe the full configured detection window before resuming ordinary restart')
 }
 foreach ($guardRuntimeHook in @(
     'class GuardRuntime',
@@ -1004,6 +1409,9 @@ foreach ($guardRuntimeHook in @(
     'ScheduleRestartFor(path, expectedSupervisor, delayMs,',
     'ScheduleVerificationFor(path, expectedSupervisor, delayMs)',
     'ScheduleVerification(path, delayMs, expectedSupervisor := "")',
+    'OnSnapshotPublished(snapshot, snapshotIndex)',
+    'BeginSnapshotWait(path, stateObj, purpose)',
+    'ScheduleRestartPreservingSnapshot(path, stateObj, delayMs)',
     'Restart(path, expectedSupervisor := "", scheduledTask := "")',
     'RestartCore(path, expectedSupervisor := "", scheduledTask := "")',
     'Verify(path, expectedSupervisor := "", scheduledTask := "")',
@@ -1015,7 +1423,7 @@ foreach ($guardRuntimeHook in @(
         $failures.Add("Missing guard runtime hook: $guardRuntimeHook")
     }
 }
-if ($guardRuntimeSource -notmatch 'Restart\(path,[\s\S]{0,900}guardWorkGate\.TryEnter\(\)[\s\S]{0,600}ScheduleRestartFor\(path, expectedSupervisor, 100\)[\s\S]{0,600}RestartCore\(' -or
+if ($guardRuntimeSource -notmatch 'Restart\(path,[\s\S]{0,900}guardWorkGate\.TryEnter\(\)[\s\S]{0,800}ScheduleRestartPreservingSnapshot\(path,[\s\S]{0,180}expectedSupervisor, 100\)[\s\S]{0,700}RestartCore\(' -or
     $guardRuntimeSource -notmatch 'Verify\(path,[\s\S]{0,900}guardWorkGate\.TryEnter\(\)[\s\S]{0,600}ScheduleVerificationFor\(path, expectedSupervisor, 100\)[\s\S]{0,600}VerifyCore\(' -or
     $guardRuntimeSource -notmatch 'MonitorTick\(\)[\s\S]{0,9000}this\.RestartCore\(path\)') {
     $failures.Add('Restart and verification must participate in the shared guard work gate')
@@ -1057,7 +1465,8 @@ foreach ($legacyGuardRuntimeEntry in @(
         $failures.Add("Legacy main guard runtime entry remains: $legacyGuardRuntimeEntry")
     }
 }
-if ($source -notmatch 'if\s+!App\.guardRuntime\.Start\(\)' -or
+if ($source -notmatch
+        'guardRuntimeStarted\s*:=\s*App\.guardRuntime\.Start\(\)' -or
     $source -notmatch 'App\.guardRuntime\.RestartMonitorTimer\(\)') {
     $failures.Add('Guard runtime must own monitor startup, shutdown and interval changes')
 }
@@ -1082,7 +1491,7 @@ foreach ($maintenanceIntegrationPattern in @(
     'matcher\.Match\(processInfo,',
     'activeKnown\[identityKey\]\s*:=\s*actorRecord',
     'activeTransient\[identityKey\]\s*:=\s*actorRecord',
-    'HasActiveActors\(stateObj\)[\s\S]{0,500}IsIdentityAlive\(',
+    'HasActiveActors\(stateObj\)[\s\S]{0,900}GetIdentityStatus\(',
     'Normalize\(config, path\)[\s\S]{0,1800}NormalizeActors\(config,'
 )) {
     if ($source -notmatch $maintenanceIntegrationPattern -and
@@ -1122,7 +1531,8 @@ else {
         $failures.Add('Target launch must validate controller generation immediately before and after execution')
     }
 }
-if ($source -notmatch 'GracefulStop\(pid\)[\s\S]{0,320}App\.targetStopper\.Stop\(') {
+if ($source -notmatch 'StopTargetProcess\(pid, expectedCreationIdentity := ""\)[\s\S]{0,500}App\.targetStopper\.Stop\(' -or
+    $source -notmatch 'GracefulStop\(pid, expectedCreationIdentity := ""\)[\s\S]{0,160}StopTargetProcess\(pid, expectedCreationIdentity\)') {
     $failures.Add('GracefulStop must delegate process termination to TargetStopper')
 }
 $removedExecutionModule = Join-Path $projectRoot `
@@ -1178,11 +1588,16 @@ if ($maintenanceCoordinatorSource -notmatch 'EndExplicit\(path\)[\s\S]{0,500}Mai
     $maintenanceStateMachineSource -notmatch 'MaintenancePhase\.Normal, Map\([\s\S]{0,240}MaintenancePhase\.Stabilizing, true') {
     $failures.Add('Explicit maintenance timeout must recover into stabilization')
 }
+if ($maintenanceCoordinatorSource -notmatch 'RestoreSessions\(\)[\s\S]{0,2800}RestoreMaintenanceMode\(MaintenancePhase\.TimedOut\)[\s\S]{0,260}RestoreMaintenanceMode\(MaintenancePhase\.Recovering\)' -or
+    $targetSupervisorSource -notmatch 'RestoreMaintenanceMode\(restoredPhase\)[\s\S]{0,140}MaintenanceStateMachine\.Restore\(restoredPhase\)' -or
+    $maintenanceStateMachineSource -match 'MaintenancePhase\.Normal, Map\([\s\S]{0,300}MaintenancePhase\.TimedOut, true') {
+    $failures.Add('Persisted maintenance sessions must restore through an explicit boundary without weakening runtime transitions')
+}
 if ($maintenanceCoordinatorSource -notmatch 'SaveJournal\(\)[\s\S]{0,500}previousCritical\s*:=\s*A_IsCritical[\s\S]{0,900}Critical\(previousCritical') {
     $failures.Add('Maintenance journal transactions must restore caller critical state')
 }
 if ($maintenanceCoordinatorSource -notmatch 'this\.JournalDirty\s*:=\s*true[\s\S]{0,300}this\.JournalRetryDelayMs\s*:=\s*Min\(' -or
-    $maintenanceCoordinatorSource -notmatch 'EventTick\(\)[\s\S]{0,6000}this\.JournalDirty[\s\S]{0,180}this\.SaveJournal\(\)') {
+    $maintenanceCoordinatorSource -notmatch 'EventTick\(\)[\s\S]{0,8000}this\.JournalDirty[\s\S]{0,180}this\.SaveJournal\(\)') {
     $failures.Add('Dirty maintenance journals must be retried by the existing event loop')
 }
 if ($maintenanceCoordinatorSource -notmatch 'StartTimers\(\)[\s\S]{0,500}eventTimerStarted\s*:=\s*true[\s\S]{0,260}catch[\s\S]{0,220}SetTimer\(this\.EventTimer, 0\)[\s\S]{0,140}SetTimer\(this\.ProcessTimer, 0\)' -or
@@ -1190,7 +1605,7 @@ if ($maintenanceCoordinatorSource -notmatch 'StartTimers\(\)[\s\S]{0,500}eventTi
     $maintenanceCoordinatorSource -notmatch 'if\s+this\.Initialized\s*\r?\n\s*try\s+this\.SaveJournal\(\)') {
     $failures.Add('Maintenance timer startup and shutdown must be transactional and avoid uninitialized journal writes')
 }
-if ($source -notmatch 'App\.appStates\[path\]\s*:=\s*TargetSupervisor\(\{') {
+if ($source -notmatch 'stateObj\s*:=\s*TargetSupervisor\(\{[\s\S]{0,2200}App\.appStates\[path\]\s*:=\s*stateObj') {
     $failures.Add('Every registered target must be owned by TargetSupervisor')
 }
 foreach ($legacySupervisorPattern in @(
@@ -1214,9 +1629,9 @@ if ($guardRuntimeSource -notmatch 'IsSupervisorCurrent\(path,[\s\S]{0,420}this\.
 if ($guardRuntimeSource -notmatch 'IsScheduledTaskCurrent\(path,[\s\S]{0,300}IsScheduledTaskCurrent\(task, expectedKind\)') {
     $failures.Add('Scheduled actions must validate the current task slot')
 }
-if ($guardRuntimeSource -notmatch 'UpdateState\(path, expectedSupervisor, statusText\)[\s\S]{0,360}IsSupervisorCurrent\(path,\s*expectedSupervisor,[\s\S]{0,80}expectedGeneration\)[\s\S]{0,220}Callbacks\.UpdateState\.Call\(path, statusText,[\s\S]{0,100}expectedSupervisor, expectedGeneration\)' -or
-    $maintenanceCoordinatorSource -notmatch 'UpdateState\(path, expectedSupervisor, statusText\)[\s\S]{0,420}Runtime\.appStates\[path\]\s*!=\s*expectedSupervisor[\s\S]{0,240}Callbacks\.UpdateState\.Call\(path, statusText,[\s\S]{0,80}expectedSupervisor\)' -or
-    $source -notmatch 'UpdateState\(updPath, statusStr, expectedState := "",[\s\S]{0,80}expectedGeneration := 0\)[\s\S]{0,360}stateObj\s*!=\s*expectedState[\s\S]{0,180}stateObj\.Generation\s*!=\s*expectedGeneration') {
+if ($guardRuntimeSource -notmatch 'UpdateState\(path, expectedSupervisor, statusText, statusKind := ""\)[\s\S]{0,360}IsSupervisorCurrent\(path,\s*expectedSupervisor,[\s\S]{0,80}expectedGeneration\)[\s\S]{0,260}Callbacks\.UpdateState\.Call\(path, statusText,[\s\S]{0,130}expectedSupervisor, expectedGeneration, false, statusKind\)' -or
+    $maintenanceCoordinatorSource -notmatch 'UpdateState\(path, expectedSupervisor, statusText, statusKind := ""\)[\s\S]{0,420}Runtime\.appStates\[path\]\s*!=\s*expectedSupervisor[\s\S]{0,280}Callbacks\.UpdateState\.Call\(path, statusText,[\s\S]{0,120}expectedSupervisor, 0, false, statusKind\)' -or
+    $source -notmatch 'UpdateState\(updPath, statusStr, expectedState := "",[\s\S]{0,120}expectedGeneration := 0, forceProjection := false, statusKind := ""\)[\s\S]{0,420}stateObj\s*!=\s*expectedState[\s\S]{0,180}stateObj\.Generation\s*!=\s*expectedGeneration') {
     $failures.Add('Background status writes must carry and validate supervisor ownership')
 }
 if ($guardRuntimeSource -notmatch 'Restart\(path, expectedSupervisor := "", scheduledTask := ""\)') {
@@ -1255,16 +1670,18 @@ foreach ($snapshotServiceHook in @(
     'PublishSnapshot(snapshot, capturedAtTicks := 0,',
     'HasFreshSnapshot(maximumAgeMs := 0, nowTicks := 0)',
     'GetIndex(maximumAgeMs := 0)',
-    'Start()',
+    'Start(requestTicks := 0)',
     'Pump()',
     'RequestFresh()',
     'Stop(waitForExit := true)',
     'NextWorkerOutputPath(nowTicks := 0)',
     'WriteWorkerFile(outputPath, snapshotProvider)',
-    'ReadWorkerResult(outputPath, &resultReady := false)',
+    'ReadWorkerResult(outputPath, &resultReady := false,',
     'outputText := "SNAPSHOT|" snapshot.Length',
     'this.WorkerCreationIdentity',
     'this.ResetWorkerState(true)',
+    'this.WorkerPollTimer := ObjBindMethod(this, "PollWorker")',
+    'this.LatestSnapshotRequestTicks',
     'outputPath ".writing"'
 )) {
     if (-not $snapshotServiceSource.Contains($snapshotServiceHook)) {
@@ -1289,25 +1706,38 @@ if ($maintenanceCoordinatorSource -notmatch 'Shutdown\(\*\)[\s\S]{0,900}this\.Ru
 }
 if ($snapshotServiceSource -notmatch 'this\.Stopped\s*:=\s*false' -or
     $snapshotServiceSource -notmatch 'Stop\(waitForExit := true\)[\s\S]{0,180}this\.Stopped\s*:=\s*true' -or
-    $snapshotServiceSource -notmatch 'Start\(\)[\s\S]{0,100}if\s+this\.Stopped[\s\S]{0,60}return\s+false') {
+    $snapshotServiceSource -notmatch 'Start\(requestTicks := 0\)[\s\S]{0,100}if\s+this\.Stopped[\s\S]{0,60}return\s+false') {
     $failures.Add('ProcessSnapshotService shutdown must be terminal and prevent worker restart')
 }
+$snapshotStartSource = [regex]::Match($snapshotServiceSource,
+    '(?ms)^    Start\(requestTicks := 0\).*?(?=^    PollWorker\(\*\))').Value
 if ($snapshotServiceSource -notmatch 'StoreSnapshot\([\s\S]{0,180}if\s+this\.Stopped\s*\|\|' -or
     $snapshotServiceSource -notmatch 'StoreNativeSnapshot\([\s\S]{0,120}if\s+this\.Stopped[\s\S]{0,60}return\s+false' -or
-    $snapshotServiceSource -notmatch 'Start\(\)[\s\S]{0,900}this\.WorkerStarting\s*:=\s*true[\s\S]{0,1200}if\s+!this\.Stopped[\s\S]{0,500}accepted\s*:=\s*true[\s\S]{0,900}this\.WorkerStarting\s*:=\s*false[\s\S]{0,500}if\s+!accepted') {
+    -not $snapshotStartSource -or
+    $snapshotStartSource -notmatch 'this\.WorkerStarting\s*:=\s*true' -or
+    $snapshotStartSource -notmatch 'if\s+!this\.Stopped\s*\{' -or
+    $snapshotStartSource -notmatch 'accepted\s*:=\s*true' -or
+    $snapshotStartSource -notmatch 'this\.WorkerStarting\s*:=\s*false' -or
+    $snapshotStartSource -notmatch 'if\s+!accepted') {
     $failures.Add('Snapshot startup and publication must revalidate terminal shutdown after yielding to external work')
 }
 if ($snapshotServiceSource -notmatch 'CanTerminateWorker\(pid, expectedCreationIdentity\)[\s\S]{0,320}expectedCreationIdentity\s*==\s*""[\s\S]{0,220}currentCreationIdentity\s*!=\s*""[\s\S]{0,100}currentCreationIdentity\s*==\s*expectedCreationIdentity' -or
     $snapshotServiceSource -match 'WorkerCreationIdentity\s*==\s*""\s*\|\||currentCreation\s*==\s*""\s*\|\|') {
     $failures.Add('Snapshot workers may be terminated only after an exact non-empty creation-identity match')
 }
+if ($snapshotServiceSource -notmatch 'this\.WorkerHandle\s*:=\s*workerHandle' -or
+    $snapshotServiceSource -notmatch 'OpenWorkerHandle\(pid\)[\s\S]{0,260}OpenProcess' -or
+    $snapshotServiceSource -notmatch 'StopWorker\(waitForExit := true\)[\s\S]{0,500}TerminateBoundWorker\(handle, waitForExit\)' -or
+    $snapshotServiceSource -notmatch 'ResetWorkerState\(deleteFiles := false\)[\s\S]{0,220}CloseWorkerHandle\(this\.WorkerHandle\)') {
+    $failures.Add('Snapshot workers must use a process handle when available and release it through the shared cleanup path')
+}
 if ($snapshotServiceSource -notmatch 'NextWorkerOutputPath\(nowTicks := 0\)[\s\S]{0,220}this\.WorkerSequence\+\+[\s\S]{0,180}this\.WorkerSequence "\.tmp"' -or
-    $snapshotServiceSource -notmatch 'Start\(\)[\s\S]{0,900}this\.NextWorkerOutputPath\(nowTicks\)') {
+    $snapshotStartSource -notmatch 'this\.NextWorkerOutputPath\(nowTicks\)') {
     $failures.Add('Concurrent process snapshot workers must never reuse an output path within the same millisecond')
 }
-if ($fileScanServiceSource -notmatch 'Stop\(workerPid, outputPath, creationIdentity := ""\)[\s\S]{0,500}creationIdentity\s*!=\s*""[\s\S]{0,260}currentCreation\s*!=\s*""[\s\S]{0,80}currentCreation\s*==\s*creationIdentity' -or
-    $fileScanServiceSource -match 'Stop\(workerPid, outputPath, creationIdentity := ""\)[\s\S]{0,500}creationIdentity\s*==\s*""\s*\|\|') {
-    $failures.Add('File-scan workers may be terminated only after an exact non-empty creation-identity match')
+if ($fileScanServiceSource -notmatch 'Stop\(workerPid, outputPath, creationIdentity := "", workerHandle := 0\)[\s\S]{0,320}if workerHandle[\s\S]{0,160}TerminateBoundWorker\(workerHandle, true\)[\s\S]{0,260}creationIdentity\s*!=\s*""[\s\S]{0,260}currentCreation\s*!=\s*""[\s\S]{0,80}currentCreation\s*==\s*creationIdentity' -or
+    $fileScanServiceSource -match 'Stop\(workerPid, outputPath, creationIdentity := "", workerHandle := 0\)[\s\S]{0,700}creationIdentity\s*==\s*""\s*\|\|') {
+    $failures.Add('File-scan workers must terminate through their bound process handle or an exact non-empty creation-identity match')
 }
 foreach ($legacySnapshotSymbol in @(
     'StartProcessSnapshotWorker\s*\(',
@@ -1337,6 +1767,7 @@ foreach ($targetProbeHook in @(
     'ObserveProcessName(processName)',
     'ObserveImagePath(targetPath, snapshotIndex := "")',
     'ObserveCommandTarget(targetPath, snapshotIndex := ""',
+    'ObserveAutoHotkeyScript(targetPath, maximumSnapshotAgeMs := 0)',
     'ObserveWorkingDirectory(workingDirectory, preferredName := ""',
     'snapshotIndex.ObserveCommandTarget(targetPath)',
     'snapshotIndex.ObserveImagePath(targetPath)'
@@ -1354,8 +1785,38 @@ elseif ($source -notmatch 'this\.targetProbe\s*:=\s*TargetProbe\([\s\S]{0,180}Ob
 elseif ($source -notmatch 'this\.targetProbe\s*:=\s*TargetProbe\([\s\S]{0,420}ObjBindMethod\(this\.processInspector,\s*"CaptureNativeSnapshot"\)[\s\S]{0,240}ObjBindMethod\(this\.processInspector,\s*"GetImagePath"\)[\s\S]{0,240}ObjBindMethod\(this\.processInspector,\s*"GetCreationIdentity"\)') {
     $failures.Add('TargetProbe must receive native process inspection through the shared instance')
 }
-if ($maintenanceCoordinatorSource -notmatch 'QueryNativeSnapshot\(&snapshotReady\)[\s\S]{0,260}this\.Runtime\.processInspector\.CaptureNativeSnapshot\(\)') {
+$snapshotPumpSource = [regex]::Match($snapshotServiceSource,
+    '(?ms)^    PumpWorker\(\).*?(?=^    RequestFresh\(\))').Value
+$snapshotPollSource = [regex]::Match($snapshotServiceSource,
+    '(?ms)^    PollWorker\(\*\).*?(?=^    ArmWorkerPoll\(\))').Value
+if ($snapshotPumpSource -notmatch 'completedRequestTicks\s*:=\s*this\.RequestTicks' -or
+    $snapshotPumpSource -notmatch 'PublishSnapshot\(snapshot, snapshotTicks, true,[\s\S]{0,160}completedRequestTicks\)' -or
+    $snapshotPollSource -notmatch 'this\.Pump\(\)' -or
+    $snapshotPollSource -notmatch 'this\.ArmWorkerPoll\(\)') {
+    $failures.Add('Process snapshot publication must retain request generations and collect worker results without waiting for the monitor interval')
+}
+elseif ($source -notmatch 'this\.targetProbe\s*:=\s*TargetProbe\([\s\S]{0,900}ObjBindMethod\(this\.processInspector,[\s\S]{0,80}"CaptureAutoHotkeyScriptSnapshot"\)') {
+    $failures.Add('TargetProbe must receive the shared AutoHotkey hidden-window snapshot provider')
+}
+if ($guardRuntimeSource -notmatch 'existingObservation\.IsUnknown\(\)[\s\S]{0,400}NeedsFreshSnapshot\(\)[\s\S]{0,300}BeginSnapshotWait\(path, stateObj, "Restart"\)' -or
+    $guardRuntimeSource -notmatch 'verificationObservation\.IsUnknown\(\)[\s\S]{0,400}NeedsFreshSnapshot\(\)[\s\S]{0,300}BeginSnapshotWait\(path, stateObj, "Verify"\)' -or
+    $guardRuntimeSource -notmatch 'snapshotIndex\.RequestTicks[\s\S]{0,120}stateObj\.SnapshotRequestTicks' -or
+    $targetSupervisorSource -notmatch 'ClearSnapshotCoordination\(\)[\s\S]{0,700}SnapshotReadyIndex') {
+    $failures.Add('Transient snapshot gaps must use bounded request generations while permanent unknown evidence returns to normal monitoring')
+}
+if ($maintenanceCoordinatorSource -notmatch 'QueryNativeSnapshot\(&snapshotReady\)[\s\S]{0,260}this\.Runtime\.processInspector\.CaptureNativeSnapshot\(\)' -or
+    $maintenanceCoordinatorSource -match 'Callbacks\.QueryProcessSnapshot') {
     $failures.Add('Maintenance native snapshots must come from ProcessInspector')
+}
+$maintenanceProcessTickSource = [regex]::Match($maintenanceCoordinatorSource,
+    '(?ms)^    ProcessTick\(\).*?(?=^    EventTick\(\))').Value
+if ($maintenanceProcessTickSource -notmatch 'snapshots\.Start\(\)' -or
+    $maintenanceProcessTickSource -notmatch 'QueryNativeSnapshot\(&snapshotReady\)' -or
+    $maintenanceProcessTickSource -match 'Callbacks\.QueryProcessSnapshot') {
+    $failures.Add('Periodic maintenance scans must request full snapshots in the worker and never run WMI on the UI thread')
+}
+if ($maintenanceProcessTickSource -notmatch 'if !this\.ProcessBaselineReady\s*\{[\s\S]{0,1000}QueryNativeSnapshot\([\s\S]{0,100}&baselineReady\)[\s\S]{0,500}RefreshActors\(baselineSnapshot, true,') {
+    $failures.Add('Maintenance polling must rebuild a failed startup baseline with native snapshots while WMI remains asynchronous')
 }
 if ($maintenanceCoordinatorSource -notmatch 'RefreshActors\(snapshot,[\s\S]{0,900}this\.CreateSnapshotIndex\(snapshot,') {
     $failures.Add('Maintenance actor refresh must build at most one process snapshot index')
@@ -1372,6 +1833,27 @@ if ($source -notmatch 'ObserveTarget\(target,[\s\S]{0,420}targetSpecsService\.Ge
 if ($guardRuntimeSource -notmatch 'Restart\(path,[\s\S]{0,6500}launchPlan\s*:=\s*targetPlan\.Launch[\s\S]{0,2200}launchPlan\.Kind') {
     $failures.Add('Restart execution must dispatch through LaunchSpec')
 }
+if ($guardRuntimeSource -notmatch 'Run 返回的 PID[\s\S]{0,400}verificationNeedsCommandLine[\s\S]{0,260}RequestFresh\(\)' -or
+    [regex]::Match($guardRuntimeSource,
+        '(?ms)^    RestartCore\(.*?^    ProcessRestartFailure\(').Value -match
+        'SetProcessIdentity\.Call\(stateObj, newPid\)') {
+    $failures.Add('Run-returned PIDs must remain untrusted until target-specific observation verifies them')
+}
+if ($source -notmatch 'SetStateProcessIdentity\(stateObj, pid, observedCreationIdentity := ""\)' -or
+    $source -notmatch 'PIDCreationIdentity := currentCreationIdentity != ""[\s\S]{0,180}observedCreationIdentity' -or
+    $guardRuntimeSource -notmatch 'SetProcessIdentity\.Call\(stateObj,[\s\S]{0,100}\.CreationIdentity\)' -or
+    $maintenanceCoordinatorSource -notmatch 'SetProcessIdentity\.Call\(stateObj,[\s\S]{0,100}observation\.CreationIdentity\)') {
+    $failures.Add('Verified creation identities must flow from observations into the owned target state')
+}
+$manualRestartSource = [regex]::Match($mainSource,
+    '(?ms)^PerformManualRestart\(.*?(?=^ScheduleManualRestartRetry\()').Value
+if (-not $manualRestartSource -or $manualRestartSource -match 'SaveAppsToIni\(\)' -or
+    $manualRestartSource -match 'stateObj\.Enabled\s*:=\s*1' -or
+    $manualRestartSource -notmatch 'guardWorkGate\.Leave\(\)[\s\S]{0,180}StopTargetProcess\(pid, creationIdentity\)' -or
+    $manualRestartSource -notmatch 'CompleteManualRestartAfterStop\([\s\S]{0,900}guardWorkGate\.TryEnter\(\)' -or
+    $manualRestartSource -notmatch 'FinalizeManualRestart\(path, stateObj, expectedGeneration\)') {
+    $failures.Add('Manual restart must stop outside the shared gate, revalidate ownership, and avoid unchanged configuration writes')
+}
 if ($targetIdentityServiceSource -notmatch 'TargetReferenceExists\(path, stateObj := ""\)[\s\S]{0,160}targetSpecsService\.Get\(path, stateObj\)[\s\S]{0,40}\.Launch\.Available') {
     $failures.Add('Target availability must come from LaunchSpec')
 }
@@ -1384,7 +1866,8 @@ if ($source -match '(?:CommandLineContainsTarget|CommandTokenMatchesTarget|GetLa
 if ($source -match 'FileGetShortcut\s*\(') {
     $failures.Add('Main script must read shortcut metadata through ShortcutResolver')
 }
-if ($guardRuntimeSource -notmatch 'existingObservation\s*:=\s*this\.Callbacks\.ObserveTarget\.Call\(path,\s*"",\s*1000\)') {
+if ($guardRuntimeSource -notmatch 'existingObservation\s*:=\s*this\.Callbacks\.ObserveTarget\.Call\(path,[\s\S]{0,180}snapshotIndex[\s\S]{0,180}\?\s*0\s*:\s*1000\)' -or
+    $guardRuntimeSource -notmatch 'existingObservation\.NeedsFreshSnapshot\(\)[\s\S]{0,220}BeginSnapshotWait\(path, stateObj, "Restart"\)') {
     $failures.Add('Restart duplicate protection must require an action-fresh process snapshot')
 }
 foreach ($legacyObservationBridge in @(
@@ -1413,7 +1896,7 @@ foreach ($legacyObservationBridge in @(
 if ($guardRuntimeSource -notmatch 'MonitorTick\(\)[\s\S]{0,12000}targetObservation\.IsUnknown\(\)[\s\S]{0,100}continue') {
     $failures.Add('Main monitoring must defer decisions for Unknown process observations')
 }
-if ($guardRuntimeSource -notmatch 'Restart\(path,[\s\S]{0,3000}existingObservation\.IsUnknown\(\)') {
+if ($guardRuntimeSource -notmatch 'RestartCore\(path,[\s\S]{0,6000}existingObservation\.IsUnknown\(\)[\s\S]{0,500}(?:BeginSnapshotWait|HandleUncertainObservation)') {
     $failures.Add('Restart duplicate protection must defer launch for Unknown observations')
 }
 $runningStateMatch = [regex]::Match($source,
@@ -1438,8 +1921,8 @@ else {
     foreach ($manualRestartHook in @(
         'stateObj.CancelScheduledTasks()',
         'operationGeneration := stateObj.Generation',
-        'GracefulStop(pid)',
-        'App.guardRuntime.Restart(path)'
+        'StopTargetProcess(pid, creationIdentity)',
+        'App.guardRuntime.RestartCore(path, stateObj)'
     )) {
         if (-not $manualRestartSource.Contains($manualRestartHook)) {
             $failures.Add("Manual restart is missing generation-safe execution hook: $manualRestartHook")
@@ -1449,7 +1932,8 @@ else {
         'App\.guardRuntime\.IsSupervisorCurrent\(').Count -lt 3) {
         $failures.Add('Manual restart must revalidate controller ownership after blocking operations')
     }
-    if ($manualRestartSource -notmatch 'GracefulStop\(pid\)[\s\S]{0,300}App\.guardRuntime\.IsSupervisorCurrent\(') {
+    if ($manualRestartSource -notmatch 'try stopResult\s*:=\s*StopTargetProcess\(pid, creationIdentity\)[\s\S]{0,900}completionCallback\s*:=\s*CompleteManualRestartAfterStop\.Bind\(' -or
+        $manualRestartSource -notmatch 'CompleteManualRestartAfterStop\([\s\S]{0,500}App\.guardRuntime\.IsSupervisorCurrent\(') {
         $failures.Add('Manual process stop must revalidate controller generation before state mutation')
     }
     if ($manualRestartSource -match '(?m)\bRun\s*\(') {
@@ -1465,8 +1949,75 @@ if ($watchlistPersistenceServiceSource -notmatch 'for\s+appEntry\s+in\s+this\.Re
 elseif ($watchlistPersistenceServiceSource -match 'for\s+appKey\s*,\s*appValue\s+in\s+appValues') {
     $failures.Add('App loading must not depend on Map enumeration order')
 }
-if ($source -notmatch 'LV_ItemDrag\(ctrl, lParam\)[\s\S]{0,4200}SyncAppOrderFromListView\(\)[\s\S]{0,120}SaveAppsToIni\(\)') {
+if ($source -notmatch 'LV_ItemDrag\(ctrl, lParam\)[\s\S]{0,3200}QueueGuardMutation\(ApplyMainListReorder\.Bind\(' -or
+    $source -notmatch 'ApplyMainListReorder\(selectedPaths, anchorCandidates,[\s\S]{0,2800}SaveAppsToIni\(\)') {
     $failures.Add('List drag reorder must synchronize and persist the visible order')
+}
+foreach ($mainListColumnCheck in @(
+    @{ Name = 'four localized columns plus hidden semantic key'; Passed = $mainSource -match '\[Tr\("\u5E94\u7528\u7A0B\u5E8F"\),\s*Tr\("\u72B6\u6001"\),\s*Tr\("\u5B8C\u6574\u8DEF\u5F84"\),\s*Tr\("\u5E8F\u53F7"\),\s*""\s*\]' },
+    @{ Name = 'column-order application'; Passed = $mainSource -match 'Main\.listProjection\.ApplyColumnOrder\(Main\.lv\)' },
+    @{ Name = 'sequence-first display order'; Passed = $mainListProjectionSource -match 'displayOrder\s*:=\s*\[3,\s*0,\s*1,\s*2,\s*4\]' },
+    @{ Name = 'hidden semantic-key width'; Passed = $mainSource -match 'Main\.lv\.ModifyCol\(5,\s*0\)' },
+    @{ Name = 'native column-order message'; Passed = $mainListProjectionSource -match 'LVM_SETCOLUMNORDERARRAY' }
+)) {
+    if (-not $mainListColumnCheck.Passed) {
+        $failures.Add("Main ListView sequence column is missing: $($mainListColumnCheck.Name)")
+    }
+}
+if ($mainListProjectionSource -notmatch 'RefreshSequenceFromOrder\(listView, orderedPaths\)' -or
+    ([regex]::Matches($source,
+        'Main\.listProjection\.RefreshSequenceFromOrder\(Main\.lv, App\.appOrder\)')).Count -lt 3) {
+    $failures.Add('Main ListView sequence must follow custom order after delete, reorder and configuration projection')
+}
+$sequenceKeyRefreshCount = ([regex]::Matches($source,
+        'Main\.listProjection\.RefreshSequenceFromOrder\(Main\.lv, App\.appOrder\)[\s\S]{0,140}RefreshMainStatusSortKeys\(\)')).Count
+if ($sequenceKeyRefreshCount -lt 3) {
+    $failures.Add('Main status semantic keys must be refreshed whenever saved sequence values change')
+}
+if ($mainSource -notmatch '#Include src\\UI\\ListViewPseudoHeader\.ahk' -or
+    $listViewPseudoHeaderSource -notmatch 'class\s+ListViewPseudoHeader' -or
+    $listViewPseudoHeaderSource -notmatch 'SortByDisplayColumn\(displayColumn,' -or
+    $listViewPseudoHeaderSource -notmatch 'OnEvent\("Click", sortCallback\)' -or
+    $listViewPseudoHeaderSource -notmatch 'OnEvent\("DoubleClick", sortCallback\)' -or
+    $listViewPseudoHeaderSource -notmatch 'AttachInputGuard\(cellHwnd, listHwnd\)' -or
+    $listViewPseudoHeaderSource -notmatch 'SetWindowSubclass' -or
+    $listViewPseudoHeaderSource -notmatch '" -Tabstop"' -or
+    $listViewPseudoHeaderSource -notmatch 'case\s+0x0007:[\s\S]{0,220}SetFocus' -or
+    $listViewPseudoHeaderSource -notmatch 'case\s+0x0301:[\s\S]{0,60}return 0' -or
+    $listViewPseudoHeaderSource -notmatch 'case\s+0x007B:[\s\S]{0,60}return 0' -or
+    $listViewPseudoHeaderSource -notmatch 'RemoveWindowSubclass' -or
+    $listViewPseudoHeaderSource -notmatch 'SkipAscending' -or
+    $listViewPseudoHeaderSource -notmatch 'this\.SortDescending\s*:=\s*this\.Columns\[displayColumn\]\.SkipAscending' -or
+    $listViewPseudoHeaderSource -notmatch 'OnBeforeSort' -or
+    $listViewPseudoHeaderSource -notmatch 'NotifyBeforeSort\(\)' -or
+    $listViewPseudoHeaderSource -notmatch 'ApplyCurrentSort\(\)' -or
+    $listViewPseudoHeaderSource -notmatch 'columnSpec\.SortOptions\s+" "\s+columnSpec\.Align' -or
+    $listViewPseudoHeaderSource -notmatch 'RestoreOrder\(\)' -or
+    $listViewPseudoHeaderSource -notmatch 'RestoreColumn' -or
+    $mainSource -notmatch 'Main\.listHeader\s*:=\s*ListViewPseudoHeader\(' -or
+    $mainSource -notmatch '\{Column:\s*4,\s*Label:\s*Tr\("\u5E8F\u53F7"\),\s*Align:\s*"Center",\s*SortOptions:\s*"Integer",\s*SkipAscending:\s*true\}' -or
+    $mainSource -notmatch '\{Column:\s*5,\s*Label:\s*Tr\("\u72B6\u6001"\),\s*SortOptions:\s*"Logical"\}' -or
+    $mainSource -notmatch 'RestoreColumn:\s*4' -or
+    $mainSource -notmatch 'OnBeforeSort:\s*PrepareMainListTemporarySort' -or
+    $mainSource -notmatch 'OnMainListTemporarySortChanged' -or
+    $source -notmatch 'LayoutMainListHeader\(clientWidth\)[\s\S]{0,900}GetDpiForWindow[\s\S]{0,500}LVM_GETCOLUMNWIDTH[\s\S]{0,120}/\s*dpiScale') {
+    $failures.Add('Main ListView must use the reusable pseudo header with temporary native sorting')
+}
+foreach ($statusSortHook in @(
+    'GetMainStatusSemanticPriority\(statusKind\)',
+    'GetMainStatusSortKey\(stateObj, sequence, descending := false\)',
+    'stableSequence\s*:=\s*descending\s*\?\s*0x7FFFFFFF\s*-\s*sequence\s*:\s*sequence',
+    'SetMainStatusSortKey\(row, stateObj := "", descending := ""\)',
+    'RefreshMainStatusSortKeys\(descending := "", scheduleSort := true\)',
+    'Main\.lv\.Modify\(row, "Col5", GetMainStatusSortKey\(stateObj, sequence,',
+    'SetMainListStatus\(row, statusText\)[\s\S]{0,900}SetMainStatusSortKey\(row, stateObj\)[\s\S]{0,160}ScheduleMainListTemporarySortRefresh\(5\)'
+)) {
+    if ($mainVisualPipelineSource -notmatch $statusSortHook) {
+        $failures.Add("Main status semantic sorting hook is missing: $statusSortHook")
+    }
+}
+if ($source -notmatch 'PrepareMainListTemporarySort\(header, column, descending\)[\s\S]{0,140}RefreshMainStatusSortKeys\(descending, false\)') {
+    $failures.Add('Main status sorting must prepare direction-stable semantic keys before invoking native sorting')
 }
 foreach ($displayHook in @(
     'OpenDisplaySettings)',
@@ -1499,14 +2050,18 @@ if ($source -notmatch 'FindRow\(searchPath\)\s*\{\s*return Main\.listProjection\
 if ($source -match 'FindRow\(searchPath\)[\s\S]{0,240}Loop Main\.lv\.GetCount\(\)') {
     $failures.Add('Main ListView row lookup must not scan every row')
 }
-foreach ($projectionMutationHook in @(
-    'Main.listProjection.Remember(path, row)',
-    'Main.listProjection.Rebuild(ctrl)',
-    'Main.listProjection.Rebuild(GuiCtrlObj)',
-    'Main.listProjection.Rebuild(Main.lv)'
+foreach ($projectionMutationCheck in @(
+    @{ Name = 'single-row registration'; Passed =
+        $source -match 'RegisterApp\([\s\S]{0,6000}Main\.listProjection\.Remember\(path, row\)' },
+    @{ Name = 'configuration projection rebuild'; Passed =
+        $source -match 'SyncMainListToConfigState\([\s\S]{0,1800}Main\.listProjection\.Rebuild\(Main\.lv\)' },
+    @{ Name = 'configuration restoration projection'; Passed =
+        $source -match 'ApplyState\([\s\S]{0,9000}SyncMainListToConfigState\(projectedItems\)' },
+    @{ Name = 'serialized drag reorder'; Passed =
+        $source -match 'ApplyMainListReorder\([\s\S]{0,2600}SyncMainListToConfigState\(projectedItems\)' }
 )) {
-    if (-not $source.Contains($projectionMutationHook)) {
-        $failures.Add("Missing main-list projection mutation hook: $projectionMutationHook")
+    if (-not $projectionMutationCheck.Passed) {
+        $failures.Add("Missing main-list projection maintenance path: $($projectionMutationCheck.Name)")
     }
 }
 if ($appConfigSnapshotServiceSource -notmatch 'SnapshotsEqual\(first, second\)[\s\S]{0,1200}DisplayConfigCodec\.Equals\(first\.Display, second\.Display\)') {
@@ -1598,7 +2153,7 @@ if ($logWindowMatch.Success -and
 }
 
 $applyStateMatch = [regex]::Match($source,
-    '(?ms)^ApplyState\(stateArr, sourceStateArr := ""\)\s*\{.*?^\}\r?\n\r?\nSaveAppsToIni\(')
+    '(?ms)^ApplyState\(stateArr, sourceStateArr := "", rollbackOnFailure := true\)\s*\{.*?^\}\r?\n\r?\nSaveAppsToIni\(')
 if (-not $applyStateMatch.Success) {
     $failures.Add('Unable to inspect the undo/redo state application boundary')
 }
@@ -1628,22 +2183,37 @@ else {
     }
 }
 if ($appConfigHistoryServiceSource -notmatch 'class\s+AppConfigHistoryService' -or
-    $appConfigHistoryServiceSource -notmatch 'UndoEntries\.Push\(\{Before: beforeItems, After: afterItems\}\)' -or
-    $source -notmatch 'appConfigHistoryService\.Commit\(beforeState, afterState\)') {
-    $failures.Add('Undo records must retain both sides of the transition')
+    $appConfigHistoryServiceSource -notmatch 'Before:\s*beforeItems' -or
+    $appConfigHistoryServiceSource -notmatch 'After:\s*afterItems' -or
+    $appConfigHistoryServiceSource -notmatch 'ApplyCallback:\s*""' -or
+    $appConfigHistoryServiceSource -notmatch 'Action:\s*this\.NormalizeAction\(action\)' -or
+    $source -notmatch 'appConfigHistoryService\.Commit\(beforeState,\s*afterState,\s*action\)') {
+    $failures.Add('Undo records must retain both transition states and their user-facing action')
 }
 if ($source -match 'CommitUndoState\(\)') {
     $failures.Add('Undo entries must be committed after mutation with an explicit before-state')
 }
-if (($appConfigHistoryServiceSource -notmatch 'applyCallback\.Call\(entry\.Before, entry\.After\)') -or
-    ($appConfigHistoryServiceSource -notmatch 'applyCallback\.Call\(entry\.After, entry\.Before\)') -or
+$unlabelledUndoCommits = [regex]::Matches($source,
+    '(?m)^\s+CommitUndoState\([^,\r\n]+\)\s*$')
+if ($unlabelledUndoCommits.Count -gt 0) {
+    $failures.Add('Every production undo commit must include an explicit action description')
+}
+if (($appConfigHistoryServiceSource -notmatch 'transitionCallback\.Call\(entry\.Before, entry\.After\)') -or
+    ($appConfigHistoryServiceSource -notmatch 'transitionCallback\.Call\(entry\.After, entry\.Before\)') -or
     ($source -notmatch 'appConfigHistoryService\.Undo\(') -or
     ($source -notmatch 'appConfigHistoryService\.Redo\(')) {
     $failures.Add('Undo and redo must apply explicit reverse transitions')
 }
-if ($appConfigHistoryServiceSource -notmatch 'applyCallback\.Call\(entry\.Before, entry\.After\)[\s\S]{0,120}UndoEntries\.Pop\(\)' -or
-    $appConfigHistoryServiceSource -notmatch 'applyCallback\.Call\(entry\.After, entry\.Before\)[\s\S]{0,120}RedoEntries\.Pop\(\)') {
+if ($appConfigHistoryServiceSource -notmatch 'transitionCallback\.Call\(entry\.Before, entry\.After\)[\s\S]{0,160}UndoEntries\.Pop\(\)' -or
+    $appConfigHistoryServiceSource -notmatch 'transitionCallback\.Call\(entry\.After, entry\.Before\)[\s\S]{0,160}RedoEntries\.Pop\(\)') {
     $failures.Add('Failed undo/redo application must leave its history entry available for retry')
+}
+if ($appConfigHistoryServiceSource -notmatch 'CommitCustom\(' -or
+    $appConfigHistoryServiceSource -notmatch 'appliedEntry\s*:=\s*entry' -or
+    $source -notmatch 'CommitRuntimeSettingsUndoState\(' -or
+    $source -notmatch 'ShowHistoryResult\(entry, true\)' -or
+    $source -notmatch 'ShowHistoryResult\(entry, false\)') {
+    $failures.Add('Shared history must cover runtime settings and return the applied action for feedback')
 }
 if ($source -match '\b(?:undoStack|redoStack)\b') {
     $failures.Add('ApplicationState must delegate undo and redo stack ownership to AppConfigHistoryService')
@@ -1651,11 +2221,39 @@ if ($source -match '\b(?:undoStack|redoStack)\b') {
 if ($appConfigSnapshotServiceSource -notmatch 'MergeMaintenanceTransition\([\s\S]{0,3000}merged\.LearnedActors') {
     $failures.Add('Undo must preserve maintenance actors learned after the recorded action')
 }
-if ($source -notmatch 'if\s+addedCount\s*\{\s*CommitUndoState\(undoState\)') {
+if ($source -notmatch 'if\s+addedCount\s*\{[\s\S]{0,100}CommitUndoState\(undoState,\s*CreateAppHistoryAction\("add", addedPaths\)\)') {
     $failures.Add('Drag-and-drop must create an undo entry only after at least one target is added')
 }
-if ($source -notmatch 'if\s+!this\.batchAddedCount\s*\r?\n\s*CommitUndoState\(firstSuccessfulSnapshot\)') {
-    $failures.Add('Batch import must create one undo entry at its first successful addition')
+if ($source -match 'firstSuccessfulSnapshot' -or
+    $source -match 'if\s+!this\.batchAddedCount\s*\r?\n\s*CommitUndoState') {
+    $failures.Add('Batch import must not commit history before the complete batch outcome is known')
+}
+if ($mainSource -match '\bisMainGui\b' -or
+    $mainSource -notmatch 'rootClass\s*==\s*"AutoHotkeyGUI"' -or
+    $mainSource -notmatch 'isTextEditor[\s\S]{0,100}GetKeyState\("Ctrl"' -or
+    $mainSource -notmatch 'PerformUndo\(\)[\s\S]{0,80}return 0' -or
+    $mainSource -notmatch 'PerformRedo\(\)[\s\S]{0,80}return 0') {
+    $failures.Add('Undo and redo shortcuts must cover every application GUI while preserving Edit history')
+}
+if ($historyToastSource -notmatch 'SetTimer\(this\.hideTimer, -3000\)' -or
+    $historyToastSource -notmatch 'ClientToScreen' -or
+    $historyToastSource -notmatch 'Main\.statsText\.Hwnd' -or
+    $historyToastSource -notmatch 'GetWindowRect[^\r\n]*statusHwnd' -or
+    $historyToastSource -notmatch 'gap\s*:=\s*Max\(1, Round\(3 \* dpi / 96\)\)' -or
+    $historyToastSource -notmatch 'x\s*:=\s*NumGet\(statusRect, 0, "Int"\)' -or
+    $historyToastSource -notmatch 'y\s*:=\s*NumGet\(statusRect, 4, "Int"\) - height - gap' -or
+    $historyToastSource -notmatch 'CreateRoundRectRgn' -or
+    $historyToastSource -notmatch '\+E0x08080000' -or
+    $historyToastSource -notmatch 'w1 h1 Left Background' -or
+    $historyToastSource -notmatch 'LayoutText\(text,' -or
+    $historyToastSource -notmatch 'startY\s*:=\s*targetY - startOffset' -or
+    $historyToastSource -notmatch 'BeginAnimation\("show"' -or
+    $historyToastSource -notmatch 'BeginAnimation\("hide", fromY, this\.targetY - hideOffset' -or
+    $source -notmatch 'GuiResized\([\s\S]{0,500}historyToast\.Reposition\(\)' -or
+    $mainSource -notmatch 'OnMessage\(Win32\.WM_MOVE, MainWindowMoved\)' -or
+    $source -notmatch 'MainWindowMoved\([\s\S]{0,220}historyToast\.Reposition\(\)' -or
+    $source -notmatch 'GuiModules\.historyToast\.Show\(message\)') {
+    $failures.Add('Undo and redo feedback must use a measured, left-aligned, animated, non-activating three-second toast above the status bar')
 }
 if ($source -notmatch 'maintenanceConfigCodec\.Equals\(priorMaintenance,[\s\S]{0,600}this\.Close\(\)[\s\S]{0,80}return') {
     $failures.Add('Unchanged maintenance settings must close without creating an undo entry')
@@ -1666,7 +2264,8 @@ if ($source -notmatch 'if\s+!settingsChanged\s*\{[\s\S]{0,560}this\.Close\(\)[\s
 $allowedDirectClickBindings = @(
     'backgroundControl.OnEvent("Click", PlaceTextCaretAtPointer.Bind(inputControl))',
     'ctrl.OnEvent("Click", HandleRegisteredButtonClick)',
-    'this.autoResolveCheck.OnEvent("Click", ObjBindMethod(this, "ToggleResolvedTargetMode"))'
+    'this.autoResolveRadio.OnEvent("Click",',
+    'this.manualResolveRadio.OnEvent("Click",'
 )
 $directClickBindings = $source -split "`r?`n" |
     ForEach-Object { $_.Trim() } |
@@ -1788,12 +2387,28 @@ foreach ($configDiagnosticHook in @(
     'warning.Field',
     'warning.Reason',
     'App.configRepository.Path',
-    'TrayTip(App.configLoadWarnings.Length'
+    'try TrayTip(Tr("{1} 条监控配置未载入'
 )) {
     if (-not ($watchlistPersistenceServiceSource.Contains($configDiagnosticHook) -or
         $source.Contains($configDiagnosticHook))) {
         $failures.Add("Missing actionable watchlist-load diagnostic: $configDiagnosticHook")
     }
+}
+
+# 状态统计和图标必须依赖稳定枚举，不能在英文环境中继续匹配中文显示文案。
+$statsProjection = [regex]::Match($applicationTelemetrySource,
+    '(?ms)^UpdateStatsUI\(\)\s*\{.*?(?=^[A-Za-z_][A-Za-z0-9_]*\()').Value
+if ($statsProjection -notmatch 'GuardPhase\.' -or
+    $statsProjection -match 'InStr\([^\r\n]*(?:运行|暂停|升级|失效|停止)') {
+    $failures.Add('Main statistics must classify stable guard state instead of localized status text')
+}
+$statusVisualProjection = [regex]::Match($mainVisualPipelineSource,
+    '(?ms)^GetMainStatusVisualKind\([^)]*\)\s*\{.*?(?=^[A-Za-z_][A-Za-z0-9_]*\()').Value
+if ($statusVisualProjection -notmatch 'GuardPhase\.' -or
+    $statusVisualProjection -notmatch 'MaintenancePhase\.' -or
+    $statusVisualProjection -notmatch 'stateObj\.StatusKind' -or
+    $statusVisualProjection -match 'InStr\([^\r\n]*(?:运行|暂停|升级|失效|停止)') {
+    $failures.Add('Status icons must preserve a fine-grained stable kind and validate guard or maintenance hard state instead of localized text')
 }
 
 $addItemDialogSource = [regex]::Match($source,
@@ -1805,7 +2420,7 @@ $logRefreshSource = [regex]::Match($logWindowSource,
 $applicationSearchSource = [regex]::Match($source,
     '(?ms)^class ApplicationSearchDialog extends ManagedWindow\s*\{.*?(?=^class DarkTooltipWindow extends ManagedWindow)').Value
 $darkTooltipSource = [regex]::Match($source,
-    '(?ms)^class DarkTooltipWindow extends ManagedWindow\s*\{.*\z').Value
+    '(?ms)^class DarkTooltipWindow extends ManagedWindow\s*\{.*?(?=^class HistoryToastWindow)').Value
 $applyStateSource = [regex]::Match($source,
     '(?ms)^ApplyState\(.*?(?=^SaveAppsToIni\()').Value
 $batchStartSource = [regex]::Match($addItemDialogSource,
@@ -1818,24 +2433,159 @@ $batchConsumeSource = [regex]::Match($addItemDialogSource,
     '(?ms)^    ConsumeBatchImport\(\*\)\s*\{.*?(?=^    CompleteBatchImport\()').Value
 $batchCompleteSource = [regex]::Match($addItemDialogSource,
     '(?ms)^    CompleteBatchImport\([^)]*\)\s*\{.*?(?=^    FailBatchImport\()').Value
+$batchFailSource = [regex]::Match($addItemDialogSource,
+    '(?ms)^    FailBatchImport\([^)]*\)\s*\{.*?(?=^    CancelBatchImport\()').Value
 $batchCancelSource = [regex]::Match($addItemDialogSource,
     '(?ms)^    CancelBatchImport\(.*?\)\s*\{.*?(?=^    Confirm\()').Value
 $everythingSearchSource = [regex]::Match($applicationSearchSource,
     '(?ms)^    SearchEverything\(\*\)\s*\{.*?(?=^    OnSearchChanged\()').Value
-$nativeFilterSource = [regex]::Match($applicationSearchSource,
-    '(?ms)^    FilterNativeList\(\*\)\s*\{.*?(?=^    Select\()').Value
-$nativeScanPollSource = [regex]::Match($applicationSearchSource,
-    '(?ms)^    PollNativeScan\(\*\)\s*\{.*?(?=^    ConsumeNativeScanBatch\()').Value
-$nativeScanConsumeSource = [regex]::Match($applicationSearchSource,
-    '(?ms)^    ConsumeNativeScanBatch\(\*\)\s*\{.*?(?=^    CancelNativeScan\()').Value
-$nativeScanCancelSource = [regex]::Match($applicationSearchSource,
-    '(?ms)^    CancelNativeScan\([^)]*\)\s*\{.*?(?=^    FailNativeScan\()').Value
+$everythingConsumeSource = [regex]::Match($applicationSearchSource,
+    '(?ms)^    ConsumeEverythingResultBatch\(\*\)\s*\{.*?(?=^    OnSearchChanged\()').Value
 if ($applicationSearchSource -notmatch 'third_party\\everything\\Everything64\.dll' -or
     $applicationSearchSource -notmatch 'LoadEverythingLibrary\(\)[\s\S]{0,1500}GetProcAddress' -or
     $everythingSearchSource -notmatch 'this\.everythingFunctions\["Everything_QueryW"\]' -or
-    $applicationSearchSource -notmatch 'if \(this\.everythingAvailable && this\.SearchEverything\(\)\)[\s\S]{0,120}this\.LoadNativeApps\(\)' -or
+    $everythingSearchSource -notmatch 'Everything_SetMax"\][\s\S]{0,80}0xFFFFFFFF' -or
+    $everythingSearchSource -match 'everythingMaxResults|Min\(resultCount' -or
+    $everythingSearchSource -match 'if\s*\(keyword\s*==\s*""\)\s*\{\s*keyword\s*:=' -or
+    $applicationSearchSource -match 'initialSearchTimer|BeginInitialSearch|🔍 搜索：' -or
+    $applicationSearchSource -notmatch 'SvgStatusBarPresenter\([\s\S]{0,260}ui-icons\\lucide\\search\.svg' -or
+    $applicationSearchSource -notmatch '\[Tr\("名称"\), Tr\("路径"\), Tr\("扩展名"\)\]' -or
+    $applicationSearchSource -match 'SourceOrder|ModifyCol\(4' -or
+    $applicationSearchSource -notmatch 'Column:\s*3, Label:\s*Tr\("扩展名"\)' -or
+    $everythingConsumeSource -notmatch 'SplitPath\(name, , , &extension\)[\s\S]{0,420}extension\s*:=\s*StrLower\(extension\)[\s\S]{0,320}this\.lv\.Add\("Icon" iconIndex, name, fullPath, extension\)' -or
+    $applicationSearchSource -notmatch 'OnSearchChanged\(\*\)[\s\S]{0,180}Trim\(this\.searchEdit\.Value\)\s*==\s*""[\s\S]{0,100}ShowEmptySearchState\(\)' -or
+    $applicationSearchSource -notmatch 'ShowEmptySearchState\(\)[\s\S]{0,500}CancelEverythingResultLoad\(\)[\s\S]{0,500}resultStatusText\.Text\s*:=\s*""' -or
+    $applicationSearchSource -match 'LoadNativeApps|FilterNativeList|PollNativeScan|App\.fileScanner' -or
+    $applicationSearchSource -notmatch 'ConsumeEverythingResultBatch\(\*\)[\s\S]{0,500}everythingResultIndex \+ 8' -or
     $applicationSearchSource -match 'everythingDllName|A_ScriptDir\s*"\\"\s*this\.everything') {
-    $failures.Add('Everything must load only the pinned DLL by full path and preserve native-scan fallback')
+    $failures.Add('Application search must use only the pinned Everything DLL, request all results, and populate them in bounded UI batches')
+}
+if ($applicationSearchSource -notmatch 'this\.listHeader\s*:=\s*ListViewPseudoHeader\(' -or
+    $applicationSearchSource -notmatch 'LayoutListHeader\(windowWidth\)' -or
+    $applicationSearchSource -notmatch 'OnSortChanged:\s*ObjBindMethod\(this,\s*"OnListSortChanged"\)' -or
+    $applicationSearchSource -notmatch 'RestoreResultOrder\(\)[\s\S]{0,900}for rowData in this\.resultRows' -or
+    $everythingConsumeSource -notmatch 'this\.resultRows\.Push\(' -or
+    $everythingConsumeSource -notmatch 'this\.listHeader\.ApplyCurrentSort\(\)') {
+    $failures.Add('Application search ListView must use three visible columns, restore source order without a hidden column, and reapply temporary sorting after batched loading')
+}
+if ($settingsWindowSource -match '搜索与导入|PreferEverything|NativeScanTimeout|EverythingMaxResults|preferEverything|nativeScan|everythingMax' -or
+    $runtimeSettingsServiceSource -match 'PreferEverything|NativeScanTimeout|EverythingMaxResults' -or
+    $mainSource -match 'preferEverything|nativeScanTimeout|everythingMaxResults') {
+    $failures.Add('Removed search choices, native-scan settings, and result-limit configuration must not remain in production state or Settings UI')
+}
+if ($localizationServiceSource -notmatch 'RefreshInstalledUiFontNames\(\)[\s\S]{0,260}this\.InstalledUiFonts\s*:=\s*""[\s\S]{0,160}this\.GetInstalledUiFontNames\(\)' -or
+    $settingsWindowSource -notmatch 'OnFontDropDownCommand\([^)]*\)[\s\S]{0,420}CBN_DROPDOWN' -or
+    $settingsWindowSource -notmatch '(?ms)^    RefreshFontDropDown\([^)]*\)\s*\{.*?RefreshInstalledUiFontNames\(\)' -or
+    $settingsWindowSource -notmatch 'OnMessage\(Win32\.WM_COMMAND, this\.fontDropDownCommandHandler\)' -or
+    $settingsWindowSource -notmatch 'OnMessage\(Win32\.WM_COMMAND,[\s\S]{0,80}this\.fontDropDownCommandHandler, 0\)') {
+    $failures.Add('The font picker must refresh installed fonts on every native drop-down opening and unregister its message hook on close')
+}
+
+# 设置窗口的五页分类、关于信息和输入对齐属于同一布局契约。旧标签若回流，
+# 不仅会造成文案退化，还常意味着控件重新落回了错误页面。
+if ($settingsWindowSource -notmatch 'Loop\s+5[\s\S]{0,280}Tr\("通用"\)[\s\S]{0,80}Tr\("监控与启动"\)[\s\S]{0,80}Tr\("停止策略"\)[\s\S]{0,80}Tr\("日志"\)[\s\S]{0,80}Tr\("关于"\)' -or
+    $settingsWindowSource -notmatch 'this\.SwitchTab\(1\)' -or
+    $settingsWindowSource -notmatch 'this\.showAtStartupCheck\s*:=\s*this\.AddTabControl\(1,' -or
+    $settingsWindowSource -notmatch 'this\.checkUpdatesOnStartupCheck\s*:=\s*this\.AddTabControl\(1,' -or
+    $settingsWindowSource -notmatch 'this\.checkUpdateButton\s*:=\s*this\.AddTabControl\(5,') {
+    $failures.Add('Settings must keep the five ordered pages and their startup/update controls in the intended page')
+}
+$alignedSettingLabels = @(
+    '进程状态检查间隔（毫秒）：',
+    '崩溃自动重启延迟序列（秒）：',
+    'GUI 程序关闭超时（秒）：',
+    'CLI 程序关闭超时（秒）：',
+    '运行日志显示上限（条）：',
+    '批处理日志保留天数：',
+    '批处理日志保存路径：'
+)
+foreach ($alignedSettingLabel in $alignedSettingLabels) {
+    $escapedLabel = [regex]::Escape($alignedSettingLabel)
+    $alignedLabelPattern = 'labelWidth\s+" h26 Right 0x200 BackgroundTrans",\s*\r?\n\s*Tr\("' `
+        + $escapedLabel + '"\)\)'
+    if ($settingsWindowSource -notmatch $alignedLabelPattern) {
+        $failures.Add("Settings input label must remain right-aligned: $alignedSettingLabel")
+    }
+}
+$aboutPageSource = [regex]::Match($settingsWindowSource,
+    '(?ms)^    BuildAboutTab\(\)\s*\{.*?(?=^    OnFontDropDownCommand\()').Value
+if (-not $settingsWindowSource.Contains(
+        'https://github.com/realSilasYang/process-watchdog') -or
+    -not $settingsWindowSource.Contains('GetApplicationEditionSummary()') -or
+    -not $settingsWindowSource.Contains('GetAutoHotkeyRuntimeSummary()') -or
+    -not $settingsWindowSource.Contains('Tr("开源地址")') -or
+    -not $settingsWindowSource.Contains('this.versionLabel') -or
+    -not $settingsWindowSource.Contains('this.versionValue') -or
+    -not $settingsWindowSource.Contains('this.runtimeLabel') -or
+    -not $settingsWindowSource.Contains('this.runtimeValue') -or
+    -not $settingsWindowSource.Contains('this.checkUpdatesOnStartupCheck') -or
+    -not $settingsWindowSource.Contains('this.aboutSubtitle') -or
+    -not $settingsWindowSource.Contains('this.aboutTopDivider') -or
+    -not $settingsWindowSource.Contains('this.aboutInfoDivider') -or
+    -not $settingsWindowSource.Contains('this.aboutBottomDivider') -or
+    -not $settingsWindowSource.Contains('this.projectButton') -or
+    -not $settingsWindowSource.Contains('showSettingsActions := index != 5') -or
+    [string]::IsNullOrWhiteSpace($aboutPageSource) -or
+    $aboutPageSource -notmatch 'GetLanguageSystemUiFontName\(\)' -or
+    $aboutPageSource -notmatch 'this\.aboutName\.SetFont\("bold"\)' -or
+    $aboutPageSource -notmatch 'Tr\("持续守护重要程序与自动化任务，让日常工作稳定运行"\)' -or
+    $aboutPageSource -notmatch 'this\.aboutSubtitle[\s\S]{0,240}UiThemeService\.Color\("MutedText"\)' -or
+    $aboutPageSource -notmatch 'this\.gui\.SetFont\("norm s14 c"' -or
+    $aboutPageSource -notmatch 'this\.gui\.SetFont\("norm s11 c"[\s\S]{0,120}fontName\)' -or
+    $aboutPageSource -notmatch 'this\.gui\.SetFont\("norm s10 c"[\s\S]{0,120}UiThemeService\.Color\("MutedText"\)' -or
+    $aboutPageSource -notmatch 'this\.gui\.SetFont\("norm s9 c"[\s\S]{0,120}UiThemeService\.Color\("MutedText"\)' -or
+    $aboutPageSource -notmatch 'SplitFieldCaption\(Tr\("当前版本："\)\)' -or
+    $aboutPageSource -notmatch 'SplitFieldCaption\(Tr\("运行环境："\)\)' -or
+    $aboutPageSource -notmatch 'this\.versionLabel[\s\S]{0,500}this\.runtimeLabel[\s\S]{0,500}this\.versionValue[\s\S]{0,500}this\.runtimeValue[\s\S]{0,500}this\.aboutInfoDivider' -or
+    $aboutPageSource -notmatch 'this\.checkUpdateButton[\s\S]{0,260}UiThemeService\.Color\("Primary"\)' -or
+    $aboutPageSource -match 'SetButtonIcon\(' -or
+    $settingsWindowSource -notmatch 'SetButtonLucideIcon\(this\.checkUpdateButton,[\s\S]{0,100}refresh-cw-action\.svg' -or
+    $settingsWindowSource -notmatch 'SetButtonSvgIcon\(this\.projectButton,[\s\S]{0,160}ui-icons\\external-link\.svg') {
+    $failures.Add('About page must use a centered brand, two-column information band, primary update action, and a read-only footer state')
+}
+if (-not $settingsWindowSource.Contains(
+        'this.shortcutLabel.Move(integrationGroupX)') -or
+    -not $settingsWindowSource.Contains(
+        'this.taskLabel.Move(integrationGroupX)') -or
+    -not $settingsWindowSource.Contains(
+        'integrationGroupWidth := integrationLabelWidth + integrationGap') -or
+    -not $settingsWindowSource.Contains(
+        'CenterControlHorizontally(this.recursiveImportCheck,') -or
+    -not $settingsWindowSource.Contains(
+        'CenterControlHorizontally(this.forceTerminateCheck,') -or
+    -not $settingsWindowSource.Contains(
+        'CenterControlHorizontally(this.clearLogsOnStartupCheck,')) {
+    $failures.Add('Settings integration groups and standalone checkboxes must be centered from measured control widths')
+}
+if ($settingsWindowSource -notmatch 'this\.tabBuilt\[1\]\s*:=\s*true' -or
+    $settingsWindowSource -notmatch 'EnsureTabBuilt\(index\)' -or
+    $settingsWindowSource -notmatch 'SwitchTab\(index,[\s\S]{0,180}EnsureTabBuilt\(index\)' -or
+    $settingsWindowSource -notmatch 'case 2: this\.BuildMonitoringTab\(\)' -or
+    $settingsWindowSource -notmatch 'case 3: this\.BuildStopPolicyTab\(\)' -or
+    $settingsWindowSource -notmatch 'case 4: this\.BuildLogTab\(\)' -or
+    $settingsWindowSource -notmatch 'case 5: this\.BuildAboutTab\(\)') {
+    $failures.Add('Settings must build only the visible general tab initially and create other pages on first selection')
+}
+$settingsShowSource = [regex]::Match($settingsWindowSource,
+    '(?ms)^    Show\(\*\)\s*\{.*?(?=^    GetTabButtonWidths\()').Value
+if (-not $settingsShowSource -or
+    $settingsShowSource -notmatch 'SetButtonLucideIcon\(this\.taskButton, "loader-circle\.svg"[\s\S]{0,120}SetRegisteredButtonEnabled\(this\.taskButton, false\)' -or
+    $settingsShowSource -notmatch 'this\.gui\.Show\([^\r\n]*\)[\s\S]{0,180}SetTimer\(this\.taskStatusTimer, -1\)' -or
+    $settingsShowSource -match 'UpdateTaskButtonStatus\(\)[\s\S]{0,180}this\.gui\.Show\(' -or
+    $settingsWindowSource -notmatch 'RefreshTaskStatusAfterShow\(\*\)[\s\S]{0,160}this\.UpdateTaskButtonStatus\(\)' -or
+    $settingsWindowSource -notmatch 'UpdateTaskButtonStatus\(\)[\s\S]{0,900}SetRegisteredButtonEnabled\(this\.taskButton, true\)' -or
+    $settingsWindowSource -notmatch 'Close\(\*\)[\s\S]{0,120}SetTimer\(this\.taskStatusTimer, 0\)') {
+    $failures.Add('Settings must show its first frame before querying Task Scheduler and cancel the deferred query on close')
+}
+foreach ($retiredSettingsLabel in @(
+        '启动后显示主窗口', '内容字体：', '状态检查间隔（毫秒）：',
+        '重启等待序列（秒）：', '批量导入文件夹时递归扫描子目录',
+        '窗口程序关闭等待（秒）：', '命令行程序退出等待（秒）：',
+        '运行日志内存上限（条）：', '批处理日志保留时间（天）：',
+        '批处理日志保存目录：')) {
+    if ($settingsWindowSource.Contains('"' + $retiredSettingsLabel + '"')) {
+        $failures.Add("Retired Settings label remains in production UI: $retiredSettingsLabel")
+    }
 }
 $lifecycleBoundaries = @(
     @{Source = $guardRuntimeSource; Pattern = 'Shutdown\(\*\)[\s\S]{0,500}SetTimer\(this\.MonitorTimer, 0\)'; Name = 'guard monitor timer'},
@@ -1844,7 +2594,7 @@ $lifecycleBoundaries = @(
     @{Source = $addItemDialogSource; Pattern = 'Close\(\*\)[\s\S]{0,220}this\.CancelBatchImport\(false\)'; Name = 'batch import worker'},
     @{Source = $addItemDialogSource; Pattern = 'Shutdown\(\*\)[\s\S]{0,180}this\.search\.Shutdown\(\)'; Name = 'owned add-dialog child'},
     @{Source = $logWindowSource; Pattern = 'Close\(\*\)[\s\S]{0,160}SetTimer\(this\.refreshTimer, 0\)'; Name = 'log refresh timer'},
-    @{Source = $applicationSearchSource; Pattern = 'Close\(\*\)[\s\S]{0,360}SetTimer\(this\.initialSearchTimer, 0\)[\s\S]{0,180}this\.CancelNativeScan\(\)'; Name = 'application search timers'},
+    @{Source = $applicationSearchSource; Pattern = 'Close\(\*\)[\s\S]{0,220}SetTimer\(this\.searchTimer, 0\)[\s\S]{0,180}this\.CancelEverythingResultLoad\(\)[\s\S]{0,500}this\.searchLabelPresenter\.Dispose\(\)'; Name = 'application search timers and SVG label'},
     @{Source = $applicationSearchSource; Pattern = 'Shutdown\(\*\)[\s\S]{0,220}FreeLibrary[\s\S]{0,120}this\.everythingLib\s*:=\s*0'; Name = 'Everything module handle'},
     @{Source = $darkTooltipSource; Pattern = 'Close\(\*\)[\s\S]{0,100}this\.Hide\(\)[\s\S]{0,100}this\.DestroyGui\(\)'; Name = 'tooltip timer and window'}
 )
@@ -1864,8 +2614,7 @@ foreach ($deadWindowBoundary in @(
     @{Source = $batchPollSource; Name = 'batch polling'},
     @{Source = $batchConsumeSource; Name = 'batch consumption'},
     @{Source = $logRefreshSource; Name = 'log refresh'},
-    @{Source = $nativeScanPollSource; Name = 'native scan polling'},
-    @{Source = $nativeScanConsumeSource; Name = 'native scan consumption'}
+    @{Source = $everythingConsumeSource; Name = 'Everything result consumption'}
 )) {
     if (-not $deadWindowBoundary.Source -or
         $deadWindowBoundary.Source -notmatch 'if\s+!this\.IsOpen\(\)\s*\{[\s\S]{0,100}this\.Close\(\)') {
@@ -1882,8 +2631,7 @@ foreach ($messageWindowBoundary in @(
 
 foreach ($redrawBoundary in @(
     @{Source = $applyStateSource; Control = 'Main\.lv'; Name = 'state application'},
-    @{Source = $everythingSearchSource; Control = 'this\.lv'; Name = 'Everything search'},
-    @{Source = $nativeFilterSource; Control = 'this\.lv'; Name = 'native search filtering'}
+    @{Source = $everythingConsumeSource; Control = 'this\.lv'; Name = 'Everything result consumption'}
 )) {
     $redrawPatternAfterSuspend = $redrawBoundary.Control + '\.Opt\("-Redraw"\)[\s\S]*?try\s*\{[\s\S]*?finally\s*\{[\s\S]*?' + $redrawBoundary.Control + '\.Opt\("\+Redraw"\)'
     $redrawPatternInsideTry = 'try\s*\{[\s\S]*?' + $redrawBoundary.Control + '\.Opt\("-Redraw"\)[\s\S]*?finally\s*\{[\s\S]*?' + $redrawBoundary.Control + '\.Opt\("\+Redraw"\)'
@@ -1916,33 +2664,75 @@ if ($addItemDialogSource -notmatch 'this\.batchSessionId\s*:=\s*0' -or
     $failures.Add('Batch import workers and callbacks must reject results from cancelled GUI sessions')
 }
 if (-not $batchCompleteSource -or
-    $batchCompleteSource -notmatch 'addedCount\s*:=\s*this\.batchAddedCount[\s\S]*?this\.batchAddedCount\s*:=\s*0[\s\S]*?this\.batchSessionId\+\+[\s\S]*?SaveAppsToIni\(\)' -or
+    $batchCompleteSource -notmatch 'undoState\s*:=\s*this\.batchUndoState[\s\S]*?addedPaths\s*:=\s*this\.batchAddedPaths[\s\S]*?CommitUndoState\(undoState,[\s\S]{0,100}CreateAppHistoryAction\("add", addedPaths\)' -or
+    -not $batchFailSource -or
+    $batchFailSource -notmatch 'CommitUndoState\(undoState,[\s\S]{0,100}CreateAppHistoryAction\("add", addedPaths\)' -or
     -not $batchCancelSource -or
-    $batchCancelSource -notmatch 'addedCount\s*:=\s*this\.batchAddedCount[\s\S]*?this\.batchAddedCount\s*:=\s*0[\s\S]*?App\.fileScanner\.Stop\([\s\S]*?SaveAppsToIni\(\)') {
-    $failures.Add('Completed or cancelled batch imports must persist partial additions and reset batch state')
+    $batchCancelSource -notmatch 'CommitUndoState\(undoState,[\s\S]{0,100}CreateAppHistoryAction\("add", addedPaths\)') {
+    $failures.Add('Every batch terminal path must commit all successful additions once and reset transaction state')
 }
-if (-not $nativeScanCancelSource -or
-    $nativeScanCancelSource -notmatch 'SetTimer\(this\.scanPollTimer, 0\)[\s\S]{0,160}SetTimer\(this\.scanConsumeTimer, 0\)' -or
-    $nativeScanCancelSource -notmatch 'App\.fileScanner\.Stop\(' -or
-    $nativeScanCancelSource -notmatch 'this\.pendingScanPaths\s*:=\s*\[\]') {
-    $failures.Add('Native application scanning must have one timer, worker, and pending-result cleanup boundary')
+if ($applicationSearchSource -notmatch 'CancelEverythingResultLoad\(\)[\s\S]{0,260}SetTimer\(this\.resultConsumeTimer, 0\)[\s\S]{0,180}this\.everythingSearchSessionId\+\+' -or
+    $everythingConsumeSource -notmatch 'sessionId\s*:=\s*this\.everythingSearchSessionId[\s\S]{0,2600}sessionId\s*!=\s*this\.everythingSearchSessionId') {
+    $failures.Add('Everything result batches must reject work from superseded searches and stop their timer on close')
 }
-if ($applicationSearchSource -notmatch 'this\.scanSessionId\s*:=\s*0' -or
-    $applicationSearchSource -notmatch 'IsNativeScanCurrent\(sessionId\)[\s\S]{0,160}sessionId\s*==\s*this\.scanSessionId' -or
-    $applicationSearchSource -notmatch 'LoadNativeApps\(\)[\s\S]{0,2200}accepted\s*:=\s*true[\s\S]{0,300}if\s+!accepted[\s\S]{0,180}App\.fileScanner\.Stop\(' -or
-    $nativeScanCancelSource -notmatch 'this\.scanSessionId\+\+') {
-    $failures.Add('Native search workers and callbacks must reject results from closed GUI sessions')
-}
-if (-not $nativeScanPollSource -or
-    $nativeScanPollSource -notmatch 'catch\s+as\s+scanPollErr[\s\S]{0,160}this\.FailNativeScan\(' -or
-    -not $nativeScanConsumeSource -or
-    $nativeScanConsumeSource -notmatch 'catch\s+as\s+scanConsumeErr[\s\S]{0,160}this\.FailNativeScan\(') {
-    $failures.Add('Native scan timer callbacks must stop and clear their worker state after exceptions')
-}
-if ($fileScanServiceSource -notmatch 'Start\(mode, rootPath, recursive, maximumResults, timeoutSeconds\)[\s\S]{0,1800}DeadlineTicks:\s*startedTicks\s*\+\s*timeoutSeconds\s*\*\s*1000\s*\+\s*5000' -or
-    $batchPollSource -notmatch 'workerDeadlineTicks[\s\S]{0,420}GetTickCount64\(\)\s*>=\s*workerDeadlineTicks' -or
-    $nativeScanPollSource -notmatch 'workerDeadlineTicks[\s\S]{0,420}GetTickCount64\(\)\s*>=\s*workerDeadlineTicks') {
+if ($fileScanServiceSource -notmatch 'Start\(rootPath, recursive, maximumResults, timeoutSeconds\)[\s\S]{0,3000}DeadlineTicks:\s*startedTicks\s*\+\s*timeoutSeconds\s*\*\s*1000\s*\+\s*5000' -or
+    $batchPollSource -notmatch 'workerDeadlineTicks[\s\S]{0,420}GetTickCount64\(\)\s*>=\s*workerDeadlineTicks') {
     $failures.Add('File-scan polling must have a parent-side deadline even when PID identity becomes unavailable')
+}
+if ($batchPollSource -notmatch 'currentWorkerIdentity\s*!=\s*""[\s\S]{0,100}currentWorkerIdentity\s*!=\s*workerCreationIdentity') {
+    $failures.Add('File-scan polling must treat an unreadable creation identity as unknown rather than PID replacement')
+}
+
+foreach ($saveWindowSource in @($settingsWindowSource,
+        $customDisplayDialogSource, $environmentSettingsDialogSource,
+        $maintenanceSettingsDialogSource)) {
+    if ($saveWindowSource -notmatch 'Save\(\*\)[\s\S]{0,180}QueueExclusiveGuardMutation\(this, "save",[\s\S]{0,100}ObjBindMethod\(this, "SaveTransaction"\)' -or
+        $saveWindowSource -match '\bsavePending\b|\bSaveCore\(') {
+        $failures.Add('Settings saves must use the shared owner-and-operation exclusive guard queue')
+    }
+}
+if ($guardMutationQueueSource -notmatch 'Enqueue\(callback, description := "", completionCallback := ""\)[\s\S]{0,800}CompletionCallback:\s*completionCallback' -or
+    $guardMutationQueueSource -notmatch 'EnqueueExclusive\(owner, operationKey,[\s\S]{0,900}ExclusiveOperations\.Has\(key\)[\s\S]{0,800}ObjBindMethod\(this, "ReleaseExclusiveOperation"' -or
+    $guardMutationQueueSource -notmatch 'finally this\.CompleteOperation\(operation\)' -or
+    $guardMutationQueueSource -notmatch 'Shutdown\(\)[\s\S]{0,700}this\.CompleteOperation\(operation\)' -or
+    $maintenanceSettingsDialogSource -notmatch 'QueueExclusiveGuardMutation\(this, "resume-protection",[\s\S]{0,100}ObjBindMethod\(this, "ResumeProtectionTransaction"\)' -or
+    $maintenanceSettingsDialogSource -match '\bresumePending\b|\bResumeProtectionCore\(') {
+    $failures.Add('Exclusive guard mutations must release operation keys after success, failure, rejection and shutdown')
+}
+
+# 只修改工作目录、参数或环境变量时，当前进程身份与守护时序仍然有效。
+# 取消任务、清理身份、重建维护基线和重新初始化必须全部受 identityChanged 约束。
+$environmentSaveTransaction = [regex]::Match(
+    $environmentSettingsDialogSource,
+    '(?ms)^    SaveTransaction\(\)\s*\{.*?(?=^    GetEnvironmentValidationMessage\()').Value
+if (-not $environmentSaveTransaction -or
+    [regex]::Matches($environmentSaveTransaction,
+        'stateObj\.CancelScheduledTasks\(\)').Count -ne 1 -or
+    [regex]::Matches($environmentSaveTransaction,
+        'ClearStateProcessIdentity\(stateObj\)').Count -ne 1 -or
+    $environmentSaveTransaction -notmatch 'if identityChanged\s*\{[\s\S]{0,260}stateObj\.CancelScheduledTasks\(\)[\s\S]{0,180}CleanupTarget\(path, stateObj, false\)[\s\S]{0,120}ClearStateProcessIdentity\(stateObj\)' -or
+    $environmentSaveTransaction -notmatch 'if identityChanged\s*\{[\s\S]{0,1800}TransitionTo\(GuardPhase\.Initializing\)') {
+    $failures.Add('Launch-environment-only edits must not cancel or reinitialize the active guard')
+}
+
+# 排队配置事务持有全局守护工作门；同步模态窗口会让所有目标监控一起停住。
+# 事务只能安排延迟消息框，待当前回调返回并释放工作门后再与用户交互。
+if ($darkMessageBoxSource -notmatch 'ShowDarkMsgBoxDeferred\([^)]*\)[\s\S]{0,220}SetTimer\(ShowDarkMsgBox\.Bind\(') {
+    $failures.Add('Deferred message boxes must yield through a one-shot timer before opening a modal window')
+}
+foreach ($guardTransactionSource in @(
+    $settingsWindowSource,
+    $customDisplayDialogSource,
+    $environmentSettingsDialogSource,
+    $maintenanceSettingsDialogSource
+)) {
+    $transactionMatches = [regex]::Matches($guardTransactionSource,
+        '(?ms)^    (?:SaveTransaction|ResumeProtectionTransaction)\([^)]*\)\s*\{.*?(?=^    [A-Z][A-Za-z0-9_]*\()')
+    foreach ($transactionMatch in $transactionMatches) {
+        if ($transactionMatch.Value -match '\bShowDarkMsgBox\s*\(') {
+            $failures.Add('Queued guard transactions must not open synchronous modal message boxes while holding the shared work gate')
+        }
+    }
 }
 foreach ($messageOwner in @(
     @{Source = $applicationSearchSource; Name = 'application search'}
@@ -1977,27 +2767,64 @@ if ($source -notmatch 'RebuildMainImageList\(rebuildGeneration, expectedDpi,[\s\
     $source -notmatch 'AddIconToImageList\(imageList,[\s\S]{0,700}finally[\s\S]{0,120}DestroyIcon') {
     $failures.Add('DPI image-list replacement and temporary icons must have transactional cleanup')
 }
-if ($addItemDialogSource -notmatch 'ReadFileDialogPath\([\s\S]{0,700}finally[\s\S]{0,220}CoTaskMemFree[\s\S]{0,160}ObjRelease') {
+if ($mainVisualPipelineSource -notmatch 'ReadSingleFileDialogPath\([\s\S]{0,700}finally[\s\S]{0,220}CoTaskMemFree[\s\S]{0,160}ObjRelease') {
     $failures.Add('File-dialog raw shell resources must be released through one finally boundary')
 }
-if ($fileScanServiceSource -notmatch 'Start\(mode, rootPath, recursive, maximumResults, timeoutSeconds\)[\s\S]{0,180}static workerSequence\s*:=\s*0[\s\S]{0,300}Critical\("On"\)[\s\S]{0,220}currentWorkerSequence\s*:=\s*workerSequence[\s\S]{0,650}currentWorkerSequence[\s\S]{0,1600}if this\.Stopped[\s\S]{0,120}this\.Workers\[outputPath\]\s*:=\s*job[\s\S]{0,300}if rejectedAfterLaunch[\s\S]{0,120}this\.Stop\(job\.Pid, job\.Path, job\.CreationIdentity\)' -or
+if ($mainVisualPipelineSource -notmatch 'SelectDirectoryWithModernDialog\([\s\S]{0,220}SelectPathWithModernDialog\([^\r\n]*[\s\S]{0,80}0x868' -or
+    $mainVisualPipelineSource -notmatch 'SelectPathWithModernDialog\([\s\S]{0,900}ComObject\([\s\S]{0,650}ReadSingleFileDialogPath\([\s\S]{0,300}finally[\s\S]{0,180}RestoreNativeDialogThemePreference' -or
+    $mainVisualPipelineSource -notmatch 'SelectFileWithNamedFilter\([\s\S]{0,300}SelectPathWithModernDialog\(' -or
+    $mainVisualPipelineSource -notmatch 'BeginNativeDialogThemePreference\([\s\S]{0,700}UiThemeService\.IsDark\(\) \? 2 : 3' -or
+    $addItemDialogSource -notmatch 'SelectDirectoryWithModernDialog\(hwndOwner' -or
+    $logWindowSource -notmatch 'SelectDirectoryWithModernDialog\(ownerHwnd,[\s\S]{0,100}A_Desktop' -or
+    $source -match '\b(?:DirSelect|FileSelect)\s*\(\s*"D"') {
+    $failures.Add('Directory selection must use the shared themed IFileOpenDialog instead of the legacy folder browser')
+}
+
+# 应用窗口不得各自复制标题栏、图标、背景和默认字体初始化；UxTheme 私有
+# 序号也只能由主题服务解析，防止窗口创建时覆盖用户的进程级主题偏好。
+if ($mainVisualPipelineSource -notmatch 'InitializeApplicationWindow\(guiObj,[\s\S]{0,650}ApplyNativeWindowTheme\(hwnd\)[\s\S]{0,260}SetWindowIcon\(hwnd,[\s\S]{0,260}guiObj\.BackColor[\s\S]{0,260}guiObj\.SetFont' -or
+    $source -match '\bSetDarkTitleBar\s*\(' -or
+    $appModuleSource -match 'SetWindowIcon\(this\.gui\.Hwnd' -or
+    $uiThemeServiceSource -notmatch 'GetUxThemeFunction\(ordinal\)[\s\S]{0,900}GetProcAddress' -or
+    $mainVisualPipelineSource -match 'GetModuleHandleW?[^\r\n]*uxtheme|GetProcAddress[^\r\n]*(?:133|135)') {
+    $failures.Add('Application window initialization and UxTheme callback resolution must remain centralized')
+}
+foreach ($windowFile in Get-ChildItem -LiteralPath `
+        (Join-Path $projectRoot 'app\Windows') -Filter '*.ahk' -File) {
+    $windowSource = Get-Content -LiteralPath $windowFile.FullName -Raw `
+        -Encoding UTF8
+    if ($windowSource -match '\bCreate(?:Owned|Standalone)Gui\(' -and
+        $windowSource -notmatch '\bInitializeApplicationWindow\(this\.gui') {
+        $failures.Add("Managed application window bypasses shared visual initialization: $($windowFile.Name)")
+    }
+}
+if ($interactionPresenterSource -notmatch 'SetRegisteredButtonEnabled\(ctrl, enabled\)[\s\S]{0,800}ClearHoveredButton\(hWnd\)[\s\S]{0,500}ctrl\.Enabled := enabled[\s\S]{0,220}RedrawRoundedButton\(hWnd\)' -or
+    $customDisplayDialogSource -notmatch 'SetRegisteredButtonEnabled\(this\.defaultNameButton' -or
+    $settingsWindowSource -notmatch 'SetRegisteredButtonEnabled\(this\.checkUpdateButton' -or
+    $addItemDialogSource -notmatch 'for button in \[this\.searchButton, this\.browseButton, this\.okButton\][\s\S]{0,100}SetRegisteredButtonEnabled\(button, !active\)' -or
+    $customDisplayDialogSource -match 'SetDefaultButtonEnabled\(' -or
+    $appModuleSource -match 'try (?:this\.)?[A-Za-z][A-Za-z0-9_]*Button\.Enabled :=') {
+    $failures.Add('Registered button enabled state must use the shared interaction reset and redraw path')
+}
+if ($fileScanServiceSource -notmatch 'Start\(rootPath, recursive, maximumResults, timeoutSeconds\)[\s\S]{0,180}static workerSequence\s*:=\s*0[\s\S]{0,300}Critical\("On"\)[\s\S]{0,220}currentWorkerSequence\s*:=\s*workerSequence[\s\S]{0,650}currentWorkerSequence[\s\S]{0,3000}if this\.Stopped[\s\S]{0,120}this\.Workers\[outputPath\]\s*:=\s*job[\s\S]{0,300}if rejectedAfterLaunch[\s\S]{0,160}this\.Stop\(job\.Pid, job\.Path, job\.CreationIdentity, job\.Handle\)' -or
     $addItemDialogSource -notmatch 'seenRoots\s*:=\s*Map\(\)[\s\S]{0,260}!seenRoots\.Has\(canonicalRoot\)') {
     $failures.Add('Concurrent file scans must use unique output paths and deduplicate batch roots')
 }
-if ($fileScanServiceSource -notmatch 'Stop\(workerPid, outputPath, creationIdentity := ""\)[\s\S]{0,750}finally\s*\{[\s\S]{0,220}this\.DeleteOutputFiles\(outputPath\)' -or
-    $fileScanServiceSource -notmatch 'ReadResult\(outputPath,[\s\S]{0,500}finally\s*\{[\s\S]{0,220}this\.DeleteOutputFiles\(outputPath\)' -or
+if ($fileScanServiceSource -notmatch 'Stop\(workerPid, outputPath, creationIdentity := "", workerHandle := 0\)[\s\S]{0,900}finally\s*\{[\s\S]{0,220}this\.DeleteOutputFiles\(outputPath\)' -or
+    $fileScanServiceSource -notmatch 'ReadResult\(outputPath,[\s\S]{0,1400}finally\s*\{[\s\S]{0,500}this\.DeleteOutputFiles\(outputPath\)' -or
     $fileScanServiceSource -notmatch 'DeletePathWithRetry\(path, maximumAttempts := 4\)[\s\S]{0,500}Loop maximumAttempts[\s\S]{0,300}Sleep\(10\)' -or
     $fileScanServiceSource -notmatch 'DeleteOutputFiles\(outputPath\)[\s\S]{0,300}DeletePathWithRetry\(outputPath\)[\s\S]{0,180}DeletePathWithRetry\(outputPath "\.writing"\)' -or
-    $fileScanServiceSource -notmatch 'Shutdown\(\*\)[\s\S]{0,650}this\.Workers\.Clear\(\)[\s\S]{0,300}this\.Stop\(job\.Pid, job\.Path, job\.CreationIdentity\)') {
+    $fileScanServiceSource -notmatch 'Shutdown\(\*\)[\s\S]{0,650}this\.Workers\.Clear\(\)[\s\S]{0,300}this\.Stop\(job\.Pid, job\.Path, job\.CreationIdentity, job\.Handle\)') {
     $failures.Add('File-scan output cleanup must use bounded retries even when worker identity inspection fails')
 }
-if ($source -notmatch 'AcquireMainImageListUse\(imageList\)[\s\S]{0,180}iconResources\.AcquireMainImageList\(imageList' -or
-    $source -notmatch 'ReleaseMainImageListUse\(imageList\)[\s\S]{0,240}iconResources\.ReleaseMainImageList\(imageList\)[\s\S]{0,180}IL_Destroy\(imageList\)' -or
+if ($source -notmatch 'AcquireMainImageListUse\(imageList\)[\s\S]{0,180}iconResources\.AcquireImageList\(imageList' -or
+    $source -notmatch 'ReleaseMainImageListUse\(imageList\)[\s\S]{0,240}iconResources\.ReleaseImageList\(imageList\)[\s\S]{0,180}IL_Destroy\(imageList\)' -or
     $source -notmatch 'ShutdownApplicationUi\(\*\)[\s\S]{0,650}Main\.appIcons\s*:=\s*0[\s\S]{0,180}Main\.lv\.SetImageList\(0, 1\)[\s\S]{0,180}RetireMainImageList\(mainImageList\)' -or
-    $applicationSearchSource -notmatch 'AcquireImageListUse\(\)[\s\S]{0,300}this\.activeImageListUsers\+\+' -or
-    $applicationSearchSource -notmatch 'RetireImageList\(imageList\)[\s\S]{0,320}this\.activeImageListUsers[\s\S]{0,180}this\.retiredImageLists\.Push\(imageList\)' -or
+    $applicationSearchSource -notmatch 'AcquireImageListUse\(\)[\s\S]{0,420}App\.iconResources\.AcquireImageList\(this\.imageList' -or
+    $applicationSearchSource -notmatch 'RetireImageList\(imageList\)[\s\S]{0,260}App\.iconResources\.RetireImageList\(imageList, this\.imageList\)' -or
     $applicationSearchSource -notmatch 'imageList\s*:=\s*this\.imageList[\s\S]{0,180}this\.DestroyGui\(\)[\s\S]{0,100}this\.RetireImageList\(imageList\)' -or
-    $applicationSearchSource -notmatch 'ReleaseImageListUse\(\)[\s\S]{0,700}ClearImageListIconCache\(imageList\)[\s\S]{0,100}IL_Destroy\(imageList\)') {
+    $applicationSearchSource -notmatch 'ReleaseImageListUse\(imageList\)[\s\S]{0,300}App\.iconResources\.ReleaseImageList\(imageList\)[\s\S]{0,180}IL_Destroy\(imageList\)' -or
+    $applicationSearchSource -match 'activeImageListUsers|retiredImageLists') {
     $failures.Add('Attached image lists must be detached or outlive their native ListView controls')
 }
 foreach ($uiShutdownHook in @(
@@ -2019,9 +2846,9 @@ foreach ($iconRegistryHook in @(
     'class IconResourceRegistry',
     'ReplaceWindowIcons(hwnd, iconPair)',
     'TakeWindowIcons(hwnd)',
-    'AcquireMainImageList(imageList, activeImageList)',
-    'ReleaseMainImageList(imageList)',
-    'RetireMainImageList(imageList, activeImageList)',
+    'AcquireImageList(imageList, activeImageList)',
+    'ReleaseImageList(imageList)',
+    'RetireImageList(imageList, activeImageList)',
     'InstallResamplerFactory(factory)',
     'TakeResamplerFactory()',
     'UpdateMainIconMetrics(dpi)',

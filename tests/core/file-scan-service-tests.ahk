@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证批量导入目录扫描工作器协议、结果上限、取消、超时和临时文件清理。
+; 不完整输出必须被拒绝，并发扫描也不能复用同一个结果路径。
+
 #Include ..\..\src\Config\IniFieldCodec.ahk
 #Include ..\..\src\Inspection\FileScanService.ahk
 
@@ -15,6 +18,39 @@ class FileScanTestState {
         this.LaunchCount := 0
         this.LastCommand := ""
         this.Logs := []
+    }
+}
+
+class TestFileScanService extends FileScanService {
+    __New(parameters*) {
+        super.__New(parameters*)
+        this.NextHandle := 1000
+        this.HandleStatus := Map()
+        this.TerminatedHandles := []
+        this.ClosedHandles := []
+    }
+
+    OpenWorkerHandle(pid) {
+        this.NextHandle++
+        this.HandleStatus[this.NextHandle] := 1
+        return this.NextHandle
+    }
+
+    GetWorkerHandleStatus(handle) {
+        return this.HandleStatus.Has(handle) ? this.HandleStatus[handle] : -1
+    }
+
+    TerminateBoundWorker(handle, waitForExit := true) {
+        if !this.HandleStatus.Has(handle)
+            return false
+        this.HandleStatus[handle] := 0
+        this.TerminatedHandles.Push(handle)
+        return true
+    }
+
+    CloseWorkerHandle(handle) {
+        if handle
+            this.ClosedHandles.Push(handle)
     }
 }
 
@@ -67,7 +103,7 @@ FileScanTestLog(state, message) {
 }
 
 CreateFileScanTestService(state, rootPath, scriptPath) {
-    return FileScanService({
+    return TestFileScanService({
         CanonicalPath: FileScanTestCanonical,
         GetCreationIdentity: FileScanTestIdentity.Bind(state),
         Log: FileScanTestLog.Bind(state),
@@ -119,8 +155,8 @@ RunFileScanServiceTests() {
             "可守护文件过滤规则错误")
 
         flatOutput := rootPath "\flat-result.tmp"
-        AssertFileScan(service.WriteWorkerFile(flatOutput, "batch", rootPath,
-            false, 20, 5), "非递归扫描结果写入失败")
+        AssertFileScan(service.WriteWorkerFile(flatOutput, rootPath, false,
+            20, 5), "非递归扫描结果写入失败")
         flatPaths := service.ReadResult(flatOutput, &flatTruncated, &flatReady)
         flatSet := FileScanPathSet(flatPaths)
         flatPathList := ""
@@ -139,8 +175,8 @@ RunFileScanServiceTests() {
             "非递归扫描结果文件未由服务清理")
 
         recursiveOutput := rootPath "\recursive-result.tmp"
-        AssertFileScan(service.WriteWorkerFile(recursiveOutput, "batch",
-            rootPath, true, 20, 5), "递归扫描结果写入失败")
+        AssertFileScan(service.WriteWorkerFile(recursiveOutput, rootPath,
+            true, 20, 5), "递归扫描结果写入失败")
         recursivePaths := service.ReadResult(recursiveOutput,
             &recursiveTruncated, &recursiveReady)
         recursiveSet := FileScanPathSet(recursivePaths)
@@ -150,8 +186,8 @@ RunFileScanServiceTests() {
             "递归扫描没有严格包含预期的可守护文件")
 
         limitedOutput := rootPath "\limited-result.tmp"
-        AssertFileScan(service.WriteWorkerFile(limitedOutput, "batch",
-            rootPath, true, 1, 5), "限量扫描结果写入失败")
+        AssertFileScan(service.WriteWorkerFile(limitedOutput, rootPath,
+            true, 1, 5), "限量扫描结果写入失败")
         limitedPaths := service.ReadResult(limitedOutput, &limitedTruncated,
             &limitedReady)
         AssertFileScan(limitedReady && limitedTruncated
@@ -174,11 +210,12 @@ RunFileScanServiceTests() {
             "超出协议上限的声明数量仍被接受")
 
         state.ThrowIdentity := true
-        firstJob := service.Start("batch", rootPath, true, 10, 5)
-        secondJob := service.Start("batch", rootPath, true, 10, 5)
+        firstJob := service.Start(rootPath, true, 10, 5)
+        secondJob := service.Start(rootPath, true, 10, 5)
         AssertFileScan(IsObject(firstJob) && IsObject(secondJob)
             && firstJob.Path != secondJob.Path
             && firstJob.CreationIdentity == ""
+            && firstJob.Handle && secondJob.Handle
             && service.Workers.Count == 2
             && InStr(state.LastCommand, "--file-scan-worker"),
             "身份读取异常后任务丢失，或同毫秒输出路径发生冲突")
@@ -186,20 +223,24 @@ RunFileScanServiceTests() {
         FileAppend("partial", firstJob.Path ".writing", "UTF-8")
         service.Stop(firstJob.Pid, firstJob.Path, firstJob.CreationIdentity)
         AssertFileScan(service.Workers.Count == 1
-            && !FileExist(firstJob.Path ".writing"),
-            "停止工作器没有清除任务登记和临时输出")
+            && !FileExist(firstJob.Path ".writing")
+            && service.TerminatedHandles.Length == 1
+            && service.ClosedHandles.Length == 1,
+            "停止工作器没有通过绑定句柄终止进程、清除登记和临时输出")
 
         service.Shutdown()
         service.Shutdown()
         AssertFileScan(service.Stopped && service.Workers.Count == 0
-            && service.Start("batch", rootPath, true, 10, 5) == "",
+            && service.TerminatedHandles.Length == 2
+            && service.ClosedHandles.Length == 2
+            && service.Start(rootPath, true, 10, 5) == "",
             "文件扫描服务关闭不是幂等终态")
 
         failedState := FileScanTestState()
         failedState.ThrowLaunch := true
         failedService := CreateFileScanTestService(failedState, rootPath,
             scriptPath)
-        AssertFileScan(failedService.Start("batch", rootPath, true, 10, 5)
+        AssertFileScan(failedService.Start(rootPath, true, 10, 5)
             == "" && failedState.Logs.Length == 1,
             "工作器启动异常没有被隔离并记录")
         failedService.Shutdown()
@@ -209,7 +250,7 @@ RunFileScanServiceTests() {
             scriptPath)
         raceState.Service := raceService
         raceState.ShutdownDuringLaunch := true
-        AssertFileScan(raceService.Start("batch", rootPath, true, 10, 5)
+        AssertFileScan(raceService.Start(rootPath, true, 10, 5)
             == "" && raceService.Stopped && raceService.Workers.Count == 0,
             "关闭期间才启动成功的工作器被登记到已停止服务")
     } finally {

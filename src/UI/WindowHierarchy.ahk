@@ -1,3 +1,7 @@
+; 多级窗口所有权、模态租约和独立最小化管理器。
+; 每个下级窗口只禁用直接上级，关闭时按租约恢复原状态；最小化前临时解除原生 Owner，
+; 避免 Windows 连带最小化主窗口，恢复后再重建正确层级和前台焦点。
+
 class WindowHierarchyPlatform {
     IsGuiAlive(guiObj) {
         if !guiObj || Type(guiObj) != "Gui"
@@ -48,7 +52,7 @@ class WindowHierarchyPlatform {
 
     GetOwnedWindowOwner(childHwnd) {
         return DllCall("user32\GetWindow", "Ptr", childHwnd,
-            "UInt", 4, "Ptr") ; GW_OWNER
+            "UInt", 4, "Ptr") ; GW_OWNER：查询下级窗口当前登记的原生所有者。
     }
 
     GetLastActivePopup(hwnd) {

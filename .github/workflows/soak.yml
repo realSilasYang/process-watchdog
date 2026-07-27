@@ -1,3 +1,4 @@
+# 定期执行长时间 GUI 资源循环，捕获短时冒烟测试难以发现的句柄增长。
 name: Scheduled soak
 
 on:
@@ -19,6 +20,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          lfs: true
       - name: Bootstrap pinned AutoHotkey
         id: toolchain
         shell: pwsh

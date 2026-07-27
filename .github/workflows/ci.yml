@@ -1,3 +1,4 @@
+# 提交与拉取请求的必需验证：核心检查、GUI 冒烟和可复现构建。
 name: CI
 
 on:
@@ -24,8 +25,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+          lfs: true
 
-      - name: Bootstrap pinned AutoHotkey toolchain
+      - name: Resolve and bootstrap build toolchain
         id: toolchain
         shell: pwsh
         run: |
@@ -35,6 +37,7 @@ jobs:
           "actionlint=$($tools.ActionlintPath)" >> $env:GITHUB_OUTPUT
           "gitleaks=$($tools.GitleaksPath)" >> $env:GITHUB_OUTPUT
           "ahk_source=$($tools.AutoHotkeySourcePath)" >> $env:GITHUB_OUTPUT
+          "resolved=$($tools.ResolvedToolchainPath)" >> $env:GITHUB_OUTPUT
 
       - name: Verify source and tests
         shell: pwsh
@@ -58,14 +61,16 @@ jobs:
           -AutoHotkeyPath '${{ steps.toolchain.outputs.ahk }}'
           -CompilerPath '${{ steps.toolchain.outputs.compiler }}'
           -AutoHotkeySourcePath '${{ steps.toolchain.outputs.ahk_source }}'
+          -ResolvedToolchainPath '${{ steps.toolchain.outputs.resolved }}'
 
       - name: Upload release-shaped artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: process-watchdog-windows-x64
           path: |
-            artifacts/release/*.zip
-            artifacts/release/*.spdx.json
-            artifacts/release/SHA256SUMS.txt
+            dist/*.zip
+            dist/*.exe
+            dist/*.spdx.json
+            dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14

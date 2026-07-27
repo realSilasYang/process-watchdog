@@ -1,0 +1,138 @@
+# 英文缺陷报告表单，与中文表单收集相同的环境、复现和诊断证据。
+# 表单在入口处强调脱敏和私密安全报告，避免英语用户误公开敏感运行信息。
+name: Bug report (English)
+description: Report a reproducible defect, monitoring mistake, or UI problem
+title: "[BUG] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Upgrade to the latest release and read the README, troubleshooting, and compatibility notes first.
+        Logs and diagnostics can contain paths, arguments, or environment variables. Redact them before posting. Use private vulnerability reporting for unresolved security issues.
+
+  - type: input
+    id: version
+    attributes:
+      label: Assistant version
+      description: Find it in the diagnostics bundle or the release VERSION file.
+      placeholder: For example, 1.0.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: distribution
+    attributes:
+      label: Distribution
+      options:
+        - GitHub Release package
+        - AutoHotkey source
+        - Self-built EXE
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows environment
+      description: Include Windows edition, feature version, OS build, and architecture.
+      placeholder: For example, Windows 11 24H2 (26100.4652) x64
+    validations:
+      required: true
+
+  - type: input
+    id: display
+    attributes:
+      label: Display environment
+      description: For UI defects, include scale, resolution, monitor count, and the affected monitor.
+      placeholder: For example, 300% scale, 3840×2160, one monitor
+    validations:
+      required: true
+
+  - type: dropdown
+    id: target_type
+    attributes:
+      label: Monitored target type
+      options:
+        - EXE desktop application
+        - LNK shortcut
+        - AHK / Python / JavaScript / PowerShell script
+        - BAT / CMD command file
+        - Not related to a specific target
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Relevant configuration
+      description: State administrator requirements, update protection, shortcut use, and relevant non-default settings. Do not post private paths or arguments.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Shortest reproduction
+      description: Start from launching the assistant or opening the relevant window and list the shortest reliable sequence.
+      placeholder: |
+        1. Start ...
+        2. Select ...
+        3. Perform ...
+        4. Observe ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Frequency
+      options:
+        - Every time
+        - Often
+        - Occasionally
+        - Once
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: Describe UI, status, error, process, or data changes; do not write only “does not work.”
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: Describe the status or outcome a user should see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs, diagnostics, and screenshots
+      description: Paste redacted log lines or attach a diagnostics bundle, screenshot, or recording.
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional information
+      description: Include first affected version, workaround, related issue, recent update, or configuration change.
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmation
+      options:
+        - label: I reproduced this on the latest release and searched existing issues.
+          required: true
+        - label: I removed private paths, arguments, environment variables, and other sensitive data from every attachment.
+          required: true
+        - label: This is not an unresolved security vulnerability; those are reported privately.
+          required: true

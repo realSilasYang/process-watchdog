@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证升级保护协调器的参与者识别、目录监听、稳定确认、超时和恢复守护。
+; 所有定时器与回调都需验证会话所有权，停止后的事件不得重新打开升级会话。
+
 #Include ..\..\src\Core\GuardTypes.ahk
 #Include ..\..\src\Core\GuardStateMachine.ahk
 #Include ..\..\src\Maintenance\MaintenanceStateMachine.ahk
@@ -16,17 +19,30 @@ class MaintenanceCoordinatorTestContext {
     static Coordinator := ""
     static Existing := false
     static ScheduledDelay := 0
+    static ScheduledCount := 0
     static SavedApps := 0
     static Logs := []
+    static ReplaceDuringRefresh := false
+    static QueryCount := 0
+    static RestoredSessions := Map()
 }
 
 class MaintenanceFakeInspector {
+    __New() {
+        this.NativeReady := true
+        this.CaptureCount := 0
+        this.CreationOverrides := Map()
+    }
+
     GetCreationIdentity(pid) {
-        return pid ? "CREATION-" pid : ""
+        if this.CreationOverrides.Has(pid)
+            return this.CreationOverrides[pid]
+        return MaintenanceTestCreationIdentity(pid)
     }
 
     CaptureNativeSnapshot() {
-        return {Ready: true, Processes: []}
+        this.CaptureCount++
+        return {Ready: this.NativeReady, Processes: []}
     }
 
     GetImagePath(*) {
@@ -37,10 +53,14 @@ class MaintenanceFakeInspector {
 class MaintenanceFakeSnapshots {
     __New() {
         this.LatestSnapshotTicks := 0
+        this.LatestSnapshotRequestTicks := 0
         this.LatestSnapshot := []
+        this.LatestNativeSnapshotTicks := 0
         this.ReuseIntervalMs := 5000
         this.IndexFactory := MaintenanceTestCreateIndex
         this.RequestCount := 0
+        this.StartCount := 0
+        this.PumpCount := 0
     }
 
     RequestFresh() {
@@ -49,6 +69,33 @@ class MaintenanceFakeSnapshots {
     }
 
     Start() {
+        this.StartCount++
+        return true
+    }
+
+    Pump() {
+        this.PumpCount++
+        return false
+    }
+
+    HasFreshSnapshot(*) {
+        return false
+    }
+
+    HasFreshNativeSnapshot(*) {
+        return false
+    }
+
+    CanRetry(*) {
+        return true
+    }
+
+    StoreNativeSnapshot(capturedAtTicks := 0) {
+        this.LatestNativeSnapshotTicks := capturedAtTicks
+        return true
+    }
+
+    StoreSnapshot(*) {
         return true
     }
 
@@ -103,8 +150,10 @@ MaintenanceTestClearIdentity(stateObj) {
     stateObj.PIDCreationIdentity := ""
 }
 
-MaintenanceTestDeserializeSession(*) {
-    return {Path: "", StartedAt: "", BaselineFingerprint: "",
+MaintenanceTestDeserializeSession(encodedValue) {
+    if MaintenanceCoordinatorTestContext.RestoredSessions.Has(encodedValue)
+        return MaintenanceCoordinatorTestContext.RestoredSessions[encodedValue]
+    return {Path: "", Mode: "", StartedAt: "", BaselineFingerprint: "",
         FileChanged: false, Explicit: false}
 }
 
@@ -148,12 +197,27 @@ MaintenanceTestObserve(*) {
 }
 
 MaintenanceTestQuerySnapshot(&ready) {
+    MaintenanceCoordinatorTestContext.QueryCount++
     ready := true
     return []
 }
 
 MaintenanceTestRefreshShortcut(*) {
+    if MaintenanceCoordinatorTestContext.ReplaceDuringRefresh {
+        runtime := MaintenanceCoordinatorTestContext.Runtime
+        for path, stateObj in runtime.appStates {
+            replacement := CreateMaintenanceTestSupervisor(
+                stateObj.MaintenanceConfig.InstallRoot)
+            replacement.State := "REPLACEMENT"
+            runtime.appStates[path] := replacement
+            break
+        }
+    }
     return false
+}
+
+MaintenanceTestCreationIdentity(pid) {
+    return pid ? Format("{:016X}", Integer(pid)) : ""
 }
 
 MaintenanceTestSaveApps(*) {
@@ -162,15 +226,17 @@ MaintenanceTestSaveApps(*) {
 
 MaintenanceTestScheduleRestart(path, stateObj, delayMs) {
     MaintenanceCoordinatorTestContext.ScheduledDelay := delayMs
+    MaintenanceCoordinatorTestContext.ScheduledCount++
 }
 
 MaintenanceTestSerializeSession(*) {
     return "STATE"
 }
 
-MaintenanceTestSetIdentity(stateObj, pid) {
+MaintenanceTestSetIdentity(stateObj, pid, creationIdentity := "") {
     stateObj.PID := pid
-    stateObj.PIDCreationIdentity := "CREATION-" pid
+    stateObj.PIDCreationIdentity := creationIdentity != ""
+        ? creationIdentity : "CREATION-" pid
 }
 
 MaintenanceTestTargetExists(*) {
@@ -181,10 +247,14 @@ MaintenanceTestUpdateRunning(path, stateObj) {
     stateObj.State := "RUNNING:" path
 }
 
-MaintenanceTestUpdateState(path, statusText, *) {
+MaintenanceTestUpdateState(path, statusText, expectedState := "",
+    expectedGeneration := 0, forceProjection := false, statusKind := "") {
     runtime := MaintenanceCoordinatorTestContext.Runtime
-    if runtime.appStates.Has(path)
+    if runtime.appStates.Has(path) {
         runtime.appStates[path].State := statusText
+        if statusKind != ""
+            runtime.appStates[path].StatusKind := statusKind
+    }
 }
 
 MaintenanceTestCreateIndex(snapshot, capturedAtTicks,
@@ -217,6 +287,7 @@ RunMaintenanceCoordinatorTests() {
     try DirCreate(rootPath)
 
     snapshots := MaintenanceFakeSnapshots()
+    inspector := MaintenanceFakeInspector()
     runtime := {
         appStates: Map(),
         maintenanceJournalPath: journalPath,
@@ -226,10 +297,10 @@ RunMaintenanceCoordinatorTests() {
         maintenanceFingerprintRetryInterval: 5000,
         guardWorkGate: GuardWorkGate(),
         retryDelayArray: [5000],
-        processInspector: MaintenanceFakeInspector(),
+        processInspector: inspector,
         processSnapshots: snapshots,
         maintenanceActorMatcher: MaintenanceActorMatcher(
-            (*) => "LIVE"),
+            MaintenanceTestCreationIdentity),
         scheduler: ""
     }
     callbacks := {
@@ -254,6 +325,7 @@ RunMaintenanceCoordinatorTests() {
         SerializeSession: MaintenanceTestSerializeSession,
         SetProcessIdentity: MaintenanceTestSetIdentity,
         TargetReferenceExists: MaintenanceTestTargetExists,
+        TargetSubjectExists: MaintenanceTestTargetExists,
         UpdateRunningState: MaintenanceTestUpdateRunning,
         UpdateState: MaintenanceTestUpdateState,
         WatcherFactory: MaintenanceFakeWatcher
@@ -283,7 +355,42 @@ RunMaintenanceCoordinatorTests() {
     AssertCoordinatorEqual(1, coordinator.PendingCommands.Length,
         "初始化前的显式维护命令队列长度错误")
     coordinator.PendingCommands := []
+    AssertCoordinator(coordinator.QueueCommand("PING|")
+        && coordinator.PendingCommands.Length == 0,
+        "实例发现探针被错误排入升级维护命令队列")
     coordinator.Initialized := true
+    coordinator.ProcessBaselineReady := false
+    inspector.NativeReady := true
+    baselineCaptureCount := inspector.CaptureCount
+    coordinator.ProcessTick()
+    AssertCoordinator(coordinator.ProcessBaselineReady
+        && inspector.CaptureCount == baselineCaptureCount + 1
+        && !runtime.guardWorkGate.Busy,
+        "初始化时原生快照失败后，进程轮询没有重建升级参与者基线")
+    stateObj.LastFileActivityTicks := coordinator.Now()
+    inspector.NativeReady := false
+    queryCountBeforeTick := MaintenanceCoordinatorTestContext.QueryCount
+    startCountBeforeTick := snapshots.StartCount
+    coordinator.ProcessTick()
+    AssertCoordinator(snapshots.StartCount == startCountBeforeTick + 1
+        && MaintenanceCoordinatorTestContext.QueryCount == queryCountBeforeTick
+        && !runtime.guardWorkGate.Busy,
+        "升级进程轮询在原生快照失败后同步执行 WMI，或没有释放工作门")
+    inspector.NativeReady := true
+    stateObj.LastFileActivityTicks := 0
+
+    currentPid := DllCall("kernel32\GetCurrentProcessId", "UInt")
+    stateObj.PID := currentPid
+    stateObj.PIDCreationIdentity := "EXPECTED-CREATION"
+    inspector.CreationOverrides[currentPid] := ""
+    AssertCoordinator(!coordinator.TargetAppearsRunning(stateObj),
+        "创建身份不可读时被错误当成同一目标仍在运行")
+    inspector.CreationOverrides[currentPid] := "EXPECTED-CREATION"
+    AssertCoordinator(coordinator.TargetAppearsRunning(stateObj),
+        "PID 与创建身份一致时没有识别目标仍在运行")
+    inspector.CreationOverrides.Delete(currentPid)
+    stateObj.PID := 0
+    stateObj.PIDCreationIdentity := ""
     AssertCoordinator(coordinator.QueueCommand("BEGIN|" path),
         "显式维护开始命令执行失败")
     AssertCoordinatorEqual(MaintenancePhase.Updating,
@@ -362,6 +469,42 @@ RunMaintenanceCoordinatorTests() {
     AssertCoordinatorEqual(1, snapshots.RequestCount,
         "升级仲裁没有且仅有一次请求后台快照")
 
+    ; 快照只描述捕获瞬间。即使新鲜快照已经返回，也不能在完整检测窗口
+    ; 结束前断言后续不会启动更新器并恢复普通拉起。
+    MaintenanceCoordinatorTestContext.Existing := true
+    MaintenanceCoordinatorTestContext.ScheduledCount := 0
+    snapshots.LatestSnapshotRequestTicks :=
+        stateObj.ArbitrationSnapshotRequestTicks
+    stateObj.MaintenanceStartedTicks := coordinator.Now() - 4000
+    coordinator.Advance(path, stateObj)
+    AssertCoordinator(stateObj.MaintenanceMode
+            == MaintenancePhase.Arbitrating
+        && MaintenanceCoordinatorTestContext.ScheduledCount == 0,
+        "新鲜快照在检测窗口结束前错误恢复了普通重启")
+    stateObj.MaintenanceStartedTicks := coordinator.Now() - 6000
+    coordinator.Advance(path, stateObj)
+    AssertCoordinator(stateObj.MaintenanceMode == MaintenancePhase.Normal
+        && MaintenanceCoordinatorTestContext.ScheduledCount == 1,
+        "完整检测窗口结束后没有恢复普通重启")
+
+    ; 后台 WMI 快照失败也不能走短窗口兜底，但完整检测窗口结束后必须
+    ; 有确定出口，避免升级仲裁永久等待。
+    MaintenanceCoordinatorTestContext.ScheduledCount := 0
+    snapshots.LatestSnapshotRequestTicks := 0
+    AssertCoordinator(coordinator.BeginArbitration(path, stateObj),
+        "快照失败出口测试无法开始升级仲裁")
+    stateObj.MaintenanceStartedTicks := coordinator.Now() - 4000
+    coordinator.Advance(path, stateObj)
+    AssertCoordinator(stateObj.MaintenanceMode
+            == MaintenancePhase.Arbitrating
+        && MaintenanceCoordinatorTestContext.ScheduledCount == 0,
+        "快照失败时在检测窗口结束前错误恢复了普通重启")
+    stateObj.MaintenanceStartedTicks := coordinator.Now() - 6000
+    coordinator.Advance(path, stateObj)
+    AssertCoordinator(stateObj.MaintenanceMode == MaintenancePhase.Normal
+        && MaintenanceCoordinatorTestContext.ScheduledCount == 1,
+        "快照失败后超过完整检测窗口仍未恢复普通重启")
+
     AssertCoordinator(runtime.guardWorkGate.TryEnter(),
         "空闲的共享守护工作门无法进入")
     AssertCoordinator(!runtime.guardWorkGate.TryEnter(),
@@ -381,6 +524,84 @@ RunMaintenanceCoordinatorTests() {
     AssertCoordinatorEqual(2,
         coordinator.Watchers[rootKey].subscribers.Count,
         "共享监听器没有登记两个目标")
+    sharedWatcherEntry := coordinator.Watchers[rootKey]
+    AssertCoordinator(coordinator.IsRelevantFootprintChange(path, stateObj,
+            "SharedRuntime.dll", sharedWatcherEntry)
+        && coordinator.IsRelevantFootprintChange(secondPath, secondState,
+            "SharedRuntime.dll", sharedWatcherEntry),
+        "共享安装目录的公共二进制变化没有保护全部相关目标")
+    AssertCoordinator(!coordinator.IsRelevantFootprintChange(path, stateObj,
+        "notes.txt", sharedWatcherEntry),
+        "共享安装目录中的普通文档变化被错误提升为升级证据")
+
+    learnedActorPath := rootPath "\ProductMaintenance.exe"
+    learnedSignature := "P:" MaintenanceTestCanonical(learnedActorPath)
+        . "|R:" MaintenanceTestCanonical(rootPath)
+    stateObj.MaintenanceConfig.LearnedActors := [learnedSignature]
+    learnedProcess := {pid: 700001, parent: 0, name: "Helper.exe",
+        cmd: "", exe: learnedActorPath,
+        creation: "很早以前的进程", identity: "LIVE"}
+    baselineIndex := MaintenanceTestCreateIndex([learnedProcess],
+        coordinator.Now(), true)
+    coordinator.RefreshActors([learnedProcess], true, true,
+        baselineIndex, false)
+    AssertCoordinator(stateObj.TransientActorIdentities.Count == 1
+        && coordinator.IsBlocking(stateObj),
+        "已配置的更新程序在初始基线中运行较久时被错误忽略")
+    coordinator.ResetSession(path, stateObj, false)
+    stateObj.KnownActorIdentities := Map()
+    stateObj.TransientActorIdentities := Map()
+    stateObj.MaintenanceConfig.LearnedActors := []
+
+    ; 已识别更新器退出后，普通名称子进程仍应通过父身份和创建时序接管会话。
+    updaterPid := 710001
+    childPid := 710002
+    updaterProcess := {pid: updaterPid, parent: 0,
+        name: "Updater.exe", cmd: "", exe: rootPath "\Updater.exe",
+        creation: "", identity: MaintenanceTestCreationIdentity(updaterPid)}
+    updaterIndex := MaintenanceTestCreateIndex([updaterProcess],
+        coordinator.Now(), true)
+    coordinator.RefreshActors([updaterProcess], false, true,
+        updaterIndex, false)
+    updaterKey := updaterPid ":" MaintenanceTestCreationIdentity(updaterPid)
+    AssertCoordinator(stateObj.TransientActorIdentities.Has(updaterKey),
+        "首个更新器没有进入短命交接缓存")
+    childProcess := {pid: childPid, parent: updaterPid,
+        name: "Worker.exe", cmd: "", exe: rootPath "\Worker.exe",
+        creation: "", identity: MaintenanceTestCreationIdentity(childPid)}
+    childIndex := MaintenanceTestCreateIndex([childProcess],
+        coordinator.Now(), true)
+    coordinator.RefreshActors([childProcess], false, true,
+        childIndex, false)
+    childKey := childPid ":" MaintenanceTestCreationIdentity(childPid)
+    AssertCoordinator(stateObj.TransientActorIdentities.Has(childKey)
+        && stateObj.TransientActorIdentities[childKey].Match.Evidence
+            == "maintenance-descendant",
+        "短命更新器退出后普通子进程没有接管升级保护会话")
+    coordinator.ResetSession(path, stateObj, false)
+    stateObj.KnownActorIdentities := Map()
+    stateObj.TransientActorIdentities := Map()
+
+    ; 文件稳定不能替代进程证据。扫描时间早于本次文件活动时必须继续等待，
+    ; 新扫描确认没有参与者后才能恢复普通守护。
+    MaintenanceCoordinatorTestContext.Existing := true
+    MaintenanceCoordinatorTestContext.ScheduledCount := 0
+    coordinator.Enter(path, stateObj, "测试进程证据门槛")
+    evidenceNow := coordinator.Now()
+    stateObj.MaintenanceMode := MaintenancePhase.Stabilizing
+    stateObj.MaintenanceStartedTicks := evidenceNow - 5000
+    stateObj.MaintenanceLastActivityTicks := evidenceNow - 5000
+    stateObj.LastFileActivityTicks := evidenceNow - 4000
+    stateObj.MaintenanceActorCheckedTicks := evidenceNow - 4500
+    coordinator.Advance(path, stateObj)
+    AssertCoordinator(stateObj.MaintenanceMode == MaintenancePhase.Stabilizing
+        && MaintenanceCoordinatorTestContext.ScheduledCount == 0,
+        "早于本次维护活动的进程快照仍放行了升级恢复")
+    stateObj.MaintenanceActorCheckedTicks := coordinator.Now()
+    coordinator.Advance(path, stateObj)
+    AssertCoordinator(stateObj.MaintenanceMode == MaintenancePhase.Normal
+        && MaintenanceCoordinatorTestContext.ScheduledCount == 1,
+        "新鲜进程快照确认参与者结束后没有恢复普通守护")
 
     replacementState := CreateMaintenanceTestSupervisor(rootPath)
     runtime.appStates[path] := replacementState
@@ -411,6 +632,55 @@ RunMaintenanceCoordinatorTests() {
     coordinator.CloseWatcher(secondState)
     AssertCoordinatorEqual(0, coordinator.Watchers.Count,
         "最后一个订阅移除后监听器没有释放")
+
+    runtime.appStates[path] := stateObj
+    coordinator.Enter(path, stateObj, "测试完成复核")
+    stateObj.MaintenanceMode := MaintenancePhase.Stabilizing
+    priorScheduledDelay := MaintenanceCoordinatorTestContext.ScheduledDelay
+    MaintenanceCoordinatorTestContext.ReplaceDuringRefresh := true
+    coordinator.Complete(path, stateObj)
+    MaintenanceCoordinatorTestContext.ReplaceDuringRefresh := false
+    AssertCoordinator(runtime.appStates[path] != stateObj
+        && runtime.appStates[path].State == "REPLACEMENT"
+        && MaintenanceCoordinatorTestContext.ScheduledDelay
+            == priorScheduledDelay,
+        "升级完成回调替换控制器后，旧会话仍继续提交状态或安排重启")
+
+    timedOutPath := rootPath "\TimedOut.exe"
+    invalidSessionPath := rootPath "\InvalidSession.exe"
+    recoveringPath := rootPath "\Recovering.exe"
+    timedOutState := CreateMaintenanceTestSupervisor(rootPath)
+    invalidSessionState := CreateMaintenanceTestSupervisor(rootPath)
+    recoveringState := CreateMaintenanceTestSupervisor(rootPath)
+    runtime.appStates[timedOutPath] := timedOutState
+    runtime.appStates[invalidSessionPath] := invalidSessionState
+    runtime.appStates[recoveringPath] := recoveringState
+    recentStartedAt := FormatTime(DateAdd(A_NowUTC, -1, "Seconds"),
+        "yyyyMMddHHmmss")
+    MaintenanceCoordinatorTestContext.RestoredSessions := Map(
+        "TIMED", {Path: timedOutPath, Mode: MaintenancePhase.TimedOut,
+            StartedAt: recentStartedAt, BaselineFingerprint: "FP-OLD",
+            FileChanged: true, Explicit: false},
+        "INVALID", {Path: invalidSessionPath, Mode: "BrokenPhase",
+            StartedAt: "not-a-time", BaselineFingerprint: "FP-BROKEN",
+            FileChanged: true, Explicit: false},
+        "ACTIVE", {Path: recoveringPath,
+            Mode: MaintenancePhase.Stabilizing,
+            StartedAt: recentStartedAt, BaselineFingerprint: "FP-ACTIVE",
+            FileChanged: true, Explicit: false})
+    IniDelete(journalPath, "Sessions")
+    IniWrite("TIMED", journalPath, "Sessions", "Timed")
+    IniWrite("INVALID", journalPath, "Sessions", "Invalid")
+    IniWrite("ACTIVE", journalPath, "Sessions", "Active")
+    coordinator.RestoreSessions()
+    AssertCoordinator(timedOutState.MaintenanceMode
+            == MaintenancePhase.TimedOut
+        && invalidSessionState.MaintenanceMode == MaintenancePhase.TimedOut,
+        "超时或损坏的恢复会话绕过了用户确认并重新进入自动恢复")
+    AssertCoordinator(recoveringState.MaintenanceMode
+            == MaintenancePhase.Recovering
+        && recoveringState.Pending,
+        "有效的未完成升级会话没有进入保守恢复阶段")
 
     coordinator.Shutdown()
     AssertCoordinator(!coordinator.Initialize()

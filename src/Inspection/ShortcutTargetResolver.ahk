@@ -1,3 +1,7 @@
+; 快捷方式真实目标发现与身份选择服务。
+; 除标准 LNK 属性外，还会审慎分析安装器生成的间接入口、便携启动器和目录候选；
+; 只有证据唯一且与保存身份兼容时才更新解析结果，歧义候选保持未知而不随意绑定。
+
 class ShortcutTargetResolver {
     static MaximumCandidateCount := 200
     static TargetExtensions :=
@@ -72,6 +76,23 @@ class ShortcutTargetResolver {
             ShortcutTargetResolver.GenericLauncherPattern) != 0
     }
 
+    IsPortableLauncher(path) {
+        SplitPath(path, , , &extension, &baseName)
+        if !RegExMatch(extension, "i)^(?:exe|com)$")
+            return false
+        if RegExMatch(baseName, "i)portable$")
+            return true
+        versionValues := this.GetExecutableVersionValues(path)
+        for fieldName in ["ProductName", "FileDescription"] {
+            fieldValue := versionValues.Has(fieldName)
+                ? versionValues[fieldName] : ""
+            if RegExMatch(fieldValue,
+                "i)(?:^|[^\p{L}\p{N}])portable(?:[^\p{L}\p{N}]|$)")
+                return true
+        }
+        return false
+    }
+
     IsAuxiliaryExecutableName(fileName) {
         if RegExMatch(fileName,
             ShortcutTargetResolver.AuxiliaryExecutablePattern)
@@ -81,6 +102,12 @@ class ShortcutTargetResolver {
             "i)^(?:update|updater|upgrade|patch|setup|install|installer|unins|uninstall|repair|helper|connector|crashreport|telemetry)")
             || RegExMatch(baseName,
                 "i)(?:update|updater|upgrade|patch|setup|installer|unins|uninstall|repair|helper|connector|crashreport|telemetry)$")
+    }
+
+    IsInstallerCacheProxy(path) {
+        normalized := StrLower(StrReplace(String(path), "/", "\"))
+        return RegExMatch(normalized,
+            "i)\\windows\\installer\\\{[0-9a-f-]{36}\}\\_[0-9a-f]+\.exe$") != 0
     }
 
     ExtractArgumentTarget(arguments) {
@@ -250,11 +277,39 @@ class ShortcutTargetResolver {
         return score
     }
 
+    SelectExecutableCandidate(path, workingDir, candidates,
+        allowUniqueWeakCandidate := true) {
+        if candidates.Length == 0
+            return ""
+        if candidates.Length == 1 && allowUniqueWeakCandidate {
+            SplitPath(candidates[1], &onlyName)
+            return this.IsAuxiliaryExecutableName(onlyName)
+                ? "" : candidates[1]
+        }
+
+        shortcutName := ""
+        SplitPath(path, , , , &shortcutName)
+        bestPath := ""
+        bestScore := -100000
+        secondScore := -100000
+        for candidatePath in candidates {
+            score := this.ScoreExecutableCandidate(shortcutName, workingDir,
+                candidatePath)
+            if (score > bestScore) {
+                secondScore := bestScore
+                bestScore := score
+                bestPath := candidatePath
+            } else if (score > secondScore) {
+                secondScore := score
+            }
+        }
+        return bestScore >= 100 && bestScore - secondScore >= 20
+            ? bestPath : ""
+    }
+
     FindExecutableCandidate(path, workingDir) {
         if !DirExist(workingDir)
             return ""
-        shortcutName := ""
-        SplitPath(path, , , , &shortcutName)
         candidates := []
         try {
             Loop Files, RTrim(workingDir, "\") "\*.exe", "F" {
@@ -275,45 +330,54 @@ class ShortcutTargetResolver {
                     break
             }
         }
-        if (candidates.Length == 1) {
-            SplitPath(candidates[1], &onlyName)
-            return this.IsAuxiliaryExecutableName(onlyName)
-                ? "" : candidates[1]
+        if (candidates.Length == 0
+            || candidates.Length >= ShortcutTargetResolver.MaximumCandidateCount)
+            return ""
+        return this.SelectExecutableCandidate(path, workingDir, candidates)
+    }
+
+    FindPortableResidentCandidate(path, launcherPath) {
+        SplitPath(launcherPath, , &launcherDirectory)
+        if launcherDirectory == "" || !DirExist(launcherDirectory)
+            return ""
+        launcherCanonical := this.Callbacks.CanonicalPath.Call(launcherPath)
+        candidates := []
+        try {
+            Loop Files, RTrim(launcherDirectory, "\") "\*.exe", "FR" {
+                if this.Callbacks.CanonicalPath.Call(A_LoopFileFullPath)
+                    == launcherCanonical
+                    continue
+                if this.IsAuxiliaryExecutableName(A_LoopFileName)
+                    continue
+                if this.IsValidExecutableFile(A_LoopFileFullPath)
+                    candidates.Push(A_LoopFileFullPath)
+                if (candidates.Length
+                    >= ShortcutTargetResolver.MaximumCandidateCount)
+                    break
+            }
         }
         if (candidates.Length == 0
             || candidates.Length >= ShortcutTargetResolver.MaximumCandidateCount)
             return ""
-
-        bestPath := ""
-        bestScore := -100000
-        secondScore := -100000
-        for candidatePath in candidates {
-            score := this.ScoreExecutableCandidate(shortcutName, workingDir,
-                candidatePath)
-            if (score > bestScore) {
-                secondScore := bestScore
-                bestScore := score
-                bestPath := candidatePath
-            } else if (score > secondScore) {
-                secondScore := score
-            }
-        }
-        return bestScore >= 100 && bestScore - secondScore >= 20
-            ? bestPath : ""
+        ; 便携目录可能同时包含修复器、卸载器和编解码辅助程序。即使只有一个
+        ; 候选，也必须凭名称、版本信息或已观察进程达到强证据阈值，不能因目录
+        ; 中恰好只剩一个 EXE 就把辅助工具当成常驻主程序。
+        return this.SelectExecutableCandidate(path, launcherDirectory,
+            candidates, false)
     }
 
     ResolveEffective(path, allowMissing := false, &resolutionSource := "") {
         resolutionSource := ""
         msiTarget := this.ResolveMsiTarget(path)
-        if (msiTarget != ""
-            && (allowMissing || this.IsUsableTarget(msiTarget))) {
-            resolutionSource := "Windows Installer"
-            return msiTarget
-        }
-
         descriptor := this.Read(path)
-        if !descriptor.Readable
+        if !descriptor.Readable {
+            if (msiTarget != "" && !this.IsInstallerCacheProxy(msiTarget)
+                && (allowMissing || this.IsUsableTarget(msiTarget))) {
+                resolutionSource := "Windows Installer"
+                return msiTarget
+            }
             return ""
+        }
         argumentTarget := this.ExtractArgumentTarget(descriptor.Arguments)
         if (argumentTarget != "") {
             resolutionSource := "快捷方式参数"
@@ -321,19 +385,32 @@ class ShortcutTargetResolver {
         }
         if (descriptor.TargetPath != ""
             && this.IsUsableTarget(descriptor.TargetPath)
+            && !this.IsInstallerCacheProxy(descriptor.TargetPath)
             && (descriptor.Arguments == ""
                 || !this.IsGenericLauncher(descriptor.TargetPath))) {
+            if this.IsPortableLauncher(descriptor.TargetPath) {
+                portableResident := this.FindPortableResidentCandidate(path,
+                    descriptor.TargetPath)
+                if portableResident != "" {
+                    resolutionSource := "安装目录特征"
+                    return portableResident
+                }
+            }
             resolutionSource := "快捷方式目标"
             return descriptor.TargetPath
         }
-        if (descriptor.WorkingDirectory == "")
-            return ""
-
-        candidatePath := this.FindExecutableCandidate(path,
-            descriptor.WorkingDirectory)
-        if (candidatePath != "") {
-            resolutionSource := "安装目录特征"
-            return candidatePath
+        if (descriptor.WorkingDirectory != "") {
+            candidatePath := this.FindExecutableCandidate(path,
+                descriptor.WorkingDirectory)
+            if (candidatePath != "") {
+                resolutionSource := "安装目录特征"
+                return candidatePath
+            }
+        }
+        if (msiTarget != "" && !this.IsInstallerCacheProxy(msiTarget)
+            && (allowMissing || this.IsUsableTarget(msiTarget))) {
+            resolutionSource := "Windows Installer"
+            return msiTarget
         }
         return ""
     }

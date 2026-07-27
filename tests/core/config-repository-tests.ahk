@@ -1,8 +1,24 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证配置仓库的原子替换、顺序读取和中文就地注释维护。
+; 事务异常不能遗留临时文件、破坏原配置或改变调用方原有临界区状态。
+
 #Include ..\..\src\Config\IniFieldCodec.ahk
 #Include ..\..\src\Config\WatchdogConfigRepository.ahk
+#Include ..\..\src\Localization\EnglishStrings.ahk
+#Include ..\..\src\Localization\TraditionalHongKongStrings.ahk
+#Include ..\..\src\Localization\TraditionalTaiwanStrings.ahk
+#Include ..\..\src\Localization\JapaneseStrings.ahk
+#Include ..\..\src\Localization\VietnameseStrings.ahk
+#Include ..\..\src\Localization\KoreanStrings.ahk
+#Include ..\..\src\Localization\SpanishStrings.ahk
+#Include ..\..\src\Localization\FrenchStrings.ahk
+#Include ..\..\src\Localization\PortugueseBrazilStrings.ahk
+#Include ..\..\src\Localization\RussianStrings.ahk
+#Include ..\..\src\Localization\GermanStrings.ahk
+#Include ..\..\src\Localization\ItalianStrings.ahk
+#Include ..\..\src\Localization\LocalizationService.ahk
 
 AssertConfigRepository(value, message) {
     if !value
@@ -36,12 +52,17 @@ RunConfigRepositoryTests() {
 
     configPath := A_Temp "\watchdog-config-repository-test-"
         DllCall("kernel32\GetCurrentProcessId", "UInt") ".ini"
+    englishConfigPath := A_Temp "\watchdog-config-repository-en-test-"
+        DllCall("kernel32\GetCurrentProcessId", "UInt") ".ini"
     clockState := {Value: 1000}
     repository := WatchdogConfigRepository(configPath,
         ReadConfigTestClock.Bind(clockState))
     try {
         try FileDelete(configPath)
+        try FileDelete(englishConfigPath)
         Loop Files, configPath ".tmp.*"
+            try FileDelete(A_LoopFileFullPath)
+        Loop Files, englishConfigPath ".tmp.*"
             try FileDelete(A_LoopFileFullPath)
 
         repository.EnsureExists([
@@ -141,9 +162,102 @@ RunConfigRepositoryTests() {
         AssertConfigRepository(repository.ReadBool("Settings",
             "ShowAtStartup", false),
             "异常恢复后配置仓储无法继续保存")
+
+        ; 系统语言切换只能替换自动生成的说明文字，不能翻译节名、键名和值；
+        ; 中英文往返和重复保存也不能叠加注释或影响 IniRead 的读取结果。
+        commentCatalogs := LocalizationService.GetAllTranslationCatalogs()
+        LocalizationService.Configure("zh-CN")
+        localizedRepository := WatchdogConfigRepository(englishConfigPath,
+            ReadConfigTestClock.Bind(clockState), Tr, commentCatalogs)
+        localizedRepository.EnsureExists([
+            {Name: "Settings", Entries: [
+                {Key: "CheckInterval", Value: 2500},
+                {Key: "ShowAtStartup", Value: 1}]},
+            {Name: "Layout", Entries: [
+                {Key: "GuiW", Value: 730}, {Key: "GuiH", Value: 520}]},
+            {Name: "Apps", Entries: [
+                {Key: "App1", Value: "enabled|target|value"}]}
+        ])
+        chineseText := FileRead(englishConfigPath, "UTF-16")
+        AssertConfigRepository(InStr(chineseText,
+            "; 本区保存运行参数")
+            && InStr(chineseText, "; 每个 AppN 对应一个监控项"),
+            "中文环境没有生成中文配置注释")
+
+        LocalizationService.Configure("en-US")
+        englishRepository := WatchdogConfigRepository(englishConfigPath,
+            ReadConfigTestClock.Bind(clockState), Tr, commentCatalogs)
+        englishRepository.WriteValue("Settings", "CheckInterval", 3000)
+        englishText := FileRead(englishConfigPath, "UTF-16")
+        AssertConfigRepository(InStr(englishText,
+            "; This section stores runtime settings.")
+            && InStr(englishText,
+                "; CheckInterval: status-check interval in milliseconds")
+            && InStr(englishText,
+                "; GuiW: main-window width, stored in logical pixels"),
+            "英文环境没有生成英文配置注释")
+        AssertConfigRepository(!InStr(englishText,
+            "; 本区保存运行参数")
+            && englishRepository.Read("Settings", "CheckInterval", 0)
+                == "3000"
+            && englishRepository.Read("Layout", "GuiW", 0) == "730"
+            && englishRepository.Read("Apps", "App1", "")
+                == "enabled|target|value",
+            "英文配置注释改变了稳定节名、键名或值的读取")
+        englishRepository.WriteValue("Settings", "CheckInterval", 3500)
+        englishText := FileRead(englishConfigPath, "UTF-16")
+        englishMarker :=
+            "; CheckInterval: status-check interval in milliseconds"
+        AssertConfigRepository(StrSplit(englishText,
+            englishMarker).Length == 2
+            && englishRepository.Read("Settings", "CheckInterval", 0)
+                == "3500",
+            "英文配置重复保存后注释重复或值读取异常")
+
+        checkIntervalComment :=
+            "; CheckInterval：状态检查间隔，单位为毫秒，范围 500～86400000。"
+        localizedCommentLanguages := ["zh-HK", "zh-TW", "ja-JP",
+            "vi-VN", "ko-KR", "es-ES", "fr-FR", "pt-BR", "ru-RU",
+            "de-DE", "it-IT"]
+        for languageIndex, language in localizedCommentLanguages {
+            LocalizationService.Configure(language)
+            languageRepository := WatchdogConfigRepository(englishConfigPath,
+                ReadConfigTestClock.Bind(clockState), Tr, commentCatalogs)
+            languageRepository.WriteValue("Settings", "CheckInterval",
+                3500 + languageIndex)
+            languageText := FileRead(englishConfigPath, "UTF-16")
+            activeMarker := Tr(checkIntervalComment)
+            AssertConfigRepository(StrSplit(languageText,
+                activeMarker).Length == 2,
+                language " 配置注释没有生成或发生重复")
+            for catalog in commentCatalogs {
+                if catalog.Has(checkIntervalComment)
+                    && catalog[checkIntervalComment] != activeMarker {
+                    AssertConfigRepository(!InStr(languageText,
+                        catalog[checkIntervalComment]),
+                        language " 配置仍残留其他语言的旧注释")
+                }
+            }
+        }
+
+        LocalizationService.Configure("zh-CN")
+        chineseRepository := WatchdogConfigRepository(englishConfigPath,
+            ReadConfigTestClock.Bind(clockState), Tr, commentCatalogs)
+        chineseRepository.WriteValue("Settings", "CheckInterval", 3600)
+        chineseText := FileRead(englishConfigPath, "UTF-16")
+        chineseMarker := "; CheckInterval：状态检查间隔"
+        AssertConfigRepository(!InStr(chineseText, englishMarker)
+            && StrSplit(chineseText, chineseMarker).Length == 2
+            && chineseRepository.Read("Settings", "CheckInterval", 0)
+                == "3600",
+            "配置注释从英文切回中文后重复或稳定值发生变化")
     } finally {
+        LocalizationService.Configure("zh-CN")
         try FileDelete(configPath)
+        try FileDelete(englishConfigPath)
         Loop Files, configPath ".tmp.*"
+            try FileDelete(A_LoopFileFullPath)
+        Loop Files, englishConfigPath ".tmp.*"
             try FileDelete(A_LoopFileFullPath)
     }
 }

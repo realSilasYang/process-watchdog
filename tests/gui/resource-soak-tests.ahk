@@ -1,13 +1,36 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 反复创建和销毁完整界面场景，观察 GDI 与 USER 句柄是否稳定。
+; 循环覆盖按钮、输入框、图标和多级窗口，结束后资源增量必须回到允许范围。
+
 #Include ..\..\src\Platform\Win32.ahk
+#Include ..\..\src\Localization\EnglishStrings.ahk
+#Include ..\..\src\Localization\TraditionalHongKongStrings.ahk
+#Include ..\..\src\Localization\TraditionalTaiwanStrings.ahk
+#Include ..\..\src\Localization\JapaneseStrings.ahk
+#Include ..\..\src\Localization\VietnameseStrings.ahk
+#Include ..\..\src\Localization\KoreanStrings.ahk
+#Include ..\..\src\Localization\SpanishStrings.ahk
+#Include ..\..\src\Localization\FrenchStrings.ahk
+#Include ..\..\src\Localization\PortugueseBrazilStrings.ahk
+#Include ..\..\src\Localization\RussianStrings.ahk
+#Include ..\..\src\Localization\GermanStrings.ahk
+#Include ..\..\src\Localization\ItalianStrings.ahk
+#Include ..\..\src\Localization\LocalizationService.ahk
+#Include ..\..\src\UI\UiThemeService.ahk
 #Include ..\..\src\UI\UiInteractionRegistry.ahk
 #Include ..\..\src\UI\WindowHierarchy.ahk
 #Include ..\..\app\UI\InteractionPresenter.ahk
 
 global App := {uiInteractions: UiInteractionRegistry()}
 global soakClickCount := 0
+
+; 此测试独立加载交互层，不加载完整应用适配层；仍提供与正式入口等价的
+; 资源目录定位函数，使共享 Lucide 按钮入口在 #Warn All 下也能完整解析。
+GetApplicationAssetPath(relativePath) {
+    return A_ScriptDir "\..\..\assets\" relativePath
+}
 
 GetTickCount64() {
     return DllCall("kernel32\GetTickCount64", "UInt64")
@@ -33,13 +56,32 @@ FailSoak(message) {
 DrawSoakButton(button) {
     if !App.uiInteractions.HasButton(button.Hwnd)
         return false
-    deviceContext := DllCall("user32\GetDC", "Ptr", button.Hwnd, "Ptr")
-    if !deviceContext
+    screenDc := DllCall("user32\GetDC", "Ptr", 0, "Ptr")
+    if !screenDc
         return false
-    try return RoundedButtonRenderer.Draw(deviceContext, 88, 30,
+    targetDc := DllCall("gdi32\CreateCompatibleDC", "Ptr", screenDc, "Ptr")
+    targetBitmap := targetDc ? DllCall("gdi32\CreateCompatibleBitmap",
+        "Ptr", screenDc, "Int", 88, "Int", 30, "Ptr") : 0
+    if !targetDc || !targetBitmap {
+        if targetBitmap
+            DllCall("gdi32\DeleteObject", "Ptr", targetBitmap)
+        if targetDc
+            DllCall("gdi32\DeleteDC", "Ptr", targetDc)
+        DllCall("user32\ReleaseDC", "Ptr", 0, "Ptr", screenDc)
+        return false
+    }
+    previousBitmap := DllCall("gdi32\SelectObject", "Ptr", targetDc,
+        "Ptr", targetBitmap, "Ptr")
+    try return RoundedButtonRenderer.Draw(targetDc, 88, 30,
         App.uiInteractions.GetButton(button.Hwnd))
-    finally DllCall("user32\ReleaseDC", "Ptr", button.Hwnd,
-        "Ptr", deviceContext)
+    finally {
+        if previousBitmap
+            DllCall("gdi32\SelectObject", "Ptr", targetDc,
+                "Ptr", previousBitmap)
+        DllCall("gdi32\DeleteObject", "Ptr", targetBitmap)
+        DllCall("gdi32\DeleteDC", "Ptr", targetDc)
+        DllCall("user32\ReleaseDC", "Ptr", 0, "Ptr", screenDc)
+    }
 }
 
 RegisterSoakButton(button, normalColor, feedbackMode) {
@@ -113,7 +155,7 @@ while GetTickCount64() < deadline {
         if !imageList
             FailSoak("ImageList creation failed")
         sharedIcon := DllCall("user32\LoadIconW", "Ptr", 0,
-            "Ptr", 32512, "Ptr") ; IDI_APPLICATION
+            "Ptr", 32512, "Ptr") ; IDI_APPLICATION：使用系统共享的默认应用图标。
         if !sharedIcon || !IL_Add(imageList, "HICON:" sharedIcon)
             FailSoak("ImageList icon insertion failed")
         list.SetImageList(imageList, 1)
