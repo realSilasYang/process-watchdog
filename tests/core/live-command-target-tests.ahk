@@ -47,6 +47,13 @@ CanonicalizeLiveTargetPath(path) {
         "UInt", 32768, "Ptr", fullPathBuffer.Ptr, "Ptr", 0, "UInt")
     if fullLength && fullLength < 32768
         path := StrGet(fullPathBuffer.Ptr, fullLength, "UTF-16")
+    if FileExist(path) {
+        longPathBuffer := Buffer(32768 * 2, 0)
+        longLength := DllCall("kernel32\GetLongPathNameW", "WStr", path,
+            "Ptr", longPathBuffer.Ptr, "UInt", 32768, "UInt")
+        if longLength && longLength < 32768
+            path := StrGet(longPathBuffer.Ptr, longLength, "UTF-16")
+    }
     return StrLower(StrLen(path) > 3 ? RTrim(path, "\") : path)
 }
 
@@ -804,7 +811,8 @@ RunLiveCommandTargetTests() {
         AssertLiveTarget(shortcutInfo.Readable
             && CanonicalizeLiveTargetPath(shortcutInfo.TargetPath)
                 == CanonicalizeLiveTargetPath(shortcutExe),
-            "普通快捷方式没有解析到真实 EXE")
+            "普通快捷方式没有解析到真实 EXE：读取值="
+                . shortcutInfo.TargetPath "，预期值=" shortcutExe)
         shortcutSpecs := TargetSpecFactory.Create(shortcutPath, {
             ResolvedTarget: shortcutInfo.TargetPath,
             ShortcutArguments: shortcutInfo.Arguments,
