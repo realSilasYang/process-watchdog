@@ -1,6 +1,12 @@
+; resvg 动态库的 SVG 位图渲染边界。
+; 负责锁定 DLL 的加载、Unicode 路径读取、目标尺寸渲染和返回位图所有权；
+; 初始化失败可由调用方回退到 Shell 图标路径，关闭后不允许再次使用已释放接口。
+
 class SvgRenderLibrary {
     static MaximumInputBytes := 16 * 1024 * 1024
     static MaximumRenderSize := 2048
+    static MaximumCacheEntries := 128
+    static MaximumCacheBytes := 32 * 1024 * 1024
 
     __New(libraryPath) {
         this.LibraryPath := libraryPath
@@ -9,6 +15,10 @@ class SvgRenderLibrary {
         this.Functions := Map()
         this.LoadAttempted := false
         this.Rendering := false
+        this.RenderCache := Map()
+        this.RenderCache.CaseSense := "Off"
+        this.RenderCacheBytes := 0
+        this.RenderCacheClock := 0
     }
 
     IsAvailable() {
@@ -76,8 +86,6 @@ class SvgRenderLibrary {
     }
 
     RenderFile(filePath, dpi, renderSize) {
-        if this.Rendering
-            return 0
         try sourceSize := FileGetSize(filePath)
         catch
             return 0
@@ -92,6 +100,16 @@ class SvgRenderLibrary {
         catch
             dpi := 96.0
         dpi := Max(24.0, Min(960.0, dpi))
+        try modifiedTime := FileGetTime(filePath, "M")
+        catch
+            modifiedTime := ""
+        cacheKey := this.BuildRenderCacheKey(filePath, sourceSize,
+            modifiedTime, dpi, renderSize)
+        cachedSnapshot := this.GetCachedSnapshot(cacheKey)
+        if cachedSnapshot
+            return cachedSnapshot
+        if this.Rendering
+            return 0
 
         previousCritical := A_IsCritical
         Critical("On")
@@ -172,7 +190,13 @@ class SvgRenderLibrary {
             if !visiblePixels
                 return 0
             ; resvg 输出预乘 RGBA；交换红蓝通道后即为 WIC 所需的预乘 BGRA。
-            return {Width: outputWidth, Height: outputHeight, Pixels: pixels}
+            snapshot := {
+                Width: outputWidth,
+                Height: outputHeight,
+                Pixels: pixels
+            }
+            this.StoreCachedSnapshot(cacheKey, snapshot)
+            return snapshot
         } catch {
             return 0
         } finally {
@@ -191,6 +215,63 @@ class SvgRenderLibrary {
         return encoded
     }
 
+    BuildRenderCacheKey(filePath, sourceSize, modifiedTime, dpi,
+        renderSize) {
+        try normalizedPath := GetCanonicalPath(filePath)
+        catch
+            normalizedPath := StrLower(String(filePath))
+        return normalizedPath "|" sourceSize "|" modifiedTime "|"
+            . Format("{:.3f}", dpi) "|" renderSize
+    }
+
+    GetCachedSnapshot(cacheKey) {
+        if !this.RenderCache.Has(cacheKey)
+            return 0
+        entry := this.RenderCache[cacheKey]
+        this.RenderCacheClock++
+        entry.LastUsed := this.RenderCacheClock
+        return entry.Snapshot
+    }
+
+    StoreCachedSnapshot(cacheKey, snapshot) {
+        snapshotBytes := snapshot.Width * snapshot.Height * 4
+        if snapshotBytes <= 0
+            || snapshotBytes > SvgRenderLibrary.MaximumCacheBytes
+            return false
+        if this.RenderCache.Has(cacheKey) {
+            previousEntry := this.RenderCache[cacheKey]
+            this.RenderCacheBytes -= previousEntry.Bytes
+        }
+        this.RenderCacheClock++
+        this.RenderCache[cacheKey] := {
+            Snapshot: snapshot,
+            Bytes: snapshotBytes,
+            LastUsed: this.RenderCacheClock
+        }
+        this.RenderCacheBytes += snapshotBytes
+        this.TrimRenderCache()
+        return true
+    }
+
+    TrimRenderCache() {
+        while this.RenderCache.Count > SvgRenderLibrary.MaximumCacheEntries
+            || this.RenderCacheBytes > SvgRenderLibrary.MaximumCacheBytes {
+            oldestKey := ""
+            oldestUse := 0
+            for cacheKey, entry in this.RenderCache {
+                if oldestKey == "" || entry.LastUsed < oldestUse {
+                    oldestKey := cacheKey
+                    oldestUse := entry.LastUsed
+                }
+            }
+            if oldestKey == ""
+                break
+            oldestEntry := this.RenderCache[oldestKey]
+            this.RenderCacheBytes -= oldestEntry.Bytes
+            this.RenderCache.Delete(oldestKey)
+        }
+    }
+
     Shutdown(*) {
         if this.Options && this.Functions.Has("resvg_options_destroy")
             try DllCall(this.Functions["resvg_options_destroy"],
@@ -201,5 +282,8 @@ class SvgRenderLibrary {
             try DllCall("kernel32\FreeLibrary", "Ptr", this.ModuleHandle)
         this.ModuleHandle := 0
         this.Rendering := false
+        this.RenderCache.Clear()
+        this.RenderCacheBytes := 0
+        this.RenderCacheClock := 0
     }
 }

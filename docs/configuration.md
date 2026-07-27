@@ -1,8 +1,70 @@
 # 配置、备份与恢复
 
+**简体中文** | [English](en/configuration.md)
+
 `watchdog.ini` 是本机运行配置，使用 UTF-16 LE 编码，由程序执行原子替换写入。
-仓库不会跟踪该文件。`watchdog.example.ini` 展示当前默认设置和就地注释，可以
-用于理解字段，但不要用它覆盖已有配置。
+仓库不会跟踪该文件。`config/watchdog.example.ini` 展示当前默认设置和就地注释，
+可以用于理解字段，但不要用它覆盖已有配置。
+
+程序会按当前界面语言生成简体中文、港繁、台繁、英文、日文、越南文、韩文、西班牙文、
+法文、葡萄牙文、俄文、德文或意大利文注释；
+节名、键名和值不会翻译。仓库示例沿用默认中文说明，其他语言仍使用相同的稳定键名。
+切换语言并保存后，程序会立即移除旧语言的自动注释再写入当前语言，不会叠加。
+
+`UiLanguage=auto` 表示跟随 Windows 界面语言。也可在设置的“通用”页选择语言，
+或填写 `zh-CN`、`zh-HK`、`zh-TW`、`en-US`、`ja-JP`、`vi-VN`、`ko-KR`、
+`es-ES`、`fr-FR`、`pt-BR`、`ru-RU`、`de-DE`、`it-IT` 之一；不受支持的系统语言
+在自动模式下回退英语。设置界面保存后会在当前进程内热切换：主窗口标题、按钮、
+当前状态、右键菜单和托盘立即更新，短生命周期窗口关闭后按新语言重新创建，后续日志、
+诊断与更新检查也使用新语言。既有日志保留写入时的原文，核心守护、目标控制器、PID、
+调度任务、主窗口和列表句柄均不会重建。
+
+`UiFont=auto` 按下表解析当前界面语言的内容字体。首选字体必须已经安装且能由
+Windows GDI 实际创建；否则小助手从 `assets/fonts` 私有加载对应 Noto 字体。
+私有字体只对当前进程可见，不会安装到系统或修改 Windows 字体设置。若字体资源
+缺失或加载失败，才使用最后一列的 Windows 自带字体。
+
+| 界面语言 | 首选字体 | 随包 Noto 回退 | Windows 最终兜底 |
+| --- | --- | --- | --- |
+| 简体中文 | PingFang SC | Noto Sans CJK SC | Microsoft YaHei UI |
+| 繁體中文（香港） | PingFang HK | Noto Sans CJK HK | Microsoft JhengHei UI |
+| 繁體中文（台灣） | PingFang TC | Noto Sans CJK TC | Microsoft JhengHei UI |
+| 日本語 | Harano Aji Gothic | Noto Sans CJK JP | Yu Gothic UI |
+| 한국어 | AppleSDGothicNeoR00 | Noto Sans CJK KR | Malgun Gothic |
+| English、Tiếng Việt、Español、Français、Português（Brasil）、Русский、Deutsch、Italiano | SF Pro Text | Noto Sans | Segoe UI |
+
+首选字体根据用户指定的 Apple 字体目录中的实际文件与内部家族名确定。该目录没有
+Hiragino 日文字体，因此日语选择同目录中字符覆盖完整、适合界面且采用 OFL 1.1 的
+`Harano Aji Gothic`，并将常规字重作为 OFL 私有资源随包提供。PingFang 原始集合、
+SF Pro Text 常规与粗体以及 Apple SD Gothic Neo 常规字体依据项目所有者持有的商业
+分发授权随包提供。自动模式仍先使用设备已安装的对应家族；缺失时才加载这些外置资源。
+第二级回退资源取自用户指定的 Google `NoTofu` 字体集：拉丁
+字体保留可变字重与字宽，CJK 字体保留原始 45 字体面集合及各地区家族。字体作为
+`assets/fonts` 外置资源随完整发行包分发，不嵌入单个 EXE。OFL 与商业字体的授权
+边界分别记录在字体目录的许可证和商业授权声明中。
+
+也可在“通用”页从本机已安装字体中选择；保存后会与语言一起在当前进程内立即应用。
+该设置控制正文、输入框、列表以及“关于”页标题和信息等内容控件。按钮、设置切换
+标签和主窗口底部状态栏不跟随 `UiFont`，始终使用表中最后一列对应的 Windows 系统
+UI 字体粗体，也不会为此加载随包字体。配置中填写了无效或已卸载字体时，程序会回退
+到 `auto`，不会把任意字体名传给界面。
+
+## EXE 与源码的配置关系
+
+配置位置始终由当前入口文件的目录决定，而不是由文件类型决定：
+
+- `进程守护小助手.exe` 与 `进程守护小助手.ahk` 位于同一目录时，共用
+  `watchdog.ini` 和 `watchdog.maintenance.ini`。
+- 两者位于不同目录时，各自读写所在目录内的配置，彼此不会自动同步。
+- 两种形态使用完全相同的配置格式；全局单实例锁会阻止它们同时运行。
+- 若要从一种形态切换到另一种形态，应先退出当前实例。需要沿用设置时，把两份
+  配置文件复制到新入口目录；若本来就在同一目录则无需复制。
+- 同目录共存只建议用于临时切换验证。EXE 包与源码包共用部分发行目录和一份
+  `update-manifest.json`，不能把它们当作两套可分别自动更新的安装；需要长期保留
+  两套形态时请放在不同目录，并在完全退出后按需复制两份配置。
+
+`CheckUpdatesOnStartup=1` 表示启动完成后在独立后台进程中检查小助手新版；设为
+`0` 只关闭启动检查，仍可从“关于”页手动检查。
 
 ## 备份
 

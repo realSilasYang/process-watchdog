@@ -1,3 +1,6 @@
+﻿# GitHub Actions 工作流语法检查。
+# 使用锁定版本的 actionlint 校验仓库工作流，避免本机与持续集成采用不同规则。
+
 [CmdletBinding()]
 param(
     [string]$ActionlintPath = ""
@@ -32,5 +35,13 @@ try {
     }
 } finally {
     Pop-Location
+}
+$releaseWorkflow = Get-Content -LiteralPath (Join-Path $projectRoot `
+    '.github\workflows\release.yml') -Raw -Encoding UTF8
+if ($releaseWorkflow -notmatch
+        '\$tagQueryExitCode\s*=\s*\$LASTEXITCODE[\s\S]{0,120}if\s*\(\$tagQueryExitCode\s*-eq\s*0\)' -or
+    $releaseWorkflow -notmatch
+        'if\s*\(\$tagQueryExitCode\s*-ne\s*2\)') {
+    throw 'Release draft resumption must preserve the git ls-remote exit code before running gh commands.'
 }
 Write-Host "GitHub Actions workflows passed actionlint $($toolLock.tools.actionlint.version)."

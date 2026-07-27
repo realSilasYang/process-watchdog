@@ -1,3 +1,7 @@
+; 主窗口尺寸和列表列宽的持久化服务。
+; 默认值只用于首次启动或损坏字段，用户拖拽后的尺寸只受最小值约束；
+; 窗口与列宽一起原子写入，重新加载后按同一逻辑像素语义恢复。
+
 class WindowLayoutService {
     __New(repository) {
         this.Repository := repository
@@ -6,13 +10,13 @@ class WindowLayoutService {
     Load() {
         return {
             Width: this.Repository.ReadBoundedInt("Layout", "GuiW", 730,
-                730, 32767),
-            Height: this.Repository.ReadBoundedInt("Layout", "GuiH", 530,
-                530, 32767),
+                580, 32767),
+            Height: this.Repository.ReadBoundedInt("Layout", "GuiH", 520,
+                300, 32767),
             Column1: this.Repository.ReadBoundedInt("Layout", "Col1W", 500,
-                450, 32767),
-            Column2: this.Repository.ReadBoundedInt("Layout", "Col2W", 205,
-                205, 32767)
+                200, 32767),
+            Column2: this.Repository.ReadBoundedInt("Layout", "Col2W", 180,
+                140, 32767)
         }
     }
 
@@ -39,10 +43,10 @@ class WindowLayoutService {
         if !IsObject(layout)
             throw TypeError("窗口布局对象无效")
         return {
-            Width: this.RequireDimension(layout, "Width", 730),
-            Height: this.RequireDimension(layout, "Height", 530),
-            Column1: this.RequireDimension(layout, "Column1", 450),
-            Column2: this.RequireDimension(layout, "Column2", 205)
+            Width: this.RequireDimension(layout, "Width", 580),
+            Height: this.RequireDimension(layout, "Height", 300),
+            Column1: this.RequireDimension(layout, "Column1", 200),
+            Column2: this.RequireDimension(layout, "Column2", 140)
         }
     }
 

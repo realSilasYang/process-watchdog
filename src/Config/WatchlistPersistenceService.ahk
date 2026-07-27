@@ -1,3 +1,7 @@
+; 守护列表与升级、展示配置的持久化服务。
+; 加载时保留 INI 中的条目顺序，损坏记录进入恢复区而不是静默丢弃；
+; 保存时把三类配置作为一个一致快照提交，并原样保留仍无法解析的恢复记录。
+
 class WatchlistPersistenceService {
     __New(repository, fieldCodec, maintenanceConfigCodec, displayConfigCodec,
         snapshotService) {

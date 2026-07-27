@@ -1,13 +1,22 @@
+; 添加守护项窗口。
+; 支持直接选择目标、批量导入和应用搜索；异步扫描以会话代际隔离，窗口关闭后
+; 迟到的工作器结果只能被丢弃，不能继续写入控件或重复提交撤销记录。
+
 class AddItemDialog extends ManagedWindow {
     __New(mainGui) {
         this.owner := mainGui
         this.edit := ""
+        this.pathHint := ""
         this.search := ApplicationSearchDialog(this)
         this.searchButton := ""
         this.browseButton := ""
         this.okButton := ""
         this.cancelButton := ""
         this.batchStatus := ""
+        this.normalActionButtonY := 0
+        this.batchActionButtonY := 0
+        this.normalWindowHeight := 0
+        this.batchWindowHeight := 0
         this.batchWorkerPid := 0
         this.batchWorkerCreationIdentity := ""
         this.batchWorkerDeadlineTicks := 0
@@ -16,6 +25,8 @@ class AddItemDialog extends ManagedWindow {
         this.batchPendingPaths := []
         this.batchPendingIndex := 0
         this.batchAddedCount := 0
+        this.batchUndoState := ""
+        this.batchAddedPaths := []
         this.batchTruncated := false
         this.batchSessionId := 0
         this.batchPollTimer := ObjBindMethod(this, "PollBatchImport")
@@ -26,39 +37,88 @@ class AddItemDialog extends ManagedWindow {
         this.search.tooltip.Hide()
     }
 
-    Show(*) {
-        if this.ShowExisting()
+    Show(positionPointer := true, *) {
+        if this.ShowExisting() {
+            if positionPointer
+                MovePointerToControlCenter(this.searchButton)
             return
+        }
 
-        if !this.CreateOwnedGui(this.owner, "-MinimizeBox -MaximizeBox", "添加监控项")
+        if !this.CreateOwnedGui(this.owner, "-MinimizeBox -MaximizeBox", Tr("添加监控项"))
             return
         try {
         this.gui.OnEvent("Escape", ObjBindMethod(this, "Close"))
         this.gui.OnEvent("Close", ObjBindMethod(this, "Close"))
-        SetDarkTitleBar(this.gui.Hwnd)
-        SetWindowIcon(this.gui.Hwnd, A_ScriptDir "\watchdog.ico")
-        this.gui.BackColor := "1E1E1E"
-        this.gui.SetFont("s10 cWhite", "Microsoft YaHei")
+        InitializeApplicationWindow(this.gui)
+        isCompact := LocalizationService.UsesCompactLayout()
+        windowWidth := isCompact ? 520 : 650
+        contentWidth := windowWidth - 40
 
-        this.gui.Add("Text", "x20 y15 w480 BackgroundTrans", "请输入进程名或目标路径，或通过下方菜单选择:`n（支持程序、脚本、快捷方式，以及文件夹批量导入）")
-        inputControl := AddCenteredSingleLineEdit(this.gui, 20, 65, 480, 26)
+        utilityWidth := isCompact ? 72 : 92
+        utilityGap := 8
+        utilityGroupWidth := utilityWidth * 2 + utilityGap
+        utilityGroupX := Round((windowWidth - utilityGroupWidth) / 2)
+        this.searchButton := this.gui.Add("Text", "x" utilityGroupX
+            " y15 w" utilityWidth
+            " h26 Center 0x200 Background" UiThemeService.Color("Toolbar")
+            " c" UiThemeService.Color("ToolbarText"), Tr("搜索..."))
+        this.browseButton := this.gui.Add("Text", "x"
+            (utilityGroupX + utilityWidth + utilityGap)
+            " y15 w" utilityWidth " h26 Center 0x200 Background"
+            UiThemeService.Color("Toolbar") " c"
+            UiThemeService.Color("ToolbarText"), Tr("选择..."))
+
+        ; 工具按钮与说明之间留出明确层次，说明到输入框则保持紧凑。
+        ; 两处增减相互抵消，使输入框位置稳定，不影响不同语言的既有高度。
+        hintY := 53
+        hintHeight := isCompact ? 42 : 62
+        inputY := hintY + hintHeight + 4
+        batchStatusY := inputY + 29
+        this.normalActionButtonY := inputY + 36
+        this.batchActionButtonY := batchStatusY + 20
+        this.normalWindowHeight := this.normalActionButtonY + 41
+        this.batchWindowHeight := this.batchActionButtonY + 41
+        this.pathHint := this.gui.Add("Text", "x20 y" hintY " w" contentWidth
+            " h" hintHeight " Center BackgroundTrans",
+            Tr("请通过上方按钮搜索或选择，或在下方填写进程名或目标路径：`n【支持程序、脚本、快捷方式，以及文件夹批量导入】"))
+
+        inputControl := AddCenteredSingleLineEdit(this.gui, 20, inputY,
+            contentWidth, 26)
         this.edit := inputControl.Edit
         SetDarkControl(this.edit.Hwnd)
 
-        this.batchStatus := this.gui.Add("Text", "x20 y94 w480 h18 Center BackgroundTrans cAFAFAF Hidden", "正在扫描...")
-        this.searchButton := this.gui.Add("Text", "x20 y114 w70 h26 Center 0x200 Background333333 cWhite", "🔍 搜索...")
-        this.browseButton := this.gui.Add("Text", "x98 y114 w72 h26 Center 0x200 Background333333 cWhite", "📂 选择...")
-        this.okButton := this.gui.Add("Text", "x356 y114 w68 h26 Center 0x200 Background0078D7 cWhite", "✔️ 确 定")
-        this.cancelButton := this.gui.Add("Text", "x432 y114 w68 h26 Center 0x200 Background333333 cWhite", "❌ 取 消")
-        RegisterHoverButton(this.searchButton, "333333")
-        RegisterHoverButton(this.browseButton, "333333")
-        RegisterHoverButton(this.okButton, "0078D7")
-        RegisterHoverButton(this.cancelButton, "333333")
+        this.batchStatus := this.gui.Add("Text", "x20 y" batchStatusY " w"
+            contentWidth
+            " h18 Center BackgroundTrans c" UiThemeService.Color("HintText")
+            " Hidden", Tr("正在扫描..."))
+        actionButtonWidth := 68
+        actionButtonGap := 8
+        actionGroupWidth := actionButtonWidth * 2 + actionButtonGap
+        actionGroupX := Round((windowWidth - actionGroupWidth) / 2)
+        this.okButton := this.gui.Add("Text", "x" actionGroupX
+            " y" this.normalActionButtonY " w" actionButtonWidth
+            " h26 Center 0x200 Background"
+            UiThemeService.Color("Primary") " c"
+            UiThemeService.Color("ButtonText"), Tr("确 定"))
+        this.cancelButton := this.gui.Add("Text", "x"
+            (actionGroupX + actionButtonWidth + actionButtonGap)
+            " y" this.normalActionButtonY " w" actionButtonWidth
+            " h26 Center 0x200 Background"
+            UiThemeService.Color("Toolbar") " c"
+            UiThemeService.Color("ToolbarText"), Tr("取 消"))
+        RegisterHoverButton(this.searchButton, UiThemeService.Color("Toolbar"))
+        RegisterHoverButton(this.browseButton, UiThemeService.Color("Toolbar"))
+        RegisterHoverButton(this.okButton, UiThemeService.Color("Primary"))
+        RegisterHoverButton(this.cancelButton, UiThemeService.Color("Toolbar"))
+        SetButtonLucideIcon(this.searchButton, "search.svg", 14, 6)
+        SetButtonLucideIcon(this.browseButton, "folder-open.svg", 14, 6)
         RegisterButtonClick(this.searchButton, ObjBindMethod(this.search, "Show"))
         RegisterButtonClick(this.browseButton, ObjBindMethod(this, "ShowBrowseMenu"))
         RegisterButtonClick(this.okButton, ObjBindMethod(this, "Confirm"), ButtonFeedbackMode.Dismissive)
         RegisterButtonClick(this.cancelButton, ObjBindMethod(this, "Close"), ButtonFeedbackMode.Dismissive)
-        this.gui.Show("w520 h155")
+        this.gui.Show("w" windowWidth " h" this.normalWindowHeight)
+        if positionPointer
+            MovePointerToControlCenter(this.searchButton)
         } catch as openErr {
             this.Close()
             throw openErr
@@ -67,74 +127,66 @@ class AddItemDialog extends ManagedWindow {
 
     ShowBrowseMenu(*) {
         browseMenu := Menu()
-        browseMenu.Add("📄 浏览文件...", ObjBindMethod(this, "BrowseFile"))
-        browseMenu.Add("📂 浏览文件夹...", ObjBindMethod(this, "BrowseDir"))
+        browseMenu.Add(Tr("📄 浏览文件..."), ObjBindMethod(this, "BrowseFile"))
+        browseMenu.Add(Tr("📂 浏览文件夹..."), ObjBindMethod(this, "BrowseDir"))
         browseMenu.Show()
     }
 
     BrowseFile(*) {
-        selected := this.SelectFile("选择要监控的文件")
+        selected := this.SelectFile(Tr("选择要监控的文件"))
         if selected && this.IsOpen()
             this.edit.Value := selected
     }
 
     BrowseDir(*) {
-        selected := this.SelectDirectory("选择要监控的文件夹")
+        selected := this.SelectDirectory(Tr("选择要监控的文件夹"))
         if selected && this.IsOpen()
             this.edit.Value := selected
     }
 
-    SelectFile(prompt := "选择文件") {
+    SelectFile(prompt := "") {
+        if prompt == ""
+            prompt := Tr("选择文件")
         hwndOwner := this.IsOpen() ? this.gui.Hwnd : 0
         return SelectFileWithNamedFilter(hwndOwner, "", prompt,
-            "支持的程序、脚本与快捷方式",
+            Tr("支持的程序、脚本与快捷方式"),
             "*.exe;*.com;*.msc;*.ahk;*.py;*.pyw;*.js;*.vbs;*.vbe;*.wsf;*.ps1;*.bat;*.cmd;*.rb;*.pl;*.php;*.lua;*.jar;*.sh;*.bash;*.lnk;*.url;*.appref-ms")
     }
 
-    SelectDirectory(prompt := "选择文件夹") {
-        try {
-            fbd := ComObject("{DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7}", "{d57c7288-d4ad-4768-be02-9d969532d960}")
-            ComCall(9, fbd, "UInt", 0x60)
-            ComCall(17, fbd, "Str", prompt)
-            hwndOwner := this.IsOpen() ? this.gui.Hwnd : 0
-            return this.ReadFileDialogPath(fbd, hwndOwner)
-        } catch {
-            return ""
-        }
-    }
-
-    ReadFileDialogPath(fileDialog, hwndOwner) {
-        if (ComCall(3, fileDialog, "Ptr", hwndOwner, "Int") != 0)
-            return ""
-        shellItem := 0
-        pathBuffer := 0
-        try {
-            ComCall(20, fileDialog, "Ptr*", &shellItem)
-            ComCall(5, shellItem, "UInt", 0x80058000, "Ptr*", &pathBuffer)
-            return pathBuffer ? StrGet(pathBuffer, "UTF-16") : ""
-        } finally {
-            if pathBuffer
-                try DllCall("ole32\CoTaskMemFree", "Ptr", pathBuffer)
-            if shellItem
-                try ObjRelease(shellItem)
-        }
+    SelectDirectory(prompt := "") {
+        if prompt == ""
+            prompt := Tr("选择文件夹")
+        hwndOwner := this.IsOpen() ? this.gui.Hwnd : 0
+        return SelectDirectoryWithModernDialog(hwndOwner, "", prompt)
     }
 
     SetBatchUi(active, statusText := "") {
         if !this.IsOpen()
             return
-        for control in [this.edit, this.searchButton, this.browseButton, this.okButton] {
-            if control
-                try control.Enabled := !active
-        }
+        if this.edit
+            try this.edit.Enabled := !active
+        for button in [this.searchButton, this.browseButton, this.okButton]
+            SetRegisteredButtonEnabled(button, !active)
         if this.batchStatus {
             try this.batchStatus.Text := statusText
             try this.batchStatus.Visible := active
         }
+        ; 常态不为空的批量状态行预留大块空白；仅在扫描期间下移操作按钮并
+        ; 增高窗口，结束后立即恢复紧凑布局。
+        actionButtonY := active
+            ? this.batchActionButtonY : this.normalActionButtonY
+        for button in [this.okButton, this.cancelButton] {
+            if button
+                try button.Move(, actionButtonY)
+        }
+        windowHeight := active
+            ? this.batchWindowHeight : this.normalWindowHeight
+        if windowHeight > 0
+            try this.gui.Show("NoActivate h" windowHeight)
     }
 
     StartBatchImport(rootPaths, directPaths := "") {
-        this.Show()
+        this.Show(false)
         if !this.IsOpen()
             return
         sessionId := this.CancelBatchImport(false)
@@ -170,10 +222,12 @@ class AddItemDialog extends ManagedWindow {
             }
             this.batchPendingIndex := 0
             this.batchAddedCount := 0
-            this.SetBatchUi(true, "正在扫描文件夹，可点击取消停止")
+            this.batchUndoState := ""
+            this.batchAddedPaths := []
+            this.SetBatchUi(true, Tr("正在扫描文件夹，可点击取消停止"))
             this.StartNextBatchRoot(sessionId)
         } catch as batchStartErr {
-            this.FailBatchImport("启动批量导入失败", batchStartErr,
+            this.FailBatchImport(Tr("启动批量导入失败"), batchStartErr,
                 sessionId)
         }
     }
@@ -193,8 +247,9 @@ class AddItemDialog extends ManagedWindow {
         while this.batchRootQueue.Length {
             rootPath := this.batchRootQueue.RemoveAt(1)
             remaining := App.batchImportMaxResults - this.batchPendingPaths.Length
-            timeoutSeconds := Max(30, Min(300, App.nativeScanTimeoutSeconds * 4))
-            scanWorker := App.fileScanner.Start("batch", rootPath,
+            ; 批量导入只扫描用户选中的目录，固定超时避免再暴露与程序搜索耦合的设置。
+            timeoutSeconds := 60
+            scanWorker := App.fileScanner.Start(rootPath,
                 App.recursiveBatchImport, remaining, timeoutSeconds)
             if scanWorker {
                 accepted := false
@@ -207,7 +262,7 @@ class AddItemDialog extends ManagedWindow {
                             scanWorker.CreationIdentity
                         this.batchWorkerDeadlineTicks := scanWorker.DeadlineTicks
                         this.batchOutputPath := scanWorker.Path
-                        this.batchStatus.Text := "正在扫描：" rootPath
+                        this.batchStatus.Text := Tr("正在扫描：{1}", rootPath)
                         SetTimer(this.batchPollTimer, 100)
                         accepted := true
                     }
@@ -282,11 +337,16 @@ class AddItemDialog extends ManagedWindow {
             workerCreationIdentity := this.batchWorkerCreationIdentity
             workerDeadlineTicks := this.batchWorkerDeadlineTicks
             outputPath := this.batchOutputPath
+            workerExists := workerPid && ProcessExist(workerPid)
+            currentWorkerIdentity := ""
+            if workerExists && workerCreationIdentity != ""
+                currentWorkerIdentity := App.processInspector
+                    .GetCreationIdentity(workerPid)
+            workerReplaced := workerExists && workerCreationIdentity != ""
+                && currentWorkerIdentity != ""
+                && currentWorkerIdentity != workerCreationIdentity
             if (workerPid
-                && (!ProcessExist(workerPid)
-                    || (workerCreationIdentity != ""
-                        && App.processInspector.GetCreationIdentity(
-                            workerPid) != workerCreationIdentity)
+                && (!workerExists || workerReplaced
                     || (workerDeadlineTicks
                         && GetTickCount64() >= workerDeadlineTicks))) {
                 SetTimer(this.batchPollTimer, 0)
@@ -308,7 +368,7 @@ class AddItemDialog extends ManagedWindow {
                 this.StartNextBatchRoot(sessionId)
             }
         } catch as batchPollErr {
-            this.FailBatchImport("读取后台扫描结果失败", batchPollErr,
+            this.FailBatchImport(Tr("读取后台扫描结果失败"), batchPollErr,
                 sessionId)
         }
     }
@@ -324,6 +384,8 @@ class AddItemDialog extends ManagedWindow {
                     return
                 this.batchPendingIndex := 0
                 this.batchAddedCount := 0
+                this.batchUndoState := ""
+                this.batchAddedPaths := []
                 this.batchTruncated := false
                 this.batchSessionId++
                 completedSessionId := this.batchSessionId
@@ -332,12 +394,14 @@ class AddItemDialog extends ManagedWindow {
                 Critical(previousCritical ? previousCritical : "Off")
             }
             if this.IsBatchSessionCurrent(completedSessionId)
-                try ShowDarkMsgBox("所选文件夹内未找到支持的程序、脚本或快捷方式。",
-                    "未找到目标", "Info", this.gui)
+                try ShowDarkMsgBox(Tr("所选文件夹内未找到支持的程序、脚本或快捷方式。"),
+                    Tr("未找到目标"), "Info", this.gui)
             return
         }
         this.batchPendingIndex := 0
-        this.batchStatus.Text := "正在添加扫描结果..."
+        this.batchUndoState := CaptureAppConfigState()
+        this.batchAddedPaths := []
+        this.batchStatus.Text := Tr("正在添加扫描结果...")
         SetTimer(this.batchConsumeTimer, 15)
     }
 
@@ -346,6 +410,15 @@ class AddItemDialog extends ManagedWindow {
             this.Close()
             return
         }
+        if !App.guardWorkGate.TryEnter()
+            return
+        try this.ConsumeBatchImportCore()
+        finally App.guardWorkGate.Leave()
+    }
+
+    ConsumeBatchImportCore(*) {
+        if !this.IsOpen()
+            return
         sessionId := this.batchSessionId
         try {
             batchEnd := Min(this.batchPendingPaths.Length,
@@ -361,25 +434,22 @@ class AddItemDialog extends ManagedWindow {
                 try {
                     if !this.IsBatchSessionCurrent(sessionId)
                         return
-                    firstSuccessfulSnapshot := this.batchAddedCount
-                        ? "" : CaptureAppConfigState()
                     if RegisterApp(resolvedPath, 1, 0, resolvedWorkDir,
                         "", "", "", "", false, shortcutArgs) {
-                        if !this.batchAddedCount
-                            CommitUndoState(firstSuccessfulSnapshot)
                         this.batchAddedCount++
+                        this.batchAddedPaths.Push(resolvedPath)
                     }
                 } finally {
                     Critical(previousCritical ? previousCritical : "Off")
                 }
             }
-            this.batchStatus.Text := "正在添加：" this.batchPendingIndex " / "
-                . this.batchPendingPaths.Length
+            this.batchStatus.Text := Tr("正在添加：{1} / {2}",
+                this.batchPendingIndex, this.batchPendingPaths.Length)
             if (this.batchPendingIndex < this.batchPendingPaths.Length)
                 return
             this.CompleteBatchImport(sessionId)
         } catch as batchConsumeErr {
-            this.FailBatchImport("添加扫描结果失败", batchConsumeErr,
+            this.FailBatchImport(Tr("添加扫描结果失败"), batchConsumeErr,
                 sessionId)
         }
     }
@@ -392,10 +462,14 @@ class AddItemDialog extends ManagedWindow {
                 return
             SetTimer(this.batchConsumeTimer, 0)
             addedCount := this.batchAddedCount
+            undoState := this.batchUndoState
+            addedPaths := this.batchAddedPaths
             wasTruncated := this.batchTruncated
             this.batchPendingPaths := []
             this.batchPendingIndex := 0
             this.batchAddedCount := 0
+            this.batchUndoState := ""
+            this.batchAddedPaths := []
             this.batchTruncated := false
             this.batchSessionId++
             completedSessionId := this.batchSessionId
@@ -403,14 +477,17 @@ class AddItemDialog extends ManagedWindow {
         } finally {
             Critical(previousCritical ? previousCritical : "Off")
         }
-        if addedCount
+        if addedCount {
+            CommitUndoState(undoState,
+                CreateAppHistoryAction("add", addedPaths))
             SaveAppsToIni()
-        message := "已添加 " addedCount " 个监控项。"
+        }
+        message := Tr("已添加 {1} 个监控项。", addedCount)
         if wasTruncated
-            message .= " 扫描达到时间或数量上限，结果已截断。"
+            message .= Tr(" 扫描达到时间或数量上限，结果已截断。")
         LogMsg(message)
         if this.IsBatchSessionCurrent(completedSessionId)
-            try ShowDarkMsgBox(message, "批量导入完成", "Info", this.gui)
+            try ShowDarkMsgBox(message, Tr("批量导入完成"), "Info", this.gui)
     }
 
     FailBatchImport(context, failure, expectedSessionId := 0) {
@@ -427,6 +504,8 @@ class AddItemDialog extends ManagedWindow {
             workerCreationIdentity := this.batchWorkerCreationIdentity
             outputPath := this.batchOutputPath
             addedCount := this.batchAddedCount
+            undoState := this.batchUndoState
+            addedPaths := this.batchAddedPaths
             this.batchWorkerPid := 0
             this.batchWorkerCreationIdentity := ""
             this.batchWorkerDeadlineTicks := 0
@@ -435,6 +514,8 @@ class AddItemDialog extends ManagedWindow {
             this.batchPendingPaths := []
             this.batchPendingIndex := 0
             this.batchAddedCount := 0
+            this.batchUndoState := ""
+            this.batchAddedPaths := []
             this.batchTruncated := false
             this.SetBatchUi(false)
         } finally {
@@ -442,15 +523,19 @@ class AddItemDialog extends ManagedWindow {
         }
         try App.fileScanner.Stop(workerPid, outputPath,
             workerCreationIdentity)
-        if addedCount
+        if addedCount {
+            CommitUndoState(undoState,
+                CreateAppHistoryAction("add", addedPaths))
             SaveAppsToIni()
-        failureText := failure is Error ? failure.Message : String(failure)
+        }
+        failureText := TrDiagnostic(failure is Error
+            ? failure.Message : String(failure))
         LogMsg(context ": " failureText)
         if this.IsBatchSessionCurrent(failureSessionId) {
-            message := context "。"
+            message := context Tr("。")
             if addedCount
-                message .= " 已保留并保存此前添加的 " addedCount " 个监控项。"
-            try ShowDarkMsgBox(message, "批量导入中断", "Error", this.gui)
+                message .= Tr(" 已保留并保存此前添加的 {1} 个监控项。", addedCount)
+            try ShowDarkMsgBox(message, Tr("批量导入中断"), "Error", this.gui)
         }
     }
 
@@ -466,6 +551,8 @@ class AddItemDialog extends ManagedWindow {
             workerCreationIdentity := this.batchWorkerCreationIdentity
             outputPath := this.batchOutputPath
             addedCount := this.batchAddedCount
+            undoState := this.batchUndoState
+            addedPaths := this.batchAddedPaths
             this.batchWorkerPid := 0
             this.batchWorkerCreationIdentity := ""
             this.batchWorkerDeadlineTicks := 0
@@ -474,6 +561,8 @@ class AddItemDialog extends ManagedWindow {
             this.batchPendingPaths := []
             this.batchPendingIndex := 0
             this.batchAddedCount := 0
+            this.batchUndoState := ""
+            this.batchAddedPaths := []
             this.batchTruncated := false
             if updateUi && this.IsOpen()
                 this.SetBatchUi(false)
@@ -483,8 +572,11 @@ class AddItemDialog extends ManagedWindow {
         try App.fileScanner.Stop(workerPid, outputPath,
             workerCreationIdentity)
         if addedCount {
+            CommitUndoState(undoState,
+                CreateAppHistoryAction("add", addedPaths))
             SaveAppsToIni()
-            LogMsg("批量导入已取消，已保留并保存此前添加的 " addedCount " 个监控项。")
+            LogMsg(Tr("批量导入已取消，已保留并保存此前添加的 {1} 个监控项。",
+                addedCount))
         }
         return cancelledSessionId
     }
@@ -507,19 +599,31 @@ class AddItemDialog extends ManagedWindow {
             normalizedPath := NormalizeTargetPath(path)
             if (normalizedPath == "" || App.appStates.Has(normalizedPath)
                 || DirExist(normalizedPath)) {
-                ShowDarkMsgBox("该目标已存在、无效或指向目录。", "未添加", "Info", this.gui)
+                ShowDarkMsgBox(Tr("该目标已存在、无效或指向目录。"),
+                    Tr("未添加"), "Info", this.gui)
             } else {
-                undoState := CaptureAppConfigState()
-                if RegisterApp(normalizedPath, 1, 0, resolvedWorkDir, "", "", "", "", false, shortcutArgs) {
-                    CommitUndoState(undoState)
-                    SaveAppsToIni()
-                    LogMsg("手动添加监控: " normalizedPath)
-                } else {
-                    ShowDarkMsgBox("该目标已存在、无效或指向目录。", "未添加", "Info", this.gui)
-                }
+                QueueGuardMutation(ObjBindMethod(this, "AddSingleItem",
+                    normalizedPath, resolvedWorkDir, shortcutArgs))
             }
         }
         this.Close()
+    }
+
+    AddSingleItem(normalizedPath, resolvedWorkDir, shortcutArgs, *) {
+        if App.appStates.Has(normalizedPath) || DirExist(normalizedPath)
+            return false
+        undoState := CaptureAppConfigState()
+        if !RegisterApp(normalizedPath, 1, 0, resolvedWorkDir, "", "", "",
+            "", false, shortcutArgs) {
+            LogMsg(Tr("添加监控项失败，已回滚内存状态：{1}",
+                normalizedPath))
+            return false
+        }
+        CommitUndoState(undoState,
+            CreateAppHistoryAction("add", normalizedPath))
+        SaveAppsToIni()
+        LogMsg(Tr("手动添加监控：{1}", normalizedPath))
+        return true
     }
 
     Close(*) {
@@ -527,11 +631,18 @@ class AddItemDialog extends ManagedWindow {
         try this.search.Close()
         this.DestroyGui()
         this.edit := ""
+        this.pathHint := ""
         this.searchButton := ""
         this.browseButton := ""
         this.okButton := ""
         this.cancelButton := ""
         this.batchStatus := ""
+        this.normalActionButtonY := 0
+        this.batchActionButtonY := 0
+        this.normalWindowHeight := 0
+        this.batchWindowHeight := 0
+        this.batchUndoState := ""
+        this.batchAddedPaths := []
     }
 
     Shutdown(*) {

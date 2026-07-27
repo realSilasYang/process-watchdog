@@ -1,3 +1,6 @@
+# GitHub Actions 依赖的自动更新策略。
+# 每月集中检查一次并限制并行拉取请求数量，既能及时获得安全与兼容性修复，
+# 也避免自动更新淹没人工维护工作；生成的请求统一标记为 dependencies。
 version: 2
 updates:
   - package-ecosystem: github-actions

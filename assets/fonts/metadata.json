@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "fonts": [
+    {
+      "name": "PingFang",
+      "version": "19.0d5e3",
+      "path": "assets/fonts/PingFang.ttc",
+      "families": ["PingFang SC", "PingFang HK", "PingFang TC"],
+      "faceCount": 36,
+      "source": "NOASSERTION",
+      "sourceCollection": "Commercially licensed Apple font collection",
+      "sourceFile": "PingFang/TrueType_Collection_format/PingFang.ttc",
+      "sha256": "8320B6E1ABB8E82DA13109AE91D74854FD800A320F62F8B5C038A4A3635DACDC",
+      "license": "LicenseRef-Commercial-Apple-Fonts",
+      "authorization": "Commercial redistribution authorization held by the project owner",
+      "copyright": "Copyright 2015 DynaComware. All rights reserved."
+    },
+    {
+      "name": "SF Pro Text Regular",
+      "version": "22.0d4e4",
+      "path": "assets/fonts/SF-Pro-Text-Regular.otf",
+      "families": ["SF Pro Text"],
+      "source": "NOASSERTION",
+      "sourceCollection": "Commercially licensed Apple font collection",
+      "sourceFile": "SF/SF Pro/SF-Pro-Text-Regular.otf",
+      "sha256": "2DA7E3FDB744566F9C96A9A3E48949E8B24209FC0B9BCF1D101F5DC88359F065",
+      "license": "LicenseRef-Commercial-Apple-Fonts",
+      "authorization": "Commercial redistribution authorization held by the project owner",
+      "copyright": "Copyright 2015-2026 Apple Inc. All rights reserved."
+    },
+    {
+      "name": "SF Pro Text Bold",
+      "version": "22.0d4e4",
+      "path": "assets/fonts/SF-Pro-Text-Bold.otf",
+      "families": ["SF Pro Text"],
+      "source": "NOASSERTION",
+      "sourceCollection": "Commercially licensed Apple font collection",
+      "sourceFile": "SF/SF Pro/SF-Pro-Text-Bold.otf",
+      "sha256": "DD73883D094A45B9F8207961168D687796C2F670D982D416C443516BFE54A9E6",
+      "license": "LicenseRef-Commercial-Apple-Fonts",
+      "authorization": "Commercial redistribution authorization held by the project owner",
+      "copyright": "Copyright 2015-2026 Apple Inc. All rights reserved."
+    },
+    {
+      "name": "Apple SD Gothic Neo",
+      "version": "1.0",
+      "path": "assets/fonts/AppleSDGothicNeo-Regular.ttf",
+      "families": ["AppleSDGothicNeoR00"],
+      "source": "NOASSERTION",
+      "sourceCollection": "Commercially licensed Apple font collection",
+      "sourceFile": "AppleSDGothicNeo-main/AppleSDGothicNeo-Regular.ttf",
+      "sha256": "F44EEC027992B99DC25DE0229C5726FE209A6CB80761AAEF98D050CDC0BC6CFE",
+      "license": "LicenseRef-Commercial-Apple-Fonts",
+      "authorization": "Commercial redistribution authorization held by the project owner",
+      "copyright": "NOASSERTION"
+    },
+    {
+      "name": "Harano Aji Gothic",
+      "version": "20250811",
+      "path": "assets/fonts/HaranoAjiGothic-Regular.otf",
+      "families": ["Harano Aji Gothic"],
+      "source": "https://github.com/trueroad/HaranoAjiFonts",
+      "sourceCollection": "User-designated Apple font directory",
+      "sourceFile": "HaranoAjiFonts/HaranoAjiGothic-Regular.otf",
+      "sha256": "FB846296A5AF628D5EAA5AC28838723A099B421C9B4F0D871413D2AD41893518",
+      "license": "OFL-1.1",
+      "copyright": "Copyright 2019-2025 Masamichi Hosoda and 2014-2025 Adobe"
+    },
+    {
+      "name": "Noto Sans",
+      "version": "2.015",
+      "path": "assets/fonts/NotoSans-Variable.ttf",
+      "families": ["Noto Sans"],
+      "axes": {
+        "weight": "100-900",
+        "width": "62.5-100"
+      },
+      "source": "https://github.com/notofonts/latin-greek-cyrillic",
+      "sourceCollection": "Google NoTofu",
+      "sourceFile": "NotoSans[wdth,wght].ttf",
+      "sha256": "AE80A5E79E4AFBF493E9F4684EC4988E6A861B3598102EE48950B4B7A754CDFF",
+      "license": "OFL-1.1",
+      "copyright": "Copyright 2022 The Noto Project Authors"
+    },
+    {
+      "name": "Noto Sans CJK",
+      "version": "2.004",
+      "path": "assets/fonts/NotoSansCJK.ttc",
+      "families": [
+        "Noto Sans CJK SC",
+        "Noto Sans CJK HK",
+        "Noto Sans CJK TC",
+        "Noto Sans CJK JP",
+        "Noto Sans CJK KR"
+      ],
+      "source": "https://github.com/notofonts/noto-cjk/releases/tag/Sans2.004",
+      "sourceCollection": "Google NoTofu",
+      "sourceFile": "NotoSansCJK.ttc",
+      "faceCount": 45,
+      "sha256": "063CDB343DC88ECB20D4B3DFA047327441AF7F7F327DCD5BE56812521C83F554",
+      "license": "OFL-1.1",
+      "copyright": "Copyright 2014-2021 Adobe"
+    }
+  ]
+}

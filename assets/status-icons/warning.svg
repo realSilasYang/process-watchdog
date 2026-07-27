@@ -1,6 +1,0 @@
-<!-- Watchdog status icon v2: symmetric octagonal warning sign. -->
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" data-design="watchdog-status-v2" shape-rendering="geometricPrecision">
-  <path d="M20 3h24l17 17v24L44 61H20L3 44V20Z" fill="#E5B73B"/>
-  <rect x="28.5" y="17" width="7" height="25" rx="3.5" fill="#FFFFFF"/>
-  <circle cx="32" cy="49" r="3.7" fill="#FFFFFF"/>
-</svg>

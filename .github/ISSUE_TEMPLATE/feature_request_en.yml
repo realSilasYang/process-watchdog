@@ -1,0 +1,77 @@
+# 英文新功能建议表单，要求从真实场景和完整工作流说明尚不存在的用户能力。
+# 对既有功能的小幅优化继续分流到改进表单，便于维护者判断范围。
+name: Feature request (English)
+description: Propose a new capability or complete workflow
+title: "[FEATURE] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: Start from a real user scenario. Use the Improvement form for changes to existing behavior, UI, or performance.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Feature summary
+      description: In one paragraph, explain the capability you want to add.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scenario
+    attributes:
+      label: Scenario and current problem
+      description: Explain who needs this, when, and why current behavior is insufficient.
+    validations:
+      required: true
+
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Expected workflow
+      description: Describe the entry point, settings, interactions, result, and failure handling in order.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Targets and edge cases
+      description: State whether this applies to EXEs, shortcuts, scripts, or particular Windows environments and list important edge cases.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed approach
+      description: Optional UI, configuration, monitoring, or compatibility design.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Explain the current workaround and why a feature is still needed.
+
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and data impact
+      description: Consider watchdog.ini, monitoring semantics, update protection, undo/redo, privileges, and system integration.
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: References
+      description: Add reference products, sketches, screenshots, related issues, or redacted examples.
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmation
+      options:
+        - label: I searched existing issues and found no equivalent request.
+          required: true
+        - label: This describes a new user capability, not a defect or a small improvement to existing behavior.
+          required: true

@@ -1,7 +1,12 @@
+﻿# SPDX 软件物料清单生成脚本。
+# 汇总项目、运行时和随包第三方组件的版本、许可证、来源与哈希，生成可独立核验的 JSON。
+
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [string]$OutputPath
+    [string]$OutputPath,
+    [Parameter(Mandatory = $true)]
+    [string]$ResolvedToolchainPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -11,8 +16,10 @@ $version = (Get-Content -LiteralPath (Join-Path $projectRoot 'VERSION') `
 $dependencyLock = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'third_party\dependencies.lock.json') `
     -Raw -Encoding UTF8 | ConvertFrom-Json
-$toolchainLock = Get-Content -LiteralPath `
-    (Join-Path $projectRoot 'tools\toolchain.lock.json') `
+$fontMetadata = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'assets\fonts\metadata.json') `
+    -Raw -Encoding UTF8 | ConvertFrom-Json
+$toolchainLock = Get-Content -LiteralPath $ResolvedToolchainPath `
     -Raw -Encoding UTF8 | ConvertFrom-Json
 $changeLog = Get-Content -LiteralPath (Join-Path $projectRoot 'CHANGELOG.md') `
     -Raw -Encoding UTF8
@@ -66,6 +73,38 @@ foreach ($dependency in $dependencyLock.dependencies) {
         spdxElementId = $applicationId
         relationshipType = 'DEPENDS_ON'
         relatedSpdxElement = $dependencyId
+    }
+}
+
+# 字体虽然位于 assets 而不是 third_party，但会随程序运行并影响界面输出，必须像
+# DLL 一样进入物料清单，避免发行包只校验二进制库却遗漏大体积字体资源。
+foreach ($font in $fontMetadata.fonts) {
+    $index++
+    $fontId = "SPDXRef-Font-$index"
+    $packages += [ordered]@{
+        SPDXID = $fontId
+        name = [string]$font.name
+        versionInfo = [string]$font.version
+        downloadLocation = [string]$font.source
+        filesAnalyzed = $false
+        licenseConcluded = [string]$font.license
+        licenseDeclared = [string]$font.license
+        copyrightText = [string]$font.copyright
+        comment = if ($font.PSObject.Properties.Name -contains
+                'authorization') {
+            [string]$font.authorization
+        } else {
+            'Open font distributed with its complete license text.'
+        }
+        checksums = @([ordered]@{
+            algorithm = 'SHA256'
+            checksumValue = [string]$font.sha256
+        })
+    }
+    $relationships += [ordered]@{
+        spdxElementId = $applicationId
+        relationshipType = 'DEPENDS_ON'
+        relatedSpdxElement = $fontId
     }
 }
 
@@ -134,14 +173,14 @@ foreach ($toolPackage in $toolPackages) {
 $iconSourceId = 'SPDXRef-IconSource'
 $packages += [ordered]@{
     SPDXID = $iconSourceId
-    name = 'Google Material Symbols Rounded'
-    versionInfo = 'NOASSERTION'
-    downloadLocation = 'https://github.com/google/material-design-icons'
+    name = 'Lucide Icons'
+    versionInfo = '1.27.0'
+    downloadLocation = 'https://github.com/lucide-icons/lucide/releases/tag/1.27.0'
     filesAnalyzed = $false
-    licenseConcluded = 'Apache-2.0'
-    licenseDeclared = 'Apache-2.0'
-    copyrightText = 'Copyright Google LLC'
-    comment = 'Status icon geometry was redrawn for this project; the exact upstream revision is not embedded.'
+    licenseConcluded = 'ISC AND MIT'
+    licenseDeclared = 'ISC AND MIT'
+    copyrightText = 'Copyright Lucide Icons contributors and Feather contributors'
+    comment = 'Selected SVG geometry is unchanged; the project applies fixed semantic colors. The administrator badge is loaded from the Windows Shell and is not packaged. Selected Feather-derived icons retain the MIT license.'
 }
 $relationships += [ordered]@{
     spdxElementId = $applicationId
@@ -161,6 +200,12 @@ $document = [ordered]@{
     }
     packages = $packages
     relationships = $relationships
+    hasExtractedLicensingInfos = @([ordered]@{
+        licenseId = 'LicenseRef-Commercial-Apple-Fonts'
+        name = 'Commercial Apple font redistribution authorization'
+        extractedText = 'The project owner has confirmed commercial authorization to distribute the identified PingFang, SF Pro Text, and Apple SD Gothic Neo files as components of Process Watchdog. The project license does not grant recipients separate extraction, resale, sublicensing, or reuse rights for these fonts.'
+        comment = 'The underlying commercial agreement contains non-public terms. Exact files and hashes are recorded in assets/fonts/metadata.json; the public boundary is documented in assets/fonts/COMMERCIAL-LICENSE-NOTICE.en.md.'
+    })
 }
 
 $parentDirectory = Split-Path -Parent ([System.IO.Path]::GetFullPath($OutputPath))

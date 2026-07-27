@@ -1,11 +1,16 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证主列表隐藏路径索引在添加、删除和重排后能够自愈。
+; 批量查询不得退化为逐次全表扫描，视觉序号也不能改变内部身份列。
+
+#Include ..\..\src\Platform\Win32.ahk
 #Include ..\..\src\UI\MainListProjection.ahk
 
 class FakeMainListView {
     __New(paths := "") {
         this.Paths := Type(paths) == "Array" ? paths : []
+        this.Sequences := []
         this.GetTextCalls := 0
     }
 
@@ -17,6 +22,15 @@ class FakeMainListView {
         this.GetTextCalls++
         return column == 3 && row >= 1 && row <= this.Paths.Length
             ? this.Paths[row] : ""
+    }
+
+    Modify(row, options, value) {
+        if options != "Col4" || row < 1 || row > this.Paths.Length
+            return false
+        while this.Sequences.Length < this.Paths.Length
+            this.Sequences.Push("")
+        this.Sequences[row] := value
+        return true
     }
 }
 
@@ -62,6 +76,21 @@ RunMainListProjectionTests() {
         "新增行未登记到投影索引")
     AssertProjectionEqual(3, projection.Find(listView,
         "C:\Apps\Gamma.exe"), "增量登记的行无法查询")
+
+    orderedList := FakeMainListView([
+        "C:\Apps\Gamma.exe",
+        "C:\Apps\Alpha.exe",
+        "C:\Apps\Beta.exe"
+    ])
+    AssertProjectionEqual(3, projection.RefreshSequenceFromOrder(orderedList,
+        ["C:\Apps\Beta.exe", "C:\Apps\Alpha.exe", "C:\Apps\Gamma.exe"]),
+        "临时排序视图未刷新全部自定义序号")
+    AssertProjectionEqual("3", orderedList.Sequences[1],
+        "临时排序后的 Gamma 序号没有保留自定义位置")
+    AssertProjectionEqual("2", orderedList.Sequences[2],
+        "临时排序后的 Alpha 序号没有保留自定义位置")
+    AssertProjectionEqual("1", orderedList.Sequences[3],
+        "临时排序后的 Beta 序号没有保留自定义位置")
 
     manyPaths := []
     Loop 1000

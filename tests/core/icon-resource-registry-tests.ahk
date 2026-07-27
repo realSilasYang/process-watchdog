@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证图标资源注册表的缓存、DPI 指标、重建代际与关闭语义。
+; 过期请求必须被拒绝，旧图像列表只能在新资源成功附着后退休。
+
 #Include ..\..\src\UI\IconResourceRegistry.ahk
 
 IconRegistryTestRebuild(generation, expectedDpi, *) {
@@ -39,26 +42,26 @@ RunIconResourceRegistryTests() {
         && registry.TakeWindowIcons(200) == "",
         "窗口图标所有权提取没有保持幂等")
 
-    AssertIconRegistry(registry.AcquireMainImageList(300, 300) == 300
-        && registry.AcquireMainImageList(300, 300) == 300
-        && registry.GetMainImageListUseCount(300) == 2,
-        "活动主 ImageList 没有正确累计占用")
-    AssertIconRegistry(!registry.RetireMainImageList(300, 300),
+    AssertIconRegistry(registry.AcquireImageList(300, 300) == 300
+        && registry.AcquireImageList(300, 300) == 300
+        && registry.GetImageListUseCount(300) == 2,
+        "活动 ImageList 没有正确累计占用")
+    AssertIconRegistry(!registry.RetireImageList(300, 300),
         "仍是活动列表的 ImageList 被错误退役")
-    AssertIconRegistry(!registry.RetireMainImageList(300, 301)
-        && registry.IsMainImageListRetired(300),
+    AssertIconRegistry(!registry.RetireImageList(300, 301)
+        && registry.IsImageListRetired(300),
         "有占用的旧 ImageList 没有进入延迟销毁状态")
-    AssertIconRegistry(!registry.ReleaseMainImageList(300)
-        && registry.GetMainImageListUseCount(300) == 1,
+    AssertIconRegistry(!registry.ReleaseImageList(300)
+        && registry.GetImageListUseCount(300) == 1,
         "尚有占用的退役 ImageList 被提前销毁")
-    AssertIconRegistry(registry.ReleaseMainImageList(300)
-        && !registry.IsMainImageListRetired(300),
+    AssertIconRegistry(registry.ReleaseImageList(300)
+        && !registry.IsImageListRetired(300),
         "最后一个占用释放后没有移交销毁责任")
-    AssertIconRegistry(!registry.ReleaseMainImageList(300),
+    AssertIconRegistry(!registry.ReleaseImageList(300),
         "重复释放 ImageList 产生了第二次销毁责任")
-    AssertIconRegistry(registry.RetireMainImageList(302, 301),
+    AssertIconRegistry(registry.RetireImageList(302, 301),
         "无占用的旧 ImageList 没有立即移交销毁责任")
-    AssertIconRegistry(!registry.AcquireMainImageList(999, 301),
+    AssertIconRegistry(!registry.AcquireImageList(999, 301),
         "未跟踪 ImageList 被错误接纳")
 
     originalMetrics := registry.GetMainIconMetrics()

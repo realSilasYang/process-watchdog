@@ -1,6 +1,6 @@
-; ==========================================
-; 13. 深色自适应用户交互弹窗面板控制方法集合
-; ==========================================
+; 深色模态消息框的创建与所有者恢复边界。
+; 弹窗使用项目统一按钮和窗口层级规则；无论用户点击按钮、关闭标题栏还是原生窗口
+; 被外部销毁，都必须先恢复上级交互，再释放当前窗口控件与图标资源。
 CloseDarkMsgBox(mb, ownerLease, &closed) {
     if closed
         return
@@ -14,7 +14,9 @@ CloseDarkMsgBox(mb, ownerLease, &closed) {
     finally WindowHierarchy.CompleteClose(closeContext)
 }
 
-ShowDarkMsgBox(Message, Title := "提示", MsgType := "Info", ownerGui := "") {
+ShowDarkMsgBox(Message, Title := "", MsgType := "Info", ownerGui := "") {
+    if Title == ""
+        Title := Tr("提示")
     Message := NormalizeUserVisibleParentheses(Message)
     Title := NormalizeUserVisibleParentheses(Title)
     mb := Gui("-MinimizeBox -MaximizeBox", Title)
@@ -24,7 +26,7 @@ ShowDarkMsgBox(Message, Title := "提示", MsgType := "Info", ownerGui := "") {
         try GuiModules.HideTransientWindows()
     ownerLease := ""
     closed := false
-    ; 检查主窗口是否存在，如果存在则将其禁用，模拟原生弹窗的“模态(Modal)”拦截效果
+    ; 主窗口存在时先将其禁用，模拟原生模态弹窗的交互拦截效果。
     dialogOwner := ownerGui
     if !dialogOwner && IsSet(Main)
         dialogOwner := Main.gui
@@ -38,24 +40,29 @@ ShowDarkMsgBox(Message, Title := "提示", MsgType := "Info", ownerGui := "") {
     }
 
     try {
-    ; 注入底层深色标题栏
-    SetDarkTitleBar(mb.Hwnd)
-    mb.BackColor := "1E1E1E"
+    ; 标题栏、图标、客户区和正文默认字体共用应用窗口初始化边界。
+    InitializeApplicationWindow(mb)
 
-    ; 图标与文字布局
+    ; 图标列保持固定宽度，正文根据消息长度计算高度并允许自然换行。
     iconStr := (MsgType == "Error") ? "❌" : "ℹ️" ; <--- 同步修改这里
     mb.SetFont("s18", "Segoe UI Emoji")
-    mb.Add("Text", "x20 y20 w30 h30 BackgroundTrans cWhite", iconStr)
+    mb.Add("Text", "x20 y20 w30 h30 BackgroundTrans c"
+        UiThemeService.Color("Text"), iconStr)
 
-    mb.SetFont("s10 cWhite", "Microsoft YaHei")
+    mb.SetFont("s10 c" UiThemeService.Color("Text"),
+        LocalizationService.GetUiFontName())
     mb.Add("Text", "x60 y25 w220 BackgroundTrans", Message)
 
-    ; 扁平化深色按钮
-    btnOk := mb.Add("Text", "x115 y+20 w70 h30 Center 0x200 Background0078D7 cWhite", "确 定")
-    RegisterHoverButton(btnOk, "0078D7")
+    ; 确认按钮复用全应用圆角绘制、悬浮和抬起后执行规则。
+    btnOk := mb.Add("Text",
+        "x115 y+20 w70 h30 Center 0x200 Background"
+            UiThemeService.Color("Primary") " c"
+            UiThemeService.Color("ButtonText"),
+        Tr("确 定"))
+    RegisterHoverButton(btnOk, UiThemeService.Color("Primary"))
     mb.Add("Text", "x10 y+0 h15", "") ; 底部留白
 
-    ; 销毁窗口并恢复主窗口交互
+    ; 所有关闭入口共享同一幂等收尾函数，避免重复恢复或激活错误窗口。
     closeAction := (*) => CloseDarkMsgBox(mb, ownerLease, &closed)
 
     RegisterButtonClick(btnOk, closeAction, ButtonFeedbackMode.Dismissive)
@@ -67,5 +74,79 @@ ShowDarkMsgBox(Message, Title := "提示", MsgType := "Info", ownerGui := "") {
     } catch as msgErr {
         CloseDarkMsgBox(mb, ownerLease, &closed)
         throw msgErr
+    }
+}
+
+; 守护事务持有共享工作门时不能显示阻塞式模态窗口。
+; 单次定时器会在当前事务返回并释放工作门后再创建消息框。
+ShowDarkMsgBoxDeferred(Message, Title := "", MsgType := "Info",
+    ownerGui := "") {
+    try {
+        SetTimer(ShowDarkMsgBox.Bind(Message, Title, MsgType, ownerGui), -1)
+        return true
+    } catch {
+        return false
+    }
+}
+
+; 需要用户明确选择的更新提示使用双按钮深色对话框，并沿用统一的所有者恢复顺序。
+ShowDarkConfirmBox(Message, Title, confirmText, cancelText,
+    ownerGui := "") {
+    Message := NormalizeUserVisibleParentheses(Message)
+    Title := NormalizeUserVisibleParentheses(Title)
+    mb := Gui("-MinimizeBox -MaximizeBox", Title)
+    try RestoreHoveredButton()
+    if IsSet(GuiModules)
+        try GuiModules.HideTransientWindows()
+    dialogOwner := ownerGui
+    if !dialogOwner && IsSet(Main)
+        dialogOwner := Main.gui
+    ownerLease := ""
+    closed := false
+    accepted := false
+    if dialogOwner && Type(dialogOwner) == "Gui" {
+        try {
+            if WinExist(dialogOwner.Hwnd) {
+                mb.Opt("+Owner" dialogOwner.Hwnd)
+                ownerLease := WindowHierarchy.Acquire(dialogOwner, mb.Hwnd)
+            }
+        }
+    }
+    try {
+        InitializeApplicationWindow(mb)
+        mb.SetFont("s18", "Segoe UI Emoji")
+        mb.Add("Text", "x20 y20 w30 h30 BackgroundTrans c"
+            UiThemeService.Color("Text"), "⬆️")
+        mb.SetFont("s10 c" UiThemeService.Color("Text"),
+            LocalizationService.GetUiFontName())
+        mb.Add("Text", "x60 y23 w280 BackgroundTrans", Message)
+        btnConfirm := mb.Add("Text",
+            "x92 y+22 w100 h30 Center 0x200 Background"
+                UiThemeService.Color("Primary") " c"
+                UiThemeService.Color("ButtonText"),
+            confirmText)
+        btnCancel := mb.Add("Text",
+            "x+12 yp w100 h30 Center 0x200 Background"
+                UiThemeService.Color("Toolbar") " c"
+                UiThemeService.Color("ToolbarText"),
+            cancelText)
+        mb.Add("Text", "x10 y+0 h15", "")
+        RegisterHoverButton(btnConfirm, UiThemeService.Color("Primary"))
+        RegisterHoverButton(btnCancel, UiThemeService.Color("Toolbar"))
+        closeAction := (*) => CloseDarkMsgBox(mb, ownerLease, &closed)
+        acceptAction := (*) => (accepted := true,
+            CloseDarkMsgBox(mb, ownerLease, &closed))
+        RegisterButtonClick(btnConfirm, acceptAction,
+            ButtonFeedbackMode.Dismissive)
+        RegisterButtonClick(btnCancel, closeAction,
+            ButtonFeedbackMode.Dismissive)
+        mb.OnEvent("Close", closeAction)
+        mb.OnEvent("Escape", closeAction)
+        mb.Show("w360 AutoSize")
+        WinWaitClose(mb.Hwnd)
+        return accepted
+    } catch as confirmError {
+        CloseDarkMsgBox(mb, ownerLease, &closed)
+        throw confirmError
     }
 }

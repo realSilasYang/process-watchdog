@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证升级保护纯状态机和参与者匹配规则。
+; 弱证据、PID 复用、文件仍变化和等待超时必须走各自分支，不能提前恢复守护。
+
 #Include ..\..\src\Maintenance\MaintenanceStateMachine.ahk
 #Include ..\..\src\Maintenance\MaintenanceActorMatcher.ahk
 
@@ -54,6 +57,12 @@ RunMaintenanceTests() {
     AssertMaintenanceThrows(
         ObjBindMethod(stateMachine, "Transition", "UnknownPhase"),
         "状态机接受了未知升级保护阶段")
+    stateMachine.Restore(MaintenancePhase.TimedOut)
+    AssertMaintenanceEqual(MaintenancePhase.TimedOut, stateMachine.Phase,
+        "持久化恢复入口无法从 Normal 恢复超时终态")
+    AssertMaintenanceThrows(
+        ObjBindMethod(stateMachine, "Restore", "UnknownPhase"),
+        "持久化恢复入口接受了未知升级保护阶段")
     AssertMaintenanceThrows(
         (*) => MaintenanceStateMachine("UnknownPhase"),
         "状态机接受了未知初始阶段")
@@ -157,7 +166,8 @@ RunMaintenanceTests() {
 
     processMap := Map(
         100, {pid: 100, parent: 0, name: "Product.exe", cmd: "",
-            exe: targetPath, creation: "TARGET"},
+            exe: targetPath, creation: "TARGET",
+            identity: "TARGET-LIVE"},
         200, {pid: 200, parent: 100, name: "Bridge.exe", cmd: "",
             exe: "C:\Tools\Bridge.exe", creation: "BRIDGE"})
     descendant := {pid: 506, parent: 200, name: "Worker.exe", cmd: "",
@@ -177,6 +187,29 @@ RunMaintenanceTests() {
     AssertMaintenanceEqual(2, descendantIdentity.ParentChain.Length,
         "演员身份没有保留完整父链")
 
+    ; 外部更新器可以先退出，再由普通名称的子进程继续替换文件。父进程已经
+    ; 不在新快照时，必须凭已记录身份和严格的创建时间顺序完成一次交接。
+    parentActorIdentity := MaintenanceActorIdentity(601,
+        "0000000000000100", rootPath "\Updater.exe", rootPath, [])
+    parentActorRecord := {Identity: parentActorIdentity,
+        LastSeenTicks: 1000}
+    actorAnchors := matcher.BuildActorAnchorMap(Map(
+        parentActorIdentity.Key, parentActorRecord))
+    handedOffChild := {pid: 602, parent: 601, name: "Worker.exe",
+        cmd: "", exe: "C:\Tools\Worker.exe",
+        identity: "0000000000000200"}
+    handoffMatch := matcher.Match(handedOffChild, targetPath, rootPath, [],
+        0, "", Map(602, handedOffChild), true, actorAnchors)
+    AssertMaintenance(handoffMatch.Matched
+        && handoffMatch.Evidence == "maintenance-descendant",
+        "短命更新器退出后没有把升级参与者身份交接给子进程")
+    reusedParentMap := Map(601, {pid: 601, parent: 0,
+        name: "Unrelated.exe", cmd: "", exe: "C:\Other\Unrelated.exe",
+        identity: "0000000000000300"}, 602, handedOffChild)
+    AssertMaintenance(!matcher.Match(handedOffChild, targetPath, rootPath,
+        [], 0, "", reusedParentMap, true, actorAnchors).Matched,
+        "父 PID 已被其他进程复用时仍接受了旧更新器的子进程交接")
+
     currentPid := DllCall("kernel32\GetCurrentProcessId", "UInt")
     creationResolver.Values[currentPid] := "ORIGINAL"
     liveIdentity := MaintenanceActorIdentity(currentPid, "ORIGINAL",
@@ -192,6 +225,12 @@ RunMaintenanceTests() {
     retainedRecords := matcher.RetainLiveRecords(previousRecords, Map())
     AssertMaintenance(retainedRecords.Has(liveIdentity.Key),
         "快照短暂缺少证据时丢弃了仍可核对身份的演员")
+    creationResolver.Values[currentPid] := ""
+    AssertMaintenanceEqual(-1, matcher.GetIdentityStatus(liveIdentity),
+        "创建身份暂不可读时没有返回未知状态")
+    retainedRecords := matcher.RetainLiveRecords(previousRecords, Map())
+    AssertMaintenance(retainedRecords.Has(liveIdentity.Key),
+        "创建身份暂不可读时提前丢弃了仍可能活动的升级参与者")
     creationResolver.Values[currentPid] := "REUSED"
     retainedRecords := matcher.RetainLiveRecords(previousRecords, Map())
     AssertMaintenance(!retainedRecords.Has(liveIdentity.Key),
@@ -203,6 +242,20 @@ RunMaintenanceTests() {
     AssertMaintenance(!matcher.Match(reusedTargetDescendant, targetPath,
         rootPath, [], currentPid, "ORIGINAL", Map(), true).Matched,
         "目标 PID 被复用后仍接受旧父子关系")
+    staleSnapshotMap := Map(currentPid, {pid: currentPid, parent: 0,
+        name: "Product.exe", cmd: "", exe: targetPath,
+        identity: "REUSED"})
+    AssertMaintenance(!matcher.Match(reusedTargetDescendant, targetPath,
+        rootPath, [], currentPid, "ORIGINAL", staleSnapshotMap,
+        true).Matched,
+        "快照内同 PID 的创建身份不符时仍接受旧父子关系")
+    identityMissingMap := Map(currentPid, {pid: currentPid, parent: 0,
+        name: "Product.exe", cmd: "", exe: targetPath,
+        identity: ""})
+    AssertMaintenance(!matcher.Match(reusedTargetDescendant, targetPath,
+        rootPath, [], currentPid, "ORIGINAL", identityMissingMap,
+        true).Matched,
+        "目标已退出且快照缺少创建身份时仍只凭 PID 接受父子关系")
 }
 
 try {

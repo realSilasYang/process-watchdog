@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证 INI 字段、展示配置和升级配置编解码器的往返一致性。
+; 损坏十六进制、非法 UTF-8、缺字段和越界数值必须显式失败，不能被当成空配置。
+
 #Include ..\..\src\Config\IniFieldCodec.ahk
 #Include ..\..\src\Config\DisplayConfigCodec.ahk
 #Include ..\..\src\Config\MaintenanceConfigCodec.ahk

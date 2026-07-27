@@ -1,9 +1,12 @@
+# 仅由维护者手动触发的正式发布流程：解析最新上游工具链、构建、校验并发布。
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
+  workflow_dispatch:
+
+concurrency:
+  group: manual-release
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -12,32 +15,65 @@ permissions:
 
 jobs:
   release:
+    if: github.ref == 'refs/heads/main'
     runs-on: windows-2022
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+          lfs: true
 
-      - name: Verify tag and version
+      - name: Verify release version and unpublished tag
+        id: release_meta
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $version = (Get-Content .\VERSION -Raw).Trim()
-          if ("v$version" -ne '${{ github.ref_name }}') {
-            throw "Tag ${{ github.ref_name }} does not match VERSION $version."
+          if ($version -notmatch '^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$') {
+            throw "VERSION is not a semantic version: $version"
           }
+          $remoteTag = git ls-remote --exit-code --tags origin "refs/tags/v$version"
+          $tagQueryExitCode = $LASTEXITCODE
+          if ($tagQueryExitCode -eq 0) {
+            git fetch --force origin `
+              "refs/tags/v$version`:refs/tags/v$version"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Unable to fetch existing draft tag v$version."
+            }
+            $remoteCommit = (git rev-list -n 1 "v$version").Trim()
+            if ($remoteCommit -cne $env:GITHUB_SHA) {
+              throw "Tag v$version already exists at another commit."
+            }
+            $release = gh api `
+              "repos/$env:GITHUB_REPOSITORY/releases/tags/v$version" |
+              ConvertFrom-Json
+            if (-not $release.draft) {
+              throw "Release v$version is already published; published versions are immutable."
+            }
+            Write-Host "Resuming the existing draft release v$version."
+          }
+          if ($tagQueryExitCode -ne 2) {
+            throw "Unable to query remote tag v$version."
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
 
-      - name: Bootstrap pinned toolchain
+      - name: Resolve latest upstream build tools
         id: toolchain
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          $tools = .\tools\bootstrap-toolchain.ps1
+          $tools = .\tools\bootstrap-toolchain.ps1 -RefreshBuildTools
           "ahk=$($tools.AutoHotkeyPath)" >> $env:GITHUB_OUTPUT
           "compiler=$($tools.CompilerPath)" >> $env:GITHUB_OUTPUT
           "actionlint=$($tools.ActionlintPath)" >> $env:GITHUB_OUTPUT
           "gitleaks=$($tools.GitleaksPath)" >> $env:GITHUB_OUTPUT
           "ahk_source=$($tools.AutoHotkeySourcePath)" >> $env:GITHUB_OUTPUT
+          "resolved=$($tools.ResolvedToolchainPath)" >> $env:GITHUB_OUTPUT
 
       - name: Verify
         shell: pwsh
@@ -61,20 +97,71 @@ jobs:
           -AutoHotkeyPath '${{ steps.toolchain.outputs.ahk }}'
           -CompilerPath '${{ steps.toolchain.outputs.compiler }}'
           -AutoHotkeySourcePath '${{ steps.toolchain.outputs.ahk_source }}'
+          -ResolvedToolchainPath '${{ steps.toolchain.outputs.resolved }}'
 
       - name: Attest release artifacts
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4
         with:
           subject-path: |
-            artifacts/release/*.zip
-            artifacts/release/*.spdx.json
-            artifacts/release/SHA256SUMS.txt
+            dist/*.zip
+            dist/*.exe
+            dist/*.spdx.json
+            dist/SHA256SUMS.txt
 
-      - name: Publish GitHub Release
+      - name: Preserve all build outputs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: process-watchdog-${{ steps.release_meta.outputs.version }}-all-build-outputs
+          path: dist/**
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload assets to draft release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
-          generate_release_notes: true
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          draft: true
+          generate_release_notes: false
+          body_path: docs/release-notes/v${{ steps.release_meta.outputs.version }}.md
+          fail_on_unmatched_files: true
           files: |
-            artifacts/release/*.zip
-            artifacts/release/*.spdx.json
-            artifacts/release/SHA256SUMS.txt
+            dist/*.zip
+            dist/*.exe
+            dist/*.spdx.json
+            dist/SHA256SUMS.txt
+
+      - name: Verify draft release assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $expectedAssets = @(
+            Get-ChildItem -LiteralPath .\dist -File |
+              Where-Object { $_.Extension -in @('.zip', '.exe', '.json') -or
+                $_.Name -ceq 'SHA256SUMS.txt' } |
+              ForEach-Object { $_.Name } |
+              Sort-Object
+          )
+          $release = gh api `
+            'repos/${{ github.repository }}/releases/tags/${{ steps.release_meta.outputs.tag }}' |
+            ConvertFrom-Json
+          if (-not $release.draft) {
+            throw 'The release became public before asset verification completed.'
+          }
+          $actualAssets = @($release.assets.name | Sort-Object)
+          $difference = @(Compare-Object -CaseSensitive `
+            -ReferenceObject $expectedAssets -DifferenceObject $actualAssets)
+          if ($difference.Count -ne 0 -or
+              $actualAssets.Count -ne $expectedAssets.Count) {
+            throw "Draft release assets are incomplete or unexpected: $($actualAssets -join ', ')"
+          }
+
+      - name: Publish completed draft atomically
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release edit '${{ steps.release_meta.outputs.tag }}'
+          --draft=false
+          --latest

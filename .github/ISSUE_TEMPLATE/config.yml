@@ -1,5 +1,13 @@
+# 关闭空白 Issue，让缺陷、功能和改进建议分别提供足够的复现与评估信息。
+# 尚未修复的安全问题统一进入 GitHub 私密漏洞报告入口。
 blank_issues_enabled: false
 contact_links:
-  - name: 私密安全报告
+  - name: 使用帮助与故障排查
+    url: https://github.com/realSilasYang/process-watchdog/blob/main/.github/SUPPORT.md
+    about: 提交 Issue 前先检查安装、兼容性、常见问题和诊断说明。
+  - name: Support and troubleshooting (English)
+    url: https://github.com/realSilasYang/process-watchdog/blob/main/.github/SUPPORT.en.md
+    about: Read installation, compatibility, troubleshooting, and diagnostics guidance before opening an issue.
+  - name: 私密报告安全漏洞
     url: https://github.com/realSilasYang/process-watchdog/security/advisories/new
-    about: 不要在公开 Issue 中提交漏洞利用细节。
+    about: 请勿在公开 Issue 中披露尚未修复的安全问题或可直接利用的细节。

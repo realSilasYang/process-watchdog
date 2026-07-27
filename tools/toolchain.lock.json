@@ -1,32 +1,6 @@
 {
   "schemaVersion": 1,
   "tools": {
-    "autoHotkey": {
-      "version": "2.0.26",
-      "archive": "AutoHotkey_2.0.26.zip",
-      "url": "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.26/AutoHotkey_2.0.26.zip",
-      "sha256": "43522AA3122A57784AC5DB30ABF85C2244475C36ACD7796E2C993355F9E926AE",
-      "executable": "AutoHotkey64.exe",
-      "executableSha256": "A2A54B8ABC476D7671D4DE0771BB54BF5F2373D79FF6871D0BA6A62C3B88AE00",
-      "licenseExpression": "GPL-2.0-only AND BSD-3-Clause",
-      "licenseFile": "license.txt",
-      "licenseSha256": "B27C1A7C92686E47F8740850AD24877A50BE23FD3DBD44EDEE50AC1223135E38",
-      "sourceCommit": "542510fe0eee2358820a1864ec8b4c9d61b39e0b",
-      "sourceArchive": "AutoHotkey_source_542510fe0eee2358820a1864ec8b4c9d61b39e0b.zip",
-      "sourceUrl": "https://codeload.github.com/AutoHotkey/AutoHotkey/zip/542510fe0eee2358820a1864ec8b4c9d61b39e0b",
-      "sourceSha256": "E54E4EA0CB04390D036F68C62B296719C4AF2E211799FD927F2B71FF501372B5",
-      "sbomRelationship": "DEPENDS_ON"
-    },
-    "ahk2Exe": {
-      "version": "1.1.37.02a2",
-      "archive": "Ahk2Exe1.1.37.02a2.zip",
-      "url": "https://github.com/AutoHotkey/Ahk2Exe/releases/download/Ahk2Exe1.1.37.02a2/Ahk2Exe1.1.37.02a2.zip",
-      "sha256": "C29B8C3A5124850D79FC9E66E2CA79677C377D7F31631AD3022BA159C5D9E3BE",
-      "executable": "Ahk2Exe.exe",
-      "executableSha256": "E54A599B19BAA5C1688849BBAE7A9CF049EEFCCD4F704C67941B40DA13A625B2",
-      "licenseExpression": "WTFPL",
-      "sbomRelationship": "BUILD_TOOL_OF"
-    },
     "actionlint": {
       "version": "1.7.12",
       "archive": "actionlint_1.7.12_windows_amd64.zip",

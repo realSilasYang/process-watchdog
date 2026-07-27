@@ -1,3 +1,7 @@
+; 全应用共享的单定时器任务调度器。
+; 待执行任务按截止时间维护在最小堆中，堆和定时器只在短临界区内修改；
+; 回调在临界区外运行，并通过任务令牌与目标代际自行拒绝过期工作。
+
 class WatchdogScheduler {
     __New(clock := "", autoArm := true, errorHandler := "") {
         this.Clock := clock
@@ -36,8 +40,9 @@ class WatchdogScheduler {
         } finally {
             Critical(previousCritical ? previousCritical : "Off")
         }
-        if shouldArm
-            this.ArmNext()
+        if shouldArm && !this.ArmNext()
+            throw (this.LastError is Error ? this.LastError
+                : Error("无法挂载守护任务定时器"))
         return task
     }
 
@@ -52,8 +57,7 @@ class WatchdogScheduler {
         } finally {
             Critical(previousCritical ? previousCritical : "Off")
         }
-        if shouldArm
-            this.ArmNext()
+        return !shouldArm || this.ArmNext()
     }
 
     RunDue(nowTicks := "") {
@@ -112,20 +116,48 @@ class WatchdogScheduler {
     }
 
     ArmNext() {
+        failedItems := []
+        timerError := ""
         previousCritical := A_IsCritical
         Critical("On")
         try {
             if this.Stopped || this.Running
-                return
-            try SetTimer(this.TimerCallback, 0)
-            this.DiscardInactiveHead()
-            if !this.Queue.Length
-                return
-            delayMs := Max(1, this.Queue[1].DueTicks - this.Now())
-            SetTimer(this.TimerCallback, -Min(delayMs, 0x7FFFFFFF))
+                return true
+            try {
+                ; 先撤销旧截止时间，再按当前堆顶重新挂载。第二步一旦失败，
+                ; 整个队列都已失去唤醒来源，必须统一失败而不能只取消新任务。
+                this.SetSharedTimer(0)
+                this.DiscardInactiveHead()
+                if !this.Queue.Length
+                    return true
+                delayMs := Max(1, this.Queue[1].DueTicks - this.Now())
+                this.SetSharedTimer(-Min(delayMs, 0x7FFFFFFF))
+            } catch as armError {
+                timerError := armError
+                this.LastError := armError
+                failedItems := this.Queue
+                this.Queue := []
+                for item in failedItems {
+                    if IsObject(item.Task)
+                        item.Task.Cancelled := true
+                }
+            }
         } finally {
             Critical(previousCritical ? previousCritical : "Off")
         }
+        if timerError is Error {
+            for item in failedItems {
+                if IsObject(this.ErrorHandler) {
+                    try this.ErrorHandler.Call(timerError, item.Task)
+                }
+            }
+            return false
+        }
+        return true
+    }
+
+    SetSharedTimer(period) {
+        SetTimer(this.TimerCallback, period)
     }
 
     Shutdown() {
@@ -135,7 +167,7 @@ class WatchdogScheduler {
             if this.Stopped
                 return
             this.Stopped := true
-            try SetTimer(this.TimerCallback, 0)
+            try this.SetSharedTimer(0)
             for item in this.Queue
                 item.Task.Cancelled := true
             this.Queue := []

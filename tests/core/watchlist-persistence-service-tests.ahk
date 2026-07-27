@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证守护列表顺序、升级配置、展示配置和恢复记录的一致持久化。
+; 损坏项目必须进入恢复区并在后续保存中原样保留，不能静默丢失用户数据。
+
 #Include ..\..\src\Config\IniFieldCodec.ahk
 #Include ..\..\src\Config\WatchdogConfigRepository.ahk
 #Include ..\..\src\Config\WatchlistPersistenceService.ahk

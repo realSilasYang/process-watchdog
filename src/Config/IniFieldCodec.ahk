@@ -1,3 +1,7 @@
+; INI 单字段的可逆文本编码器。
+; 使用十六进制保存任意 UTF-8 内容，读取时验证字节序列并执行往返检查，
+; 从而区分真正的空字符串与损坏、截断或无法无损解码的数据。
+
 class IniFieldCodec {
     static Encode(value) {
         value := String(value)

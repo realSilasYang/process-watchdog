@@ -1,3 +1,7 @@
+; 守护目标启动执行边界。
+; 根据目标规格选择 EXE、脚本宿主或快捷方式调用，按需隔离环境变量并保证随后恢复；
+; 管理员启动、工作目录和参数在这里统一落地，核心状态机不直接调用 Run。
+
 class TargetLaunchInvocation {
     __New(command, workingDirectory := "", options := "", outputLogPath := "") {
         this.Command := command
@@ -129,21 +133,65 @@ class TargetLauncher {
     }
 
     ParseEnvironment(environmentText) {
+        return this.ParseEnvironmentConfiguration(environmentText, false)
+            .Variables
+    }
+
+    ValidateEnvironment(environmentText) {
+        return this.ParseEnvironmentConfiguration(environmentText, true)
+    }
+
+    ParseEnvironmentConfiguration(environmentText, rejectInvalid) {
         variables := Map()
         variables.CaseSense := "Off"
+        normalizedLines := []
+        result := {
+            Valid: true,
+            Variables: variables,
+            Normalized: "",
+            ErrorCode: "",
+            LineNumber: 0,
+            VariableName: ""
+        }
         if (environmentText == "")
-            return variables
+            return result
+        lineNumber := 0
         Loop Parse, environmentText, "`n", "`r" {
-            if (A_LoopField == "")
+            lineNumber++
+            if (Trim(A_LoopField) == "")
                 continue
             separator := InStr(A_LoopField, "=")
-            if !separator
+            if !separator {
+                if rejectInvalid
+                    return this.InvalidEnvironmentResult(result,
+                        "MissingSeparator", lineNumber)
                 continue
+            }
             variableName := Trim(SubStr(A_LoopField, 1, separator - 1))
-            variableValue := Trim(SubStr(A_LoopField, separator + 1))
-            if RegExMatch(variableName, "i)^[a-z_][a-z0-9_]*$")
-                variables[variableName] := variableValue
+            variableValue := SubStr(A_LoopField, separator + 1)
+            if !RegExMatch(variableName, "i)^[a-z_][a-z0-9_]*$") {
+                if rejectInvalid
+                    return this.InvalidEnvironmentResult(result,
+                        "InvalidName", lineNumber, variableName)
+                continue
+            }
+            if rejectInvalid && variables.Has(variableName)
+                return this.InvalidEnvironmentResult(result,
+                    "DuplicateName", lineNumber, variableName)
+            variables[variableName] := variableValue
+            normalizedLines.Push(variableName "=" variableValue)
         }
-        return variables
+        for index, normalizedLine in normalizedLines
+            result.Normalized .= (index > 1 ? "`n" : "") normalizedLine
+        return result
+    }
+
+    InvalidEnvironmentResult(result, errorCode, lineNumber,
+        variableName := "") {
+        result.Valid := false
+        result.ErrorCode := errorCode
+        result.LineNumber := lineNumber
+        result.VariableName := variableName
+        return result
     }
 }

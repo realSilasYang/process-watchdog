@@ -1,3 +1,7 @@
+; 独立运行日志窗口。
+; 日志采用增量刷新并保留用户当前选择，允许复制、调整大小和最大化，但不会显示文本光标；
+; 该窗口不禁用主窗口，最小化或关闭日志也不会改变主窗口状态。
+
 class LogWindow extends ManagedWindow {
     __New(mainGui) {
         this.mainOwner := mainGui
@@ -9,6 +13,8 @@ class LogWindow extends ManagedWindow {
         this.horizontalScrollbarVisible := false
         this.verticalScrollbarVisible := false
         this.refreshTimer := ObjBindMethod(this, "RefreshContent")
+        this.initialLayoutTimer := ObjBindMethod(this,
+            "CompleteInitialLayout")
         this.renderedRevision := 0
     }
 
@@ -16,33 +22,35 @@ class LogWindow extends ManagedWindow {
         if this.ShowExisting()
             return
         this.owner := ownerGui ? ownerGui : this.mainOwner
-        if !this.CreateStandaloneGui("+Resize +MaximizeBox +MinSize420x280", "运行日志")
+        if !this.CreateStandaloneGui("+Resize +MaximizeBox +MinSize420x280",
+            Tr("运行日志"))
             return
         try {
         this.gui.OnEvent("Escape", ObjBindMethod(this, "Close"))
         this.gui.OnEvent("Close", ObjBindMethod(this, "Close"))
         this.gui.OnEvent("Size", ObjBindMethod(this, "OnResize"))
-        SetDarkTitleBar(this.gui.Hwnd)
-        SetWindowIcon(this.gui.Hwnd, A_ScriptDir "\watchdog.ico")
-        this.gui.BackColor := "1E1E1E"
-        this.gui.SetFont("s10 cWhite", "Microsoft YaHei")
-        this.textEdit := this.gui.Add("Edit", "x10 y10 w600 h260 ReadOnly Multi VScroll HScroll -Wrap Background252526 cWhite -E0x200", GetLogText())
+        InitializeApplicationWindow(this.gui)
+        this.textEdit := this.gui.Add("Edit", "x10 y10 w600 h260 ReadOnly Multi VScroll HScroll -Wrap Background"
+            UiThemeService.Color("Surface") " c" UiThemeService.Color("Text")
+            " -E0x200", GetLogText())
         SetDarkControl(this.textEdit.Hwnd)
         RegisterTextInputControl(this.textEdit, true)
         this.textEdit.OnEvent("Focus", ObjBindMethod(this, "HideCaret"))
         this.renderedRevision := App.logRevision
         this.exportButton := this.gui.Add("Button", "x250 y280 w120 h30",
-            "导出诊断包")
-        RegisterHoverButton(this.exportButton, "3A4656")
+            Tr("导出诊断包"))
+        RegisterHoverButton(this.exportButton, UiThemeService.Color("Toolbar"))
+        SetButtonLucideIcon(this.exportButton, "package-open.svg", 14, 6)
         RegisterButtonClick(this.exportButton,
             ObjBindMethod(this, "ExportDiagnostics"))
-        SetButtonTextColor(this.exportButton, "FFFFFF")
-        this.MeasureContent()
+        SetButtonTextColor(this.exportButton,
+            UiThemeService.Color("ToolbarText"))
         DllCall("user32\ShowScrollBar", "Ptr", this.textEdit.Hwnd, "Int", Win32.SB_BOTH, "Int", 0)
         this.horizontalScrollbarVisible := false
         this.verticalScrollbarVisible := false
         this.gui.Show("w620 h320")
-        this.UpdateScrollBars()
+        ; 先让窗口和日志正文进入屏幕，下一次消息循环再逐行测量滚动范围。
+        SetTimer(this.initialLayoutTimer, -1)
         SetTimer(this.refreshTimer, 500)
         } catch as openErr {
             this.Close()
@@ -60,6 +68,15 @@ class LogWindow extends ManagedWindow {
             this.exportButton.Move((Width - 120) // 2, Height - 40, 120, 30)
         this.UpdateScrollBars()
         this.HideCaret()
+    }
+
+    CompleteInitialLayout(*) {
+        try SetTimer(this.initialLayoutTimer, 0)
+        if !this.IsOpen() || !this.textEdit
+            return false
+        this.MeasureContent()
+        this.UpdateScrollBars()
+        return true
     }
 
     MeasureContent() {
@@ -105,9 +122,9 @@ class LogWindow extends ManagedWindow {
         availableWidth := NumGet(formattingRect, 8, "Int") - NumGet(formattingRect, 0, "Int")
         availableHeight := NumGet(formattingRect, 12, "Int") - NumGet(formattingRect, 4, "Int")
         if this.verticalScrollbarVisible
-            availableWidth += SysGet(2) ; SM_CXVSCROLL
+            availableWidth += SysGet(2) ; SM_CXVSCROLL：补回垂直滚动条占用的宽度。
         if this.horizontalScrollbarVisible
-            availableHeight += SysGet(3) ; SM_CYHSCROLL
+            availableHeight += SysGet(3) ; SM_CYHSCROLL：补回水平滚动条占用的高度。
 
         verticalBarWidth := SysGet(2)
         horizontalBarHeight := SysGet(3)
@@ -138,7 +155,8 @@ class LogWindow extends ManagedWindow {
         try this.RefreshContentCore()
         catch as refreshErr {
             try SetTimer(this.refreshTimer, 0)
-            LogMsg("刷新运行日志窗口失败，已暂停自动刷新: " refreshErr.Message)
+            LogMsg(Tr("刷新运行日志窗口失败，已暂停自动刷新：{1}",
+                TrDiagnostic(refreshErr.Message)))
         }
     }
 
@@ -179,25 +197,28 @@ class LogWindow extends ManagedWindow {
     }
 
     ExportDiagnostics(*) {
-        destinationDirectory := DirSelect(A_Desktop, 3,
-            "选择诊断包保存位置")
+        ownerHwnd := this.IsOpen() ? this.gui.Hwnd : 0
+        destinationDirectory := SelectDirectoryWithModernDialog(ownerHwnd,
+            A_Desktop, Tr("选择诊断包保存位置"))
         if destinationDirectory == ""
             return
         try {
             archivePath := App.diagnosticBundleService.Export(
                 destinationDirectory)
-            LogMsg("已导出本地诊断包: " archivePath)
-            ShowDarkMsgBox("诊断包已导出到：`n" archivePath,
-                "导出诊断包", "Info", this.gui)
+            LogMsg(Tr("已导出本地诊断包：{1}", archivePath))
+            ShowDarkMsgBox(Tr("诊断包已导出到：`n{1}", archivePath),
+                Tr("导出诊断包"), "Info", this.gui)
         } catch as exportError {
-            LogMsg("导出诊断包失败: " exportError.Message)
-            ShowDarkMsgBox("无法导出诊断包：`n" exportError.Message,
-                "导出诊断包", "Error", this.gui)
+            errorText := TrDiagnostic(exportError.Message)
+            LogMsg(Tr("导出诊断包失败：{1}", errorText))
+            ShowDarkMsgBox(Tr("无法导出诊断包：`n{1}", errorText),
+                Tr("导出诊断包"), "Error", this.gui)
         }
     }
 
     Close(*) {
         try SetTimer(this.refreshTimer, 0)
+        try SetTimer(this.initialLayoutTimer, 0)
         this.DestroyGui()
         this.textEdit := ""
         this.exportButton := ""

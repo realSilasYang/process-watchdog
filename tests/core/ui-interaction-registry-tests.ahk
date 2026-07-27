@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证界面交互注册表的按钮、输入框、光标缓存和失效句柄剪除。
+; 不可用按钮不能显示手型，窗口销毁后也不能残留指向旧控件的交互状态。
+
 #Include ..\..\src\UI\UiInteractionRegistry.ahk
 
 class FakeUiCursorLoader {

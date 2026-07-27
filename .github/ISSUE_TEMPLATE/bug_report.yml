@@ -1,47 +1,140 @@
-name: 缺陷报告
-description: 报告能够稳定复现的功能或界面问题
-title: "[Bug] "
+# 中文缺陷报告表单。
+# 必填环境、复现步骤和诊断信息用于区分守护误判、平台限制与界面问题；
+# 敏感信息提示放在提交入口，避免用户无意公开路径、参数或环境变量。
+name: 报告问题（简体中文）
+description: 报告能够稳定复现的功能错误、守护误判或界面异常
+title: "[BUG] "
 labels:
   - bug
 body:
   - type: markdown
     attributes:
-      value: 请先确认正在使用最新版本，并删除日志中的私人路径或参数后再提交。
+      value: |
+        提交前请升级到最新版本，并先查看 README、故障排查和兼容性说明。
+        日志和诊断包可能包含目标路径、启动参数或环境变量，请在公开前自行脱敏。尚未修复的安全问题请使用私密漏洞报告入口，不要创建公开 Issue。
+
   - type: input
     id: version
     attributes:
       label: 小助手版本
-      placeholder: 例如 0.1.0
+      description: 可在诊断包或发行包的 VERSION 文件中确认。
+      placeholder: 例如 1.0.0
     validations:
       required: true
-  - type: input
-    id: environment
+
+  - type: dropdown
+    id: distribution
     attributes:
-      label: 系统与显示环境
-      placeholder: 例如 Windows 11 24H2、150% 缩放、双显示器
+      label: 运行方式
+      options:
+        - GitHub Release 发行包
+        - AutoHotkey 源码
+        - 自行编译的 EXE
     validations:
       required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows 环境
+      description: 请填写 Windows 版本、版本号和系统内部版本。
+      placeholder: 例如 Windows 11 24H2（26100.4652）x64
+    validations:
+      required: true
+
+  - type: input
+    id: display
+    attributes:
+      label: 显示环境
+      description: 界面问题必须填写缩放比例、显示器数量和问题窗口所在显示器。
+      placeholder: 例如 300% 缩放、3840×2160、单显示器
+    validations:
+      required: true
+
+  - type: dropdown
+    id: target_type
+    attributes:
+      label: 守护目标类型
+      options:
+        - EXE 桌面程序
+        - LNK 快捷方式
+        - AHK／Python／JavaScript／PowerShell 脚本
+        - BAT／CMD 命令文件
+        - 与具体守护目标无关
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: 相关配置
+      description: 请说明是否要求管理员运行、是否启用软件升级保护、目标是否通过快捷方式启动，以及与问题有关的非默认设置。不要提交真实私人路径或参数。
+      placeholder: 例如：要求管理员运行；升级保护关闭；通过 LNK 启动；检查间隔 2000 毫秒。
+    validations:
+      required: true
+
   - type: textarea
     id: steps
     attributes:
-      label: 复现步骤
-      description: 请提供最短、稳定的操作顺序。
+      label: 最短复现步骤
+      description: 请从启动小助手或打开相关窗口开始，提供能够稳定复现的最短操作顺序。
+      placeholder: |
+        1. 启动……
+        2. 选择……
+        3. 执行……
+        4. 观察到……
     validations:
       required: true
-  - type: textarea
-    id: expected
+
+  - type: dropdown
+    id: frequency
     attributes:
-      label: 预期结果
+      label: 出现频率
+      options:
+        - 每次都出现
+        - 经常出现
+        - 偶尔出现
+        - 只出现过一次
     validations:
       required: true
+
   - type: textarea
     id: actual
     attributes:
-      label: 实际结果与日志
-      description: 可附截图、日志窗口内容或诊断包。
+      label: 实际表现
+      description: 请描述界面、状态、错误信息、进程变化或数据变化。不要只写“不能用”。
     validations:
       required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期表现
+      description: 请描述正确情况下用户应当看到的状态或结果。
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 日志、诊断包和截图
+      description: 请粘贴经过脱敏的关键日志，或拖入诊断包、截图和录屏。界面问题建议同时提供完整窗口和局部细节。
+
   - type: textarea
     id: notes
     attributes:
       label: 补充信息
+      description: 可填写首次出现版本、临时解决办法、相关 Issue、最近的软件升级或配置变化。
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: 提交确认
+      options:
+        - label: 我已确认问题在最新版本中仍然存在，并搜索过现有 Issue。
+          required: true
+        - label: 我已删除日志、诊断包和截图中的私人路径、参数、环境变量及其他敏感信息。
+          required: true
+        - label: 这不是尚未修复的安全漏洞；安全问题将通过私密报告入口提交。
+          required: true

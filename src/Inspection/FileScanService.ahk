@@ -1,3 +1,8 @@
+; 批量导入目录扫描工作器服务。
+; 扫描只接受用户明确选择的目录，并在独立进程中执行；父进程通过唯一结果文件轮询
+; 并验证完整头部。父进程从启动时就持有绑定工作器进程对象的内核句柄，
+; 即使创建身份暂不可读，取消、超时和退出也能安全终止正确的子进程并完成清理。
+
 class FileScanService {
     static MaximumResultLimit := 20000
 
@@ -54,24 +59,19 @@ class FileScanService {
         return results.Length < maximumResults
     }
 
-    ScanDirectoryToDepth(rootPath, depth, deadlineTicks, maximumResults,
-        seen, results) {
-        if (depth < 0 || !DirExist(rootPath))
+    ScanDirectoryFlat(rootPath, deadlineTicks, maximumResults, seen,
+        results) {
+        if !DirExist(rootPath)
             return true
         try {
-            Loop Files, RTrim(rootPath, "\") "\*.*", "FD" {
+            Loop Files, RTrim(rootPath, "\") "\*.*", "F" {
                 if (this.Now() >= deadlineTicks
                     || results.Length >= maximumResults)
                     return false
                 if InStr(A_LoopFileAttrib, "H")
                     || InStr(A_LoopFileAttrib, "S")
                     continue
-                if DirExist(A_LoopFileFullPath) {
-                    if (depth > 0 && !this.ScanDirectoryToDepth(
-                        A_LoopFileFullPath, depth - 1, deadlineTicks,
-                        maximumResults, seen, results))
-                        return false
-                } else if !this.AddScannedFile(A_LoopFileFullPath,
+                if !this.AddScannedFile(A_LoopFileFullPath,
                     deadlineTicks, maximumResults, seen, results) {
                     return false
                 }
@@ -98,7 +98,7 @@ class FileScanService {
             && results.Length < maximumResults
     }
 
-    WriteWorkerFile(outputPath, mode, rootPath, recursive, maximumResults,
+    WriteWorkerFile(outputPath, rootPath, recursive, maximumResults,
         timeoutSeconds) {
         maximumResults := Max(1, Min(Integer(maximumResults),
             FileScanService.MaximumResultLimit))
@@ -106,42 +106,11 @@ class FileScanService {
         seen := Map()
         seen.CaseSense := "Off"
         results := []
-        completed := true
-        if (StrLower(mode) == "batch") {
-            completed := recursive
-                ? this.ScanDirectoryRecursive(rootPath, deadlineTicks,
-                    maximumResults, seen, results)
-                : this.ScanDirectoryToDepth(rootPath, 0, deadlineTicks,
-                    maximumResults, seen, results)
-        } else {
-            for scanPath in [A_Programs, A_ProgramsCommon, A_Desktop,
-                A_DesktopCommon] {
-                if !this.ScanDirectoryRecursive(scanPath, deadlineTicks,
-                    maximumResults, seen, results) {
-                    completed := false
-                    break
-                }
-            }
-            if completed {
-                for scanPath in [EnvGet("ProgramFiles"),
-                    EnvGet("ProgramFiles(x86)"), A_MyDocuments] {
-                    if !this.ScanDirectoryToDepth(scanPath, 2, deadlineTicks,
-                        maximumResults, seen, results) {
-                        completed := false
-                        break
-                    }
-                }
-            }
-            if completed {
-                Loop Parse, DriveGetList() {
-                    if !this.ScanDirectoryToDepth(A_LoopField ":\", 1,
-                        deadlineTicks, maximumResults, seen, results) {
-                        completed := false
-                        break
-                    }
-                }
-            }
-        }
+        completed := recursive
+            ? this.ScanDirectoryRecursive(rootPath, deadlineTicks,
+                maximumResults, seen, results)
+            : this.ScanDirectoryFlat(rootPath, deadlineTicks,
+                maximumResults, seen, results)
         outputText := Format("{}|{}`r`n",
             completed ? "COMPLETE" : "TRUNCATED", results.Length)
         for filePath in results
@@ -159,7 +128,7 @@ class FileScanService {
         }
     }
 
-    Start(mode, rootPath, recursive, maximumResults, timeoutSeconds) {
+    Start(rootPath, recursive, maximumResults, timeoutSeconds) {
         static workerSequence := 0
         if this.Stopped
             return ""
@@ -173,30 +142,46 @@ class FileScanService {
         }
         timeoutSeconds := Max(1, Integer(timeoutSeconds))
         startedTicks := this.Now()
-        outputPath := Format("{}\watchdog-scan-{}-{}-{}.tmp",
+        outputPath := Format("{}\watchdog-import-{}-{}-{}.tmp",
             this.TempDirectory, this.ScriptWindow, startedTicks,
             currentWorkerSequence)
         workerPrefix := this.Compiled
             ? '"' this.ScriptPath '"'
             : '"' this.InterpreterPath '" "' this.ScriptPath '"'
-        command := Format('{} --file-scan-worker "{}" "{}" "{}" {} {} {}',
-            workerPrefix, outputPath, mode, rootPath, recursive ? 1 : 0,
+        command := Format('{} --file-scan-worker "{}" "{}" {} {} {}',
+            workerPrefix, outputPath, rootPath, recursive ? 1 : 0,
             maximumResults, timeoutSeconds)
         workerPid := 0
+        workerHandle := 0
+        creationIdentity := ""
         try {
             workerPid := this.LaunchWorker(command)
             if !workerPid
                 throw Error("后台扫描进程未返回 PID")
+            workerHandle := this.OpenWorkerHandle(workerPid)
+            try creationIdentity := this.Callbacks.GetCreationIdentity.Call(
+                workerPid)
+            if !workerHandle && creationIdentity == ""
+                throw Error("无法绑定后台扫描进程身份")
         } catch as scanError {
+            if workerHandle {
+                try this.TerminateBoundWorker(workerHandle, true)
+                this.CloseWorkerHandle(workerHandle)
+            } else if workerPid && creationIdentity != "" {
+                currentCreation := ""
+                try currentCreation := this.Callbacks.GetCreationIdentity.Call(
+                    workerPid)
+                if currentCreation != "" && currentCreation == creationIdentity {
+                    try ProcessClose(workerPid)
+                    try ProcessWaitClose(workerPid, 1)
+                }
+            }
             this.DeleteOutputFiles(outputPath)
-            try this.Callbacks.Log.Call("无法启动后台文件扫描: "
-                scanError.Message)
+            try this.Callbacks.Log.Call(this.Text("无法启动后台文件扫描：{1}",
+                this.DiagnosticText(scanError.Message)))
             return ""
         }
-        creationIdentity := ""
-        try creationIdentity := this.Callbacks.GetCreationIdentity.Call(
-            workerPid)
-        job := {Pid: workerPid, Path: outputPath,
+        job := {Pid: workerPid, Handle: workerHandle, Path: outputPath,
             CreationIdentity: creationIdentity,
             DeadlineTicks: startedTicks + timeoutSeconds * 1000 + 5000}
         rejectedAfterLaunch := false
@@ -211,7 +196,7 @@ class FileScanService {
             Critical(previousCritical ? previousCritical : "Off")
         }
         if rejectedAfterLaunch {
-            this.Stop(job.Pid, job.Path, job.CreationIdentity)
+            this.Stop(job.Pid, job.Path, job.CreationIdentity, job.Handle)
             return ""
         }
         return job
@@ -226,9 +211,14 @@ class FileScanService {
         return workerPid
     }
 
-    Stop(workerPid, outputPath, creationIdentity := "") {
+    Stop(workerPid, outputPath, creationIdentity := "", workerHandle := 0) {
+        if !workerHandle && outputPath != "" && this.Workers.Has(outputPath)
+            workerHandle := this.Workers[outputPath].Handle
         try {
-            if workerPid && creationIdentity != "" {
+            if workerHandle {
+                if this.GetWorkerHandleStatus(workerHandle) != 0
+                    this.TerminateBoundWorker(workerHandle, true)
+            } else if workerPid && creationIdentity != "" {
                 currentCreation := ""
                 try currentCreation := this.Callbacks.GetCreationIdentity.Call(
                     workerPid)
@@ -239,10 +229,11 @@ class FileScanService {
                 }
             }
         } finally {
+            this.CloseWorkerHandle(workerHandle)
             this.Forget(outputPath)
             if outputPath && !this.DeleteOutputFiles(outputPath)
-                try this.Callbacks.Log.Call(
-                    "无法清理后台扫描临时文件: " outputPath)
+                try this.Callbacks.Log.Call(this.Text(
+                    "无法清理后台扫描临时文件：{1}", outputPath))
         }
     }
 
@@ -254,10 +245,15 @@ class FileScanService {
             return []
         try return this.ParseResultText(resultText, &truncated, &resultReady)
         finally {
+            workerHandle := this.Workers.Has(outputPath)
+                ? this.Workers[outputPath].Handle : 0
+            if workerHandle && this.GetWorkerHandleStatus(workerHandle) != 0
+                try this.TerminateBoundWorker(workerHandle, true)
+            this.CloseWorkerHandle(workerHandle)
             this.Forget(outputPath)
             if !this.DeleteOutputFiles(outputPath)
-                try this.Callbacks.Log.Call(
-                    "无法清理后台扫描结果文件: " outputPath)
+                try this.Callbacks.Log.Call(this.Text(
+                    "无法清理后台扫描结果文件：{1}", outputPath))
         }
     }
 
@@ -326,6 +322,46 @@ class FileScanService {
         return outputDeleted && writingDeleted
     }
 
+    OpenWorkerHandle(pid) {
+        if !pid
+            return 0
+        ; SYNCHRONIZE | PROCESS_TERMINATE。句柄绑定的是本次创建的内核进程对象，
+        ; 后续即使数字 PID 被复用，也不会误伤复用该 PID 的其它进程。
+        return DllCall("kernel32\OpenProcess", "UInt", 0x00100001,
+            "Int", false, "UInt", pid, "Ptr")
+    }
+
+    GetWorkerHandleStatus(handle) {
+        if !handle
+            return -1
+        waitResult := DllCall("kernel32\WaitForSingleObject", "Ptr", handle,
+            "UInt", 0, "UInt")
+        if waitResult == 0
+            return 0
+        if waitResult == 0x00000102
+            return 1
+        return -1
+    }
+
+    TerminateBoundWorker(handle, waitForExit := true) {
+        if !handle
+            return false
+        if this.GetWorkerHandleStatus(handle) == 0
+            return true
+        if !DllCall("kernel32\TerminateProcess", "Ptr", handle,
+            "UInt", 1, "Int")
+            return false
+        if waitForExit
+            DllCall("kernel32\WaitForSingleObject", "Ptr", handle,
+                "UInt", 1000, "UInt")
+        return true
+    }
+
+    CloseWorkerHandle(handle) {
+        if handle
+            DllCall("kernel32\CloseHandle", "Ptr", handle)
+    }
+
     Shutdown(*) {
         jobs := []
         alreadyStopped := false
@@ -346,7 +382,7 @@ class FileScanService {
         if alreadyStopped
             return
         for job in jobs
-            this.Stop(job.Pid, job.Path, job.CreationIdentity)
+            this.Stop(job.Pid, job.Path, job.CreationIdentity, job.Handle)
     }
 
     CanonicalPath(path) {
@@ -355,5 +391,21 @@ class FileScanService {
 
     Now() {
         return this.Callbacks.Now.Call()
+    }
+
+    Text(template, values*) {
+        if this.Callbacks.HasOwnProp("Localize")
+            && IsObject(this.Callbacks.Localize) {
+            return this.Callbacks.Localize.Call(template, values*)
+        }
+        return values.Length ? Format(template, values*) : template
+    }
+
+    DiagnosticText(value) {
+        if this.Callbacks.HasOwnProp("LocalizeDiagnostic")
+            && IsObject(this.Callbacks.LocalizeDiagnostic) {
+            return this.Callbacks.LocalizeDiagnostic.Call(value)
+        }
+        return this.Text(value)
     }
 }

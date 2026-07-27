@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证目标身份冲突检测和快捷方式身份刷新事务。
+; 刷新期间控制器若被替换或新身份与现有项目冲突，任何候选结果都不能提交。
+
 #Include ..\..\src\Core\TargetSpecs.ahk
 #Include ..\..\src\Core\TargetIdentityService.ahk
 
@@ -112,6 +115,13 @@ TargetIdentityTestLog(messages, message) {
     messages.Push(message)
 }
 
+TargetIdentityTestInvalidate(counter, path, stateObj) {
+    counter.Count++
+    counter.LastPath := path
+    counter.LastState := stateObj
+    return true
+}
+
 TargetIdentityReplaceState(runtime, path, replacement, *) {
     runtime.appStates[path] := replacement
 }
@@ -147,7 +157,10 @@ RunTargetIdentityServiceTests() {
     runtime.appStates.CaseSense := "Off"
     clock := {Value: 100000}
     messages := []
+    invalidations := {Count: 0, LastPath: "", LastState: ""}
     service := TargetIdentityService(runtime, {
+        InvalidateRuntimeIdentity: TargetIdentityTestInvalidate.Bind(
+            invalidations),
         Log: TargetIdentityTestLog.Bind(messages),
         NormalizeRoot: TargetIdentityTestNormalizeRoot,
         Now: TargetIdentityTestNow.Bind(clock),
@@ -228,7 +241,8 @@ RunTargetIdentityServiceTests() {
     } finally Critical("Off")
     AssertTargetIdentityService(stateObj.ShortcutArgs == "--changed"
         && stateObj.ShortcutTargetSource == "快捷方式目标"
-        && runtime.targetSpecsService.ForceCount == forceCountBefore + 1,
+        && runtime.targetSpecsService.ForceCount == forceCountBefore + 1
+        && invalidations.Count == 0,
         "同一真实身份的参数更新没有精准失效规格缓存")
 
     clock.Value := 200000
@@ -246,6 +260,9 @@ RunTargetIdentityServiceTests() {
         && stateObj.SafetyStableSince == clock.Value
         && stateObj.MaintenanceFingerprintCheckedTicks == clock.Value
         && stateObj.MaintenanceReadyCheckedTicks == 0
+        && invalidations.Count == 1
+        && invalidations.LastPath == linkPath
+        && invalidations.LastState == stateObj
         && runtime.maintenanceCoordinator.CloseCount == 1
         && runtime.maintenanceCoordinator.EnsureCount == 1,
         "真实身份迁移没有原子更新目录、指纹或监听器")

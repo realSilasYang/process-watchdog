@@ -1,8 +1,12 @@
+﻿# 可复现构建检查。
+# 在隔离目录中连续构建两次发行物并比较哈希，定位时间戳、文件顺序或环境依赖造成的差异。
+
 [CmdletBinding()]
 param(
     [string]$AutoHotkeyPath = "",
     [string]$CompilerPath = "",
     [string]$AutoHotkeySourcePath = "",
+    [string]$ResolvedToolchainPath = "",
     [string]$OutputDirectory = ""
 )
 
@@ -12,27 +16,56 @@ $buildScript = Join-Path $projectRoot 'tools\build-release.ps1'
 $outputRoot = if ($OutputDirectory) {
     [System.IO.Path]::GetFullPath($OutputDirectory)
 } else {
-    Join-Path $projectRoot 'artifacts\release'
+    Join-Path $projectRoot 'dist'
+}
+
+if (-not $AutoHotkeyPath -or -not $CompilerPath -or
+    -not $AutoHotkeySourcePath -or -not $ResolvedToolchainPath) {
+    $toolchain = & (Join-Path $projectRoot `
+        'tools\bootstrap-toolchain.ps1')
+    if (-not $AutoHotkeyPath) { $AutoHotkeyPath = $toolchain.AutoHotkeyPath }
+    if (-not $CompilerPath) { $CompilerPath = $toolchain.CompilerPath }
+    if (-not $AutoHotkeySourcePath) {
+        $AutoHotkeySourcePath = $toolchain.AutoHotkeySourcePath
+    }
+    if (-not $ResolvedToolchainPath) {
+        $ResolvedToolchainPath = $toolchain.ResolvedToolchainPath
+    }
 }
 
 $first = & $buildScript -OutputDirectory $outputRoot `
     -AutoHotkeyPath $AutoHotkeyPath -CompilerPath $CompilerPath `
-    -AutoHotkeySourcePath $AutoHotkeySourcePath
+    -AutoHotkeySourcePath $AutoHotkeySourcePath `
+    -ResolvedToolchainPath $ResolvedToolchainPath
 $firstHash = $first.Sha256
+$firstExecutableHash = $first.ExecutableSha256
+$firstSourceHash = $first.SourceSha256
 $firstSbomHash = $first.SbomSha256
 $second = & $buildScript -OutputDirectory $outputRoot `
     -AutoHotkeyPath $AutoHotkeyPath -CompilerPath $CompilerPath `
-    -AutoHotkeySourcePath $AutoHotkeySourcePath
+    -AutoHotkeySourcePath $AutoHotkeySourcePath `
+    -ResolvedToolchainPath $ResolvedToolchainPath
 $secondHash = $second.Sha256
+$secondExecutableHash = $second.ExecutableSha256
+$secondSourceHash = $second.SourceSha256
 $secondSbomHash = $second.SbomSha256
 if ($firstHash -ne $secondHash) {
     throw "Release build is not reproducible: $firstHash != $secondHash"
 }
+if ($firstExecutableHash -ne $secondExecutableHash) {
+    throw "Standalone executable is not reproducible: $firstExecutableHash != $secondExecutableHash"
+}
 if ($firstSbomHash -ne $secondSbomHash) {
     throw "Release SBOM is not reproducible: $firstSbomHash != $secondSbomHash"
 }
+if ($firstSourceHash -ne $secondSourceHash) {
+    throw "Source release build is not reproducible: $firstSourceHash != $secondSourceHash"
+}
 $expectedChecksums = @{
     ([System.IO.Path]::GetFileName($second.ZipPath)) = $secondHash
+    ([System.IO.Path]::GetFileName($second.ExecutablePath)) = `
+        $secondExecutableHash
+    ([System.IO.Path]::GetFileName($second.SourceZipPath)) = $secondSourceHash
     ([System.IO.Path]::GetFileName($second.SbomPath)) = $secondSbomHash
 }
 $checksumLines = @(Get-Content -LiteralPath $second.ChecksumsPath `
@@ -51,7 +84,12 @@ foreach ($checksumLine in $checksumLines) {
     }
 }
 & (Join-Path $projectRoot 'tools\verify-release.ps1') `
-    -PackageDirectory $second.PackageDirectory
+    -PackageDirectory $second.PackageDirectory `
+    -StandaloneExecutablePath $second.ExecutablePath `
+    -SourcePackageDirectory $second.SourcePackageDirectory `
+    -ResolvedToolchainPath $ResolvedToolchainPath
 
 Write-Host "Reproducible release ZIP hash: $secondHash"
+Write-Host "Reproducible standalone EXE hash: $secondExecutableHash"
+Write-Host "Reproducible source ZIP hash: $secondSourceHash"
 Write-Host "Reproducible release SBOM hash: $secondSbomHash"

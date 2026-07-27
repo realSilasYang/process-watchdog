@@ -1,8 +1,16 @@
+; 项目使用的 Win32 常量集中表。
+; 数值保持与 Windows SDK 一致，业务模块只引用具名常量，避免散落的魔法数字；
+; 本文件不封装状态，也不拥有任何句柄或内存资源。
+
 class Win32 {
     static AHK_NOTIFYICON := 0x0404
     static NIN_BALLOONUSERCLICK := 0x0405
+    static WM_MOVE := 0x0003
     static WM_CLOSE := 0x0010
+    static WM_SETTINGCHANGE := 0x001A
+    static WM_THEMECHANGED := 0x031A
     static WM_DRAWITEM := 0x002B
+    static WM_MEASUREITEM := 0x002C
     static WM_NCDESTROY := 0x0082
     static WM_SETREDRAW := 0x000B
     static WM_GETFONT := 0x0031
@@ -12,6 +20,7 @@ class Win32 {
     static WM_SETICON := 0x0080
     static WM_NCLBUTTONDOWN := 0x00A1
     static WM_KEYDOWN := 0x0100
+    static WM_COMMAND := 0x0111
     static WM_SYSCOMMAND := 0x0112
     static WM_SETCURSOR := 0x0020
     static WM_MOUSEMOVE := 0x0200
@@ -24,19 +33,40 @@ class Win32 {
     static WM_DROPFILES := 0x0233
     static WM_COPYGLOBALDATA := 0x0049
     static WM_COPYDATA := 0x004A
+    static NM_CUSTOMDRAW := -12
+    static CDDS_PREPAINT := 0x00000001
+    static CDDS_ITEMPREPAINT := 0x00010001
+    static CDDS_ITEMPOSTPAINT := 0x00010002
+    static CDRF_DODEFAULT := 0x00000000
+    static CDRF_NOTIFYPOSTPAINT := 0x00000010
+    static CDRF_NOTIFYITEMDRAW := 0x00000020
+    static CDIS_SELECTED := 0x0001
+    static CBN_DROPDOWN := 7
     static EM_SETSEL := 0x00B1
     static EM_SCROLLCARET := 0x00B7
+    static EM_SETMARGINS := 0x00D3
+    static EM_GETMARGINS := 0x00D4
     static EM_GETSEL := 0x00B0
     static EM_LINESCROLL := 0x00B6
     static EM_GETFIRSTVISIBLELINE := 0x00CE
     static EM_GETRECT := 0x00B2
     static EM_GETLINECOUNT := 0x00BA
     static EM_CHARFROMPOS := 0x00D7
+    static EC_LEFTMARGIN := 0x0001
+    static EC_RIGHTMARGIN := 0x0002
+    static LVM_REDRAWITEMS := 0x1015
     static LVM_GETCOLUMNWIDTH := 0x101D
+    static LVM_GETCOLUMNW := 0x105F
     static LVM_GETHEADER := 0x101F
     static LVM_HITTEST := 0x1012
+    static LVM_GETITEMSTATE := 0x102C
+    static LVM_SETCOLUMNORDERARRAY := 0x103A
+    static LVM_GETCOLUMNORDERARRAY := 0x103B
     static LVM_SETITEMW := 0x104C
+    static LVIF_STATE := 0x00000008
     static LVIF_IMAGE := 0x00000002
+    static LVIS_SELECTED := 0x00000002
+    static LVIS_OVERLAYMASK := 0x00000F00
     static ICON_SMALL := 0
     static ICON_BIG := 1
     static LR_LOADFROMFILE := 0x00000010
@@ -52,12 +82,27 @@ class Win32 {
     static SHGFI_LARGEICON := 0x000000000
     static SHGFI_USEFILEATTRIBUTES := 0x000000010
     static SHGFI_SYSICONINDEX := 0x000004000
+    static SHGSI_ICON := 0x000000100
+    static SHGSI_SYSICONINDEX := 0x000004000
+    static SIID_SHIELD := 77
     static FILE_ATTRIBUTE_NORMAL := 0x00000080
     static PROCESS_QUERY_LIMITED_INFORMATION := 0x1000
     static TOKEN_QUERY := 0x0008
     static TOKEN_ELEVATION := 20
     static SHIL_EXTRALARGE := 2
+    static SHIL_JUMBO := 4
     static ILD_TRANSPARENT := 1
+    static MIM_STYLE := 0x00000010
+    static MNS_NOCHECK := 0x80000000
+    static MIIM_FTYPE := 0x00000100
+    static MFT_BITMAP := 0x00000004
+    static MFT_OWNERDRAW := 0x00000100
+    static MFT_SEPARATOR := 0x00000800
+    static ODT_MENU := 1
+    static ODS_SELECTED := 0x0001
+    static ODS_GRAYED := 0x0002
+    static ODS_MENU_DISABLED := 0x0004
+    static EVENT_OBJECT_SHOW := 0x8002
     static CTRL_C_EVENT := 0
     static SC_MINIMIZE := 0xF020
     static GWLP_HWNDPARENT := -8
@@ -82,4 +127,6 @@ class Win32 {
     static FILE_NOTIFY_FILTER := 0x0000005B
     static ERROR_IO_PENDING := 997
     static RDW_BUTTON_REFRESH := 0x0121
+    static RDW_LAYOUT_REFRESH := 0x0185 ; 同步重绘父窗口局部区域及其中的子控件。
+    static RDW_CONTROL_REFRESH := 0x0105 ; 失效、擦除并同步重绘单个控件。
 }

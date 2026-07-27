@@ -1,7 +1,12 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证原生进程检查器读取路径、创建身份、父进程和权限提升状态。
+; 访问拒绝与 PID 复用必须保持不确定语义，不能被误判成目标已停止。
+
 #Include ..\..\src\Platform\Win32.ahk
+#Include ..\..\src\Core\GuardTypes.ahk
+#Include ..\..\src\Inspection\ProcessSnapshotIndex.ahk
 #Include ..\..\src\Inspection\ProcessInspector.ahk
 
 AssertProcessInspector(value, message) {
@@ -40,6 +45,19 @@ RunProcessInspectorTests() {
     }
     AssertProcessInspector(currentFound,
         "原生进程快照没有包含当前进程")
+
+    autoHotkeySnapshot := inspector.CaptureAutoHotkeyScriptSnapshot()
+    currentScriptFound := false
+    for scriptInfo in autoHotkeySnapshot.Scripts {
+        if (scriptInfo.PID == currentPid
+            && ProcessSnapshotIndex.NormalizePath(scriptInfo.Path)
+                == ProcessSnapshotIndex.NormalizePath(A_ScriptFullPath)) {
+            currentScriptFound := true
+            break
+        }
+    }
+    AssertProcessInspector(autoHotkeySnapshot.Ready && currentScriptFound,
+        "AutoHotkey 主窗口快照没有识别当前脚本")
 
     deadPid := 0x7FFFFFFF
     while (deadPid > 0 && ProcessExist(deadPid))

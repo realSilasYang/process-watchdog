@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证目标文件指纹、可启动性、稳定时间与安装目录归属。
+; 文件替换中的短暂缺失和读取失败必须作为不确定证据，不能提前结束升级保护。
+
 #Include ..\..\src\Platform\Win32.ahk
 #Include ..\..\src\Inspection\TargetFileInspector.ahk
 

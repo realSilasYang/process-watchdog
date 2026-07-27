@@ -1,3 +1,7 @@
+; 软件升级保护配置的序列化边界。
+; 将安装足迹、等待时间和已学习更新程序身份转换为当前唯一格式；
+; 任何缺字段或非法数值都显式拒绝，避免兼容残留改变升级状态机含义。
+
 class MaintenanceConfigCodec {
     __New(callbacks, maintenanceActorMatcher) {
         this.Callbacks := callbacks

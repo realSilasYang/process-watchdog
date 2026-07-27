@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证多级窗口租约、上级禁用恢复和独立最小化行为。
+; 关闭或最小化下级窗口不能隐藏、最小化或错误激活更上层窗口。
+
 #Include ..\..\src\Platform\Win32.ahk
 #Include ..\..\src\UI\WindowHierarchy.ahk
 

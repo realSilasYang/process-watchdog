@@ -1,3 +1,7 @@
+; 应用运行设置的读取、校验、保存与运行态应用服务。
+; 每个字段独立使用安全默认值读取，保存时先校验完整候选对象，再用一次配置事务写入，
+; 防止轮询、停止或日志设置只更新了一部分。
+
 class RuntimeSettingsService {
     __New(repository, parseRetrySequence, defaultLogDirectory) {
         this.Repository := repository
@@ -14,12 +18,20 @@ class RuntimeSettingsService {
     Load() {
         defaults := this.CreateDefaults()
         settings := {
+            UiLanguage: this.Repository.Read("Settings", "UiLanguage",
+                defaults.UiLanguage),
+            UiFont: this.Repository.Read("Settings", "UiFont",
+                defaults.UiFont),
+            Theme: this.Repository.Read("Settings", "Theme",
+                defaults.Theme),
             CheckInterval: this.Repository.ReadBoundedInt("Settings",
                 "CheckInterval", defaults.CheckInterval, 500, 86400000),
             RetrySequence: this.Repository.Read("Settings", "RetrySequence",
                 defaults.RetrySequence),
             ShowAtStartup: this.Repository.ReadBool("Settings",
                 "ShowAtStartup", defaults.ShowAtStartup),
+            CheckUpdatesOnStartup: this.Repository.ReadBool("Settings",
+                "CheckUpdatesOnStartup", defaults.CheckUpdatesOnStartup),
             RecursiveBatchImport: this.Repository.ReadBool("Settings",
                 "RecursiveBatchImport", defaults.RecursiveBatchImport),
             LogMaxEntries: this.Repository.ReadBoundedInt("Settings",
@@ -35,16 +47,14 @@ class RuntimeSettingsService {
             CtrlCWaitSeconds: this.Repository.ReadBoundedInt("Settings",
                 "CtrlCWaitSeconds", defaults.CtrlCWaitSeconds, 1, 60),
             AllowForceTerminate: this.Repository.ReadBool("Settings",
-                "AllowForceTerminate", defaults.AllowForceTerminate),
-            PreferEverything: this.Repository.ReadBool("Settings",
-                "PreferEverything", defaults.PreferEverything),
-            NativeScanTimeoutSeconds: this.Repository.ReadBoundedInt(
-                "Settings", "NativeScanTimeoutSeconds",
-                defaults.NativeScanTimeoutSeconds, 1, 120),
-            EverythingMaxResults: this.Repository.ReadBoundedInt("Settings",
-                "EverythingMaxResults", defaults.EverythingMaxResults,
-                10, 1000)
+                "AllowForceTerminate", defaults.AllowForceTerminate)
         }
+        settings.UiLanguage := LocalizationService.NormalizeRequestedLanguage(
+            settings.UiLanguage, defaults.UiLanguage)
+        settings.UiFont := LocalizationService.NormalizeRequestedUiFont(
+            settings.UiFont, defaults.UiFont)
+        settings.Theme := UiThemeService.NormalizeRequestedTheme(
+            settings.Theme, defaults.Theme)
         try settings.LogDirectory := Trim(String(settings.LogDirectory))
         catch
             settings.LogDirectory := defaults.LogDirectory
@@ -70,10 +80,14 @@ class RuntimeSettingsService {
     }
 
     Apply(runtime, settings) {
+        runtime.uiLanguage := settings.UiLanguage
+        runtime.uiFont := settings.UiFont
+        runtime.uiTheme := settings.Theme
         runtime.checkInterval := settings.CheckInterval
         runtime.retrySequence := settings.RetrySequence
         runtime.retryDelayArray := this.CloneArray(settings.RetryDelayArray)
         runtime.showAtStartup := !!settings.ShowAtStartup
+        runtime.checkUpdatesOnStartup := !!settings.CheckUpdatesOnStartup
         runtime.recursiveBatchImport := !!settings.RecursiveBatchImport
         runtime.logMaxEntries := settings.LogMaxEntries
         runtime.logDirectory := settings.LogDirectory
@@ -82,9 +96,9 @@ class RuntimeSettingsService {
         runtime.gracefulStopSeconds := settings.GracefulStopSeconds
         runtime.ctrlCWaitSeconds := settings.CtrlCWaitSeconds
         runtime.allowForceTerminate := !!settings.AllowForceTerminate
-        runtime.preferEverything := !!settings.PreferEverything
-        runtime.nativeScanTimeoutSeconds := settings.NativeScanTimeoutSeconds
-        runtime.everythingMaxResults := settings.EverythingMaxResults
+        if runtime.HasOwnProp("applicationUpdateService")
+            runtime.applicationUpdateService.UiLanguage :=
+                LocalizationService.GetLanguage()
         return runtime
     }
 
@@ -92,10 +106,15 @@ class RuntimeSettingsService {
         if !IsObject(settings)
             throw TypeError("运行参数对象无效")
         normalized := {
+            UiLanguage: this.RequireUiLanguage(settings),
+            UiFont: this.RequireUiFont(settings),
+            Theme: this.RequireTheme(settings),
             CheckInterval: this.RequireInteger(settings, "CheckInterval",
                 500, 86400000),
             RetrySequence: this.RequireText(settings, "RetrySequence"),
             ShowAtStartup: this.RequireBoolean(settings, "ShowAtStartup"),
+            CheckUpdatesOnStartup: this.RequireBoolean(settings,
+                "CheckUpdatesOnStartup"),
             RecursiveBatchImport: this.RequireBoolean(settings,
                 "RecursiveBatchImport"),
             LogMaxEntries: this.RequireInteger(settings, "LogMaxEntries",
@@ -110,13 +129,7 @@ class RuntimeSettingsService {
             CtrlCWaitSeconds: this.RequireInteger(settings,
                 "CtrlCWaitSeconds", 1, 60),
             AllowForceTerminate: this.RequireBoolean(settings,
-                "AllowForceTerminate"),
-            PreferEverything: this.RequireBoolean(settings,
-                "PreferEverything"),
-            NativeScanTimeoutSeconds: this.RequireInteger(settings,
-                "NativeScanTimeoutSeconds", 1, 120),
-            EverythingMaxResults: this.RequireInteger(settings,
-                "EverythingMaxResults", 10, 1000)
+                "AllowForceTerminate")
         }
         retryDelays := this.ParseRetrySequence.Call(normalized.RetrySequence)
         if !retryDelays
@@ -127,10 +140,14 @@ class RuntimeSettingsService {
 
     CreateDefaults() {
         return {
+            UiLanguage: "auto",
+            UiFont: "auto",
+            Theme: "auto",
             CheckInterval: 2000,
             RetrySequence: "1, 10, 60",
             RetryDelayArray: [1000, 10000, 60000],
             ShowAtStartup: false,
+            CheckUpdatesOnStartup: true,
             RecursiveBatchImport: true,
             LogMaxEntries: 500,
             LogDirectory: this.DefaultLogDirectory,
@@ -138,15 +155,15 @@ class RuntimeSettingsService {
             ClearLogsOnStartup: false,
             GracefulStopSeconds: 3,
             CtrlCWaitSeconds: 2,
-            AllowForceTerminate: true,
-            PreferEverything: true,
-            NativeScanTimeoutSeconds: 15,
-            EverythingMaxResults: 80
+            AllowForceTerminate: true
         }
     }
 
     CreateEntries(settings, includeReloadMarker := false) {
         entries := [
+            {Key: "UiLanguage", Value: settings.UiLanguage},
+            {Key: "UiFont", Value: settings.UiFont},
+            {Key: "Theme", Value: settings.Theme},
             {Key: "CheckInterval", Value: settings.CheckInterval},
             {Key: "RetrySequence", Value: settings.RetrySequence}
         ]
@@ -154,6 +171,8 @@ class RuntimeSettingsService {
             entries.Push({Key: "ShowAfterReload", Value: 0})
         entries.Push(
             {Key: "ShowAtStartup", Value: settings.ShowAtStartup ? 1 : 0},
+            {Key: "CheckUpdatesOnStartup",
+                Value: settings.CheckUpdatesOnStartup ? 1 : 0},
             {Key: "RecursiveBatchImport",
                 Value: settings.RecursiveBatchImport ? 1 : 0},
             {Key: "LogMaxEntries", Value: settings.LogMaxEntries},
@@ -164,11 +183,7 @@ class RuntimeSettingsService {
             {Key: "GracefulStopSeconds", Value: settings.GracefulStopSeconds},
             {Key: "CtrlCWaitSeconds", Value: settings.CtrlCWaitSeconds},
             {Key: "AllowForceTerminate",
-                Value: settings.AllowForceTerminate ? 1 : 0},
-            {Key: "PreferEverything", Value: settings.PreferEverything ? 1 : 0},
-            {Key: "NativeScanTimeoutSeconds",
-                Value: settings.NativeScanTimeoutSeconds},
-            {Key: "EverythingMaxResults", Value: settings.EverythingMaxResults}
+                Value: settings.AllowForceTerminate ? 1 : 0}
         )
         return entries
     }
@@ -197,6 +212,36 @@ class RuntimeSettingsService {
         if !settings.HasOwnProp(propertyName)
             throw ValueError("缺少运行参数: " propertyName)
         return !!settings.%propertyName%
+    }
+
+    RequireUiLanguage(settings) {
+        if !settings.HasOwnProp("UiLanguage")
+            throw ValueError("缺少运行参数: UiLanguage")
+        if !LocalizationService.TryNormalizeRequestedLanguage(
+                settings.UiLanguage, &normalized)
+            throw ValueError("运行参数不是支持的界面语言: "
+                String(settings.UiLanguage))
+        return normalized
+    }
+
+    RequireUiFont(settings) {
+        if !settings.HasOwnProp("UiFont")
+            throw ValueError("缺少运行参数: UiFont")
+        if !LocalizationService.TryNormalizeRequestedUiFont(
+                settings.UiFont, &normalized)
+            throw ValueError("运行参数不是本机已安装的内容字体: "
+                String(settings.UiFont))
+        return normalized
+    }
+
+    RequireTheme(settings) {
+        if !settings.HasOwnProp("Theme")
+            throw ValueError("缺少运行参数: Theme")
+        if !UiThemeService.TryNormalizeRequestedTheme(settings.Theme,
+                &normalized)
+            throw ValueError("运行参数不是支持的界面主题: "
+                String(settings.Theme))
+        return normalized
     }
 
     CloneArray(values) {

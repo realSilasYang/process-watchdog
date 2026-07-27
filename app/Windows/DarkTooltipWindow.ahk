@@ -1,3 +1,7 @@
+; 深色悬浮提示窗口。
+; 根据文本测量结果和当前显示器工作区动态定位，既不抢夺键盘焦点，也不越出屏幕；
+; 字体和窗口句柄只在窗口存活期间使用，销毁后必须清空以免命中旧对象。
+
 class DarkTooltipWindow extends ManagedWindow {
     __New() {
         this.hoverTimer := 0
@@ -28,32 +32,44 @@ class DarkTooltipWindow extends ManagedWindow {
             if !control
                 return
             text := ""
-            if (control == Main.lv) {
-                hitTestInfo := Buffer(24, 0)
-                point := Buffer(8)
-                DllCall("user32\GetCursorPos", "Ptr", point)
-                DllCall("user32\ScreenToClient", "Ptr", Main.lv.Hwnd, "Ptr", point)
-                NumPut("Int", NumGet(point, 0, "Int"), hitTestInfo, 0)
-                NumPut("Int", NumGet(point, 4, "Int"), hitTestInfo, 4)
-                result := SendMessage(Win32.LVM_HITTEST, 0, hitTestInfo.Ptr, Main.lv.Hwnd)
-                if (result != -1) {
-                    this.lastRow := result + 1
-                    path := Main.lv.GetText(result + 1, 3)
-                    if App.appStates.Has(path)
-                        text := this.BuildEnvironmentText(App.appStates[path])
+            ; 普通窗口可把提示直接附着在共享按钮状态上；显式文本优先于
+            ; 主窗口的固定说明，也使 URL 提示天然复用当前主题的提示窗口。
+            if App.uiInteractions.HasButton(hwnd) {
+                buttonState := App.uiInteractions.GetButton(hwnd)
+                if buttonState.HasOwnProp("tooltipText")
+                    text := buttonState.tooltipText
+            }
+            if text == "" && IsSet(Main) {
+                if (control == Main.lv) {
+                    hitTestInfo := Buffer(24, 0)
+                    point := Buffer(8)
+                    DllCall("user32\GetCursorPos", "Ptr", point)
+                    DllCall("user32\ScreenToClient", "Ptr", Main.lv.Hwnd,
+                        "Ptr", point)
+                    NumPut("Int", NumGet(point, 0, "Int"), hitTestInfo, 0)
+                    NumPut("Int", NumGet(point, 4, "Int"), hitTestInfo, 4)
+                    result := SendMessage(Win32.LVM_HITTEST, 0,
+                        hitTestInfo.Ptr, Main.lv.Hwnd)
+                    if (result != -1) {
+                        this.lastRow := result + 1
+                        path := Main.lv.GetText(result + 1, 3)
+                        if App.appStates.Has(path)
+                            text := this.BuildEnvironmentText(
+                                App.appStates[path])
+                    }
+                } else if (control == Main.btnAdd) {
+                    text := Tr("添加程序、脚本或快捷方式`n支持搜索、文件夹批量导入和文件拖放")
+                } else if (control == Main.btnDel) {
+                    text := Tr("删除选中的守护项目（支持多选，可撤销）`n快捷键：Delete")
+                } else if (control == Main.btnPause) {
+                    text := Tr("暂停或恢复选中项目的守护，不会退出目标`n支持多选；混合状态时逐项反转")
+                } else if (control == Main.btnSet) {
+                    text := Tr("配置通用、监控与启动、停止策略、日志`n以及关于选项")
+                } else if (control == Main.btnSupport) {
+                    text := Tr("打开帮助信息`n可选择查看使用说明、运行日志或提交反馈")
+                } else if (control == Main.btnDonate) {
+                    text := Tr("支持开源项目`n可使用微信支付或支付宝扫码捐赠")
                 }
-            } else if (control == Main.btnAdd) {
-                text := "添加程序、脚本或快捷方式`n支持搜索、文件夹批量导入和文件拖放"
-            } else if (control == Main.btnDel) {
-                text := "删除选中的守护项目（支持多选，可撤销）`n快捷键：Delete"
-            } else if (control == Main.btnPause) {
-                text := "暂停或恢复选中项目的守护，不会退出目标`n支持多选；混合状态时逐项反转"
-            } else if (control == Main.btnSet) {
-                text := "配置系统集成、监控与启动、停止`n以及日志、搜索与导入选项"
-            } else if (control == Main.btnLog) {
-                text := "查看实时运行日志`n涵盖监控、重启、升级保护与操作记录"
-            } else if (control == Main.btnHelp) {
-                text := "查看支持类型、操作方法、守护设置`n以及升级保护说明"
             }
             if (text != "") {
                 this.hoverTimer := ObjBindMethod(this, "Show", text)
@@ -68,32 +84,37 @@ class DarkTooltipWindow extends ManagedWindow {
             || (state.HasOwnProp("EnvVars") && state.EnvVars != "")
         if !hasEnvironment
             return ""
-        text := "独立环境配置 💡`n"
+        text := Tr("独立环境配置 💡`n")
         if (state.HasOwnProp("WorkDir") && state.WorkDir != "")
-            text .= "📁 工作目录: " state.WorkDir "`n"
+            text .= Tr("📁 工作目录：{1}`n", state.WorkDir)
         if (state.HasOwnProp("Args") && state.Args != "")
-            text .= "⚙️ 启动参数: " state.Args "`n"
+            text .= Tr("⚙️ 启动参数：{1}`n", state.Args)
         if (state.HasOwnProp("EnvVars") && state.EnvVars != "") {
             count := 0
             Loop Parse, state.EnvVars, "`n", "`r" {
                 if Trim(A_LoopField) != ""
                     count++
             }
-            text .= "🌿 环境变量: " count " 项`n"
+            text .= Tr("🌿 环境变量：{1} 项`n", count)
         }
         return text
     }
 
     Show(text, *) {
-        text := NormalizeUserVisibleParentheses(text)
+        ; 调用方按项目逐行拼接提示时容易留下末尾换行。DrawText 会把它视为
+        ; 一个额外空行，因此在统一入口裁掉行尾换行，再进行测量和显示。
+        text := RTrim(NormalizeUserVisibleParentheses(text), "`r`n")
         this.hoverTimer := 0
         if !this.IsOpen() {
             this.gui := Gui("-Caption +ToolWindow +AlwaysOnTop +LastFound")
-            this.gui.BackColor := "202020"
-            this.gui.SetFont("s9 cE5E5E5", "Microsoft YaHei")
+            this.gui.BackColor := UiThemeService.Color("Tooltip")
+            this.gui.SetFont("s9 c" UiThemeService.Color("TooltipText"),
+                LocalizationService.GetUiFontName())
             this.gui.MarginX := 12
             this.gui.MarginY := 8
-            this.textControl := this.gui.Add("Text", "Background202020", text)
+            this.textControl := this.gui.Add("Text", "Background"
+                UiThemeService.Color("Tooltip") " c"
+                UiThemeService.Color("TooltipText"), text)
             if (VerCompare(A_OSVersion, "10.0.18362") >= 0) {
                 try DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", this.gui.Hwnd, "Int", 33, "Int*", 2, "Int", 4)
                 try DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", this.gui.Hwnd, "Int", 2, "Int*", 2, "Int", 4)
@@ -113,7 +134,7 @@ class DarkTooltipWindow extends ManagedWindow {
         deviceContext := DllCall("user32\GetDC", "Ptr", this.textControl.Hwnd, "Ptr")
         if !deviceContext
             return
-        fontHandle := SendMessage(0x0031, 0, 0, this.textControl.Hwnd) ; WM_GETFONT
+        fontHandle := SendMessage(0x0031, 0, 0, this.textControl.Hwnd) ; WM_GETFONT：读取控件实际使用的字体。
         previousFont := fontHandle
             ? DllCall("gdi32\SelectObject", "Ptr", deviceContext, "Ptr", fontHandle, "Ptr") : 0
         try {
@@ -134,7 +155,7 @@ class DarkTooltipWindow extends ManagedWindow {
             measureRect := Buffer(16, 0)
             NumPut("Int", textWidthPx, measureRect, 8)
             DllCall("user32\DrawTextW", "Ptr", deviceContext, "Str", text, "Int", -1,
-                "Ptr", measureRect, "UInt", 0x0C50, "Int") ; CALCRECT | NOPREFIX | WORDBREAK | EXPANDTABS
+                "Ptr", measureRect, "UInt", 0x0C50, "Int") ; 只测量排版矩形，并启用自动换行和制表符展开。
             textHeightPx := Max(1, NumGet(measureRect, 12, "Int"))
             this.textControl.Move(,, Max(1, Ceil(textWidthPx * 96 / dpi)),
                 Max(1, Ceil(textHeightPx * 96 / dpi)))

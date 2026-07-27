@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
+; 验证未完成升级会话在独立日志中的序列化和恢复。
+; 损坏记录、非法时间与参与者身份必须被拒绝，合法记录需保持逐字段一致。
+
 #Include ..\..\src\Config\IniFieldCodec.ahk
 #Include ..\..\src\Maintenance\MaintenanceSessionCodec.ahk
 
