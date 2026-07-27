@@ -2419,6 +2419,8 @@ $logRefreshSource = [regex]::Match($logWindowSource,
     '(?ms)^    RefreshContent\(\*\)\s*\{.*?(?=^    RefreshContentCore\()').Value
 $applicationSearchSource = [regex]::Match($source,
     '(?ms)^class ApplicationSearchDialog extends ManagedWindow\s*\{.*?(?=^class DarkTooltipWindow extends ManagedWindow)').Value
+$shutdownApplicationUiSource = [regex]::Match($source,
+    '(?ms)^ShutdownApplicationUi\(\*\)\s*\{.*?(?=^AcquireApplicationMutex\()').Value
 $darkTooltipSource = [regex]::Match($source,
     '(?ms)^class DarkTooltipWindow extends ManagedWindow\s*\{.*?(?=^class HistoryToastWindow)').Value
 $applyStateSource = [regex]::Match($source,
@@ -2819,7 +2821,7 @@ if ($fileScanServiceSource -notmatch 'Stop\(workerPid, outputPath, creationIdent
 }
 if ($source -notmatch 'AcquireMainImageListUse\(imageList\)[\s\S]{0,180}iconResources\.AcquireImageList\(imageList' -or
     $source -notmatch 'ReleaseMainImageListUse\(imageList\)[\s\S]{0,240}iconResources\.ReleaseImageList\(imageList\)[\s\S]{0,180}IL_Destroy\(imageList\)' -or
-    $source -notmatch 'ShutdownApplicationUi\(\*\)[\s\S]{0,650}Main\.appIcons\s*:=\s*0[\s\S]{0,180}Main\.lv\.SetImageList\(0, 1\)[\s\S]{0,180}RetireMainImageList\(mainImageList\)' -or
+    $shutdownApplicationUiSource -notmatch 'mainImageList\s*:=\s*Main\.appIcons[\s\S]*Main\.appIcons\s*:=\s*0[\s\S]*Main\.lv\.SetImageList\(0, 1\)[\s\S]*RetireMainImageList\(mainImageList\)' -or
     $applicationSearchSource -notmatch 'AcquireImageListUse\(\)[\s\S]{0,420}App\.iconResources\.AcquireImageList\(this\.imageList' -or
     $applicationSearchSource -notmatch 'RetireImageList\(imageList\)[\s\S]{0,260}App\.iconResources\.RetireImageList\(imageList, this\.imageList\)' -or
     $applicationSearchSource -notmatch 'imageList\s*:=\s*this\.imageList[\s\S]{0,180}this\.DestroyGui\(\)[\s\S]{0,100}this\.RetireImageList\(imageList\)' -or
