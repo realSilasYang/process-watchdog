@@ -15,6 +15,23 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+# Windows PowerShell 5.1 与 PowerShell 7 对 -Encoding UTF8 和 ConvertTo-Json
+# 的默认字节输出不同。发行构建必须显式控制 BOM、换行和 JSON 空白，避免同一源码
+# 仅因宿主版本不同而产生不同 EXE、SBOM 或 ZIP。
+$script:utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+$script:utf8WithBom = [System.Text.UTF8Encoding]::new($true)
+function Write-CanonicalJson {
+    param(
+        [object]$InputObject,
+        [string]$Path,
+        [int]$Depth
+    )
+
+    $json = $InputObject | ConvertTo-Json -Depth $Depth -Compress
+    [System.IO.File]::WriteAllText($Path, $json + "`r`n",
+        $script:utf8NoBom)
+}
+
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $outputRoot = if ($OutputDirectory) {
     [System.IO.Path]::GetFullPath($OutputDirectory)
@@ -181,34 +198,24 @@ if ([regex]::Matches($stagedSource, $versionDirectivePattern).Count -ne 1) {
 }
 $stagedSource = [regex]::Replace($stagedSource, $versionDirectivePattern,
     ";@Ahk2Exe-SetVersion $version.0")
-Set-Content -LiteralPath $asciiSourcePath -Value $stagedSource -Encoding UTF8 `
-    -NoNewline
+[System.IO.File]::WriteAllText($asciiSourcePath, $stagedSource,
+    $script:utf8WithBom)
 $scratchExecutablePath = Join-Path $scratchRoot 'ProcessWatchdog.exe'
 
-$substituteDrive = $null
-$mappedProjectRoot = $projectRoot
-if (($asciiSourcePath + $scratchExecutablePath + $AutoHotkeyPath) `
-        -match '[^\x00-\x7F]') {
-    $occupiedDrives = @(Get-PSDrive -PSProvider FileSystem |
-        ForEach-Object { $_.Name.ToUpperInvariant() })
-    foreach ($letterCode in 90..80) {
-        $candidate = [char]$letterCode
-        if ($candidate -in $occupiedDrives) {
-            continue
-        }
-        $substituteProcess = Start-Process -FilePath 'subst.exe' `
-            -ArgumentList "$candidate`:", $projectRoot -PassThru -Wait `
-            -WindowStyle Hidden
-        if ($substituteProcess.ExitCode -eq 0) {
-            $substituteDrive = "$candidate`:"
-            $mappedProjectRoot = "$substituteDrive\"
-            break
-        }
-    }
-    if (-not $substituteDrive) {
-        throw 'Unable to allocate an ASCII build drive for Ahk2Exe.'
-    }
+$buildDriveLetter = 'R'
+$occupiedDrives = @(Get-PSDrive -PSProvider FileSystem |
+    ForEach-Object { $_.Name.ToUpperInvariant() })
+if ($buildDriveLetter -in $occupiedDrives) {
+    throw "Deterministic build drive $buildDriveLetter`: is already in use."
 }
+$substituteProcess = Start-Process -FilePath 'subst.exe' `
+    -ArgumentList "$buildDriveLetter`:", $projectRoot -PassThru -Wait `
+    -WindowStyle Hidden
+if ($substituteProcess.ExitCode -ne 0) {
+    throw "Unable to allocate deterministic build drive $buildDriveLetter`: ."
+}
+$substituteDrive = "$buildDriveLetter`:"
+$mappedProjectRoot = "$substituteDrive\"
 
 function ConvertTo-CompilerPath {
     param([string]$Path)
@@ -229,6 +236,7 @@ $compilerOutputPath = ConvertTo-CompilerPath $scratchExecutablePath
 $compilerIconPath = ConvertTo-CompilerPath `
     (Join-Path $scratchAppAssetDirectory 'watchdog.ico')
 $compilerBasePath = ConvertTo-CompilerPath $AutoHotkeyPath
+$compilerExecutablePath = ConvertTo-CompilerPath $CompilerPath
 if (-not (Test-Path -LiteralPath $asciiSourcePath -PathType Leaf)) {
     throw "ASCII staging source was not created: $asciiSourcePath"
 }
@@ -246,11 +254,11 @@ $compilerArguments = @(
 $compilerProcess = $null
 try {
     $compilerStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
-    $compilerStartInfo.FileName = $CompilerPath
+    $compilerStartInfo.FileName = $compilerExecutablePath
     $compilerStartInfo.Arguments = ($compilerArguments | ForEach-Object {
         '"' + ([string]$_).Replace('"', '\"') + '"'
     }) -join ' '
-    $compilerStartInfo.WorkingDirectory = $projectRoot
+    $compilerStartInfo.WorkingDirectory = $mappedProjectRoot
     $compilerStartInfo.UseShellExecute = $false
     $compilerStartInfo.CreateNoWindow = $true
     $compilerStartInfo.RedirectStandardOutput = $true
@@ -370,8 +378,7 @@ $buildManifest = [ordered]@{
     sourceEntry = $mainScript.Name
 }
 $manifestPath = Join-Path $packageDirectory 'build-manifest.json'
-$buildManifest | ConvertTo-Json -Depth 4 |
-    Set-Content -LiteralPath $manifestPath -Encoding UTF8
+Write-CanonicalJson $buildManifest $manifestPath 4
 $executableName = Split-Path -Leaf $executablePath
 $compiledUpdateManifest = [ordered]@{
     schemaVersion = 1
@@ -386,9 +393,8 @@ $compiledUpdateManifest = [ordered]@{
         'third_party', 'update-manifest.json'
     )
 }
-$compiledUpdateManifest | ConvertTo-Json -Depth 5 |
-    Set-Content -LiteralPath (Join-Path $packageDirectory `
-        'update-manifest.json') -Encoding UTF8
+Write-CanonicalJson $compiledUpdateManifest `
+    (Join-Path $packageDirectory 'update-manifest.json') 5
 $packageSbomPath = Join-Path $packageDirectory 'SBOM.spdx.json'
 & (Join-Path $PSScriptRoot 'generate-sbom.ps1') `
     -OutputPath $packageSbomPath `
@@ -418,9 +424,8 @@ $sourceUpdateManifest = [ordered]@{
         'tests', 'third_party', 'tools', 'update-manifest.json'
     )
 }
-$sourceUpdateManifest | ConvertTo-Json -Depth 5 |
-    Set-Content -LiteralPath (Join-Path $sourcePackageDirectory `
-        'update-manifest.json') -Encoding UTF8
+Write-CanonicalJson $sourceUpdateManifest `
+    (Join-Path $sourcePackageDirectory 'update-manifest.json') 5
 
 if (-not $SkipStartupValidation) {
     $process = Start-Process -FilePath $executablePath `
@@ -453,8 +458,10 @@ function New-DeterministicArchive {
             foreach ($file in $files) {
                 $relativePath = $file.FullName.Substring(
                     $SourceDirectory.Length + 1).Replace('\', '/')
+                # Store 模式避免 .NET Framework 与现代 .NET 的 Deflate 实现差异。
+                # 随包字体本身已经压缩，体积增加有限，却能让 ZIP 字节跨宿主稳定。
                 $entry = $archive.CreateEntry($relativePath,
-                    [System.IO.Compression.CompressionLevel]::Optimal)
+                    [System.IO.Compression.CompressionLevel]::NoCompression)
                 $entry.LastWriteTime = [DateTimeOffset]::new(1980, 1, 1,
                     0, 0, 0, [TimeSpan]::Zero)
                 $inputStream = [System.IO.File]::OpenRead($file.FullName)

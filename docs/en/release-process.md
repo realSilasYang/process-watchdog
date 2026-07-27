@@ -19,9 +19,10 @@
    Apple SD Gothic Neo still covers the exact files in
    `assets/fonts/metadata.json`, Windows, the public repository, and Release
    distribution. Do not start a formal release without this confirmation.
-5. Run `tests/reproducible-build.ps1` and preserve the final SHA-256 output. Do
-   not release if the standalone EXE, EXE ZIP, source ZIP, or standalone SBOM
-   differs between the two builds, or if
+5. Run `tests/reproducible-build.ps1` and preserve the final SHA-256 output. CI,
+   dry runs, and formal releases build once with PowerShell 7 and once with
+   Windows PowerShell 5.1. Do not release if the standalone EXE, EXE ZIP, source
+   ZIP, or standalone SBOM differs between the two hosts, or if
    `SHA256SUMS.txt` does not match.
 6. Ordinary CI uses the hash-pinned repository snapshot at
    `tools/ci-toolchain.resolved.json` and a cache, so upstream changes cannot
@@ -50,7 +51,8 @@
 12. The formal workflow resolves upstream tools and runs every gate again. It then
     attests and uploads only the standalone EXE, complete portable ZIP, and complete
     source ZIP to a draft. The SBOM, `SHA256SUMS.txt`, and remaining `dist` stay in
-    the complete Actions artifact. The draft body, commit, allowlist, sizes, and
+    the complete Actions artifact, with hidden directories explicitly included.
+    The draft body, commit, allowlist, sizes, and
     GitHub SHA-256 digests must match the local build before publication, followed
     by a second audit of the public Release and remote tag.
 

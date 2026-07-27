@@ -227,8 +227,9 @@ $resolved = [ordered]@{
         gitleaks = $fixedToolLock.tools.gitleaks
     }
 }
-$resolved | ConvertTo-Json -Depth 8 |
-    Set-Content -LiteralPath $resolvedPath -Encoding UTF8
+$resolvedJson = $resolved | ConvertTo-Json -Depth 8 -Compress
+[System.IO.File]::WriteAllText($resolvedPath, $resolvedJson + "`r`n",
+    [System.Text.UTF8Encoding]::new($false))
 
 Write-Host "Resolved AutoHotkey $autoHotkeyVersion and Ahk2Exe $ahk2ExeVersion."
 [pscustomobject]@{

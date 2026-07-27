@@ -60,7 +60,9 @@ Assert-WorkflowContains 'ci.yml' $ci @(
     'tools\ci-toolchain.resolved.json'
     'actions/cache@'
     '.\tools\invoke-release-validation.ps1'
+    '-SecondPowerShellPath powershell.exe'
     'path: dist/**'
+    'include-hidden-files: true'
     'fetch-depth: 0'
 )
 if ($ci.Contains('"codex/**"') -or $ci.Contains("'codex/**'")) {
@@ -74,7 +76,9 @@ Assert-WorkflowContains 'release-dry-run.yml' $dryRun @(
     '.\tools\resolve-release-state.ps1'
     '-RefreshBuildTools'
     '.\tools\invoke-release-validation.ps1'
+    '-SecondPowerShellPath powershell.exe'
     'path: dist/**'
+    'include-hidden-files: true'
     'fetch-depth: 0'
 )
 foreach ($forbidden in @('softprops/action-gh-release@',
@@ -104,6 +108,8 @@ Assert-WorkflowContains 'release.yml' $release @(
     '.\tools\verify-release-draft.ps1'
     '--draft=false'
     '.\tools\verify-published-release.ps1'
+    '-SecondPowerShellPath powershell.exe'
+    'include-hidden-files: true'
     'fetch-depth: 0'
 )
 foreach ($asset in $userAssets) {

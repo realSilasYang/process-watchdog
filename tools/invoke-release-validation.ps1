@@ -9,7 +9,8 @@ param(
     [Parameter(Mandatory)][string]$ActionlintPath,
     [Parameter(Mandatory)][string]$GitleaksPath,
     [int]$SoakSeconds = 15,
-    [string]$OutputDirectory = ""
+    [string]$OutputDirectory = "",
+    [string]$SecondPowerShellPath = ""
 )
 
 $ErrorActionPreference = 'Stop'
@@ -26,5 +27,8 @@ $buildArguments = @{
     ResolvedToolchainPath = $ResolvedToolchainPath
 }
 if ($OutputDirectory) { $buildArguments.OutputDirectory = $OutputDirectory }
+if ($SecondPowerShellPath) {
+    $buildArguments.SecondPowerShellPath = $SecondPowerShellPath
+}
 & (Join-Path $projectRoot 'tests\reproducible-build.ps1') @buildArguments
 Write-Host '完整发布门禁已通过。'

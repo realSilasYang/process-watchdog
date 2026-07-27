@@ -7,6 +7,15 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Standardized UTF-8, JSON, compiler paths, and ZIP bytes across Windows
+  PowerShell 5.1 and PowerShell 7. CI now compares its two release builds across
+  both hosts instead of treating same-host repetition as cross-host reproducibility.
+- Made complete Actions artifacts retain hidden directories, preventing the
+  upload step from filtering extracted `.github` community files. The three
+  GitHub Release user assets were not affected by that filter.
+
 ## [2.0.0] - 2026-07-28
 
 ### Release editions

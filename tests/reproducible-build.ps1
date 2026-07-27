@@ -7,7 +7,8 @@ param(
     [string]$CompilerPath = "",
     [string]$AutoHotkeySourcePath = "",
     [string]$ResolvedToolchainPath = "",
-    [string]$OutputDirectory = ""
+    [string]$OutputDirectory = "",
+    [string]$SecondPowerShellPath = ""
 )
 
 $ErrorActionPreference = 'Stop'
@@ -41,14 +42,51 @@ $firstHash = $first.Sha256
 $firstExecutableHash = $first.ExecutableSha256
 $firstSourceHash = $first.SourceSha256
 $firstSbomHash = $first.SbomSha256
-$second = & $buildScript -OutputDirectory $outputRoot `
-    -AutoHotkeyPath $AutoHotkeyPath -CompilerPath $CompilerPath `
-    -AutoHotkeySourcePath $AutoHotkeySourcePath `
-    -ResolvedToolchainPath $ResolvedToolchainPath
-$secondHash = $second.Sha256
-$secondExecutableHash = $second.ExecutableSha256
-$secondSourceHash = $second.SourceSha256
-$secondSbomHash = $second.SbomSha256
+if ($SecondPowerShellPath) {
+    $secondArguments = @(
+        '-NoLogo', '-NoProfile', '-NonInteractive',
+        '-ExecutionPolicy', 'Bypass', '-File', $buildScript,
+        '-OutputDirectory', $outputRoot,
+        '-AutoHotkeyPath', $AutoHotkeyPath,
+        '-CompilerPath', $CompilerPath,
+        '-AutoHotkeySourcePath', $AutoHotkeySourcePath,
+        '-ResolvedToolchainPath', $ResolvedToolchainPath
+    )
+    & $SecondPowerShellPath @secondArguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Second-runtime release build failed with exit code $LASTEXITCODE."
+    }
+    $version = (Get-Content -LiteralPath (Join-Path $projectRoot 'VERSION') `
+        -Raw -Encoding UTF8).Trim()
+    $packageName = "process-watchdog-$version-windows-x64"
+    $sourceName = "process-watchdog-$version-source"
+    $second = [pscustomobject]@{
+        PackageDirectory = Join-Path $outputRoot $packageName
+        ZipPath = Join-Path $outputRoot "$packageName.zip"
+        ExecutablePath = Join-Path $outputRoot "$packageName.exe"
+        SourcePackageDirectory = Join-Path $outputRoot $sourceName
+        SourceZipPath = Join-Path $outputRoot "$sourceName.zip"
+        SbomPath = Join-Path $outputRoot "$packageName.spdx.json"
+        ChecksumsPath = Join-Path $outputRoot 'SHA256SUMS.txt'
+    }
+    $secondHash = (Get-FileHash -Algorithm SHA256 `
+        -LiteralPath $second.ZipPath).Hash
+    $secondExecutableHash = (Get-FileHash -Algorithm SHA256 `
+        -LiteralPath $second.ExecutablePath).Hash
+    $secondSourceHash = (Get-FileHash -Algorithm SHA256 `
+        -LiteralPath $second.SourceZipPath).Hash
+    $secondSbomHash = (Get-FileHash -Algorithm SHA256 `
+        -LiteralPath $second.SbomPath).Hash
+} else {
+    $second = & $buildScript -OutputDirectory $outputRoot `
+        -AutoHotkeyPath $AutoHotkeyPath -CompilerPath $CompilerPath `
+        -AutoHotkeySourcePath $AutoHotkeySourcePath `
+        -ResolvedToolchainPath $ResolvedToolchainPath
+    $secondHash = $second.Sha256
+    $secondExecutableHash = $second.ExecutableSha256
+    $secondSourceHash = $second.SourceSha256
+    $secondSbomHash = $second.SbomSha256
+}
 if ($firstHash -ne $secondHash) {
     throw "Release build is not reproducible: $firstHash != $secondHash"
 }

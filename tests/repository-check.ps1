@@ -610,6 +610,8 @@ foreach ($releaseRequirement in @(
         'actions/attest-build-provenance@',
         'actions/upload-artifact@',
         'path: dist/**',
+        'include-hidden-files: true',
+        '-SecondPowerShellPath powershell.exe',
         'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.exe',
         'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.zip',
         'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-source.zip',
@@ -626,6 +628,8 @@ if ($releaseWorkflow.Contains('dist/*.spdx.json') -or
 $ciWorkflow = Get-Content -LiteralPath `
     (Join-Path $projectRoot '.github\workflows\ci.yml') -Raw -Encoding UTF8
 if (-not $ciWorkflow.Contains('path: dist/**') -or
+    -not $ciWorkflow.Contains('include-hidden-files: true') -or
+    -not $ciWorkflow.Contains('-SecondPowerShellPath powershell.exe') -or
     -not $ciWorkflow.Contains('tools\ci-toolchain.resolved.json') -or
     -not $ciWorkflow.Contains('.\tools\invoke-release-validation.ps1')) {
     throw 'CI must use the repository toolchain snapshot and retain all build outputs.'
@@ -636,6 +640,15 @@ $buildScript = Get-Content -LiteralPath (Join-Path $projectRoot `
 if ($buildScript -match "'/setversion'" -or
     -not $buildScript.Contains(';@Ahk2Exe-SetVersion $version.0')) {
     throw 'Release build must inject the source SetVersion directive instead of passing an unsupported Ahk2Exe CLI switch.'
+}
+foreach ($determinismRequirement in @(
+        'function Write-CanonicalJson',
+        '$buildDriveLetter = ''R''',
+        '[System.IO.Compression.CompressionLevel]::NoCompression',
+        '$script:utf8WithBom')) {
+    if (-not $buildScript.Contains($determinismRequirement)) {
+        throw "Release build is missing a cross-runtime determinism boundary: $determinismRequirement"
+    }
 }
 if ($releaseWorkflow -match '(?m)^\s*push:\s*$' -or
     $releaseWorkflow -match '(?m)^\s*schedule:\s*$') {
