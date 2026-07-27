@@ -672,36 +672,54 @@ CopyLiveExecutable(sourcePath, targetPath) {
 }
 
 CloseLiveTargetProcesses(rootPids, tempRoot := "") {
-    tracked := Map()
+    rootPidSet := Map()
     for pid in rootPids {
-        tracked[pid] := true
+        rootPidSet[pid] := true
     }
     canonicalRoot := tempRoot != ""
         ? CanonicalizeLiveTargetPath(tempRoot) : ""
-    Loop 6 {
-        closeOrder := []
+    Loop 20 {
         try snapshot := CaptureLiveTargetSnapshot()
-        catch
-            snapshot := []
+        catch {
+            ; 有临时目录身份时宁可等待下一轮快照，也不依据可能已复用的 PID 关闭进程。
+            if canonicalRoot == "" {
+                for pid in rootPidSet {
+                    try ProcessClose(pid)
+                }
+            }
+            Sleep(100)
+            continue
+        }
+        ; PID 在 Windows 上会被快速复用。每轮都从当前路径证据重建集合，避免把
+        ; 已退出测试进程的旧 PID 误认为新的无关进程。
+        tracked := Map()
+        for processInfo in snapshot {
+            belongsToTempRoot := canonicalRoot != ""
+                && ((processInfo.HasOwnProp("cmd")
+                        && InStr(CanonicalizeLiveTargetPath(
+                            processInfo.cmd), canonicalRoot))
+                    || (processInfo.HasOwnProp("exe")
+                        && InStr(CanonicalizeLiveTargetPath(
+                            processInfo.exe), canonicalRoot) == 1))
+            if belongsToTempRoot
+                tracked[processInfo.pid] := true
+            else if canonicalRoot == "" && rootPidSet.Has(processInfo.pid)
+                tracked[processInfo.pid] := true
+        }
         changed := true
         while changed {
             changed := false
             for processInfo in snapshot {
-                belongsToTempRoot := canonicalRoot != ""
-                    && ((processInfo.HasOwnProp("cmd")
-                            && InStr(CanonicalizeLiveTargetPath(
-                                processInfo.cmd), canonicalRoot))
-                        || (processInfo.HasOwnProp("exe")
-                            && InStr(CanonicalizeLiveTargetPath(
-                                processInfo.exe), canonicalRoot) == 1))
                 if tracked.Has(processInfo.pid)
-                    || (!belongsToTempRoot
-                        && !tracked.Has(processInfo.parent))
+                    || !tracked.Has(processInfo.parent)
                     continue
                 tracked[processInfo.pid] := true
                 changed := true
             }
         }
+        if tracked.Count == 0
+            return true
+        closeOrder := []
         for processInfo in snapshot {
             if tracked.Has(processInfo.pid)
                 closeOrder.Push(processInfo.pid)
@@ -711,32 +729,28 @@ CloseLiveTargetProcesses(rootPids, tempRoot := "") {
             try ProcessClose(pid)
         }
         Sleep(100)
-        remaining := false
-        for pid in tracked {
-            if ProcessExist(pid) {
-                remaining := true
-                break
-            }
-        }
-        if !remaining
-            return true
     }
     return false
 }
 
 DeleteLiveTargetTempRoot(tempRoot) {
-    Loop 20 {
+    lastDeleteError := ""
+    Loop 150 {
         try DirDelete(tempRoot, true)
+        catch as deleteError
+            lastDeleteError := Type(deleteError) "：" deleteError.Message
         if !DirExist(tempRoot)
-            return true
+            return {Deleted: true, Error: ""}
         Sleep(100)
     }
-    return false
+    return {Deleted: false, Error: lastDeleteError}
 }
 
 DeleteStaleLiveTargetRoots() {
-    Loop Files, A_Temp "\watchdog-live-command-target-*", "D"
+    Loop Files, A_Temp "\watchdog-live-command-target-*", "D" {
+        CloseLiveTargetProcesses([], A_LoopFileFullPath)
         DeleteLiveTargetTempRoot(A_LoopFileFullPath)
+    }
 }
 
 RunLiveCommandTargetTests() {
@@ -963,11 +977,13 @@ RunLiveCommandTargetTests() {
             "并发退出后至少一个目标仍被误判为运行中")
     } finally {
         processesClosed := CloseLiveTargetProcesses(processes, tempRoot)
-        tempDeleted := DeleteLiveTargetTempRoot(tempRoot)
+        tempDeleteResult := DeleteLiveTargetTempRoot(tempRoot)
         AssertLiveTarget(processesClosed,
             "真实进程测试结束后仍有属于临时目标的进程存活")
-        AssertLiveTarget(tempDeleted,
-            "真实进程测试结束后无法删除临时目录")
+        AssertLiveTarget(tempDeleteResult.Deleted,
+            "真实进程测试结束后无法删除临时目录"
+                . (tempDeleteResult.Error != ""
+                    ? "：" tempDeleteResult.Error : ""))
     }
 }
 

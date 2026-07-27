@@ -55,11 +55,13 @@ jobs:
           -ActionlintPath '${{ steps.toolchain.outputs.actionlint }}'
           -GitleaksPath '${{ steps.toolchain.outputs.gitleaks }}'
           -SoakSeconds 15
+          -SecondPowerShellPath powershell.exe
 
       - name: Preserve all dry-run build outputs
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: process-watchdog-${{ steps.release_meta.outputs.version }}-dry-run-all-build-outputs
           path: dist/**
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 30

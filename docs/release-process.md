@@ -17,8 +17,9 @@
 4. 发布负责人重新确认 PingFang、SF Pro Text 与 Apple SD Gothic Neo 的商业授权
    仍覆盖 `assets/fonts/metadata.json` 所列精确文件、Windows、公开仓库和 Release
    分发；未确认时不得触发正式发布。
-5. 运行 `tests/reproducible-build.ps1`，保存脚本输出的最终 SHA-256；两次独立 EXE、
-   EXE ZIP、源码 ZIP 或独立 SBOM 构建哈希不同，或 `SHA256SUMS.txt` 不匹配时不得发布。
+5. 运行 `tests/reproducible-build.ps1`，保存脚本输出的最终 SHA-256；CI、演练和正式
+   发布会分别以 PowerShell 7 与 Windows PowerShell 5.1 构建并比较。两次 EXE、
+   EXE ZIP、源码 ZIP 或独立 SBOM 哈希不同，或 `SHA256SUMS.txt` 不匹配时不得发布。
 6. 普通 CI 使用仓库内经哈希固定的 `tools/ci-toolchain.resolved.json` 和缓存，避免
    上游变化影响无关提交。发布演练与正式发布则重新查询 AutoHotkey 最新稳定版和
    Ahk2Exe 最新发布版，并冻结本次 `toolchain.resolved.json`。检查发行目录包含
@@ -37,7 +38,7 @@
     安全续传，重复记录和不一致状态会明确失败。
 12. 正式工作流再次动态解析上游工具链并执行全部门禁。通过后只为独立 EXE、完整
     便携 ZIP 和完整源码 ZIP 生成溯源证明并上传到草稿；SBOM、`SHA256SUMS.txt` 和其余
-    `dist` 只保存在完整 Actions 构建产物中。草稿正文、提交、附件白名单、大小和
+    `dist` 只保存在完整 Actions 构建产物中；上传时必须显式包含隐藏目录。草稿正文、提交、附件白名单、大小和
     GitHub SHA-256 摘要与本地构建完全一致后才公开，公开后再审计远程标签和 Release。
 
 标签必须属于 `main` 历史，并由人工 Release 工作流在全部门禁通过后创建。推送代码、

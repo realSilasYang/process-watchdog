@@ -212,6 +212,7 @@ $parentDirectory = Split-Path -Parent ([System.IO.Path]::GetFullPath($OutputPath
 if ($parentDirectory) {
     New-Item -ItemType Directory -Force -Path $parentDirectory | Out-Null
 }
-$document | ConvertTo-Json -Depth 8 |
-    Set-Content -LiteralPath $OutputPath -Encoding UTF8
+$json = $document | ConvertTo-Json -Depth 8 -Compress
+[System.IO.File]::WriteAllText($OutputPath, $json + "`r`n",
+    [System.Text.UTF8Encoding]::new($false))
 Write-Host "SPDX SBOM: $OutputPath"

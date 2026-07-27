@@ -15,6 +15,23 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+# Windows PowerShell 5.1 与 PowerShell 7 对 -Encoding UTF8 和 ConvertTo-Json
+# 的默认字节输出不同。发行构建必须显式控制 BOM、换行和 JSON 空白，避免同一源码
+# 仅因宿主版本不同而产生不同 EXE、SBOM 或 ZIP。
+$script:utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+$script:utf8WithBom = [System.Text.UTF8Encoding]::new($true)
+function Write-CanonicalJson {
+    param(
+        [object]$InputObject,
+        [string]$Path,
+        [int]$Depth
+    )
+
+    $json = $InputObject | ConvertTo-Json -Depth $Depth -Compress
+    [System.IO.File]::WriteAllText($Path, $json + "`r`n",
+        $script:utf8NoBom)
+}
+
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $outputRoot = if ($OutputDirectory) {
     [System.IO.Path]::GetFullPath($OutputDirectory)
@@ -181,34 +198,24 @@ if ([regex]::Matches($stagedSource, $versionDirectivePattern).Count -ne 1) {
 }
 $stagedSource = [regex]::Replace($stagedSource, $versionDirectivePattern,
     ";@Ahk2Exe-SetVersion $version.0")
-Set-Content -LiteralPath $asciiSourcePath -Value $stagedSource -Encoding UTF8 `
-    -NoNewline
+[System.IO.File]::WriteAllText($asciiSourcePath, $stagedSource,
+    $script:utf8WithBom)
 $scratchExecutablePath = Join-Path $scratchRoot 'ProcessWatchdog.exe'
 
-$substituteDrive = $null
-$mappedProjectRoot = $projectRoot
-if (($asciiSourcePath + $scratchExecutablePath + $AutoHotkeyPath) `
-        -match '[^\x00-\x7F]') {
-    $occupiedDrives = @(Get-PSDrive -PSProvider FileSystem |
-        ForEach-Object { $_.Name.ToUpperInvariant() })
-    foreach ($letterCode in 90..80) {
-        $candidate = [char]$letterCode
-        if ($candidate -in $occupiedDrives) {
-            continue
-        }
-        $substituteProcess = Start-Process -FilePath 'subst.exe' `
-            -ArgumentList "$candidate`:", $projectRoot -PassThru -Wait `
-            -WindowStyle Hidden
-        if ($substituteProcess.ExitCode -eq 0) {
-            $substituteDrive = "$candidate`:"
-            $mappedProjectRoot = "$substituteDrive\"
-            break
-        }
-    }
-    if (-not $substituteDrive) {
-        throw 'Unable to allocate an ASCII build drive for Ahk2Exe.'
-    }
+$buildDriveLetter = 'R'
+$occupiedDrives = @(Get-PSDrive -PSProvider FileSystem |
+    ForEach-Object { $_.Name.ToUpperInvariant() })
+if ($buildDriveLetter -in $occupiedDrives) {
+    throw "Deterministic build drive $buildDriveLetter`: is already in use."
 }
+$substituteProcess = Start-Process -FilePath 'subst.exe' `
+    -ArgumentList "$buildDriveLetter`:", $projectRoot -PassThru -Wait `
+    -WindowStyle Hidden
+if ($substituteProcess.ExitCode -ne 0) {
+    throw "Unable to allocate deterministic build drive $buildDriveLetter`: ."
+}
+$substituteDrive = "$buildDriveLetter`:"
+$mappedProjectRoot = "$substituteDrive\"
 
 function ConvertTo-CompilerPath {
     param([string]$Path)
@@ -229,6 +236,7 @@ $compilerOutputPath = ConvertTo-CompilerPath $scratchExecutablePath
 $compilerIconPath = ConvertTo-CompilerPath `
     (Join-Path $scratchAppAssetDirectory 'watchdog.ico')
 $compilerBasePath = ConvertTo-CompilerPath $AutoHotkeyPath
+$compilerExecutablePath = ConvertTo-CompilerPath $CompilerPath
 if (-not (Test-Path -LiteralPath $asciiSourcePath -PathType Leaf)) {
     throw "ASCII staging source was not created: $asciiSourcePath"
 }
@@ -236,52 +244,25 @@ Write-Verbose "Ahk2Exe source: $compilerSourcePath"
 Write-Verbose "Ahk2Exe output: $compilerOutputPath"
 Write-Verbose "Ahk2Exe base: $compilerBasePath"
 $executablePath = Join-Path $packageDirectory ($mainScript.BaseName + '.exe')
-$compilerArguments = @(
-    '/in', $compilerSourcePath,
-    '/out', $compilerOutputPath,
-    '/icon', $compilerIconPath,
-    '/base', $compilerBasePath,
-    '/silent', 'verbose'
-)
-$compilerProcess = $null
+$canonicalPowerShell = Join-Path $env:SystemRoot `
+    'System32\WindowsPowerShell\v1.0\powershell.exe'
+if (-not (Test-Path -LiteralPath $canonicalPowerShell -PathType Leaf)) {
+    throw "Canonical release host is missing: $canonicalPowerShell"
+}
 try {
-    $compilerStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
-    $compilerStartInfo.FileName = $CompilerPath
-    $compilerStartInfo.Arguments = ($compilerArguments | ForEach-Object {
-        '"' + ([string]$_).Replace('"', '\"') + '"'
-    }) -join ' '
-    $compilerStartInfo.WorkingDirectory = $projectRoot
-    $compilerStartInfo.UseShellExecute = $false
-    $compilerStartInfo.CreateNoWindow = $true
-    $compilerStartInfo.RedirectStandardOutput = $true
-    $compilerStartInfo.RedirectStandardError = $true
-    $compilerProcess = [System.Diagnostics.Process]::Start($compilerStartInfo)
-    $standardOutputTask = $compilerProcess.StandardOutput.ReadToEndAsync()
-    $standardErrorTask = $compilerProcess.StandardError.ReadToEndAsync()
-    if (-not $compilerProcess.WaitForExit(120000)) {
-        try { $compilerProcess.Kill() } catch {}
-        throw 'Ahk2Exe timed out after 120 seconds.'
-    }
-    $compilerProcess.WaitForExit()
-    $compilerExitCode = $compilerProcess.ExitCode
-    $compilerStandardOutput = $standardOutputTask.GetAwaiter().GetResult()
-    $compilerStandardError = $standardErrorTask.GetAwaiter().GetResult()
-    if ($compilerExitCode -ne 0 -or
-        -not (Test-Path -LiteralPath $scratchExecutablePath -PathType Leaf)) {
-        $compilerDiagnostics = @($compilerStandardError,
-            $compilerStandardOutput) -join "`n"
-        throw ("Ahk2Exe failed with exit code {0}.{1}" -f `
-            $compilerExitCode,
-            $(if ($compilerDiagnostics.Trim()) {
-                "`n$($compilerDiagnostics.Trim())"
-            } else { '' }))
+    & $canonicalPowerShell -NoLogo -NoProfile -NonInteractive `
+        -ExecutionPolicy Bypass -File `
+        (Join-Path $PSScriptRoot 'invoke-release-compiler.ps1') `
+        -CompilerPath $compilerExecutablePath `
+        -SourcePath $compilerSourcePath -OutputPath $compilerOutputPath `
+        -IconPath $compilerIconPath -BasePath $compilerBasePath `
+        -WorkingDirectory $mappedProjectRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw "Canonical compiler host failed with exit code $LASTEXITCODE."
     }
     Copy-Item -LiteralPath $scratchExecutablePath `
         -Destination $executablePath
 } finally {
-    if ($compilerProcess) {
-        $compilerProcess.Dispose()
-    }
     if ($substituteDrive) {
         $removeDrive = Start-Process -FilePath 'subst.exe' `
             -ArgumentList $substituteDrive, '/D' -PassThru -Wait `
@@ -370,8 +351,7 @@ $buildManifest = [ordered]@{
     sourceEntry = $mainScript.Name
 }
 $manifestPath = Join-Path $packageDirectory 'build-manifest.json'
-$buildManifest | ConvertTo-Json -Depth 4 |
-    Set-Content -LiteralPath $manifestPath -Encoding UTF8
+Write-CanonicalJson $buildManifest $manifestPath 4
 $executableName = Split-Path -Leaf $executablePath
 $compiledUpdateManifest = [ordered]@{
     schemaVersion = 1
@@ -386,9 +366,8 @@ $compiledUpdateManifest = [ordered]@{
         'third_party', 'update-manifest.json'
     )
 }
-$compiledUpdateManifest | ConvertTo-Json -Depth 5 |
-    Set-Content -LiteralPath (Join-Path $packageDirectory `
-        'update-manifest.json') -Encoding UTF8
+Write-CanonicalJson $compiledUpdateManifest `
+    (Join-Path $packageDirectory 'update-manifest.json') 5
 $packageSbomPath = Join-Path $packageDirectory 'SBOM.spdx.json'
 & (Join-Path $PSScriptRoot 'generate-sbom.ps1') `
     -OutputPath $packageSbomPath `
@@ -418,9 +397,8 @@ $sourceUpdateManifest = [ordered]@{
         'tests', 'third_party', 'tools', 'update-manifest.json'
     )
 }
-$sourceUpdateManifest | ConvertTo-Json -Depth 5 |
-    Set-Content -LiteralPath (Join-Path $sourcePackageDirectory `
-        'update-manifest.json') -Encoding UTF8
+Write-CanonicalJson $sourceUpdateManifest `
+    (Join-Path $sourcePackageDirectory 'update-manifest.json') 5
 
 if (-not $SkipStartupValidation) {
     $process = Start-Process -FilePath $executablePath `
@@ -431,51 +409,17 @@ if (-not $SkipStartupValidation) {
     }
 }
 
-Add-Type -AssemblyName System.IO.Compression
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-function New-DeterministicArchive {
-    param(
-        [string]$SourceDirectory,
-        [string]$ArchivePath
-    )
-
-    $archiveStream = [System.IO.File]::Open($ArchivePath,
-        [System.IO.FileMode]::CreateNew)
-    try {
-        $archive = [System.IO.Compression.ZipArchive]::new($archiveStream,
-            [System.IO.Compression.ZipArchiveMode]::Create, $false,
-            [System.Text.Encoding]::UTF8)
-        try {
-            $files = Get-ChildItem -LiteralPath $SourceDirectory `
-                -Recurse -File | Sort-Object {
-                    $_.FullName.Substring($SourceDirectory.Length + 1)
-                }
-            foreach ($file in $files) {
-                $relativePath = $file.FullName.Substring(
-                    $SourceDirectory.Length + 1).Replace('\', '/')
-                $entry = $archive.CreateEntry($relativePath,
-                    [System.IO.Compression.CompressionLevel]::Optimal)
-                $entry.LastWriteTime = [DateTimeOffset]::new(1980, 1, 1,
-                    0, 0, 0, [TimeSpan]::Zero)
-                $inputStream = [System.IO.File]::OpenRead($file.FullName)
-                $entryStream = $entry.Open()
-                try {
-                    $inputStream.CopyTo($entryStream)
-                } finally {
-                    $entryStream.Dispose()
-                    $inputStream.Dispose()
-                }
-            }
-        } finally {
-            $archive.Dispose()
-        }
-    } finally {
-        $archiveStream.Dispose()
+$archiveWriter = Join-Path $PSScriptRoot 'new-release-archive.ps1'
+foreach ($archiveSpec in @(
+        @($packageDirectory, $zipPath),
+        @($sourcePackageDirectory, $sourceZipPath))) {
+    & $canonicalPowerShell -NoLogo -NoProfile -NonInteractive `
+        -ExecutionPolicy Bypass -File $archiveWriter `
+        -SourceDirectory $archiveSpec[0] -ArchivePath $archiveSpec[1]
+    if ($LASTEXITCODE -ne 0) {
+        throw "Canonical archive host failed with exit code $LASTEXITCODE."
     }
 }
-
-New-DeterministicArchive $packageDirectory $zipPath
-New-DeterministicArchive $sourcePackageDirectory $sourceZipPath
 # Release 附件保留一份与 ZIP 内完全相同的 EXE，便于独立留档、核验和生成溯源
 # 证明；它仍依赖完整发行包中的资源和 DLL，不作为单文件安装包使用。
 Copy-Item -LiteralPath $executablePath -Destination $standaloneExecutablePath

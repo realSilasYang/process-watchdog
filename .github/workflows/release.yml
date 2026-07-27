@@ -57,6 +57,7 @@ jobs:
           -ActionlintPath '${{ steps.toolchain.outputs.actionlint }}'
           -GitleaksPath '${{ steps.toolchain.outputs.gitleaks }}'
           -SoakSeconds 15
+          -SecondPowerShellPath powershell.exe
 
       - name: Attest the three user editions
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4
@@ -71,6 +72,7 @@ jobs:
         with:
           name: process-watchdog-${{ steps.release_meta.outputs.version }}-all-build-outputs
           path: dist/**
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 90
 
