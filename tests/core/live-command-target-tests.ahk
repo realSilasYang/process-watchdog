@@ -796,7 +796,7 @@ RunLiveCommandTargetTests() {
         directExe := CopyLiveExecutable(pingSource,
             tempRoot "\WatchdogLiveDirect.exe")
         directPid := StartLiveExecutable(directExe,
-            "-n 16 127.0.0.1", processes)
+            "-t 127.0.0.1", processes)
         directObservation := WaitForLiveTarget(TargetProbeKind.ImagePath,
             directExe, true)
         AssertLiveTarget(directObservation.IsRunning(),
@@ -806,7 +806,7 @@ RunLiveCommandTargetTests() {
             tempRoot "\WatchdogLiveShortcut.exe")
         shortcutPath := tempRoot "\WatchdogLiveShortcut.lnk"
         FileCreateShortcut(shortcutExe, shortcutPath, tempRoot,
-            "-n 16 127.0.0.1")
+            "-t 127.0.0.1")
         shortcutInfo := ShortcutResolver.Read(shortcutPath)
         AssertLiveTarget(shortcutInfo.Readable
             && CanonicalizeLiveTargetPath(shortcutInfo.TargetPath)
@@ -839,7 +839,7 @@ RunLiveCommandTargetTests() {
             tempRoot "\WatchdogLiveTransferred.exe")
         transferShortcut := tempRoot "\WatchdogLiveTransferred.lnk"
         transferArguments := '/d /c start "" /b "' transferredExe
-            . '" -n 16 127.0.0.1'
+            . '" -t 127.0.0.1'
         FileCreateShortcut(A_ComSpec, transferShortcut, tempRoot,
             transferArguments)
         transferResolver := CreateLiveShortcutResolver()
@@ -891,7 +891,7 @@ RunLiveCommandTargetTests() {
         }
         directSpecs := TargetSpecs(directExe,
             LaunchSpec(TargetLaunchKind.Direct, directExe,
-                "-n 16 127.0.0.1", tempRoot),
+                "-t 127.0.0.1", tempRoot),
             ProbeSpec(TargetProbeKind.ImagePath, directExe))
         recoveryTargets.Push({Name: "直接 EXE", Path: directExe,
             PID: directPid, Specs: directSpecs})
@@ -911,9 +911,9 @@ RunLiveCommandTargetTests() {
         concurrentExeB := CopyLiveExecutable(pingSource,
             tempRoot "\WatchdogLiveConcurrentB.exe")
         concurrentPidA := StartLiveExecutable(concurrentExeA,
-            "-n 16 127.0.0.1", processes)
+            "-t 127.0.0.1", processes)
         concurrentPidB := StartLiveExecutable(concurrentExeB,
-            "-n 16 127.0.0.1", processes)
+            "-t 127.0.0.1", processes)
         AssertLiveTarget(WaitForLiveTarget(TargetProbeKind.ImagePath,
                 concurrentExeA, true).IsRunning()
             && WaitForLiveTarget(TargetProbeKind.ImagePath,
