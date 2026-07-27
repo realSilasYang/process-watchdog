@@ -13,6 +13,7 @@ $ErrorActionPreference = 'Stop'
 & (Join-Path $PSScriptRoot '..\tools\verify-dependencies.ps1')
 & (Join-Path $PSScriptRoot 'static-check.ps1')
 & (Join-Path $PSScriptRoot 'application-update-helper-tests.ps1')
+& (Join-Path $PSScriptRoot 'release-engineering-tests.ps1')
 & (Join-Path $PSScriptRoot 'run-core-tests.ps1') `
     -AutoHotkeyPath $AutoHotkeyPath
 & (Join-Path $PSScriptRoot 'repository-check.ps1')

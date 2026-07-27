@@ -1,4 +1,4 @@
-# First public-release checklist
+# Formal release checklist
 
 [简体中文](../publication-checklist.md) | **English**
 
@@ -39,8 +39,11 @@ actions on GitHub after repository creation and cannot be replaced by local test
 7. Confirm that Actions permits the third-party actions already pinned to full SHAs.
 8. Add a concise description, Windows/AutoHotkey topics, and the actual license to About.
 
-## First Release
+## Formal Release
 
+- First dispatch the read-only Release dry run from `main`. Confirm that it creates
+  no tag or Release and preserves the complete `dist` Actions artifact. Only then
+  dispatch Release from the same commit.
 - The Release workflow is manually dispatched from `main` only and creates the
   `v<VERSION>` tag after every gate passes.
 - The resolved AutoHotkey must be the latest stable release and Ahk2Exe the latest
@@ -53,6 +56,9 @@ actions on GitHub after repository creation and cannot be replaced by local test
 - The Release remains a draft during upload and becomes public only after its
   three assets match the explicit allowlist. An interrupted run may resume only
   the draft from the same commit and never overwrite a published release.
+- After publication, audit the remote tag, commit, title, body, and GitHub SHA-256
+  for all three assets again. Preserve a failed public audit and issue a patch;
+  never delete or overwrite it.
 - After extraction, repeat the layout checks covered by
   `tools/verify-release.ps1` and confirm no personal configuration is present.
 - Open the AutoHotkey license, corresponding source archive, resolved toolchain snapshot, and

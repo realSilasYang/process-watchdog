@@ -75,13 +75,22 @@ $requiredFiles = @(
     'tests\application-update-helper-tests.ps1',
     '.github\workflows\ci.yml',
     '.github\workflows\release.yml',
+    '.github\workflows\release-dry-run.yml',
     '.github\workflows\soak.yml',
     'third_party\dependencies.lock.json',
     'tools\toolchain.lock.json',
+    'tools\ci-toolchain.resolved.json',
+    'tools\ReleaseEngineering.psm1',
+    'tools\resolve-release-state.ps1',
+    'tools\invoke-release-validation.ps1',
+    'tools\verify-github-release.ps1',
+    'tools\verify-release-draft.ps1',
+    'tools\verify-published-release.ps1',
     'tools\resolve-toolchain.ps1',
     'tools\generate-sbom.ps1',
     'tools\verify-release.ps1',
     'tests\verify-workflows.ps1'
+    'tests\release-engineering-tests.ps1'
     'tests\verify-publication.ps1'
     'docs\README.md'
     'docs\versioning.md'
@@ -183,6 +192,15 @@ if ($version -notmatch `
     '^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$') {
     throw "VERSION is not semantic version text: $version"
 }
+$releaseNotesPath = Join-Path $projectRoot `
+    "docs\release-notes\v$version.md"
+if (-not (Test-Path -LiteralPath $releaseNotesPath -PathType Leaf)) {
+    throw "Current release notes are missing: docs\release-notes\v$version.md"
+}
+$releaseNotesRelativePath = "docs/release-notes/v$version.md"
+if ($trackedFiles -notcontains $releaseNotesRelativePath) {
+    throw "Current release notes are not tracked: $releaseNotesRelativePath"
+}
 $mainScripts = @(Get-ChildItem -LiteralPath $projectRoot -File `
     -Filter '*.ahk' | Where-Object { $_.Name -notlike '_*' })
 if ($mainScripts.Count -ne 1) {
@@ -227,9 +245,9 @@ if ($exampleBytes.Length -lt 2 -or $exampleBytes[0] -ne 0xFF -or
 # 因此所有 PowerShell 入口都必须带 UTF-8 BOM，不能只依赖编辑器显示正确。
 $powerShellScripts = @(
     Get-ChildItem -LiteralPath (Join-Path $projectRoot 'tests') -Recurse `
-        -File -Filter '*.ps1'
+        -File | Where-Object Extension -in @('.ps1', '.psm1')
     Get-ChildItem -LiteralPath (Join-Path $projectRoot 'tools') -Recurse `
-        -File -Filter '*.ps1'
+        -File | Where-Object Extension -in @('.ps1', '.psm1')
 )
 foreach ($script in $powerShellScripts) {
     $bytes = [System.IO.File]::ReadAllBytes($script.FullName)
@@ -528,6 +546,37 @@ foreach ($dynamicTool in @('autoHotkey', 'ahk2Exe')) {
         throw "$dynamicTool must be resolved from upstream at release time, not pinned in the repository lock."
     }
 }
+$ciToolchainPath = Join-Path $projectRoot 'tools\ci-toolchain.resolved.json'
+$ciToolchain = Get-Content -LiteralPath $ciToolchainPath -Raw `
+    -Encoding UTF8 | ConvertFrom-Json
+if ($ciToolchain.schemaVersion -ne 2 -or
+    $ciToolchain.selection.autoHotkey -cne 'repository-ci-snapshot' -or
+    $ciToolchain.selection.ahk2Exe -cne 'repository-ci-snapshot') {
+    throw 'CI toolchain snapshot schema or selection policy is invalid.'
+}
+foreach ($toolName in @('autoHotkey', 'ahk2Exe', 'actionlint', 'gitleaks')) {
+    $definition = $ciToolchain.tools.$toolName
+    foreach ($propertyName in @('version', 'archive', 'url', 'sha256',
+            'executable', 'executableSha256', 'licenseExpression',
+            'sbomRelationship')) {
+        if ($definition.PSObject.Properties.Name -notcontains $propertyName -or
+            -not $definition.$propertyName) {
+            throw "CI toolchain snapshot is missing $toolName.$propertyName."
+        }
+    }
+    foreach ($hashProperty in @('sha256', 'executableSha256')) {
+        if ($definition.$hashProperty -notmatch '^[0-9A-F]{64}$') {
+            throw "CI toolchain snapshot hash is invalid: $toolName.$hashProperty"
+        }
+    }
+}
+foreach ($fixedTool in @('actionlint', 'gitleaks')) {
+    if (($ciToolchain.tools.$fixedTool | ConvertTo-Json -Depth 8 -Compress) `
+            -cne ($toolLock.tools.$fixedTool | ConvertTo-Json -Depth 8 `
+                -Compress)) {
+        throw "CI snapshot drifted from tools/toolchain.lock.json: $fixedTool"
+    }
+}
 
 $workflowFiles = Get-ChildItem -LiteralPath `
     (Join-Path $projectRoot '.github\workflows') -File -Filter '*.yml'
@@ -552,11 +601,10 @@ $releaseWorkflow = Get-Content -LiteralPath `
     (Join-Path $projectRoot '.github\workflows\release.yml') `
     -Raw -Encoding UTF8
 foreach ($releaseRequirement in @(
-        '.\tests\run-gui-tests.ps1',
-        '.\tests\reproducible-build.ps1',
-        '-GitleaksPath',
-        '-AutoHotkeySourcePath',
-        '-ResolvedToolchainPath',
+        '.\tools\resolve-release-state.ps1',
+        '.\tools\invoke-release-validation.ps1',
+        '.\tools\verify-release-draft.ps1',
+        '.\tools\verify-published-release.ps1',
         '-RefreshBuildTools',
         'workflow_dispatch:',
         'actions/attest-build-provenance@',
@@ -566,7 +614,6 @@ foreach ($releaseRequirement in @(
         'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.zip',
         'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-source.zip',
         'draft: true',
-        'Verify draft release assets',
         '--draft=false')) {
     if (-not $releaseWorkflow.Contains($releaseRequirement)) {
         throw "Release workflow is missing: $releaseRequirement"
@@ -578,8 +625,10 @@ if ($releaseWorkflow.Contains('dist/*.spdx.json') -or
 }
 $ciWorkflow = Get-Content -LiteralPath `
     (Join-Path $projectRoot '.github\workflows\ci.yml') -Raw -Encoding UTF8
-if (-not $ciWorkflow.Contains('dist/*.exe')) {
-    throw 'CI artifact must retain the standalone executable.'
+if (-not $ciWorkflow.Contains('path: dist/**') -or
+    -not $ciWorkflow.Contains('tools\ci-toolchain.resolved.json') -or
+    -not $ciWorkflow.Contains('.\tools\invoke-release-validation.ps1')) {
+    throw 'CI must use the repository toolchain snapshot and retain all build outputs.'
 }
 
 $buildScript = Get-Content -LiteralPath (Join-Path $projectRoot `
@@ -626,7 +675,8 @@ foreach ($updateRequirement in @(
     }
 }
 
-foreach ($workflowName in @('ci.yml', 'release.yml')) {
+foreach ($workflowName in @('ci.yml', 'release.yml',
+        'release-dry-run.yml')) {
     $workflowText = Get-Content -LiteralPath (Join-Path $projectRoot `
         ".github\workflows\$workflowName") -Raw -Encoding UTF8
     if ($workflowText -notmatch '(?m)^\s+fetch-depth:\s+0\s*$') {

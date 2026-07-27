@@ -16,7 +16,7 @@
 
 - [架构与正确性边界](architecture.md)
 - [发布流程](release-process.md)
-- [公开发布清单](publication-checklist.md)
+- [正式发布清单](publication-checklist.md)
 - [更新日志模板](changelog-template.md)
 - [项目治理](project/GOVERNANCE.md)
 - [第三方软件声明](project/THIRD_PARTY_NOTICES.md)

@@ -60,8 +60,9 @@ The workflow then:
    source, computes SHA-256 values, and freezes one `toolchain.resolved.json`.
 4. Uses that one snapshot for core validation, real GUI smoke, resource soaking,
    and two reproducible builds.
-5. Embeds that AutoHotkey runtime and publishes checksums, the SBOM, and build
-   provenance only after every gate passes.
+5. Embeds that AutoHotkey runtime only after every gate passes. The three user
+   editions go to GitHub Releases, checksums and the SBOM remain in the complete
+   Actions build artifact, and provenance covers the three user editions.
 
 The official EXE therefore contains the latest stable AutoHotkey selected and
 validated when that assistant release began. It does not follow later upstream

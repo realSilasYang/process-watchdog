@@ -1,24 +1,21 @@
-# 提交与拉取请求的必需验证：固定 CI 工具链、完整检查、GUI 冒烟和可复现构建。
-name: CI
+# 手动发布演练：使用最新上游构建工具执行正式门禁，但不创建标签或 GitHub Release。
+name: Release dry run
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
   workflow_dispatch:
+
+concurrency:
+  group: release-dry-run-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  verify:
+  dry-run:
+    if: github.ref == 'refs/heads/main'
     runs-on: windows-2022
-    timeout-minutes: 25
+    timeout-minutes: 50
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -26,23 +23,20 @@ jobs:
           fetch-depth: 0
           lfs: true
 
-      - name: Restore verified tool cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            .tools/cache
-            .tools/AutoHotkey-*
-            .tools/Ahk2Exe-*
-            .tools/actionlint-*
-            .tools/gitleaks-*
-          key: ${{ runner.os }}-tools-${{ hashFiles('tools/ci-toolchain.resolved.json', 'tools/toolchain.lock.json') }}
+      - name: Confirm release state without modifying GitHub
+        id: release_meta
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .\tools\resolve-release-state.ps1
 
-      - name: Bootstrap repository CI toolchain snapshot
+      - name: Resolve latest upstream build tools
         id: toolchain
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          $tools = .\tools\bootstrap-toolchain.ps1 `
-            -ResolvedToolchainPath .\tools\ci-toolchain.resolved.json
+          $tools = .\tools\bootstrap-toolchain.ps1 -RefreshBuildTools
           "ahk=$($tools.AutoHotkeyPath)" >> $env:GITHUB_OUTPUT
           "compiler=$($tools.CompilerPath)" >> $env:GITHUB_OUTPUT
           "actionlint=$($tools.ActionlintPath)" >> $env:GITHUB_OUTPUT
@@ -50,7 +44,7 @@ jobs:
           "ahk_source=$($tools.AutoHotkeySourcePath)" >> $env:GITHUB_OUTPUT
           "resolved=$($tools.ResolvedToolchainPath)" >> $env:GITHUB_OUTPUT
 
-      - name: Run complete release-shaped validation
+      - name: Run the same validation used by a formal release
         shell: pwsh
         run: >-
           .\tools\invoke-release-validation.ps1
@@ -62,10 +56,10 @@ jobs:
           -GitleaksPath '${{ steps.toolchain.outputs.gitleaks }}'
           -SoakSeconds 15
 
-      - name: Preserve all build outputs
+      - name: Preserve all dry-run build outputs
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: process-watchdog-ci-all-build-outputs
+          name: process-watchdog-${{ steps.release_meta.outputs.version }}-dry-run-all-build-outputs
           path: dist/**
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30

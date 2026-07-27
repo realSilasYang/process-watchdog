@@ -23,11 +23,13 @@
    not release if the standalone EXE, EXE ZIP, source ZIP, or standalone SBOM
    differs between the two builds, or if
    `SHA256SUMS.txt` does not match.
-6. Local preflight may reuse an existing resolved toolchain. The official release
-   workflow queries the latest stable AutoHotkey release and latest published
-   Ahk2Exe release again, then freezes one `toolchain.resolved.json`. Confirm the
-   package contains the AutoHotkey license, corresponding complete source archive,
-   resolved snapshot, and an SBOM consistent with the actual archive hashes.
+6. Ordinary CI uses the hash-pinned repository snapshot at
+   `tools/ci-toolchain.resolved.json` and a cache, so upstream changes cannot
+   destabilize unrelated commits. The dry run and formal release instead query
+   the latest stable AutoHotkey and latest published Ahk2Exe, then freeze one
+   `toolchain.resolved.json`. Confirm that the package contains the AutoHotkey
+   license, corresponding source archive, resolved snapshot, and an SBOM
+   consistent with the actual archive hashes.
 7. Test affected Windows and DPI combinations in the manual GUI matrix. List
    incomplete physical combinations in the Release notes; automation does not
    replace them.
@@ -36,17 +38,21 @@
    describes observable behavior, not a commit title or internal class.
 9. Commit all source, tests, and documents so Git can reconstruct `main`, and wait
    for CI to pass.
-10. Manually run the Release workflow from `main` in GitHub Actions. Do not push a
-   version tag first. The workflow validates `VERSION` and accepts manual dispatch
-   only. A first run requires no remote tag; an interrupted draft at the same commit
-   may be resumed by rerunning the workflow.
-11. After dynamically resolving the upstream tools, the workflow reruns full
-    verification, a short GUI soak, and two reproducible builds. Only then does it
-    attest the standalone EXE, the complete portable ZIP, and the complete source
-    ZIP. The SBOM and `SHA256SUMS.txt` remain only in the complete `dist` tree
-    preserved as an Actions artifact. It uploads the three user editions to a draft,
-    verifies them against an explicit allowlist, and only then makes the
-    `v<version>` Release public in one final step.
+10. Manually run Release dry run from `main`. With read-only permissions, it resolves
+    the latest upstream toolchain, executes the same full validation, GUI smoke,
+    and two reproducible builds as a formal release, and preserves the full `dist`.
+    It never creates a tag, draft, or Release. Do not proceed if it fails.
+11. After the dry run passes, manually run Release from that same `main` commit.
+    Do not push a version tag first. The workflow rejects tags or drafts from other
+    commits and every already-published version. It may safely resume a same-commit
+    draft or recover an orphaned same-commit tag; duplicates and inconsistent state
+    fail explicitly.
+12. The formal workflow resolves upstream tools and runs every gate again. It then
+    attests and uploads only the standalone EXE, complete portable ZIP, and complete
+    source ZIP to a draft. The SBOM, `SHA256SUMS.txt`, and remaining `dist` stay in
+    the complete Actions artifact. The draft body, commit, allowlist, sizes, and
+    GitHub SHA-256 digests must match the local build before publication, followed
+    by a second audit of the public Release and remote tag.
 
 The tag must be in `main` history and is created by the manually dispatched
 Release workflow only after every gate passes. Code pushes, tag pushes, schedules,
@@ -58,6 +64,11 @@ verification method, and uncompleted physical GUI check.
 Each Release contains only three downloads: the standalone EXE, the complete
 portable ZIP, and the complete source ZIP. The SBOM, `SHA256SUMS.txt`, and extracted
 package directories remain available only in the complete Actions build artifact.
+If the final post-publication audit fails, do not delete or overwrite the public
+version. Preserve the evidence, diagnose the cause, and issue a new patch release.
+Release-state resolution and both audits share the contract in
+`tools/ReleaseEngineering.psm1`; the workflow YAML does not maintain a second
+implementation.
 
 Packages are not code-signed. If signing is added later, perform it after the
 deterministic unsigned build and preserve the unsigned hash, signed-artifact

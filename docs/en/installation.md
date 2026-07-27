@@ -12,9 +12,8 @@ and source-based execution. The EXE, `assets/`, and `third_party/` in the portab
 edition must keep their relative locations; do not copy only the EXE out of the ZIP.
 
 `v1.0.0` predates self-update and contains no update helper, so it cannot initiate
-its own upgrade. Install the first later release that includes self-update by
-downloading and fully replacing the package manually. Releases after that bootstrap
-step can use Check for Updates in Settings.
+its own upgrade. Move to `v2.0.0` by downloading and fully replacing the package
+manually. Releases after that bootstrap step can use Check for Updates in Settings.
 
 Official packages include the required AutoHotkey runtime. AutoHotkey v2 x64 is
 needed only when running from source. `licenses/sources/` also contains the full

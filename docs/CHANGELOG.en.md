@@ -7,17 +7,17 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [1.1.0] - 2026-07-27
+## [2.0.0] - 2026-07-28
 
 ### Release editions
 
-- `process-watchdog-1.1.0-windows-x64.exe`: Standalone executable. AutoHotkey is not required; download and run it directly.
-- `process-watchdog-1.1.0-windows-x64.zip`: Complete portable package with the EXE, documentation, licenses, fonts, and runtime resources for long-term extraction or manual deployment.
-- `process-watchdog-1.1.0-source.zip`: Complete source package with AHK source, modules, tests, documentation, and fonts. Source mode requires AutoHotkey v2 x64 on the computer.
+- `process-watchdog-2.0.0-windows-x64.exe`: Standalone executable. AutoHotkey is not required; download and run it directly.
+- `process-watchdog-2.0.0-windows-x64.zip`: Complete portable package with the EXE, documentation, licenses, fonts, and runtime resources for long-term extraction or manual deployment.
+- `process-watchdog-2.0.0-source.zip`: Complete source package with AHK source, modules, tests, documentation, and fonts. Source mode requires AutoHotkey v2 x64 on the computer.
 
 ### Important notes
 
-- `v1.0.0` cannot update itself. Moving to `v1.1.0` requires one manual download
+- `v1.0.0` cannot update itself. Moving to `v2.0.0` requires one manual download
   and complete package replacement; later EXE and source editions can use the
   built-in updater.
 - Application search now requires a running Everything service. There is no
@@ -83,6 +83,13 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   full test suite, two reproducible builds, SBOM and checksum generation,
   provenance, and draft-asset verification before publication. The versioned EXE
   and complete `dist` output remain available as artifacts.
+- Ordinary CI now uses a hash-pinned repository toolchain snapshot and Actions
+  cache, so unrelated upstream changes cannot destabilize it. A read-only manual
+  dry run exercises the same dynamic toolchain and gates as a formal release.
+- Release conflict handling, the three-asset allowlist, GitHub digests, and body
+  checks now use one tested state machine. It can resume a same-commit draft or
+  recover an orphaned same-commit tag, then audits the tag, commit, body, and
+  asset hashes again after publication.
 
 ### Fixed
 
@@ -149,6 +156,6 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v1.1.0...HEAD
-[1.1.0]: https://github.com/realSilasYang/process-watchdog/compare/v1.0.0...v1.1.0
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/realSilasYang/process-watchdog/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/realSilasYang/process-watchdog/releases/tag/v1.0.0
