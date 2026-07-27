@@ -83,6 +83,9 @@ $requiredFiles = @(
     'tools\ReleaseEngineering.psm1',
     'tools\resolve-release-state.ps1',
     'tools\invoke-release-validation.ps1',
+    'tools\invoke-release-compiler.ps1',
+    'tools\normalize-version-resource.ps1',
+    'tools\new-release-archive.ps1',
     'tools\verify-github-release.ps1',
     'tools\verify-release-draft.ps1',
     'tools\verify-published-release.ps1',
@@ -644,10 +647,38 @@ if ($buildScript -match "'/setversion'" -or
 foreach ($determinismRequirement in @(
         'function Write-CanonicalJson',
         '$buildDriveLetter = ''R''',
-        '[System.IO.Compression.CompressionLevel]::NoCompression',
+        "'invoke-release-compiler.ps1'",
+        "'new-release-archive.ps1'",
+        '$canonicalPowerShell',
         '$script:utf8WithBom')) {
     if (-not $buildScript.Contains($determinismRequirement)) {
         throw "Release build is missing a cross-runtime determinism boundary: $determinismRequirement"
+    }
+}
+$archiveWriterSource = Get-Content -LiteralPath (Join-Path $projectRoot `
+    'tools\new-release-archive.ps1') -Raw -Encoding UTF8
+foreach ($archiveRequirement in @(
+        '[System.StringComparer]::Ordinal',
+        '[System.IO.Compression.CompressionLevel]::NoCompression',
+        '[System.IO.FileMode]::CreateNew')) {
+    if (-not $archiveWriterSource.Contains($archiveRequirement)) {
+        throw "Canonical archive writer is missing: $archiveRequirement"
+    }
+}
+$compilerBoundarySource = Get-Content -LiteralPath (Join-Path $projectRoot `
+    'tools\invoke-release-compiler.ps1') -Raw -Encoding UTF8
+if (-not $compilerBoundarySource.Contains(
+        "'normalize-version-resource.ps1'")) {
+    throw 'Canonical compiler boundary must normalize VERSIONINFO padding.'
+}
+$versionNormalizerSource = Get-Content -LiteralPath (Join-Path $projectRoot `
+    'tools\normalize-version-resource.ps1') -Raw -Encoding UTF8
+foreach ($normalizerRequirement in @(
+        'EnumResourceLanguagesW',
+        'NormalizeNode',
+        'UpdateResourceW')) {
+    if (-not $versionNormalizerSource.Contains($normalizerRequirement)) {
+        throw "Version resource normalizer is missing: $normalizerRequirement"
     }
 }
 if ($releaseWorkflow -match '(?m)^\s*push:\s*$' -or

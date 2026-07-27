@@ -244,52 +244,25 @@ Write-Verbose "Ahk2Exe source: $compilerSourcePath"
 Write-Verbose "Ahk2Exe output: $compilerOutputPath"
 Write-Verbose "Ahk2Exe base: $compilerBasePath"
 $executablePath = Join-Path $packageDirectory ($mainScript.BaseName + '.exe')
-$compilerArguments = @(
-    '/in', $compilerSourcePath,
-    '/out', $compilerOutputPath,
-    '/icon', $compilerIconPath,
-    '/base', $compilerBasePath,
-    '/silent', 'verbose'
-)
-$compilerProcess = $null
+$canonicalPowerShell = Join-Path $env:SystemRoot `
+    'System32\WindowsPowerShell\v1.0\powershell.exe'
+if (-not (Test-Path -LiteralPath $canonicalPowerShell -PathType Leaf)) {
+    throw "Canonical release host is missing: $canonicalPowerShell"
+}
 try {
-    $compilerStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
-    $compilerStartInfo.FileName = $compilerExecutablePath
-    $compilerStartInfo.Arguments = ($compilerArguments | ForEach-Object {
-        '"' + ([string]$_).Replace('"', '\"') + '"'
-    }) -join ' '
-    $compilerStartInfo.WorkingDirectory = $mappedProjectRoot
-    $compilerStartInfo.UseShellExecute = $false
-    $compilerStartInfo.CreateNoWindow = $true
-    $compilerStartInfo.RedirectStandardOutput = $true
-    $compilerStartInfo.RedirectStandardError = $true
-    $compilerProcess = [System.Diagnostics.Process]::Start($compilerStartInfo)
-    $standardOutputTask = $compilerProcess.StandardOutput.ReadToEndAsync()
-    $standardErrorTask = $compilerProcess.StandardError.ReadToEndAsync()
-    if (-not $compilerProcess.WaitForExit(120000)) {
-        try { $compilerProcess.Kill() } catch {}
-        throw 'Ahk2Exe timed out after 120 seconds.'
-    }
-    $compilerProcess.WaitForExit()
-    $compilerExitCode = $compilerProcess.ExitCode
-    $compilerStandardOutput = $standardOutputTask.GetAwaiter().GetResult()
-    $compilerStandardError = $standardErrorTask.GetAwaiter().GetResult()
-    if ($compilerExitCode -ne 0 -or
-        -not (Test-Path -LiteralPath $scratchExecutablePath -PathType Leaf)) {
-        $compilerDiagnostics = @($compilerStandardError,
-            $compilerStandardOutput) -join "`n"
-        throw ("Ahk2Exe failed with exit code {0}.{1}" -f `
-            $compilerExitCode,
-            $(if ($compilerDiagnostics.Trim()) {
-                "`n$($compilerDiagnostics.Trim())"
-            } else { '' }))
+    & $canonicalPowerShell -NoLogo -NoProfile -NonInteractive `
+        -ExecutionPolicy Bypass -File `
+        (Join-Path $PSScriptRoot 'invoke-release-compiler.ps1') `
+        -CompilerPath $compilerExecutablePath `
+        -SourcePath $compilerSourcePath -OutputPath $compilerOutputPath `
+        -IconPath $compilerIconPath -BasePath $compilerBasePath `
+        -WorkingDirectory $mappedProjectRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw "Canonical compiler host failed with exit code $LASTEXITCODE."
     }
     Copy-Item -LiteralPath $scratchExecutablePath `
         -Destination $executablePath
 } finally {
-    if ($compilerProcess) {
-        $compilerProcess.Dispose()
-    }
     if ($substituteDrive) {
         $removeDrive = Start-Process -FilePath 'subst.exe' `
             -ArgumentList $substituteDrive, '/D' -PassThru -Wait `
@@ -436,53 +409,17 @@ if (-not $SkipStartupValidation) {
     }
 }
 
-Add-Type -AssemblyName System.IO.Compression
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-function New-DeterministicArchive {
-    param(
-        [string]$SourceDirectory,
-        [string]$ArchivePath
-    )
-
-    $archiveStream = [System.IO.File]::Open($ArchivePath,
-        [System.IO.FileMode]::CreateNew)
-    try {
-        $archive = [System.IO.Compression.ZipArchive]::new($archiveStream,
-            [System.IO.Compression.ZipArchiveMode]::Create, $false,
-            [System.Text.Encoding]::UTF8)
-        try {
-            $files = Get-ChildItem -LiteralPath $SourceDirectory `
-                -Recurse -File | Sort-Object {
-                    $_.FullName.Substring($SourceDirectory.Length + 1)
-                }
-            foreach ($file in $files) {
-                $relativePath = $file.FullName.Substring(
-                    $SourceDirectory.Length + 1).Replace('\', '/')
-                # Store 模式避免 .NET Framework 与现代 .NET 的 Deflate 实现差异。
-                # 随包字体本身已经压缩，体积增加有限，却能让 ZIP 字节跨宿主稳定。
-                $entry = $archive.CreateEntry($relativePath,
-                    [System.IO.Compression.CompressionLevel]::NoCompression)
-                $entry.LastWriteTime = [DateTimeOffset]::new(1980, 1, 1,
-                    0, 0, 0, [TimeSpan]::Zero)
-                $inputStream = [System.IO.File]::OpenRead($file.FullName)
-                $entryStream = $entry.Open()
-                try {
-                    $inputStream.CopyTo($entryStream)
-                } finally {
-                    $entryStream.Dispose()
-                    $inputStream.Dispose()
-                }
-            }
-        } finally {
-            $archive.Dispose()
-        }
-    } finally {
-        $archiveStream.Dispose()
+$archiveWriter = Join-Path $PSScriptRoot 'new-release-archive.ps1'
+foreach ($archiveSpec in @(
+        @($packageDirectory, $zipPath),
+        @($sourcePackageDirectory, $sourceZipPath))) {
+    & $canonicalPowerShell -NoLogo -NoProfile -NonInteractive `
+        -ExecutionPolicy Bypass -File $archiveWriter `
+        -SourceDirectory $archiveSpec[0] -ArchivePath $archiveSpec[1]
+    if ($LASTEXITCODE -ne 0) {
+        throw "Canonical archive host failed with exit code $LASTEXITCODE."
     }
 }
-
-New-DeterministicArchive $packageDirectory $zipPath
-New-DeterministicArchive $sourcePackageDirectory $sourceZipPath
 # Release 附件保留一份与 ZIP 内完全相同的 EXE，便于独立留档、核验和生成溯源
 # 证明；它仍依赖完整发行包中的资源和 DLL，不作为单文件安装包使用。
 Copy-Item -LiteralPath $executablePath -Destination $standaloneExecutablePath
