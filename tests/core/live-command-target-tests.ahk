@@ -625,6 +625,31 @@ WaitForLiveTarget(kind, targetPath, shouldRun, timeoutMs := 5000) {
     }
 }
 
+DescribeLiveTargetLaunch(observation, targetPath, launcherPid) {
+    details := "status=" observation.Status
+        . ";reasonCode=" observation.ReasonCode
+        . ";launcherPid=" launcherPid
+        . ";launcherAlive=" (!!launcherPid && !!ProcessExist(launcherPid))
+    SplitPath(targetPath, &targetName)
+    try snapshot := CaptureLiveTargetSnapshot()
+    catch as snapshotError
+        return details ";snapshotError=" Type(snapshotError)
+    candidateCount := 0
+    for processInfo in snapshot {
+        isLauncher := launcherPid && processInfo.pid == launcherPid
+        isTargetName := processInfo.name != ""
+            && StrLower(processInfo.name) == StrLower(targetName)
+        if !isLauncher && !isTargetName
+            continue
+        candidateCount++
+        details .= "|candidatePid=" processInfo.pid
+            . ";name=" processInfo.name
+            . ";exe=" processInfo.exe
+            . ";cmd=" processInfo.cmd
+    }
+    return details ";candidateCount=" candidateCount
+}
+
 StartLiveExecutable(executablePath, arguments, processes) {
     Run(QuoteLiveTarget(executablePath) " " arguments, A_Temp, "Hide", &pid)
     AssertLiveTarget(pid && ProcessWait(pid, 5),
@@ -833,7 +858,9 @@ RunLiveCommandTargetTests() {
             shortcutExe, true)
         AssertLiveTarget(shortcutObservation.IsRunning(),
             "普通快捷方式启动后的真实进程未被识别："
-                . shortcutObservation.Reason)
+                . shortcutObservation.Reason " ["
+                . DescribeLiveTargetLaunch(shortcutObservation, shortcutExe,
+                    shortcutLauncherPid) "]")
 
         transferredExe := CopyLiveExecutable(pingSource,
             tempRoot "\WatchdogLiveTransferred.exe")
