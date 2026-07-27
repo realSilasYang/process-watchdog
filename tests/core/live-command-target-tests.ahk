@@ -734,18 +734,23 @@ CloseLiveTargetProcesses(rootPids, tempRoot := "") {
 }
 
 DeleteLiveTargetTempRoot(tempRoot) {
-    Loop 20 {
+    lastDeleteError := ""
+    Loop 150 {
         try DirDelete(tempRoot, true)
+        catch as deleteError
+            lastDeleteError := Type(deleteError) "：" deleteError.Message
         if !DirExist(tempRoot)
-            return true
+            return {Deleted: true, Error: ""}
         Sleep(100)
     }
-    return false
+    return {Deleted: false, Error: lastDeleteError}
 }
 
 DeleteStaleLiveTargetRoots() {
-    Loop Files, A_Temp "\watchdog-live-command-target-*", "D"
+    Loop Files, A_Temp "\watchdog-live-command-target-*", "D" {
+        CloseLiveTargetProcesses([], A_LoopFileFullPath)
         DeleteLiveTargetTempRoot(A_LoopFileFullPath)
+    }
 }
 
 RunLiveCommandTargetTests() {
@@ -972,11 +977,13 @@ RunLiveCommandTargetTests() {
             "并发退出后至少一个目标仍被误判为运行中")
     } finally {
         processesClosed := CloseLiveTargetProcesses(processes, tempRoot)
-        tempDeleted := DeleteLiveTargetTempRoot(tempRoot)
+        tempDeleteResult := DeleteLiveTargetTempRoot(tempRoot)
         AssertLiveTarget(processesClosed,
             "真实进程测试结束后仍有属于临时目标的进程存活")
-        AssertLiveTarget(tempDeleted,
-            "真实进程测试结束后无法删除临时目录")
+        AssertLiveTarget(tempDeleteResult.Deleted,
+            "真实进程测试结束后无法删除临时目录"
+                . (tempDeleteResult.Error != ""
+                    ? "：" tempDeleteResult.Error : ""))
     }
 }
 
