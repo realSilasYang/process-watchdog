@@ -1,4 +1,4 @@
-# 首次公开发布清单
+# 正式发布清单
 
 **简体中文** | [English](en/publication-checklist.md)
 
@@ -35,8 +35,10 @@
 7. 检查 Actions 允许使用仓库中已经固定完整提交 SHA 的第三方 Action。
 8. 在仓库 About 中填写简洁描述、Windows／AutoHotkey 主题和实际许可证。
 
-## 首个 Release
+## 正式 Release
 
+- 先从 `main` 人工运行只读 Release dry run；确认它不创建标签或 Release，并保留完整
+  `dist` Actions 产物。演练通过后才能从同一提交人工运行 Release。
 - Release 工作流只能从 `main` 人工触发，并在全部门禁通过后创建 `v<VERSION>` 标签。
 - 工作流解析出的 AutoHotkey 必须是最新稳定版，Ahk2Exe 必须是最新发布版；同一次
   发布的测试、两次构建和 SBOM 必须共用一份解析快照。
@@ -45,6 +47,8 @@
   `SHA256SUMS.txt`、解压目录及其他构建输出只在 Actions 完整产物中保留。
 - 附件上传期间 Release 保持草稿；工作流按三项白名单核对实际附件后才公开。
   若中断，只能续传同一提交的草稿，不能覆盖已发布版本。
+- 公开后再次确认远程标签、提交、标题、正文和三个附件的 GitHub SHA-256；最终审计
+  失败时保留已公开现场并改发补丁版本，不删除或覆盖。
 - 解压 ZIP 后再次运行 `tools/verify-release.ps1` 所覆盖的结构检查；确认不含个人配置。
 - 确认包内 AutoHotkey 许可证、对应源码归档、工具链解析快照和第三方许可证都能打开。
 - 发布负责人重新确认 PingFang、SF Pro Text 与 Apple SD Gothic Neo 的商业授权仍然

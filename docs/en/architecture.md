@@ -256,6 +256,8 @@ Public-release validation requires a non-shallow clone, scans every commit with
 the pinned Gitleaks, rejects personal configuration and temporary probes in
 history, and rejects local absolute paths in release text. Builds pin AutoHotkey,
 Ahk2Exe, runtime DLL, and packaged-font hashes, compile through an ASCII-only virtual path, and
-validate the compiled startup. Two builds must produce byte-identical ZIP and
-SPDX SBOM files. The release also contains checksums, provenance, the AutoHotkey
-license, and the source archive for the exact embedded runtime.
+validate the compiled startup. Two builds must produce byte-identical EXE, ZIP,
+and SPDX SBOM files. The portable package includes its SBOM, AutoHotkey license,
+and source archive for the exact embedded runtime. The complete Actions artifact
+retains checksums and the standalone SBOM, while provenance covers the three user
+editions.

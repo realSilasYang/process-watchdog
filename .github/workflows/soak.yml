@@ -22,13 +22,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           lfs: true
-      - name: Bootstrap pinned AutoHotkey
+      - name: Restore verified tool cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .tools/cache
+            .tools/AutoHotkey-*
+            .tools/Ahk2Exe-*
+            .tools/actionlint-*
+            .tools/gitleaks-*
+          key: ${{ runner.os }}-tools-${{ hashFiles('tools/ci-toolchain.resolved.json', 'tools/toolchain.lock.json') }}
+      - name: Bootstrap repository CI toolchain snapshot
         id: toolchain
         shell: pwsh
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          $tools = .\tools\bootstrap-toolchain.ps1
+          $tools = .\tools\bootstrap-toolchain.ps1 `
+            -ResolvedToolchainPath .\tools\ci-toolchain.resolved.json
           "ahk=$($tools.AutoHotkeyPath)" >> $env:GITHUB_OUTPUT
       - name: Run GUI resource soak
         shell: pwsh

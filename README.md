@@ -276,7 +276,7 @@ AutoHotkey 与 Ahk2Exe 不在仓库中预先锁定版本：每次人工正式发
 
 用户可见变化必须同步更新 README 和 CHANGELOG。新增版本时使用[更新日志模板](docs/changelog-template.md)，按用户能够观察到的“新增、优化、修复”归纳变化，不直接复制提交信息或内部类名。
 
-完整发布步骤见[发布流程](docs/release-process.md)，仓库设置和首次公开检查见[公开发布清单](docs/publication-checklist.md)。普通 Pull Request 不应创建版本标签或改写已经发布的标签。
+完整发布步骤见[发布流程](docs/release-process.md)，仓库设置和版本发布门禁见[正式发布清单](docs/publication-checklist.md)。普通 Pull Request 不应创建版本标签或改写已经发布的标签。
 
 欢迎提交能够复现问题、说明风险并附验证证据的 Issue 和 Pull Request。涉及窗口、DPI、图标或深色模式时，请同时说明实际验证的 Windows 版本和缩放比例。贡献要求见[贡献指南](.github/CONTRIBUTING.md)，项目决策原则见[项目治理](docs/project/GOVERNANCE.md)。
 

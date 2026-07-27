@@ -279,7 +279,7 @@ AutoHotkey and Ahk2Exe versions are not pre-pinned in the repository. Every manu
 
 User-visible changes must update every localized README and the changelog. Use the [changelog template](en/changelog-template.md) for new versions and describe observable additions, changes, and fixes rather than copying commit messages or internal class names.
 
-See the [release process](en/release-process.md) and [public-release checklist](en/publication-checklist.md). An ordinary pull request must not create a version tag or rewrite a published tag.
+See the [release process](en/release-process.md) and [formal release checklist](en/publication-checklist.md). An ordinary pull request must not create a version tag or rewrite a published tag.
 
 Issues and pull requests should describe a reproducible problem, its risk, and verification evidence. For windows, DPI, icons, or dark mode, include the actual Windows version and scale tested. See [Contributing](../.github/CONTRIBUTING.en.md) and [Governance](project/GOVERNANCE.en.md).
 

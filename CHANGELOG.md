@@ -7,17 +7,17 @@
 
 ## [未发布]
 
-## [1.1.0] - 2026-07-27
+## [2.0.0] - 2026-07-28
 
 ### 发行版本
 
-- `process-watchdog-1.1.0-windows-x64.exe`：独立可执行版。用户无需安装 AutoHotkey，下载后即可运行。
-- `process-watchdog-1.1.0-windows-x64.zip`：完整便携版，包含 EXE、说明文档、许可证、字体及运行所需资源，适合解压后长期使用或手动部署。
-- `process-watchdog-1.1.0-source.zip`：完整源码版，包含 AHK 源码、模块、测试、文档和字体资源。源码版需要本机 AutoHotkey v2 x64。
+- `process-watchdog-2.0.0-windows-x64.exe`：独立可执行版。用户无需安装 AutoHotkey，下载后即可运行。
+- `process-watchdog-2.0.0-windows-x64.zip`：完整便携版，包含 EXE、说明文档、许可证、字体及运行所需资源，适合解压后长期使用或手动部署。
+- `process-watchdog-2.0.0-source.zip`：完整源码版，包含 AHK 源码、模块、测试、文档和字体资源。源码版需要本机 AutoHotkey v2 x64。
 
 ### 重要说明
 
-- `v1.0.0` 尚无自更新能力，升级到 `v1.1.0` 时必须手动下载并完整替换一次发行包；
+- `v1.0.0` 尚无自更新能力，升级到 `v2.0.0` 时必须手动下载并完整替换一次发行包；
   此后 EXE 版和源码版均可使用小助手内置更新。
 - 程序搜索现在只使用正在运行的 Everything 服务，不再内置全盘扫描回退，也不限制
   应用层结果数量；文件夹批量导入不受影响。
@@ -60,6 +60,10 @@
 - 正式发布改为只允许从 `main` 手动触发。每次发布解析 AutoHotkey 最新稳定版和
   Ahk2Exe 最新发布版，完成全套测试、双次可复现构建、SBOM、校验清单、构建溯源和
   草稿附件核验后再公开，同时保留版本化 EXE 与完整 `dist` 产物。
+- 普通 CI 改用仓库内经哈希固定的工具链快照和 Actions 缓存，避免上游临时变化造成
+  无关失败；新增只读的手动发布演练，使用与正式发布完全相同的动态工具链与门禁。
+- 发布冲突判断、三附件白名单、GitHub 摘要和正文核对收敛为可测试的共享状态机；
+  支持恢复同提交草稿或孤立标签，并在公开后再次审计标签、提交、正文和附件哈希。
 
 ### 修复
 
@@ -109,6 +113,6 @@
 - 后台文件扫描使用 `DirExist` 明确区分目录边界，临时文件遇到瞬时占用时执行
   短时有界重试；测试分别报告结果协议、实际文件集合和清理失败。
 
-[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v1.1.0...HEAD
-[1.1.0]: https://github.com/realSilasYang/process-watchdog/compare/v1.0.0...v1.1.0
+[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/realSilasYang/process-watchdog/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/realSilasYang/process-watchdog/releases/tag/v1.0.0
