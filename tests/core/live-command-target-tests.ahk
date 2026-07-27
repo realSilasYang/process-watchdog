@@ -479,6 +479,7 @@ RunLiveGuardRecoveryTests(recoveryTargets, quickExitTarget, tempRoot,
             "可明确确认停止的真实目标不足，无法覆盖并发恢复链路")
         recoveryTargets := confirmedRecoveryTargets
         snapshots.Invalidate()
+        inspector.AutoHotkeyScriptSnapshot := ""
         guardEngine.MonitorTick()
         for recoveryTarget in recoveryTargets {
             AssertLiveTarget(recoveryTarget.State.Phase
@@ -490,6 +491,7 @@ RunLiveGuardRecoveryTests(recoveryTargets, quickExitTarget, tempRoot,
         }
         Sleep(50)
         snapshots.Invalidate()
+        inspector.AutoHotkeyScriptSnapshot := ""
         guardEngine.MonitorTick()
         for recoveryTarget in recoveryTargets {
             AssertLiveTarget(recoveryTarget.State.RestartTask
