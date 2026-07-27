@@ -388,7 +388,7 @@ $localizedReadmes = @(
 )
 $readmeRequiredTopics = @(
     'Running', 'Stopped', 'Unknown', 'Everything', 'watchdog.ini',
-    'watchdog.maintenance.ini', 'SHA256SUMS.txt', 'AutoHotkey', 'Ahk2Exe',
+    'watchdog.maintenance.ini', 'AutoHotkey', 'Ahk2Exe',
     'third_party', 'reproducible-build.ps1'
 )
 foreach ($readmeDefinition in $localizedReadmes) {
@@ -419,7 +419,7 @@ foreach ($readmeDefinition in $localizedReadmes) {
     }
 
     # 每个版本都必须是完整说明，而不是只有语言跳转的占位页。稳定的技术词同时覆盖
-    # 身份探测、搜索、配置、升级状态、发行校验和可复现构建等主要职责。
+    # 身份探测、搜索、配置、升级状态和可复现构建等主要职责。
     if ($readme.Length -lt 9000) {
         throw "Localized README is unexpectedly short: $($readmeDefinition.Path)"
     }
@@ -562,14 +562,19 @@ foreach ($releaseRequirement in @(
         'actions/attest-build-provenance@',
         'actions/upload-artifact@',
         'path: dist/**',
-        'dist/*.exe',
-        'dist/*.spdx.json',
+        'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.exe',
+        'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.zip',
+        'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-source.zip',
         'draft: true',
         'Verify draft release assets',
         '--draft=false')) {
     if (-not $releaseWorkflow.Contains($releaseRequirement)) {
         throw "Release workflow is missing: $releaseRequirement"
     }
+}
+if ($releaseWorkflow.Contains('dist/*.spdx.json') -or
+    $releaseWorkflow.Contains('dist/SHA256SUMS.txt')) {
+    throw 'Release attachments must be limited to the three supported editions.'
 }
 $ciWorkflow = Get-Content -LiteralPath `
     (Join-Path $projectRoot '.github\workflows\ci.yml') -Raw -Encoding UTF8

@@ -38,6 +38,12 @@ try {
 }
 $releaseWorkflow = Get-Content -LiteralPath (Join-Path $projectRoot `
     '.github\workflows\release.yml') -Raw -Encoding UTF8
+$versionExpression = '${{ steps.release_meta.outputs.version }}'
+$releaseAssetPaths = @(
+    "dist/process-watchdog-$versionExpression-windows-x64.exe",
+    "dist/process-watchdog-$versionExpression-windows-x64.zip",
+    "dist/process-watchdog-$versionExpression-source.zip"
+)
 if ($releaseWorkflow -notmatch
         '\$tagQueryExitCode\s*=\s*\$LASTEXITCODE[\s\S]{0,120}if\s*\(\$tagQueryExitCode\s*-notin\s*@\(0,\s*2\)\)' -or
     $releaseWorkflow -notmatch
@@ -51,5 +57,15 @@ if ($releaseWorkflow -notmatch
     $releaseWorkflow -notmatch
         '\$global:LASTEXITCODE\s*=\s*0') {
     throw 'Release tag detection must consume git status and validate a unique draft at the current commit.'
+}
+foreach ($releaseAssetPath in $releaseAssetPaths) {
+    if (([regex]::Matches($releaseWorkflow,
+            [regex]::Escape($releaseAssetPath))).Count -lt 2) {
+        throw "Release workflow must attest and upload the user artifact: $releaseAssetPath"
+    }
+}
+if ($releaseWorkflow.Contains('dist/*.spdx.json') -or
+    $releaseWorkflow.Contains('dist/SHA256SUMS.txt')) {
+    throw 'Release workflow must publish only the standalone EXE, portable ZIP, and source ZIP.'
 }
 Write-Host "GitHub Actions workflows passed actionlint $($toolLock.tools.actionlint.version)."

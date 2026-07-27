@@ -104,6 +104,9 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Fixed release builds against current Ahk2Exe, checksum parsing, draft-resume exit
   codes, English batch-import punctuation, and a small set of untranslated status
   messages.
+- Fixed Releases incorrectly attaching a standalone SBOM and checksum list. The
+  page now contains only the standalone EXE, portable ZIP, and source ZIP, while
+  automatic update prefers the asset SHA-256 supplied by the GitHub Release API.
 
 ## [1.0.0] - 2026-07-23
 

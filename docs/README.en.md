@@ -89,16 +89,9 @@ Process Watchdog Assistant will remain open source. Long-term maintenance depend
 
 1. Choose any one of these editions from [Releases](https://github.com/realSilasYang/process-watchdog/releases): standalone EXE, complete portable ZIP, or complete source ZIP.
 2. The standalone EXE needs no AutoHotkey and runs directly; the portable ZIP is intended for long-term extraction; the source ZIP requires AutoHotkey v2 x64 on the computer.
-3. Use the matching `SHA256SUMS.txt` and SBOM when you want to verify a download. They are verification attachments, not separate runtime editions.
-4. Run `进程守护小助手.exe`. The application requests administrator privileges, then shows the main window or starts in the system tray according to its settings.
-5. Select Add to choose a target, or drag supported files into the main window.
-6. Open Logs to see which identity evidence, state checks, recovery attempts, and update signals the assistant actually used.
-
-```powershell
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.zip
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.exe
-Get-Content .\SHA256SUMS.txt
-```
+3. Run `进程守护小助手.exe`. The application requests administrator privileges, then shows the main window or starts in the system tray according to its settings.
+4. Select Add to choose a target, or drag supported files into the main window.
+5. Open Logs to see which identity evidence, state checks, recovery attempts, and update signals the assistant actually used.
 
 To run from source, install AutoHotkey v2 x64 and execute `进程守护小助手.ahk`.
 A Git clone also requires Git LFS and `git lfs pull` so the bundled font files

@@ -24,6 +24,8 @@ param(
     [string]$Tag = '',
     [string]$BinaryUrl = '',
     [string]$SourceUrl = '',
+    [string]$BinarySha256 = '',
+    [string]$SourceSha256 = '',
     [string]$ChecksumsUrl = ''
 )
 
@@ -121,7 +123,8 @@ function Write-CheckResult {
     $lines = [System.Collections.Generic.List[string]]::new()
     $lines.Add('[Update]')
     foreach ($key in @('Status', 'CurrentVersion', 'Version', 'Tag',
-            'ReleaseUrl', 'BinaryUrl', 'SourceUrl', 'ChecksumsUrl', 'Error')) {
+            'ReleaseUrl', 'BinaryUrl', 'SourceUrl', 'BinarySha256',
+            'SourceSha256', 'ChecksumsUrl', 'Error')) {
         $value = if ($Values.ContainsKey($key)) { $Values[$key] } else { '' }
         $lines.Add("$key=$(ConvertTo-SingleLine $value)")
     }
@@ -143,7 +146,7 @@ function Invoke-GitHubApi {
     return $response
 }
 
-function Get-UniqueReleaseAssetUrl {
+function Get-UniqueReleaseAsset {
     param(
         [object]$Release,
         [string]$ExpectedName,
@@ -154,7 +157,7 @@ function Get-UniqueReleaseAssetUrl {
         [string]$_.name -ceq $ExpectedName
     })
     if ($matches.Count -eq 0 -and $Optional) {
-        return ''
+        return $null
     }
     if ($matches.Count -ne 1) {
         throw (Get-UpdateText `
@@ -162,7 +165,30 @@ function Get-UniqueReleaseAssetUrl {
             'Release asset {0} has {1} matches.' `
             @($ExpectedName, $matches.Count))
     }
-    return [string]$matches[0].browser_download_url
+    return $matches[0]
+}
+
+function Get-ReleaseAssetUrl {
+    param([object]$Asset)
+
+    if ($null -eq $Asset) {
+        return ''
+    }
+    return [string]$Asset.browser_download_url
+}
+
+function Get-ReleaseAssetSha256 {
+    param([object]$Asset)
+
+    if ($null -eq $Asset) {
+        return ''
+    }
+    $digestProperty = $Asset.PSObject.Properties['digest']
+    if ($null -eq $digestProperty -or
+        [string]$digestProperty.Value -notmatch '^sha256:([0-9A-Fa-f]{64})$') {
+        return ''
+    }
+    return $Matches[1].ToUpperInvariant()
 }
 
 function Invoke-Check {
@@ -191,24 +217,31 @@ function Invoke-Check {
     $status = if ($latest -gt $current) { 'available' } else { 'current' }
     $binaryName = "process-watchdog-$latestVersion-windows-x64.zip"
     $sourceName = "process-watchdog-$latestVersion-source.zip"
+    $binaryAsset = Get-UniqueReleaseAsset $release $binaryName -Optional
+    $sourceAsset = Get-UniqueReleaseAsset $release $sourceName -Optional
+    $checksumsAsset = Get-UniqueReleaseAsset $release 'SHA256SUMS.txt' -Optional
     $values = @{
         Status = $status
         CurrentVersion = $CurrentVersion
         Version = $latestVersion
         Tag = [string]$release.tag_name
         ReleaseUrl = [string]$release.html_url
-        BinaryUrl = Get-UniqueReleaseAssetUrl $release $binaryName -Optional
-        SourceUrl = Get-UniqueReleaseAssetUrl $release $sourceName -Optional
-        ChecksumsUrl = Get-UniqueReleaseAssetUrl $release `
-            'SHA256SUMS.txt' -Optional
+        BinaryUrl = Get-ReleaseAssetUrl $binaryAsset
+        SourceUrl = Get-ReleaseAssetUrl $sourceAsset
+        BinarySha256 = Get-ReleaseAssetSha256 $binaryAsset
+        SourceSha256 = Get-ReleaseAssetSha256 $sourceAsset
+        ChecksumsUrl = Get-ReleaseAssetUrl $checksumsAsset
         Error = ''
     }
     $missingRequiredAsset = $status -eq 'available' -and (
-        ($PackageKind -eq 'compiled' -and -not $values.BinaryUrl) -or
-        ($PackageKind -eq 'source' -and -not $values.SourceUrl) -or
-        ($PackageKind -notin @('source-git') -and -not $values.ChecksumsUrl) -or
+        ($PackageKind -eq 'compiled' -and (-not $values.BinaryUrl -or
+            (-not $values.BinarySha256 -and -not $values.ChecksumsUrl))) -or
+        ($PackageKind -eq 'source' -and (-not $values.SourceUrl -or
+            (-not $values.SourceSha256 -and -not $values.ChecksumsUrl))) -or
         ($PackageKind -eq '' -and
-            (-not $values.BinaryUrl -or -not $values.SourceUrl)))
+            (-not $values.BinaryUrl -or -not $values.SourceUrl -or
+             (-not $values.BinarySha256 -and -not $values.ChecksumsUrl) -or
+             (-not $values.SourceSha256 -and -not $values.ChecksumsUrl))))
     if ($missingRequiredAsset) {
         throw (Get-UpdateText '最新版本缺少一个或多个自动更新附件。' `
             'The latest release is missing one or more automatic-update assets.')
@@ -603,9 +636,6 @@ function Install-ArchivePackage {
     $stage = Join-Path $workRoot 'stage'
     New-Item -ItemType Directory -Force -Path $stage | Out-Null
     try {
-        $checksumsPath = Join-Path $workRoot 'SHA256SUMS.txt'
-        Invoke-WebRequest -UseBasicParsing -Uri $ChecksumsUrl `
-            -OutFile $checksumsPath -TimeoutSec 120
         $packageUrl = if ($PackageKind -eq 'compiled') {
             $BinaryUrl
         } else {
@@ -620,7 +650,17 @@ function Install-ArchivePackage {
         $packagePath = Join-Path $workRoot $packageName
         Invoke-WebRequest -UseBasicParsing -Uri $packageUrl `
             -OutFile $packagePath -TimeoutSec 300
-        $expectedHash = Get-ExpectedChecksum $checksumsPath $packageName
+        $expectedHash = if ($PackageKind -eq 'compiled') {
+            $BinarySha256
+        } else {
+            $SourceSha256
+        }
+        if (-not $expectedHash) {
+            $checksumsPath = Join-Path $workRoot 'SHA256SUMS.txt'
+            Invoke-WebRequest -UseBasicParsing -Uri $ChecksumsUrl `
+                -OutFile $checksumsPath -TimeoutSec 120
+            $expectedHash = Get-ExpectedChecksum $checksumsPath $packageName
+        }
         $actualHash = (Get-FileHash -Algorithm SHA256 `
             -LiteralPath $packagePath).Hash
         if ($actualHash -ne $expectedHash) {
@@ -1044,12 +1084,18 @@ function Assert-ApplyArguments {
         throw (Get-UpdateText '源码版更新后重启所需的 AutoHotkey 解释器不可用。' `
             'The AutoHotkey interpreter required to restart the source edition is unavailable.')
     }
-    if ($PackageKind -ne 'source-git' -and
-        (-not $ChecksumsUrl -or
-            ($PackageKind -eq 'compiled' -and -not $BinaryUrl) -or
-            ($PackageKind -eq 'source' -and -not $SourceUrl))) {
-        throw (Get-UpdateText '安装更新缺少下载地址或校验清单地址。' `
-            'The update is missing a package or checksum URL.')
+    if (($BinarySha256 -and $BinarySha256 -cnotmatch '^[0-9A-F]{64}$') -or
+        ($SourceSha256 -and $SourceSha256 -cnotmatch '^[0-9A-F]{64}$')) {
+        throw (Get-UpdateText '更新包 SHA-256 校验失败：{0}' `
+            'Update package hash mismatch: {0}' @('invalid digest'))
+    }
+    if ($PackageKind -ne 'source-git' -and (
+        ($PackageKind -eq 'compiled' -and (-not $BinaryUrl -or
+            (-not $BinarySha256 -and -not $ChecksumsUrl))) -or
+        ($PackageKind -eq 'source' -and (-not $SourceUrl -or
+            (-not $SourceSha256 -and -not $ChecksumsUrl))))) {
+        throw (Get-UpdateText '安装更新缺少下载地址或完整性校验值。' `
+            'The update is missing a package URL or integrity value.')
     }
 }
 

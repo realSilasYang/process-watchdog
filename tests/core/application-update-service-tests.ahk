@@ -43,7 +43,9 @@ CreateAvailableUpdateResult(currentVersion := "1.2.3",
         ReleaseUrl: "https://example.invalid/release",
         BinaryUrl: "https://example.invalid/binary.zip",
         SourceUrl: "https://example.invalid/source.zip",
-        ChecksumsUrl: "https://example.invalid/SHA256SUMS.txt",
+        BinarySha256: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        SourceSha256: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+        ChecksumsUrl: "",
         Error: ""
     }
 }
@@ -57,6 +59,8 @@ CreateCurrentUpdateResult() {
         ReleaseUrl: "https://example.invalid/release",
         BinaryUrl: "",
         SourceUrl: "",
+        BinarySha256: "",
+        SourceSha256: "",
         ChecksumsUrl: "",
         Error: ""
     }
@@ -101,6 +105,15 @@ RunApplicationUpdateServiceTests() {
         validResult := CreateAvailableUpdateResult()
         AssertApplicationUpdate(service.ValidateCheckResult(validResult,
             true) == validResult, "有效更新结果没有通过二次校验")
+
+        invalidDigestResult := CreateAvailableUpdateResult()
+        invalidDigestResult.SourceSha256 := "not-a-sha256"
+        rejected := false
+        try service.ValidateCheckResult(invalidDigestResult, true)
+        catch
+            rejected := true
+        AssertApplicationUpdate(rejected,
+            "格式错误的 GitHub 发行附件摘要没有被拒绝")
 
         currentResult := CreateCurrentUpdateResult()
         AssertApplicationUpdate(service.ValidateCheckResult(currentResult)

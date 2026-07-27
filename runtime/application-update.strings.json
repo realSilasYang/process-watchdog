@@ -50,7 +50,7 @@
                                     "安装目录或当前程序入口不存在。":  "安裝目錄或目前的程式入口不存在。",
                                     "当前运行入口不在安装目录的顶层。":  "目前的執行入口不在安裝目錄頂層。",
                                     "源码版更新后重启所需的 AutoHotkey 解释器不可用。":  "原始碼版更新後重新啟動所需的 AutoHotkey 解譯器無法使用。",
-                                    "安装更新缺少下载地址或校验清单地址。":  "安裝更新缺少下載網址或驗證清單網址。"
+                                    "安装更新缺少下载地址或完整性校验值。":  "安裝更新缺少下載網址或完整性驗證值。"
                                 },
                       "zh-TW":  {
                                     "检查更新缺少结果文件路径。":  "檢查更新缺少結果檔案路徑。",
@@ -101,7 +101,7 @@
                                     "安装目录或当前程序入口不存在。":  "安裝目錄或目前的程式進入點不存在。",
                                     "当前运行入口不在安装目录的顶层。":  "目前的執行進入點不在安裝目錄頂層。",
                                     "源码版更新后重启所需的 AutoHotkey 解释器不可用。":  "原始碼版更新後重新啟動所需的 AutoHotkey 解譯器無法使用。",
-                                    "安装更新缺少下载地址或校验清单地址。":  "安裝更新缺少下載網址或驗證清單網址。"
+                                    "安装更新缺少下载地址或完整性校验值。":  "安裝更新缺少下載網址或完整性驗證值。"
                                 },
                       "ja-JP":  {
                                     "检查更新缺少结果文件路径。":  "更新チェックの結果ファイルのパスが指定されていません。",
@@ -152,7 +152,7 @@
                                     "安装目录或当前程序入口不存在。":  "インストール先または現在のプログラムエントリが存在しません。",
                                     "当前运行入口不在安装目录的顶层。":  "現在の実行エントリがインストール先の直下にありません。",
                                     "源码版更新后重启所需的 AutoHotkey 解释器不可用。":  "ソース版の更新後に再起動するための AutoHotkey インタープリターを使用できません。",
-                                    "安装更新缺少下载地址或校验清单地址。":  "更新のインストールに必要なダウンロード URL またはチェックサム一覧の URL がありません。"
+                                    "安装更新缺少下载地址或完整性校验值。":  "更新のインストールに必要なダウンロード URL または整合性検証値がありません。"
                                 },
                       "vi-VN":  {
                                     "检查更新缺少结果文件路径。":  "Thiếu đường dẫn tệp kết quả kiểm tra cập nhật.",
@@ -203,7 +203,7 @@
                                     "安装目录或当前程序入口不存在。":  "Thư mục cài đặt hoặc điểm khởi chạy chương trình hiện tại không tồn tại.",
                                     "当前运行入口不在安装目录的顶层。":  "Điểm khởi chạy hiện tại không nằm ở cấp cao nhất của thư mục cài đặt.",
                                     "源码版更新后重启所需的 AutoHotkey 解释器不可用。":  "Không thể dùng trình thông dịch AutoHotkey cần thiết để khởi động lại bản mã nguồn sau khi cập nhật.",
-                                    "安装更新缺少下载地址或校验清单地址。":  "Thiếu địa chỉ tải xuống hoặc địa chỉ danh sách kiểm tra để cài đặt bản cập nhật."
+                                    "安装更新缺少下载地址或完整性校验值。":  "Thiếu địa chỉ tải xuống hoặc giá trị kiểm tra tính toàn vẹn để cài đặt bản cập nhật."
                                 },
                       "ko-KR":  {
                                     "检查更新缺少结果文件路径。":  "업데이트 확인 결과 파일 경로가 없습니다.",
@@ -254,7 +254,7 @@
                                     "安装目录或当前程序入口不存在。":  "설치 폴더 또는 현재 프로그램 진입점이 없습니다.",
                                     "当前运行入口不在安装目录的顶层。":  "현재 실행 진입점이 설치 폴더 최상위에 없습니다.",
                                     "源码版更新后重启所需的 AutoHotkey 解释器不可用。":  "소스 버전을 업데이트한 뒤 다시 시작하는 데 필요한 AutoHotkey 인터프리터를 사용할 수 없습니다.",
-                                    "安装更新缺少下载地址或校验清单地址。":  "업데이트 설치에 필요한 다운로드 주소 또는 체크섬 목록 주소가 없습니다."
+                                    "安装更新缺少下载地址或完整性校验值。":  "업데이트 설치에 필요한 다운로드 주소 또는 무결성 검증 값이 없습니다."
                                 },
                       "es-ES":  {
                                     "检查更新缺少结果文件路径。":  "Falta la ruta del archivo de resultados de la búsqueda de actualizaciones.",
@@ -305,7 +305,7 @@
                                     "安装目录或当前程序入口不存在。":  "El directorio de instalación o la entrada actual del programa no existen.",
                                     "当前运行入口不在安装目录的顶层。":  "La entrada de ejecución actual no está en el nivel superior del directorio de instalación.",
                                     "源码版更新后重启所需的 AutoHotkey 解释器不可用。":  "El intérprete de AutoHotkey necesario para reiniciar la edición de código fuente después de actualizar no está disponible.",
-                                    "安装更新缺少下载地址或校验清单地址。":  "Falta la dirección de descarga o la dirección de la lista de comprobación para instalar la actualización."
+                                    "安装更新缺少下载地址或完整性校验值。":  "Falta la dirección de descarga o el valor de verificación de integridad para instalar la actualización."
                                 },
                       "fr-FR":  {
                                     "检查更新缺少结果文件路径。":  "Le chemin du fichier de résultat de la recherche des mises à jour est manquant.",
@@ -356,7 +356,7 @@
                                     "安装目录或当前程序入口不存在。":  "Le répertoire d\u0027installation ou le point d\u0027entrée actuel du programme n\u0027existe pas.",
                                     "当前运行入口不在安装目录的顶层。":  "Le point d\u0027entrée actuel ne se trouve pas à la racine du répertoire d\u0027installation.",
                                     "源码版更新后重启所需的 AutoHotkey 解释器不可用。":  "L\u0027interpréteur AutoHotkey nécessaire au redémarrage de l\u0027édition source après la mise à jour n\u0027est pas disponible.",
-                                    "安装更新缺少下载地址或校验清单地址。":  "L\u0027adresse de téléchargement ou celle de la liste de contrôle manque pour installer la mise à jour."
+                                    "安装更新缺少下载地址或完整性校验值。":  "L\u0027adresse de téléchargement ou la valeur de contrôle d\u0027intégrité manque pour installer la mise à jour."
                                 },
                       "pt-BR":  {
                                     "检查更新缺少结果文件路径。":  "Falta o caminho do arquivo de resultado da verificação de atualizações.",
@@ -407,7 +407,7 @@
                                     "安装目录或当前程序入口不存在。":  "A pasta de instalação ou o ponto de entrada atual do programa não existe.",
                                     "当前运行入口不在安装目录的顶层。":  "O ponto de entrada atual não está no nível superior da pasta de instalação.",
                                     "源码版更新后重启所需的 AutoHotkey 解释器不可用。":  "O interpretador AutoHotkey necessário para reiniciar a edição de código-fonte após a atualização não está disponível.",
-                                    "安装更新缺少下载地址或校验清单地址。":  "Falta o endereço de download ou o endereço da lista de verificação para instalar a atualização."
+                                    "安装更新缺少下载地址或完整性校验值。":  "Falta o endereço de download ou o valor de verificação de integridade para instalar a atualização."
                                 },
                       "ru-RU":  {
                                     "检查更新缺少结果文件路径。":  "Не указан путь к файлу результатов проверки обновлений.",
@@ -458,7 +458,7 @@
                                     "安装目录或当前程序入口不存在。":  "Папка установки или текущая точка запуска программы не существует.",
                                     "当前运行入口不在安装目录的顶层。":  "Текущая точка запуска не находится в корне папки установки.",
                                     "源码版更新后重启所需的 AutoHotkey 解释器不可用。":  "Интерпретатор AutoHotkey, необходимый для перезапуска исходной версии после обновления, недоступен.",
-                                    "安装更新缺少下载地址或校验清单地址。":  "Отсутствует адрес загрузки или адрес списка контрольных сумм для установки обновления."
+                                    "安装更新缺少下载地址或完整性校验值。":  "Отсутствует адрес загрузки или значение проверки целостности для установки обновления."
                                 },
                       "de-DE":  {
                                     "检查更新缺少结果文件路径。":  "Der Pfad zur Ergebnisdatei der Update-Prüfung fehlt.",
@@ -509,7 +509,7 @@
                                     "安装目录或当前程序入口不存在。":  "Das Installationsverzeichnis oder der aktuelle Programmeinstieg ist nicht vorhanden.",
                                     "当前运行入口不在安装目录的顶层。":  "Der aktuelle Programmeinstieg liegt nicht direkt im Installationsverzeichnis.",
                                     "源码版更新后重启所需的 AutoHotkey 解释器不可用。":  "Der AutoHotkey-Interpreter, der zum Neustart der Quellcodeversion nach dem Update benötigt wird, ist nicht verfügbar.",
-                                    "安装更新缺少下载地址或校验清单地址。":  "Zum Installieren des Updates fehlt die Downloadadresse oder die Adresse der Prüfsummenliste."
+                                    "安装更新缺少下载地址或完整性校验值。":  "Zum Installieren des Updates fehlt die Downloadadresse oder der Wert für die Integritätsprüfung."
                                 },
                       "it-IT":  {
                                     "检查更新缺少结果文件路径。":  "Manca il percorso del file dei risultati del controllo aggiornamenti.",
@@ -560,7 +560,7 @@
                                     "安装目录或当前程序入口不存在。":  "La directory di installazione o il punto di ingresso corrente del programma non esiste.",
                                     "当前运行入口不在安装目录的顶层。":  "Il punto di ingresso corrente non si trova al livello superiore della directory di installazione.",
                                     "源码版更新后重启所需的 AutoHotkey 解释器不可用。":  "L\u0027interprete AutoHotkey necessario per riavviare la versione sorgente dopo l\u0027aggiornamento non è disponibile.",
-                                    "安装更新缺少下载地址或校验清单地址。":  "Manca l\u0027indirizzo di download o quello dell\u0027elenco dei checksum necessario per installare l\u0027aggiornamento."
+                                    "安装更新缺少下载地址或完整性校验值。":  "Manca l\u0027indirizzo di download o il valore di verifica dell\u0027integrità necessario per installare l\u0027aggiornamento."
                                 }
                   }
 }

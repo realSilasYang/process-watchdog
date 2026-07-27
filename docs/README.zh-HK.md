@@ -87,17 +87,11 @@
 
 ## 1. 安裝與首次執行
 
-1. 從 [Releases](https://github.com/realSilasYang/process-watchdog/releases) 下載 `process-watchdog-<版本>-windows-x64.zip` 及同版本的 `SHA256SUMS.txt`。
-2. 核實 ZIP、獨立 EXE 及 SBOM 的 SHA-256，然後完整解壓 ZIP。Release 另外保留的 EXE 只供封存和核實；程式仍需要套件內的 DLL、資源及 `third_party` 目錄，不能只下載或複製 EXE 執行。
+1. 從 [Releases](https://github.com/realSilasYang/process-watchdog/releases) 選擇獨立 EXE、完整可攜式 ZIP 或完整原始碼 ZIP 其中一種版本。
+2. 獨立 EXE 無需安裝 AutoHotkey；可攜式 ZIP 適合長期使用；原始碼 ZIP 需要 AutoHotkey v2 x64。
 3. 執行 `进程守护小助手.exe`。程式會要求系統管理員權限，並按設定顯示主視窗或靜默留在系統匣。
 4. 選擇「加入」以選取目標，亦可把支援的檔案拖入主視窗。
 5. 開啟「記錄」，查看小助手實際採用的身分證據、狀態檢查、恢復嘗試及更新訊號。
-
-```powershell
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.zip
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.exe
-Get-Content .\SHA256SUMS.txt
-```
 
 亦可從原始碼執行：安裝 AutoHotkey v2 x64 後執行 `进程守护小助手.ahk`。透過 Git 複製專案時還須安裝 Git LFS，並執行 `git lfs pull`，以取得完整字型檔案而非 LFS 指標。Release 附帶的原始碼 ZIP 已包含這些資源，無需 Git LFS。正式發行套件已內嵌通過完整發行測試的 AutoHotkey 執行階段，一般使用者無需另行安裝。
 

@@ -87,17 +87,11 @@ Der Prozessüberwachungs-Assistent bleibt Open Source. Seine langfristige Pflege
 
 ## 1. Installation und erster Start
 
-1. Laden Sie `process-watchdog-<Version>-windows-x64.zip` und die passende `SHA256SUMS.txt` von [Releases](https://github.com/realSilasYang/process-watchdog/releases) herunter.
-2. Prüfen Sie SHA-256 von ZIP, eigenständiger EXE und SBOM und entpacken Sie das vollständige ZIP. Die separat im Release aufbewahrte EXE dient Archivierung und Prüfung. Für die Ausführung werden weiterhin DLLs, Ressourcen und der Ordner `third_party` aus dem Paket benötigt; laden oder kopieren Sie nicht nur die EXE.
+1. Wählen Sie unter [Releases](https://github.com/realSilasYang/process-watchdog/releases) eine der drei Ausgaben: eigenständige EXE, vollständiges portables ZIP oder vollständiges Quellcode-ZIP.
+2. Die eigenständige EXE benötigt kein AutoHotkey; das portable ZIP ist für die dauerhafte Nutzung vorgesehen; für das Quellcode-ZIP muss AutoHotkey v2 x64 installiert sein.
 3. Starten Sie `进程守护小助手.exe`. Die Anwendung fordert Administratorrechte an und zeigt je nach Einstellung das Hauptfenster oder bleibt im Infobereich.
 4. Wählen Sie „Hinzufügen“ oder ziehen Sie unterstützte Dateien in das Hauptfenster.
 5. Öffnen Sie das Protokoll, um die tatsächlich verwendeten Identitätsbelege, Statusprüfungen, Wiederherstellungsversuche und Updatesignale zu sehen.
-
-```powershell
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.zip
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.exe
-Get-Content .\SHA256SUMS.txt
-```
 
 Für den Start aus dem Quellcode installieren Sie AutoHotkey v2 x64 und führen `进程守护小助手.ahk` aus. Wenn Sie das Repository mit Git klonen, installieren Sie zusätzlich Git LFS und führen `git lfs pull` aus, damit die vollständigen Schriftdateien statt der LFS-Zeiger geladen werden. Das einem Release beigefügte Quellcode-ZIP enthält diese Ressourcen bereits und benötigt Git LFS nicht. Offizielle Versionen enthalten die AutoHotkey-Laufzeit, die sämtliche Veröffentlichungstests bestanden hat; normale Benutzer benötigen keine separate Installation.
 

@@ -47,12 +47,12 @@ actions on GitHub after repository creation and cannot be replaced by local test
   published release. Tests, both builds, and the SBOM share one resolved snapshot.
 - The release workflow reruns full-history scanning, core tests, real-GUI smoke,
   and two reproducible builds.
-- Assets include at least the standalone EXE, Windows x64 ZIP, source ZIP,
-  standalone SPDX SBOM, `SHA256SUMS.txt`, and build-provenance attestations;
-  the Actions artifact preserves the complete `dist` tree.
+- The Release contains only the standalone EXE, Windows x64 ZIP, and source ZIP.
+  The standalone SPDX SBOM, `SHA256SUMS.txt`, extracted directories, and other
+  build outputs remain available only in the complete Actions artifact.
 - The Release remains a draft during upload and becomes public only after its
-  assets exactly match the top-level release files in `dist`. An interrupted run
-  may resume a draft from the same commit but never overwrite a published release.
+  three assets match the explicit allowlist. An interrupted run may resume only
+  the draft from the same commit and never overwrite a published release.
 - After extraction, repeat the layout checks covered by
   `tools/verify-release.ps1` and confirm no personal configuration is present.
 - Open the AutoHotkey license, corresponding source archive, resolved toolchain snapshot, and

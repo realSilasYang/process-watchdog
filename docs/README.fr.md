@@ -87,17 +87,11 @@ L’Assistant de surveillance des processus restera un logiciel libre. Sa mainte
 
 ## 1. Installation et premier démarrage
 
-1. Téléchargez `process-watchdog-<version>-windows-x64.zip` et le fichier `SHA256SUMS.txt` correspondant depuis [Releases](https://github.com/realSilasYang/process-watchdog/releases).
-2. Vérifiez le SHA-256 du ZIP, de l’EXE autonome et du SBOM, puis extrayez tout le ZIP. L’EXE conservé séparément dans la version sert à l’archivage et à la vérification. L’application a toujours besoin des DLL, ressources et du dossier `third_party` du paquet : ne téléchargez ni ne copiez l’EXE seul pour l’exécuter.
+1. Choisissez dans les [Releases](https://github.com/realSilasYang/process-watchdog/releases) l’une des trois éditions : EXE autonome, ZIP portable complet ou ZIP complet du code source.
+2. L’EXE autonome ne nécessite pas AutoHotkey ; le ZIP portable convient à une utilisation durable ; le ZIP du code source exige AutoHotkey v2 x64.
 3. Lancez `进程守护小助手.exe`. L’application demande les droits administrateur, puis affiche la fenêtre principale ou reste dans la zone de notification selon les réglages.
 4. Choisissez Ajouter pour sélectionner une cible, ou faites glisser un fichier compatible dans la fenêtre principale.
 5. Ouvrez le journal pour voir les indices d’identité, contrôles d’état, tentatives de rétablissement et signaux de mise à jour effectivement utilisés.
-
-```powershell
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.zip
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.exe
-Get-Content .\SHA256SUMS.txt
-```
 
 Pour lancer le code source, installez AutoHotkey v2 x64 puis exécutez `进程守护小助手.ahk`. Si vous clonez le dépôt avec Git, installez aussi Git LFS et exécutez `git lfs pull` afin d’obtenir les fichiers de polices complets plutôt que leurs pointeurs LFS. Le ZIP du code source joint à chaque version contient déjà ces ressources et ne nécessite pas Git LFS. Les versions officielles intègrent l’environnement AutoHotkey ayant réussi tous les essais de publication ; un utilisateur ordinaire n’a pas à l’installer séparément.
 

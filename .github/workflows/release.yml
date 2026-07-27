@@ -122,10 +122,9 @@ jobs:
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4
         with:
           subject-path: |
-            dist/*.zip
-            dist/*.exe
-            dist/*.spdx.json
-            dist/SHA256SUMS.txt
+            dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.exe
+            dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.zip
+            dist/process-watchdog-${{ steps.release_meta.outputs.version }}-source.zip
 
       - name: Preserve all build outputs
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -145,23 +144,21 @@ jobs:
           body_path: docs/release-notes/v${{ steps.release_meta.outputs.version }}.md
           fail_on_unmatched_files: true
           files: |
-            dist/*.zip
-            dist/*.exe
-            dist/*.spdx.json
-            dist/SHA256SUMS.txt
+            dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.exe
+            dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.zip
+            dist/process-watchdog-${{ steps.release_meta.outputs.version }}-source.zip
 
       - name: Verify draft release assets
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $version = '${{ steps.release_meta.outputs.version }}'
           $expectedAssets = @(
-            Get-ChildItem -LiteralPath .\dist -File |
-              Where-Object { $_.Extension -in @('.zip', '.exe', '.json') -or
-                $_.Name -ceq 'SHA256SUMS.txt' } |
-              ForEach-Object { $_.Name } |
-              Sort-Object
-          )
+            "process-watchdog-$version-source.zip"
+            "process-watchdog-$version-windows-x64.exe"
+            "process-watchdog-$version-windows-x64.zip"
+          ) | Sort-Object
           $releasePages = gh api --paginate --slurp `
             'repos/${{ github.repository }}/releases?per_page=100' |
             ConvertFrom-Json
