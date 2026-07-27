@@ -606,7 +606,7 @@ CaptureLiveTargetSnapshot() {
 ObserveLiveTarget(kind, targetPath) {
     snapshotTicks := DllCall("kernel32\GetTickCount64", "UInt64")
     snapshotIndex := ProcessSnapshotIndex(CaptureLiveTargetSnapshot(),
-        snapshotTicks, true)
+        snapshotTicks, true, CanonicalizeLiveTargetPath)
     return kind == TargetProbeKind.CommandTarget
         ? snapshotIndex.ObserveCommandTarget(targetPath)
         : snapshotIndex.ObserveImagePath(targetPath)
