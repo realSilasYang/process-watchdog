@@ -39,11 +39,17 @@ try {
 $releaseWorkflow = Get-Content -LiteralPath (Join-Path $projectRoot `
     '.github\workflows\release.yml') -Raw -Encoding UTF8
 if ($releaseWorkflow -notmatch
-        '\$tagQueryExitCode\s*=\s*\$LASTEXITCODE[\s\S]{0,120}if\s*\(\$tagQueryExitCode\s*-eq\s*0\)' -or
+        '\$tagQueryExitCode\s*=\s*\$LASTEXITCODE[\s\S]{0,120}if\s*\(\$tagQueryExitCode\s*-notin\s*@\(0,\s*2\)\)' -or
     $releaseWorkflow -notmatch
-        'elseif\s*\(\$tagQueryExitCode\s*-ne\s*2\)' -or
+        'releases\?per_page=100' -or
+    ([regex]::Matches($releaseWorkflow,
+        'gh\s+api\s+--paginate\s+--slurp')).Count -lt 2 -or
+    $releaseWorkflow -notmatch
+        '\$matchingReleases\.Count\s*-gt\s*1' -or
+    $releaseWorkflow -notmatch
+        'target_commitish\s*-cne\s*\$env:GITHUB_SHA' -or
     $releaseWorkflow -notmatch
         '\$global:LASTEXITCODE\s*=\s*0') {
-    throw 'Release tag detection must preserve and consume the handled git ls-remote exit code.'
+    throw 'Release tag detection must consume git status and validate a unique draft at the current commit.'
 }
 Write-Host "GitHub Actions workflows passed actionlint $($toolLock.tools.actionlint.version)."

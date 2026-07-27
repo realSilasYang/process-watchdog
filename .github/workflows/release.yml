@@ -37,6 +37,32 @@ jobs:
           }
           $remoteTag = git ls-remote --exit-code --tags origin "refs/tags/v$version"
           $tagQueryExitCode = $LASTEXITCODE
+          if ($tagQueryExitCode -notin @(0, 2)) {
+            throw "Unable to query remote tag v$version."
+          }
+          $releasePages = gh api --paginate --slurp `
+            "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" |
+            ConvertFrom-Json
+          $releases = @($releasePages | ForEach-Object { $_ })
+          $matchingReleases = @($releases | Where-Object {
+            $_.tag_name -ceq "v$version"
+          })
+          if ($matchingReleases.Count -gt 1) {
+            throw "More than one release exists for v$version."
+          }
+          if ($matchingReleases.Count -eq 1) {
+            $release = $matchingReleases[0]
+            if (-not $release.draft) {
+              throw "Release v$version is already published; published versions are immutable."
+            }
+            if ([string]$release.target_commitish -cne $env:GITHUB_SHA) {
+              throw "Draft release v$version belongs to another commit."
+            }
+            Write-Host "Resuming the existing draft release v$version."
+          }
+          elseif ($tagQueryExitCode -eq 0) {
+            throw "Tag v$version exists without a resumable draft release."
+          }
           if ($tagQueryExitCode -eq 0) {
             git fetch --force origin `
               "refs/tags/v$version`:refs/tags/v$version"
@@ -47,16 +73,6 @@ jobs:
             if ($remoteCommit -cne $env:GITHUB_SHA) {
               throw "Tag v$version already exists at another commit."
             }
-            $release = gh api `
-              "repos/$env:GITHUB_REPOSITORY/releases/tags/v$version" |
-              ConvertFrom-Json
-            if (-not $release.draft) {
-              throw "Release v$version is already published; published versions are immutable."
-            }
-            Write-Host "Resuming the existing draft release v$version."
-          }
-          elseif ($tagQueryExitCode -ne 2) {
-            throw "Unable to query remote tag v$version."
           }
           # 退出码 2 已作为“标签不存在”处理；避免 Actions 的 pwsh 收尾逻辑
           # 把仍保留在 LASTEXITCODE 中的已处理状态重新解释为步骤失败。
@@ -146,11 +162,22 @@ jobs:
               ForEach-Object { $_.Name } |
               Sort-Object
           )
-          $release = gh api `
-            'repos/${{ github.repository }}/releases/tags/${{ steps.release_meta.outputs.tag }}' |
+          $releasePages = gh api --paginate --slurp `
+            'repos/${{ github.repository }}/releases?per_page=100' |
             ConvertFrom-Json
+          $releases = @($releasePages | ForEach-Object { $_ })
+          $matchingReleases = @($releases | Where-Object {
+            $_.tag_name -ceq '${{ steps.release_meta.outputs.tag }}'
+          })
+          if ($matchingReleases.Count -ne 1) {
+            throw 'The draft release could not be identified uniquely.'
+          }
+          $release = $matchingReleases[0]
           if (-not $release.draft) {
             throw 'The release became public before asset verification completed.'
+          }
+          if ([string]$release.target_commitish -cne $env:GITHUB_SHA) {
+            throw 'The draft release points to an unexpected commit.'
           }
           $actualAssets = @($release.assets.name | Sort-Object)
           $difference = @(Compare-Object -CaseSensitive `
