@@ -55,9 +55,12 @@ jobs:
             }
             Write-Host "Resuming the existing draft release v$version."
           }
-          if ($tagQueryExitCode -ne 2) {
+          elseif ($tagQueryExitCode -ne 2) {
             throw "Unable to query remote tag v$version."
           }
+          # 退出码 2 已作为“标签不存在”处理；避免 Actions 的 pwsh 收尾逻辑
+          # 把仍保留在 LASTEXITCODE 中的已处理状态重新解释为步骤失败。
+          $global:LASTEXITCODE = 0
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=v$version" >> $env:GITHUB_OUTPUT
 

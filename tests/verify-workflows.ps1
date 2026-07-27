@@ -41,7 +41,9 @@ $releaseWorkflow = Get-Content -LiteralPath (Join-Path $projectRoot `
 if ($releaseWorkflow -notmatch
         '\$tagQueryExitCode\s*=\s*\$LASTEXITCODE[\s\S]{0,120}if\s*\(\$tagQueryExitCode\s*-eq\s*0\)' -or
     $releaseWorkflow -notmatch
-        'if\s*\(\$tagQueryExitCode\s*-ne\s*2\)') {
-    throw 'Release draft resumption must preserve the git ls-remote exit code before running gh commands.'
+        'elseif\s*\(\$tagQueryExitCode\s*-ne\s*2\)' -or
+    $releaseWorkflow -notmatch
+        '\$global:LASTEXITCODE\s*=\s*0') {
+    throw 'Release tag detection must preserve and consume the handled git ls-remote exit code.'
 }
 Write-Host "GitHub Actions workflows passed actionlint $($toolLock.tools.actionlint.version)."
