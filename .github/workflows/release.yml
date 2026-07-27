@@ -40,9 +40,10 @@ jobs:
           if ($tagQueryExitCode -notin @(0, 2)) {
             throw "Unable to query remote tag v$version."
           }
-          $releases = gh api `
+          $releasePages = gh api --paginate --slurp `
             "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" |
             ConvertFrom-Json
+          $releases = @($releasePages | ForEach-Object { $_ })
           $matchingReleases = @($releases | Where-Object {
             $_.tag_name -ceq "v$version"
           })
@@ -161,9 +162,10 @@ jobs:
               ForEach-Object { $_.Name } |
               Sort-Object
           )
-          $releases = gh api `
+          $releasePages = gh api --paginate --slurp `
             'repos/${{ github.repository }}/releases?per_page=100' |
             ConvertFrom-Json
+          $releases = @($releasePages | ForEach-Object { $_ })
           $matchingReleases = @($releases | Where-Object {
             $_.tag_name -ceq '${{ steps.release_meta.outputs.tag }}'
           })

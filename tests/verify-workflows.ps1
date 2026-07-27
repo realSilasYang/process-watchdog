@@ -42,6 +42,8 @@ if ($releaseWorkflow -notmatch
         '\$tagQueryExitCode\s*=\s*\$LASTEXITCODE[\s\S]{0,120}if\s*\(\$tagQueryExitCode\s*-notin\s*@\(0,\s*2\)\)' -or
     $releaseWorkflow -notmatch
         'releases\?per_page=100' -or
+    ([regex]::Matches($releaseWorkflow,
+        'gh\s+api\s+--paginate\s+--slurp')).Count -lt 2 -or
     $releaseWorkflow -notmatch
         '\$matchingReleases\.Count\s*-gt\s*1' -or
     $releaseWorkflow -notmatch
