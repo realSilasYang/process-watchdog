@@ -176,14 +176,15 @@ class ApplicationUpdateService {
     ErrorResult(message) {
         return {Status: "error", CurrentVersion: this.CurrentVersion,
             Version: "", Tag: "", ReleaseUrl: "", BinaryUrl: "",
-            SourceUrl: "", ChecksumsUrl: "", Error: message}
+            SourceUrl: "", BinarySha256: "", SourceSha256: "",
+            ChecksumsUrl: "", Error: message}
     }
 
     CurrentResult() {
         return {Status: "current", CurrentVersion: this.CurrentVersion,
             Version: this.CurrentVersion, Tag: "v" this.CurrentVersion,
             ReleaseUrl: "", BinaryUrl: "", SourceUrl: "",
-            ChecksumsUrl: "", Error: ""}
+            BinarySha256: "", SourceSha256: "", ChecksumsUrl: "", Error: ""}
     }
 
     ReadResult(resultPath) {
@@ -196,6 +197,8 @@ class ApplicationUpdateService {
             ReleaseUrl: readValue("ReleaseUrl"),
             BinaryUrl: readValue("BinaryUrl"),
             SourceUrl: readValue("SourceUrl"),
+            BinarySha256: readValue("BinarySha256"),
+            SourceSha256: readValue("SourceSha256"),
             ChecksumsUrl: readValue("ChecksumsUrl"),
             Error: readValue("Error")
         }
@@ -229,6 +232,8 @@ class ApplicationUpdateService {
             "-Tag", result.Tag,
             "-BinaryUrl", result.BinaryUrl,
             "-SourceUrl", result.SourceUrl,
+            "-BinarySha256", result.BinarySha256,
+            "-SourceSha256", result.SourceSha256,
             "-ChecksumsUrl", result.ChecksumsUrl,
             "-UiLanguage", this.UiLanguage
         ])
@@ -267,7 +272,8 @@ class ApplicationUpdateService {
             throw ValueError(this.Text("更新检查返回了无法识别的状态：{1}",
                 status))
         requiredFields := ["CurrentVersion", "Version", "Tag", "ReleaseUrl",
-            "BinaryUrl", "SourceUrl", "ChecksumsUrl", "Error"]
+            "BinaryUrl", "SourceUrl", "BinarySha256", "SourceSha256",
+            "ChecksumsUrl", "Error"]
         for fieldName in requiredFields {
             if !result.HasOwnProp(fieldName)
                 throw ValueError("更新检查未返回结果")
@@ -284,12 +290,16 @@ class ApplicationUpdateService {
         if requireAvailable && status != "available"
             throw ValueError("没有可安装的应用更新")
         if status == "available" {
+            for digest in [result.BinarySha256, result.SourceSha256] {
+                if digest != "" && !RegExMatch(digest, "^[0-9A-F]{64}$")
+                    throw ValueError("更新检查未返回结果")
+            }
             packageKind := this.GetPackageKind()
-            if packageKind == "compiled" && result.BinaryUrl == ""
+            if packageKind == "compiled" && (result.BinaryUrl == ""
+                || (result.BinarySha256 == "" && result.ChecksumsUrl == ""))
                 throw ValueError("最新版本缺少一个或多个自动更新附件。")
-            if packageKind == "source" && result.SourceUrl == ""
-                throw ValueError("最新版本缺少一个或多个自动更新附件。")
-            if packageKind != "source-git" && result.ChecksumsUrl == ""
+            if packageKind == "source" && (result.SourceUrl == ""
+                || (result.SourceSha256 == "" && result.ChecksumsUrl == ""))
                 throw ValueError("最新版本缺少一个或多个自动更新附件。")
         }
         return result

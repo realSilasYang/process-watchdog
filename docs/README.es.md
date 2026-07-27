@@ -87,17 +87,11 @@ El Asistente de supervisión de procesos seguirá siendo de código abierto. Su 
 
 ## 1. Instalación y primer inicio
 
-1. Descarga `process-watchdog-<versión>-windows-x64.zip` y el `SHA256SUMS.txt` de la misma versión desde [Releases](https://github.com/realSilasYang/process-watchdog/releases).
-2. Verifica el SHA-256 del ZIP, del EXE independiente y del SBOM, y extrae el ZIP completo. El EXE que se conserva por separado en la versión sirve para archivo y verificación. La aplicación sigue necesitando las DLL, los recursos y el directorio `third_party`; no descargues ni copies únicamente el EXE para ejecutarlo.
+1. Elige en [Releases](https://github.com/realSilasYang/process-watchdog/releases) una de las tres ediciones: EXE independiente, ZIP portátil completo o ZIP completo del código fuente.
+2. El EXE independiente no necesita AutoHotkey; el ZIP portátil está pensado para un uso permanente; el ZIP del código fuente requiere AutoHotkey v2 x64.
 3. Ejecuta `进程守护小助手.exe`. La aplicación solicitará privilegios de administrador y mostrará la ventana principal o permanecerá en la bandeja del sistema según los ajustes.
 4. Pulsa Añadir para elegir un destino o arrastra archivos compatibles a la ventana principal.
 5. Abre el Registro para consultar las pruebas de identidad, comprobaciones de estado, intentos de recuperación y señales de actualización utilizadas.
-
-```powershell
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.zip
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.exe
-Get-Content .\SHA256SUMS.txt
-```
 
 Para ejecutar desde el código fuente, instala AutoHotkey v2 x64 y abre `进程守护小助手.ahk`. Si clonas el repositorio con Git, instala también Git LFS y ejecuta `git lfs pull` para descargar los archivos de fuentes completos en lugar de sus punteros LFS. El ZIP de código fuente adjunto a cada versión ya contiene esos recursos y no necesita Git LFS. Las versiones oficiales incorporan el entorno de ejecución de AutoHotkey que superó todas las pruebas de publicación; un usuario normal no necesita instalarlo por separado.
 

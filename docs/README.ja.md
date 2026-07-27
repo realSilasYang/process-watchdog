@@ -87,17 +87,11 @@ Process Watchdog Assistant は今後もオープンソースであり続けま�
 
 ## 1. インストールと初回起動
 
-1. [Releases](https://github.com/realSilasYang/process-watchdog/releases) から `process-watchdog-<バージョン>-windows-x64.zip` と同じバージョンの `SHA256SUMS.txt` をダウンロードします。
-2. ZIP、単体 EXE、SBOM の SHA-256 を照合してから、ZIP 全体を展開します。Release に別途残す EXE は保管と検証用です。実行には配布パッケージ内の DLL、リソース、`third_party` ディレクトリも必要なため、EXE だけをダウンロードまたはコピーしないでください。
+1. [Releases](https://github.com/realSilasYang/process-watchdog/releases) から、単体 EXE、完全なポータブル ZIP、完全なソース ZIP のいずれかを選びます。
+2. 単体 EXE は AutoHotkey 不要でそのまま実行できます。ポータブル ZIP は継続利用向け、ソース ZIP は AutoHotkey v2 x64 が必要です。
 3. `进程守护小助手.exe` を実行します。管理者権限を要求した後、設定に応じてメイン画面を表示するか、通知領域に常駐します。
 4. ［追加］で対象を選ぶか、対応ファイルをメイン画面へドラッグ＆ドロップします。
 5. ［ログ］を開くと、識別根拠、状態確認、復旧試行、アップデート信号を確認できます。
-
-```powershell
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.zip
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.exe
-Get-Content .\SHA256SUMS.txt
-```
 
 ソースから実行する場合は AutoHotkey v2 x64 をインストールし、`进程守护小助手.ahk` を実行します。Git でリポジトリをクローンする場合は Git LFS もインストールし、`git lfs pull` を実行して、ポインターではなく完全なフォント ファイルを取得してください。Release に添付されるソース ZIP にはこれらのファイルが含まれているため、Git LFS は不要です。正式版には完全なリリース試験を通過した AutoHotkey ランタイムが組み込まれているため、通常の利用者は別途インストールする必要がありません。
 

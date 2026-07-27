@@ -87,17 +87,11 @@
 
 ## 1. 설치와 첫 실행
 
-1. [Releases](https://github.com/realSilasYang/process-watchdog/releases)에서 `process-watchdog-<버전>-windows-x64.zip`과 같은 버전의 `SHA256SUMS.txt`를 받습니다.
-2. ZIP, 독립 EXE, SBOM의 SHA-256을 확인한 다음 ZIP 전체를 압축 해제합니다. Release에 따로 남겨 둔 EXE는 보관 및 검증용입니다. 실행에는 패키지의 DLL, 리소스, `third_party` 디렉터리도 필요하므로 EXE만 다운로드하거나 복사하지 마세요.
+1. [Releases](https://github.com/realSilasYang/process-watchdog/releases)에서 독립 EXE, 전체 포터블 ZIP, 전체 소스 ZIP 중 하나를 선택합니다.
+2. 독립 EXE는 AutoHotkey 없이 바로 실행할 수 있습니다. 포터블 ZIP은 장기 사용용이며, 소스 ZIP은 AutoHotkey v2 x64가 필요합니다.
 3. `进程守护小助手.exe`를 실행합니다. 앱이 관리자 권한을 요청한 뒤 설정에 따라 기본 창을 표시하거나 시스템 트레이에 머뭅니다.
 4. 추가를 눌러 대상을 선택하거나 지원 파일을 기본 창으로 끌어 놓습니다.
 5. 로그에서 실제 사용한 식별 근거, 상태 확인, 복구 시도, 업데이트 신호를 확인합니다.
-
-```powershell
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.zip
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.exe
-Get-Content .\SHA256SUMS.txt
-```
 
 소스에서 실행하려면 AutoHotkey v2 x64를 설치하고 `进程守护小助手.ahk`를 실행합니다. Git으로 저장소를 복제했다면 Git LFS도 설치한 뒤 `git lfs pull`을 실행하여 포인터가 아닌 전체 글꼴 파일을 받아야 합니다. Release에 첨부된 소스 ZIP에는 해당 파일이 이미 들어 있으므로 Git LFS가 필요하지 않습니다. 정식 배포판은 전체 릴리스 테스트를 통과한 AutoHotkey 런타임을 포함하므로 일반 사용자는 별도로 설치할 필요가 없습니다.
 

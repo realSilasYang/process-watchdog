@@ -4,13 +4,12 @@
 
 ## Release package
 
-Download the Windows x64 ZIP that matches your release. Use `SHA256SUMS.txt`
-from the same GitHub Release to verify the ZIP, standalone EXE, and SPDX SBOM,
-then extract the archive completely. GitHub-hosted releases also provide build
-provenance. The standalone EXE asset preserves the exact packaged binary for
-archival and comparison; it is not a single-file installer. The EXE, `assets/`,
-and `third_party/` must keep their relative locations, so downloading or copying
-only the EXE for execution is not supported.
+Each Release offers only three downloads: a standalone EXE, a complete portable
+ZIP, and a complete source ZIP. For long-term use, download and fully extract the
+Windows x64 portable ZIP. The standalone EXE is suitable for a quick run or for
+comparison with the packaged binary; the source ZIP is for review, development,
+and source-based execution. The EXE, `assets/`, and `third_party/` in the portable
+edition must keep their relative locations; do not copy only the EXE out of the ZIP.
 
 `v1.0.0` predates self-update and contains no update helper, so it cannot initiate
 its own upgrade. Install the first later release that includes self-update by
@@ -77,14 +76,14 @@ Check for assistant updates at startup is enabled by default, and About offers
 an immediate check. A new release is announced first;
 files are never replaced silently. After confirmation:
 
-- Official EXE: downloads the complete Windows x64 ZIP and `SHA256SUMS.txt`,
-  verifies SHA-256, exits the main process, replaces release-managed files from
-  a temporary helper, and restarts.
+- Official EXE: downloads the complete Windows x64 ZIP, verifies it against the
+  SHA-256 digest supplied by the GitHub Release API, exits the main process,
+  replaces release-managed files from a temporary helper, and restarts.
 - Git source: requires every tracked file to be clean, allows only a fast-forward
   to the official release tag, and restarts through the original AutoHotkey
   interpreter. Local changes or divergent history are never overwritten.
-- Non-Git source package: downloads the project-built source ZIP listed in the
-  release checksums, replaces source-managed files, and restarts.
+- Non-Git source package: downloads the project-built source ZIP, verifies the
+  GitHub-provided SHA-256 digest, replaces source-managed files, and restarts.
 
 If archive replacement fails partway through, the helper restores backed-up
 managed files. Other failure paths also attempt to restart the current entry and

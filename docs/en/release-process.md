@@ -43,10 +43,10 @@
 11. After dynamically resolving the upstream tools, the workflow reruns full
     verification, a short GUI soak, and two reproducible builds. Only then does it
     attest the standalone EXE, the complete portable ZIP, and the complete source
-    ZIP. The SBOM and `SHA256SUMS.txt` remain verification attachments, and the
-    complete `dist` tree is preserved as an Actions artifact.
-    It uploads every asset to a draft, verifies the exact inventory, and only then
-    makes the `v<version>` Release public in one final step.
+    ZIP. The SBOM and `SHA256SUMS.txt` remain only in the complete `dist` tree
+    preserved as an Actions artifact. It uploads the three user editions to a draft,
+    verifies them against an explicit allowlist, and only then makes the
+    `v<version>` Release public in one final step.
 
 The tag must be in `main` history and is created by the manually dispatched
 Release workflow only after every gate passes. Code pushes, tag pushes, schedules,
@@ -55,9 +55,9 @@ version for corrections.
 Release text uses the corresponding `docs/release-notes/v<version>.md` and the
 matching changelog entry as its source of truth, explaining each asset,
 verification method, and uncompleted physical GUI check.
-Each Release keeps exactly three user editions: the standalone EXE, the complete
+Each Release contains only three downloads: the standalone EXE, the complete
 portable ZIP, and the complete source ZIP. The SBOM, `SHA256SUMS.txt`, and extracted
-package directories are verification or build attachments, not additional editions.
+package directories remain available only in the complete Actions build artifact.
 
 Packages are not code-signed. If signing is added later, perform it after the
 deterministic unsigned build and preserve the unsigned hash, signed-artifact

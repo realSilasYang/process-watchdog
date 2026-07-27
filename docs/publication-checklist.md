@@ -41,10 +41,10 @@
 - 工作流解析出的 AutoHotkey 必须是最新稳定版，Ahk2Exe 必须是最新发布版；同一次
   发布的测试、两次构建和 SBOM 必须共用一份解析快照。
 - Release 工作流重新执行全历史扫描、核心测试、真实 GUI 冒烟和双次可复现构建。
-- Release 至少包含独立 EXE、Windows x64 ZIP、源码 ZIP、独立 SPDX SBOM、
-  `SHA256SUMS.txt` 和构建溯源证明；Actions 产物中保留完整 `dist`。
-- 附件上传期间 Release 保持草稿；工作流核对实际附件与 `dist` 顶层发行文件完全
-  一致后才公开。若中断，只能续传同一提交的草稿，不能覆盖已发布版本。
+- Release 只包含独立 EXE、Windows x64 ZIP 和源码 ZIP；独立 SPDX SBOM、
+  `SHA256SUMS.txt`、解压目录及其他构建输出只在 Actions 完整产物中保留。
+- 附件上传期间 Release 保持草稿；工作流按三项白名单核对实际附件后才公开。
+  若中断，只能续传同一提交的草稿，不能覆盖已发布版本。
 - 解压 ZIP 后再次运行 `tools/verify-release.ps1` 所覆盖的结构检查；确认不含个人配置。
 - 确认包内 AutoHotkey 许可证、对应源码归档、工具链解析快照和第三方许可证都能打开。
 - 发布负责人重新确认 PingFang、SF Pro Text 与 Apple SD Gothic Neo 的商业授权仍然

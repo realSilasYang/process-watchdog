@@ -181,21 +181,37 @@ function New-MockRelease {
     }
 }
 function New-MockAsset {
-    param([string]$Name)
+    param(
+        [string]$Name,
+        [string]$Digest = ''
+    )
+    if (-not $Digest) {
+        $Digest = 'sha256:' + ('A' * 64)
+    }
     return [pscustomobject]@{
         name = $Name
         browser_download_url = "https://example.invalid/$Name"
+        digest = $Digest
     }
 }
 
 $script:CurrentVersion = '1.0.0'
 $script:PackageKind = 'compiled'
 $script:MockRelease = New-MockRelease 'v1.1.0' @(
-    (New-MockAsset 'process-watchdog-1.1.0-windows-x64.zip'),
-    (New-MockAsset 'SHA256SUMS.txt'))
+    (New-MockAsset 'process-watchdog-1.1.0-windows-x64.zip'))
 Invoke-Check
 Assert-UpdateHelperTest ($script:CapturedCheckResult.Status -ceq 'available') `
-    '编译版被缺少无关源码附件的发行版错误阻断。'
+    '编译版被缺少无关源码附件或独立校验文件的发行版错误阻断。'
+Assert-UpdateHelperTest ($script:CapturedCheckResult.BinarySha256 -ceq
+    ('A' * 64)) '检查阶段没有读取 GitHub 发行附件的 SHA-256 摘要。'
+
+$script:MockRelease = New-MockRelease 'v1.1.0' @(
+    (New-MockAsset 'process-watchdog-1.1.0-windows-x64.zip' 'unsupported'),
+    (New-MockAsset 'SHA256SUMS.txt'))
+Invoke-Check
+Assert-UpdateHelperTest ($script:CapturedCheckResult.ChecksumsUrl -ceq
+    'https://example.invalid/SHA256SUMS.txt') `
+    '缺少 GitHub 摘要时没有保留旧版校验清单回退。'
 
 $script:PackageKind = 'source'
 $missingSourceRejected = $false
@@ -282,12 +298,7 @@ try {
         -DestinationPath $packagePath
     $packageHash = (Get-FileHash -Algorithm SHA256 `
         -LiteralPath $packagePath).Hash
-    $checksumsPath = Join-Path $downloadRoot 'SHA256SUMS.txt'
-    Set-Content -LiteralPath $checksumsPath -Encoding ASCII `
-        -Value "$packageHash  $packageName"
-
     $script:MockDownloads = @{
-        'https://example.invalid/SHA256SUMS.txt' = $checksumsPath
         "https://example.invalid/$packageName" = $packagePath
     }
     function Invoke-WebRequest {
@@ -312,7 +323,9 @@ try {
     $script:Tag = 'v2.0.0'
     $script:BinaryUrl = ''
     $script:SourceUrl = "https://example.invalid/$packageName"
-    $script:ChecksumsUrl = 'https://example.invalid/SHA256SUMS.txt'
+    $script:BinarySha256 = ''
+    $script:SourceSha256 = $packageHash
+    $script:ChecksumsUrl = ''
 
     Assert-ApplyArguments
     $transaction = Install-ArchivePackage

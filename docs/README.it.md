@@ -87,17 +87,11 @@ L’Assistente di sorveglianza dei processi resterà open source. La sua manuten
 
 ## 1. Installazione e primo avvio
 
-1. Scarica `process-watchdog-<versione>-windows-x64.zip` e il relativo `SHA256SUMS.txt` da [Releases](https://github.com/realSilasYang/process-watchdog/releases).
-2. Verifica lo SHA-256 dello ZIP, dell’EXE autonomo e del SBOM, quindi estrai l’intero ZIP. L’EXE conservato separatamente nella release serve per archiviazione e verifica. L’app necessita comunque delle DLL, delle risorse e della cartella `third_party` del pacchetto: non scaricare né copiare solo l’EXE per eseguirla.
+1. Scegli in [Releases](https://github.com/realSilasYang/process-watchdog/releases) una delle tre edizioni: EXE autonomo, ZIP portatile completo o ZIP completo del codice sorgente.
+2. L’EXE autonomo non richiede AutoHotkey; lo ZIP portatile è adatto all’uso continuativo; lo ZIP del codice sorgente richiede AutoHotkey v2 x64.
 3. Avvia `进程守护小助手.exe`. L’app richiede i privilegi di amministratore e, secondo le impostazioni, mostra la finestra principale oppure resta nell’area di notifica.
 4. Seleziona Aggiungi per scegliere una destinazione oppure trascina un file supportato nella finestra principale.
 5. Apri il Registro per vedere le prove di identità, i controlli di stato, i tentativi di ripristino e i segnali di aggiornamento effettivamente usati.
-
-```powershell
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.zip
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.exe
-Get-Content .\SHA256SUMS.txt
-```
 
 Per avviare il codice sorgente, installa AutoHotkey v2 x64 ed esegui `进程守护小助手.ahk`. Se cloni il repository con Git, installa anche Git LFS ed esegui `git lfs pull` per ottenere i file dei font completi anziché i puntatori LFS. Lo ZIP del codice sorgente allegato a ogni release contiene già queste risorse e non richiede Git LFS. Le versioni ufficiali incorporano il runtime AutoHotkey che ha superato tutti i test di pubblicazione, quindi un utente normale non deve installarlo separatamente.
 

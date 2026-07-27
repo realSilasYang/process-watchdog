@@ -87,17 +87,11 @@ Trợ lý giám sát tiến trình sẽ luôn là phần mềm nguồn mở. Vi�
 
 ## 1. Cài đặt và lần chạy đầu
 
-1. Tải `process-watchdog-<phiên-bản>-windows-x64.zip` và `SHA256SUMS.txt` cùng phiên bản từ [Releases](https://github.com/realSilasYang/process-watchdog/releases).
-2. Kiểm tra SHA-256 của ZIP, EXE độc lập và SBOM, rồi giải nén toàn bộ ZIP. EXE riêng trên Release chỉ dành cho lưu trữ và xác minh. Ứng dụng vẫn cần DLL, tài nguyên và thư mục `third_party` trong gói; không chạy bằng cách chỉ tải hoặc sao chép EXE.
+1. Trong [Releases](https://github.com/realSilasYang/process-watchdog/releases), hãy chọn một trong ba bản: EXE độc lập, ZIP di động đầy đủ hoặc ZIP mã nguồn đầy đủ.
+2. EXE độc lập chạy ngay mà không cần AutoHotkey; ZIP di động phù hợp để dùng lâu dài; ZIP mã nguồn cần AutoHotkey v2 x64.
 3. Chạy `进程守护小助手.exe`. Ứng dụng yêu cầu quyền quản trị, sau đó hiển thị cửa sổ chính hoặc nằm trong khay hệ thống tùy cài đặt.
 4. Chọn Thêm để chọn đích, hoặc kéo tệp được hỗ trợ vào cửa sổ chính.
 5. Mở Nhật ký để xem bằng chứng danh tính, kiểm tra trạng thái, lần thử khôi phục và tín hiệu cập nhật thực tế.
-
-```powershell
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.zip
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.exe
-Get-Content .\SHA256SUMS.txt
-```
 
 Để chạy từ mã nguồn, hãy cài AutoHotkey v2 x64 rồi chạy `进程守护小助手.ahk`. Nếu sao chép kho mã bằng Git, bạn cũng phải cài Git LFS và chạy `git lfs pull` để nhận tệp phông chữ đầy đủ thay vì tệp con trỏ LFS. Gói ZIP mã nguồn đính kèm Release đã chứa các tài nguyên này nên không cần Git LFS. Bản phát hành chính thức đã nhúng môi trường AutoHotkey vượt qua toàn bộ kiểm thử, nên người dùng thông thường không cần cài AutoHotkey riêng.
 

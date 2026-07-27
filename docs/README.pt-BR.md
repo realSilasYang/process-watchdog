@@ -87,17 +87,11 @@ O Assistente de monitoramento de processos continuará sendo código aberto. Sua
 
 ## 1. Instalação e primeira execução
 
-1. Baixe `process-watchdog-<versão>-windows-x64.zip` e o `SHA256SUMS.txt` correspondente em [Releases](https://github.com/realSilasYang/process-watchdog/releases).
-2. Confira o SHA-256 do ZIP, do EXE avulso e do SBOM e extraia todo o ZIP. O EXE mantido separadamente na versão serve para arquivo e verificação. O aplicativo ainda precisa das DLLs, dos recursos e da pasta `third_party` do pacote; não baixe nem copie apenas o EXE para executá-lo.
+1. Escolha em [Releases](https://github.com/realSilasYang/process-watchdog/releases) uma das três edições: EXE independente, ZIP portátil completo ou ZIP completo do código-fonte.
+2. O EXE independente dispensa o AutoHotkey; o ZIP portátil é indicado para uso permanente; o ZIP do código-fonte requer AutoHotkey v2 x64.
 3. Execute `进程守护小助手.exe`. O aplicativo solicitará privilégios de administrador e, conforme a configuração, mostrará a janela principal ou ficará na área de notificação.
 4. Selecione Adicionar para escolher um alvo ou arraste arquivos compatíveis para a janela principal.
 5. Abra o Log para ver as evidências de identidade, as verificações de estado, as tentativas de recuperação e os sinais de atualização usados de fato.
-
-```powershell
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.zip
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.exe
-Get-Content .\SHA256SUMS.txt
-```
 
 Para executar pelo código-fonte, instale o AutoHotkey v2 x64 e abra `进程守护小助手.ahk`. Ao clonar o repositório com Git, instale também o Git LFS e execute `git lfs pull` para obter os arquivos de fontes completos, em vez de ponteiros LFS. O ZIP de código-fonte anexado ao Release já contém esses recursos e não precisa do Git LFS. As versões oficiais incorporam o runtime do AutoHotkey aprovado em todos os testes de publicação, portanto usuários comuns não precisam instalá-lo separadamente.
 

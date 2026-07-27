@@ -89,16 +89,9 @@
 
 1. 从 [Releases](https://github.com/realSilasYang/process-watchdog/releases) 选择以下任一版本：独立 EXE、完整便携 ZIP，或完整源码 ZIP。
 2. 独立 EXE 无需安装 AutoHotkey，下载后即可运行；便携 ZIP 适合长期解压使用；源码 ZIP 需要本机 AutoHotkey v2 x64。
-3. 如需核验下载完整性，可使用同一版本的 `SHA256SUMS.txt` 和 SBOM；它们是验证附件，不是独立运行版本。
-4. 运行 `进程守护小助手.exe`。程序会请求管理员权限，并按设置显示主窗口或静默驻留系统托盘。
-5. 点击“添加”选择目标，或把支持的文件拖入主窗口。
-6. 从“帮助信息 → 运行日志”查看目标识别、状态检查、恢复重试和升级保护实际采用的证据。
-
-```powershell
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.zip
-Get-FileHash -Algorithm SHA256 .\process-watchdog-*-windows-x64.exe
-Get-Content .\SHA256SUMS.txt
-```
+3. 运行 `进程守护小助手.exe`。程序会请求管理员权限，并按设置显示主窗口或静默驻留系统托盘。
+4. 点击“添加”选择目标，或把支持的文件拖入主窗口。
+5. 从“帮助信息 → 运行日志”查看目标识别、状态检查、恢复重试和升级保护实际采用的证据。
 
 也可以从源码运行：安装 AutoHotkey v2 x64 后执行 `进程守护小助手.ahk`。通过 Git
 克隆仓库时还需安装 Git LFS 并执行 `git lfs pull`，以取得随包字体的完整二进制文件；
