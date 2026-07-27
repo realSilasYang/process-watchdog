@@ -25,6 +25,8 @@ jobs:
       - name: Bootstrap pinned AutoHotkey
         id: toolchain
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           $tools = .\tools\bootstrap-toolchain.ps1
           "ahk=$($tools.AutoHotkeyPath)" >> $env:GITHUB_OUTPUT

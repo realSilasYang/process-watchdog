@@ -64,6 +64,8 @@ jobs:
       - name: Resolve latest upstream build tools
         id: toolchain
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           $tools = .\tools\bootstrap-toolchain.ps1 -RefreshBuildTools
           "ahk=$($tools.AutoHotkeyPath)" >> $env:GITHUB_OUTPUT
