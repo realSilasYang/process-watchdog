@@ -672,36 +672,54 @@ CopyLiveExecutable(sourcePath, targetPath) {
 }
 
 CloseLiveTargetProcesses(rootPids, tempRoot := "") {
-    tracked := Map()
+    rootPidSet := Map()
     for pid in rootPids {
-        tracked[pid] := true
+        rootPidSet[pid] := true
     }
     canonicalRoot := tempRoot != ""
         ? CanonicalizeLiveTargetPath(tempRoot) : ""
-    Loop 6 {
-        closeOrder := []
+    Loop 20 {
         try snapshot := CaptureLiveTargetSnapshot()
-        catch
-            snapshot := []
+        catch {
+            ; 有临时目录身份时宁可等待下一轮快照，也不依据可能已复用的 PID 关闭进程。
+            if canonicalRoot == "" {
+                for pid in rootPidSet {
+                    try ProcessClose(pid)
+                }
+            }
+            Sleep(100)
+            continue
+        }
+        ; PID 在 Windows 上会被快速复用。每轮都从当前路径证据重建集合，避免把
+        ; 已退出测试进程的旧 PID 误认为新的无关进程。
+        tracked := Map()
+        for processInfo in snapshot {
+            belongsToTempRoot := canonicalRoot != ""
+                && ((processInfo.HasOwnProp("cmd")
+                        && InStr(CanonicalizeLiveTargetPath(
+                            processInfo.cmd), canonicalRoot))
+                    || (processInfo.HasOwnProp("exe")
+                        && InStr(CanonicalizeLiveTargetPath(
+                            processInfo.exe), canonicalRoot) == 1))
+            if belongsToTempRoot
+                tracked[processInfo.pid] := true
+            else if canonicalRoot == "" && rootPidSet.Has(processInfo.pid)
+                tracked[processInfo.pid] := true
+        }
         changed := true
         while changed {
             changed := false
             for processInfo in snapshot {
-                belongsToTempRoot := canonicalRoot != ""
-                    && ((processInfo.HasOwnProp("cmd")
-                            && InStr(CanonicalizeLiveTargetPath(
-                                processInfo.cmd), canonicalRoot))
-                        || (processInfo.HasOwnProp("exe")
-                            && InStr(CanonicalizeLiveTargetPath(
-                                processInfo.exe), canonicalRoot) == 1))
                 if tracked.Has(processInfo.pid)
-                    || (!belongsToTempRoot
-                        && !tracked.Has(processInfo.parent))
+                    || !tracked.Has(processInfo.parent)
                     continue
                 tracked[processInfo.pid] := true
                 changed := true
             }
         }
+        if tracked.Count == 0
+            return true
+        closeOrder := []
         for processInfo in snapshot {
             if tracked.Has(processInfo.pid)
                 closeOrder.Push(processInfo.pid)
@@ -711,15 +729,6 @@ CloseLiveTargetProcesses(rootPids, tempRoot := "") {
             try ProcessClose(pid)
         }
         Sleep(100)
-        remaining := false
-        for pid in tracked {
-            if ProcessExist(pid) {
-                remaining := true
-                break
-            }
-        }
-        if !remaining
-            return true
     }
     return false
 }
