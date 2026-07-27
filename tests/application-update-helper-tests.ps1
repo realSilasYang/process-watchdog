@@ -304,7 +304,9 @@ try {
     $script:PackageKind = 'source'
     $script:InstallRoot = $installRoot
     $script:EntryPath = Join-Path $installRoot $customEntry
-    $script:InterpreterPath = $PSHOME + '\powershell.exe'
+    # 这里只需要一个真实存在的解释器替身来验证参数边界；当前宿主路径同时兼容
+    # Windows PowerShell 的 powershell.exe 与 PowerShell 7 的 pwsh.exe。
+    $script:InterpreterPath = (Get-Process -Id $PID).Path
     $script:CurrentVersion = '1.0.0'
     $script:Version = '2.0.0'
     $script:Tag = 'v2.0.0'
