@@ -239,6 +239,13 @@ class SettingsWindow extends ManagedWindow {
                     " c" UiThemeService.Color("Text") " -Border -E0x200",
                 AddComboBoxDisplayPadding(themeLabels)))
         ApplyDarkComboBoxTheme(this.themeDropDown.Hwnd)
+        for labelAndInput in [
+                [this.languageLabel, this.languageDropDown],
+                [this.fontLabel, this.fontDropDown],
+                [this.themeLabel, this.themeDropDown]] {
+            this.AlignControlCentersVertically(labelAndInput[1],
+                labelAndInput[2])
+        }
 
         this.tabBuilt[1] := true
 
@@ -347,6 +354,12 @@ class SettingsWindow extends ManagedWindow {
     CenterControlHorizontally(control, windowWidth) {
         control.GetPos(, , &controlWidth)
         control.Move(Max(15, Floor((windowWidth - controlWidth) / 2)))
+    }
+
+    AlignControlCentersVertically(labelControl, inputControl) {
+        labelControl.GetPos(, , , &labelHeight)
+        inputControl.GetPos(, &inputY, , &inputHeight)
+        labelControl.Move(, Round(inputY + (inputHeight - labelHeight) / 2))
     }
 
     AddSettingsEdit(index, x, y, width, value, extraOptions := "") {
