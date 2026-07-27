@@ -99,7 +99,7 @@ foreach ($relativePath in $requiredFiles) {
     }
 }
 
-$trackedFiles = @(git -C $projectRoot ls-files)
+$trackedFiles = @(git -c core.quotePath=false -C $projectRoot ls-files)
 if ($LASTEXITCODE -ne 0) {
     throw 'Unable to inspect tracked repository files.'
 }
