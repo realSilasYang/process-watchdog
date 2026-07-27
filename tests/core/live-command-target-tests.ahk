@@ -619,8 +619,12 @@ WaitForLiveTarget(kind, targetPath, shouldRun, timeoutMs := 5000) {
         observation := ObserveLiveTarget(kind, targetPath)
         if shouldRun ? observation.IsRunning() : observation.IsStopped()
             return observation
-        if DllCall("kernel32\GetTickCount64", "UInt64") >= deadline
-            return observation
+        if DllCall("kernel32\GetTickCount64", "UInt64") >= deadline {
+            ; Win32_Process 可能在 Shell 启动快捷方式后恰好落后一轮查询；
+            ; 截止时使用独立终态快照，避免把提供者缓存边界当成探活失败。
+            Sleep(100)
+            return ObserveLiveTarget(kind, targetPath)
+        }
         Sleep(100)
     }
 }
@@ -855,7 +859,7 @@ RunLiveCommandTargetTests() {
         if shortcutLauncherPid
             processes.Push(shortcutLauncherPid)
         shortcutObservation := WaitForLiveTarget(TargetProbeKind.ImagePath,
-            shortcutExe, true, 15000)
+            shortcutExe, true)
         AssertLiveTarget(shortcutObservation.IsRunning(),
             "普通快捷方式启动后的真实进程未被识别："
                 . shortcutObservation.Reason " ["
@@ -889,7 +893,7 @@ RunLiveCommandTargetTests() {
         if transferLauncherPid
             processes.Push(transferLauncherPid)
         transferredObservation := WaitForLiveTarget(TargetProbeKind.ImagePath,
-            transferredExe, true, 15000)
+            transferredExe, true)
         AssertLiveTarget(transferredObservation.IsRunning(),
             "短命启动器转交后的真实进程未被识别："
                 . transferredObservation.Reason)
