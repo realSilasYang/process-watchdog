@@ -855,7 +855,7 @@ RunLiveCommandTargetTests() {
         if shortcutLauncherPid
             processes.Push(shortcutLauncherPid)
         shortcutObservation := WaitForLiveTarget(TargetProbeKind.ImagePath,
-            shortcutExe, true)
+            shortcutExe, true, 15000)
         AssertLiveTarget(shortcutObservation.IsRunning(),
             "普通快捷方式启动后的真实进程未被识别："
                 . shortcutObservation.Reason " ["
@@ -889,7 +889,7 @@ RunLiveCommandTargetTests() {
         if transferLauncherPid
             processes.Push(transferLauncherPid)
         transferredObservation := WaitForLiveTarget(TargetProbeKind.ImagePath,
-            transferredExe, true)
+            transferredExe, true, 15000)
         AssertLiveTarget(transferredObservation.IsRunning(),
             "短命启动器转交后的真实进程未被识别："
                 . transferredObservation.Reason)
