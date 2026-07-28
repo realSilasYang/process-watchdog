@@ -175,18 +175,16 @@ if (-not $source.Contains('FormatContextMenuToggleLabel(label, checked)') -or
 if (-not $mainSource.Contains('#Include app\UI\ListViewSelectionPresenter.ahk') -or
     -not $mainSource.Contains('Main.listSelectionPresenter := ListViewSelectionPresenter(Main.lv)') -or
     -not $listViewSelectionPresenterSource.Contains('Win32.NM_CUSTOMDRAW') -or
-    -not $listViewSelectionPresenterSource.Contains('Win32.CDDS_POSTPAINT') -or
     -not $listViewSelectionPresenterSource.Contains('Win32.CDDS_ITEMPREPAINT') -or
     -not $listViewSelectionPresenterSource.Contains('Win32.CDDS_ITEMPOSTPAINT') -or
     -not $listViewSelectionPresenterSource.Contains('Win32.CDRF_NOTIFYPOSTPAINT') -or
     -not $listViewSelectionPresenterSource.Contains('Win32.LVM_GETITEMSTATE') -or
     -not $listViewSelectionPresenterSource.Contains('Win32.LVIS_SELECTED') -or
     -not $listViewSelectionPresenterSource.Contains('Win32.LVM_REDRAWITEMS') -or
-    -not $listViewSelectionPresenterSource.Contains('PrepareColumnSeparators(listView)') -or
-    -not $listViewSelectionPresenterSource.Contains('DrawColumnSeparators(hdc, requestedTop') -or
-    -not $listViewSelectionPresenterSource.Contains('Win32.LVM_GETCOLUMNORDERARRAY') -or
-    -not $listViewSelectionPresenterSource.Contains('UiThemeService.Color("Divider")') -or
+    -not $listViewSelectionPresenterSource.Contains('Win32.LVM_SETEXTENDEDLISTVIEWSTYLE') -or
+    -not $listViewSelectionPresenterSource.Contains('Win32.LVS_EX_GRIDLINES, 0, listView.Hwnd') -or
     -not $listViewSelectionPresenterSource.Contains('MaskOutsideRoundedRectangle(hdc,') -or
+    $listViewSelectionPresenterSource.Contains('ColumnSeparators') -or
     -not $source.Contains('Main.listSelectionPresenter.RefreshItem(Item)') -or
     -not $source.Contains('Main.listSelectionPresenter.Dispose()')) {
     $failures.Add('Main ListView selection must use a DPI-aware rounded background while preserving native item content and cleanup')
