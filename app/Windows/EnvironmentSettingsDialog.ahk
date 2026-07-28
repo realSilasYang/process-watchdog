@@ -98,7 +98,7 @@ class EnvironmentSettingsDialog extends ManagedWindow {
 
             this.gui.OnEvent("Close", ObjBindMethod(this, "Close"))
             this.gui.OnEvent("Escape", ObjBindMethod(this, "Close"))
-            this.gui.Show("w" windowWidth " h525")
+            ShowApplicationWindow(this.gui, "w" windowWidth " h525")
             ShowSingleLineEditFromStart(targetInput.Edit)
             if this.resolvedTargetEdit
                 ShowSingleLineEditFromStart(this.resolvedTargetEdit)

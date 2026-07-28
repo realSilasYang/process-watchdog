@@ -2,7 +2,8 @@
 #Warn All, StdOut
 
 ; 用全部受支持语言分别创建主要生产窗口，验证本地化标题、控件边界和单行文案宽度。
-; 测试只展示后立即隐藏窗口，不保存设置、不启动守护，也不读取或覆盖正式配置。
+; 自动化批量测试创建真实窗口但不映射到桌面；人工预览使用完整主题窗口。
+; 全程不保存设置、不启动守护，也不读取或覆盖正式配置。
 
 try {
     if A_Args.Length && A_Args[1] == "--about-preview"
@@ -293,13 +294,13 @@ CreateLocalizedSmokeState(path, maintenanceRoot := "") {
 }
 
 RunOneLocalizedWindowPass(language, previewEnvironment := false,
-    previewAbout := false, previewDonation := false, previewTheme := "dark") {
+    previewAbout := false, previewDonation := false, requestedTheme := "") {
     global App
     LocalizationService.Configure(language)
     LocalizationService.ConfigureUiFont("auto")
+    if requestedTheme != ""
+        UiThemeService.Configure(requestedTheme)
     App := ApplicationState()
-    if previewEnvironment || previewAbout || previewDonation
-        UiThemeService.Configure(previewTheme)
     App.logMessages := [Tr("进程守护小助手已静默启动。")]
     App.logRevision := 1
 
@@ -323,6 +324,9 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             ReleaseIcons: ReleaseWindowIcons
         }, WindowHierarchy))
         owner := Gui("+Resize", "Localized smoke owner")
+        ; 人工预览解除所有者关系前仍可能短暂绘制该窗口，因此所有者也必须
+        ; 使用与目标窗口相同的标题栏和客户区主题，避免浅色空白窗口闪现。
+        InitializeApplicationWindow(owner)
         owner.Show((previewEnvironment || previewAbout || previewDonation
             ? "" : "Hide ")
             "w730 h520")
@@ -339,6 +343,10 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
 
         settingsDialog := SettingsWindow(owner)
         settingsDialog.Show()
+        if ApplicationWindowPresenter.AutomationHidden
+            AssertLocalizedWindow(!DllCall("user32\IsWindowVisible", "Ptr",
+                settingsDialog.gui.Hwnd, "Int"),
+                language " 自动化设置窗口意外映射到用户桌面")
         AssertLocalizedWindow(settingsDialog.tabBuilt.Length == 5
             && settingsDialog.tabBuilt[1]
             && !settingsDialog.tabBuilt[2]
@@ -1822,12 +1830,18 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
 
 RunLocalizedWindowSmokeTests() {
     priorHiddenWindowMode := A_DetectHiddenWindows
+    priorAutomationHidden := ApplicationWindowPresenter.AutomationHidden
     DetectHiddenWindows(true)
+    ApplicationWindowPresenter.SetAutomationHidden(true)
     try {
         languages := LocalizationService.GetSupportedLanguageCodes()
-        for language in languages
-            RunOneLocalizedWindowPass(language)
-    } finally DetectHiddenWindows(priorHiddenWindowMode)
+        for languageIndex, language in languages
+            RunOneLocalizedWindowPass(language, false, false, false,
+                Mod(languageIndex, 2) ? "light" : "dark")
+    } finally {
+        ApplicationWindowPresenter.SetAutomationHidden(priorAutomationHidden)
+        DetectHiddenWindows(priorHiddenWindowMode)
+    }
     languageSummary := ""
     for languageIndex, language in LocalizationService.GetSupportedLanguageCodes()
         languageSummary .= (languageIndex > 1 ? "," : "") language
@@ -1838,7 +1852,7 @@ RunLocalizedWindowSmokeTests() {
 RunEnvironmentSettingsPreview() {
     priorHiddenWindowMode := A_DetectHiddenWindows
     DetectHiddenWindows(true)
-    try RunOneLocalizedWindowPass("zh-CN", true)
+    try RunOneLocalizedWindowPass("zh-CN", true, false, false, "dark")
     finally DetectHiddenWindows(priorHiddenWindowMode)
 }
 
@@ -1847,7 +1861,7 @@ RunAboutSettingsPreview() {
     DetectHiddenWindows(true)
     OnMessage(Win32.WM_MEASUREITEM, OnMeasureApplicationControl)
     OnMessage(Win32.WM_DRAWITEM, OnDrawApplicationControl)
-    try RunOneLocalizedWindowPass("zh-CN", false, true)
+    try RunOneLocalizedWindowPass("zh-CN", false, true, false, "dark")
     finally {
         OnMessage(Win32.WM_MEASUREITEM, OnMeasureApplicationControl, 0)
         OnMessage(Win32.WM_DRAWITEM, OnDrawApplicationControl, 0)

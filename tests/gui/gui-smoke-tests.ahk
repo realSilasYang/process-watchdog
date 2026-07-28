@@ -350,15 +350,48 @@ try {
         && list.GetText(1, 1) == "Smoke target A"
         && list.GetText(1, 4) == "1",
         "Main ListView sequence did not refresh after deletion")
-    owner.Add("Button", "x16 y216 w88 h30", "Action")
+    actionButton := owner.Add("Text",
+        "x16 y216 w88 h30 Center 0x200 Background333333 cFFFFFF",
+        "Action")
     statusBar := owner.Add("Text",
         "x10 y250 w410 h20 Background1E1E1E cA8AAA9", "status")
+    ; 这组测试必须可见才能验证焦点、气泡动画和真实像素；因此显示前就把
+    ; 标题栏与原生输入／列表控件设为同一深色主题，禁止测试夹具自身混搭。
+    if VerCompare(A_OSVersion, "10.0.17763") >= 0 {
+        titleBarAttribute := VerCompare(A_OSVersion, "10.0.18985") >= 0
+            ? 20 : 19
+        try DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", owner.Hwnd,
+            "Int", titleBarAttribute, "Int*", 1, "Int", 4)
+        try DllCall("uxtheme\SetWindowTheme", "Ptr", ownerEdit.Hwnd,
+            "Str", "DarkMode_Explorer", "Ptr", 0)
+        try DllCall("uxtheme\SetWindowTheme", "Ptr", list.Hwnd,
+            "Str", "DarkMode_Explorer", "Ptr", 0)
+    }
     owner.Show("w430 h270")
 
     AssertGuiSmoke(DllCall("user32\IsWindow", "Ptr", owner.Hwnd, "Int"),
         "Owner GUI handle was not created")
     dpi := DllCall("user32\GetDpiForWindow", "Ptr", owner.Hwnd, "UInt")
     AssertGuiSmoke(dpi >= 96, "GUI DPI was not available")
+    DllCall("user32\RedrawWindow", "Ptr", owner.Hwnd, "Ptr", 0,
+        "Ptr", 0, "UInt", Win32.RDW_LAYOUT_REFRESH, "Int")
+    ownerDc := DllCall("user32\GetDC", "Ptr", owner.Hwnd, "Ptr")
+    actionDc := DllCall("user32\GetDC", "Ptr", actionButton.Hwnd, "Ptr")
+    AssertGuiSmoke(ownerDc && actionDc,
+        "GUI smoke theme surfaces were not readable")
+    try {
+        AssertGuiSmoke(DllCall("gdi32\GetPixel", "Ptr", ownerDc,
+                "Int", 5, "Int", 5, "UInt")
+                == RoundedButtonRenderer.ColorToBgr("1E1E1E")
+            && DllCall("gdi32\GetPixel", "Ptr", actionDc,
+                "Int", 4, "Int", 4, "UInt")
+                == RoundedButtonRenderer.ColorToBgr("333333"),
+            "可见 GUI 冒烟窗口出现了跨主题表面")
+    } finally {
+        DllCall("user32\ReleaseDC", "Ptr", actionButton.Hwnd,
+            "Ptr", actionDc)
+        DllCall("user32\ReleaseDC", "Ptr", owner.Hwnd, "Ptr", ownerDc)
+    }
     sequenceWidth := SendMessage(Win32.LVM_GETCOLUMNWIDTH, 3, 0, list.Hwnd)
     AssertGuiSmoke(Abs(sequenceWidth - Round(48 * dpi / 96)) <= 1,
         "Main ListView sequence width did not follow the window DPI")

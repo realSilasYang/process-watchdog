@@ -137,42 +137,64 @@ class DisplayHotSwitchFailingRegistry {
 CreateDisplayHotSwitchMainWindow() {
     global Main
     Main := MainWindow()
-    Main.gui.BackColor := "1E1E1E"
-    Main.gui.SetFont("s10 cWhite", LocalizationService.GetUiFontName())
+    InitializeApplicationWindow(Main.gui)
+    Main.gui.SetFont("s10 c" UiThemeService.Color("Text"),
+        LocalizationService.GetUiFontName())
     Main.btnAdd := Main.gui.Add("Text",
-        "x10 y15 w80 h30 Center 0x200 Background3F6B5B cWhite",
+        "x10 y15 w80 h30 Center 0x200 Background"
+            UiThemeService.Color("Add") " c"
+            UiThemeService.Color("ButtonText"),
         Tr("➕ 添加"))
     Main.btnPause := Main.gui.Add("Text",
-        "x+10 y15 w80 h30 Center 0x200 Background555148 cB8BAB9",
+        "x+10 y15 w80 h30 Center 0x200 Background"
+            UiThemeService.Color("PauseDisabled") " c"
+            UiThemeService.Color("DisabledButtonText"),
         Tr("⏸️ 暂停"))
     Main.btnDel := Main.gui.Add("Text",
-        "x+10 y15 w80 h30 Center 0x200 Background554B4B cB8BAB9",
+        "x+10 y15 w80 h30 Center 0x200 Background"
+            UiThemeService.Color("DeleteDisabled") " c"
+            UiThemeService.Color("DisabledButtonText"),
         Tr("🗑️ 删除"))
     Main.settingsButtonWidth := 70
     Main.supportButtonWidth := 100
     Main.donateButtonWidth := 70
     Main.btnSet := Main.gui.Add("Text",
-        "x480 y15 w70 h30 Center 0x200 Background333333 cWhite",
+        "x480 y15 w70 h30 Center 0x200 Background"
+            UiThemeService.Color("Toolbar") " c"
+            UiThemeService.Color("ToolbarText"),
         Tr("设置"))
     Main.btnSupport := Main.gui.Add("Text",
-        "x560 y15 w100 h30 Center 0x200 Background333333 cWhite",
+        "x560 y15 w100 h30 Center 0x200 Background"
+            UiThemeService.Color("Toolbar") " c"
+            UiThemeService.Color("ToolbarText"),
         Tr("帮助信息"))
     Main.btnDonate := Main.gui.Add("Text",
-        "x670 y15 w50 h30 Center 0x200 Background333333 cWhite",
+        "x670 y15 w50 h30 Center 0x200 Background"
+            UiThemeService.Color("Toolbar") " c"
+            UiThemeService.Color("ToolbarText"),
         Tr("捐赠"))
-    RegisterHoverButton(Main.btnAdd, "3F6B5B")
-    RegisterHoverButton(Main.btnPause, "555148", "555148", "", "B8BAB9")
-    RegisterHoverButton(Main.btnDel, "554B4B", "554B4B", "", "B8BAB9")
-    RegisterHoverButton(Main.btnSet, "333333")
-    RegisterHoverButton(Main.btnSupport, "333333")
-    RegisterHoverButton(Main.btnDonate, "333333")
+    RegisterHoverButton(Main.btnAdd, UiThemeService.Color("Add"))
+    RegisterHoverButton(Main.btnPause,
+        UiThemeService.Color("PauseDisabled"),
+        UiThemeService.Color("PauseDisabled"), "",
+        UiThemeService.Color("DisabledButtonText"))
+    RegisterHoverButton(Main.btnDel,
+        UiThemeService.Color("DeleteDisabled"),
+        UiThemeService.Color("DeleteDisabled"), "",
+        UiThemeService.Color("DisabledButtonText"))
+    RegisterHoverButton(Main.btnSet, UiThemeService.Color("Toolbar"))
+    RegisterHoverButton(Main.btnSupport, UiThemeService.Color("Toolbar"))
+    RegisterHoverButton(Main.btnDonate, UiThemeService.Color("Toolbar"))
     SetButtonLucideIcon(Main.btnSet, "settings.svg", 15, 6)
     SetButtonLucideIcon(Main.btnSupport, "circle-question-mark.svg", 15, 6)
     SetButtonLucideIcon(Main.btnDonate, "heart.svg", 15, 6)
 
-    Main.gui.SetFont("s12 cWhite", LocalizationService.GetUiFontName())
+    Main.gui.SetFont("s12 c" UiThemeService.Color("Text"),
+        LocalizationService.GetUiFontName())
     Main.lv := Main.gui.Add("ListView",
-        "x10 y60 w710 h390 Report +LV0x10002 -Hdr Background252526 cWhite",
+        "x10 y60 w710 h390 Report +LV0x10002 -Hdr Background"
+            UiThemeService.Color("Surface") " c"
+            UiThemeService.Color("Text"),
         [Tr("应用程序"), Tr("状态"), Tr("完整路径"), Tr("序号"), ""])
     Main.lv.ModifyCol(1, 430)
     Main.lv.ModifyCol(2, 180)
@@ -180,9 +202,11 @@ CreateDisplayHotSwitchMainWindow() {
     Main.lv.ModifyCol(4, "Center 48")
     Main.lv.ModifyCol(5, 0)
     Main.listProjection.ApplyColumnOrder(Main.lv)
-    Main.gui.SetFont("s10 cWhite", LocalizationService.GetUiFontName())
+    Main.gui.SetFont("s10 c" UiThemeService.Color("Text"),
+        LocalizationService.GetUiFontName())
     Main.statsText := Main.gui.Add("Text",
-        "x10 y460 w710 h20 c888888 Background1E1E1E +0xD",
+        "x10 y460 w710 h20 c" UiThemeService.Color("MutedText")
+            " Background" UiThemeService.Color("Window") " +0xD",
         Tr("载入中..."))
     Main.statsPresenter := SvgStatusBarPresenter(Main.statsText)
     Main.gui.Show("Hide w730 h520")
@@ -655,7 +679,7 @@ AssertMainStatusSortKeyDirection(stateObj) {
 
 AssertMainStatusResizeRecovery() {
     originalText := Main.statsText.Text
-    Main.gui.Show("NoActivate w730 h520")
+    Main.gui.Show("Hide NoActivate w730 h520")
     Sleep(20)
     GuiResized(Main.gui, 0, 580, 300)
     Main.statsText.GetPos(&smallX, &smallY, &smallWidth, &smallHeight)
@@ -753,6 +777,8 @@ RunDisplayHotSwitchTests() {
 
     LocalizationService.Configure("zh-CN")
     LocalizationService.ConfigureUiFont("auto")
+    UiThemeService.Configure("dark")
+    ApplicationWindowPresenter.SetAutomationHidden(true)
     App := ApplicationState()
     processId := DllCall("kernel32\GetCurrentProcessId", "UInt")
     configPath := A_Temp "\watchdog-display-hot-switch-" processId ".ini"

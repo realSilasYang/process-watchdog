@@ -33,6 +33,8 @@ LogWindowSmokeLogs() {
 
 RunLogWindowSmokeTests() {
     global App
+    UiThemeService.Configure("dark")
+    ApplicationWindowPresenter.SetAutomationHidden(true)
     processId := DllCall("kernel32\GetCurrentProcessId", "UInt")
     testRoot := A_Temp "\watchdog-log-window-smoke-" processId
     try DirDelete(testRoot, true)
@@ -76,6 +78,9 @@ RunLogWindowSmokeTests() {
         logWindowInstance.Show()
         AssertLogWindowSmoke(logWindowInstance.IsOpen(),
             "日志窗口没有成功创建")
+        AssertLogWindowSmoke(!DllCall("user32\IsWindowVisible", "Ptr",
+            logWindowInstance.gui.Hwnd, "Int"),
+            "自动化日志窗口意外映射到用户桌面")
         AssertLogWindowSmoke(logWindowInstance.contentPixelWidth == 0
             && logWindowInstance.contentPixelHeight == 0
             && logWindowInstance.CompleteInitialLayout(),

@@ -104,7 +104,7 @@ class CustomDisplayDialog extends ManagedWindow {
                 ObjBindMethod(this, "UpdateDefaultButtonStates"))
             this.gui.OnEvent("Close", ObjBindMethod(this, "Close"))
             this.gui.OnEvent("Escape", ObjBindMethod(this, "Close"))
-            this.gui.Show("w" windowWidth " h260")
+            ShowApplicationWindow(this.gui, "w" windowWidth " h260")
             ShowSingleLineEditFromStart(targetInput.Edit)
             this.UpdateDefaultButtonStates()
         } catch as openErr {

@@ -76,7 +76,7 @@ class BatchOutputLogNoticeWindow extends ManagedWindow {
                 ObjBindMethod(this, "Close"), ButtonFeedbackMode.Dismissive)
             this.gui.OnEvent("Close", ObjBindMethod(this, "Close"))
             this.gui.OnEvent("Escape", ObjBindMethod(this, "Close"))
-            this.gui.Show("w" windowWidth " h224")
+            ShowApplicationWindow(this.gui, "w" windowWidth " h224")
             ShowSingleLineEditFromStart(this.pathEdit)
             this.confirmButton.Focus()
         } catch as openErr {

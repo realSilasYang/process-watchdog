@@ -49,7 +49,8 @@ class DonationWindow extends ManagedWindow {
                 GetApplicationAssetPath("donate\支付宝个人收款码-界面.png"))
 
             windowHeight := qrLabelY + 24 + qrSize + 22
-            this.gui.Show("w" windowWidth " h" windowHeight)
+            ShowApplicationWindow(this.gui,
+                "w" windowWidth " h" windowHeight)
         } catch as openErr {
             this.Close()
             throw openErr

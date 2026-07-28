@@ -56,7 +56,7 @@ class SupportInfoWindow extends ManagedWindow {
             RegisterButtonClick(this.feedbackButton,
                 ObjBindMethod(this, "OpenFeedback"),
                 ButtonFeedbackMode.Dismissive)
-            this.gui.Show("w" windowWidth " h160")
+            ShowApplicationWindow(this.gui, "w" windowWidth " h160")
         } catch as openErr {
             this.Close()
             throw openErr

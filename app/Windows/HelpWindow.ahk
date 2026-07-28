@@ -31,7 +31,7 @@ class HelpWindow extends ManagedWindow {
         SetDarkControl(this.textEdit.Hwnd)
         RegisterTextInputControl(this.textEdit, true, true)
         this.textEdit.OnEvent("Focus", ObjBindMethod(this, "HideCaret"))
-        this.gui.Show("AutoSize")
+        ShowApplicationWindow(this.gui, "AutoSize")
         SendMessage(Win32.EM_SETSEL, 0, 0, this.textEdit.Hwnd)
         SendMessage(0x00B7, 0, 0, this.textEdit.Hwnd) ; EM_SCROLLCARET：确保帮助内容从首行开始显示。
         lineCount := SendMessage(0x00BA, 0, 0, this.textEdit.Hwnd)

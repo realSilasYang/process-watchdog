@@ -277,7 +277,7 @@ class SettingsWindow extends ManagedWindow {
             ObjBindMethod(this, "CreateShortcut"))
         RegisterButtonClick(this.taskButton, ObjBindMethod(this, "ToggleTaskAction"))
         this.SwitchTab(1)
-        this.gui.Show("w" windowWidth " h350")
+        ShowApplicationWindow(this.gui, "w" windowWidth " h350")
         ; 任务计划程序 COM 查询不参与首屏布局，窗口显示后再读取真实状态。
         SetTimer(this.taskStatusTimer, -1)
         ; 原生控件首次显示时可能重建主题句柄，显示后再同步一次收起区和弹出列表。

@@ -151,7 +151,7 @@ class ApplicationSearchDialog extends ManagedWindow {
         this.mouseHandlerRegistered := true
 
         this.windowWidth := 700
-        this.gui.Show("w700 h400")
+        ShowApplicationWindow(this.gui, "w700 h400")
         ControlFocus(this.searchEdit)
         this.searchEdit.OnEvent("Change", ObjBindMethod(this,
             "OnSearchChanged"))
