@@ -20,6 +20,7 @@ must be reported privately according to [Security](SECURITY.en.md).
 After the first checkout, run:
 
 ```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify-fast.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify.ps1
 ```
 
@@ -62,11 +63,17 @@ them in isolated temporary directories, and remove their temporary copies.
 
 | Change | Minimum requirement |
 | --- | --- |
+| Documentation, issue templates, or community files only | `tests/verify-fast.ps1` |
 | State machine, codec, scheduling, or path logic | Related `tests/core` tests and `tests/verify.ps1` |
-| Module boundary, cleanup rule, or visible text | Update `tests/static-check.ps1` and run `tests/verify.ps1` |
-| Window, button, input, ListView, log, or icon | Run the related GUI test and record manual observations |
+| Module boundary, cleanup rule, or visible text | Prefer a behavioral test; update `tests/static-check.ps1` only for a genuine static boundary, then run `tests/verify.ps1` |
+| Window, button, input, ListView, log, icon, or font | `tests/verify-windows-integration.ps1` and recorded manual observations |
 | DPI, dark mode, window hierarchy, or accessibility | Record Windows version, scale, and physical-display evidence |
 | Build, dependency, SBOM, or release package | Run `tests/reproducible-build.ps1` and release-layout validation |
+
+Ordinary CI applies the same tiers automatically. The fast gate always runs;
+only runtime changes download LFS fonts and start real Windows/GUI integration;
+non-documentation pushes to `main` and release-engineering pull requests add the
+cross-runtime reproducible build. A formal release skips no tier.
 
 The full manual GUI scope is in `tests/gui/MANUAL-REGRESSION.md`. Automation
 cannot replace real DPI, multi-monitor, high-contrast, touchpad, or screen-reader

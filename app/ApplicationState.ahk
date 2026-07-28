@@ -204,6 +204,9 @@ class ApplicationState {
         this.configLoadWarnings := []
         this.configRecoveryEntries := []
         this.appsDirty := false
+        this.appConfigSaveRevision := 0
+        this.appConfigPersistedRevision := 0
+        this.appConfigSaveInProgress := false
         this.lastSaveWarningTicks := 0
         this.configSaveRetryDelayMs := 5000
         this.configSaveRetryTimer := ObjBindMethod(this,
@@ -314,10 +317,10 @@ class ApplicationState {
         if !this.appsDirty
             return
         if !this.guardWorkGate.TryEnter() {
-            this.guardMutationQueue.Enqueue(SaveAppsToIni)
+            this.guardMutationQueue.Enqueue(SaveAppsToIni.Bind(false))
             return
         }
-        try SaveAppsToIni()
+        try SaveAppsToIni(false)
         finally this.guardWorkGate.Leave()
     }
 

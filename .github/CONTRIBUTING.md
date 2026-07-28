@@ -18,6 +18,7 @@
 首次检出后运行：
 
 ```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify-fast.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify.ps1
 ```
 
@@ -50,11 +51,16 @@ Gitleaks，不需要把第三方 DLL 加入系统 `PATH`。正式发布会强制
 
 | 改动类型 | 最低验证要求 |
 | --- | --- |
-| 纯状态机、编解码、调度或路径逻辑 | 对应 `tests/core` 测试和 `tests/verify.ps1` |
-| 模块边界、清理约束或用户可见文本 | 更新 `tests/static-check.ps1`，运行 `tests/verify.ps1` |
-| 窗口、按钮、输入框、ListView、日志或图标 | 运行相关 GUI 测试，并记录人工观察结果 |
+| 纯文档、Issue 模板或社区文件 | `tests/verify-fast.ps1` |
+| 状态机、编解码、调度或路径逻辑 | 对应 `tests/core` 测试和 `tests/verify.ps1` |
+| 模块边界、清理约束或用户可见文本 | 优先补行为测试；确属静态边界时更新 `tests/static-check.ps1`，再运行 `tests/verify.ps1` |
+| 窗口、按钮、输入框、ListView、日志、图标或字体 | `tests/verify-windows-integration.ps1`，并记录人工观察结果 |
 | DPI、暗色模式、窗口层级或可访问性 | 填写 Windows 版本、缩放比例和物理显示器证据 |
 | 构建、依赖、SBOM 或发行包 | 运行 `tests/reproducible-build.ps1` 和发行结构校验 |
+
+普通 CI 按同一规则自动分层：快速门禁始终运行；只有运行时变更才下载 LFS 字体并
+执行真实 Windows／GUI；主分支非文档变更和发行工程相关 Pull Request 才做双宿主
+可复现构建。正式发布不跳层，会重新运行完整发布门禁。
 
 完整 GUI 人工范围见 `tests/gui/MANUAL-REGRESSION.md`。自动化不能替代真实 DPI、
 多显示器、高对比度、触控板或屏幕阅读器验证；未覆盖的组合必须明确写出。

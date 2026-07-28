@@ -216,21 +216,34 @@ class GuardMutationQueue {
         }
     }
 
-    Shutdown() {
-        abandonedOperations := []
+    Shutdown(flushPending := true) {
+        pendingOperations := []
         previousCritical := A_IsCritical
         Critical("On")
         try {
             if this.Stopped
-                return
+                return 0
             this.Stopped := true
-            abandonedOperations := this.Pending
+            pendingOperations := this.Pending
             this.Pending := []
             try SetTimer(this.TimerCallback, 0)
         } finally {
             Critical(previousCritical ? previousCritical : "Off")
         }
-        for operation in abandonedOperations
-            this.CompleteOperation(operation)
+        for operation in pendingOperations {
+            try {
+                if flushPending {
+                    try operation.Callback.Call()
+                    catch as operationError {
+                        this.LastError := operationError
+                        if IsObject(this.ErrorHandler) {
+                            try this.ErrorHandler.Call(operationError,
+                                operation.Description)
+                        }
+                    }
+                }
+            } finally this.CompleteOperation(operation)
+        }
+        return pendingOperations.Length
     }
 }

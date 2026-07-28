@@ -338,6 +338,10 @@ class GuardRuntime {
                 if (InStr(path, "\") && !snapshotReady
                     && !this.Callbacks.StateProcessIdentityIsValid.Call(path,
                         stateObj)) {
+                    this.HandleUncertainObservation(path, stateObj,
+                        ProcessObservation.Unknown(this.Now(),
+                            "process-snapshot", "后台进程快照暂不可用",
+                            ProcessObservationReason.SnapshotUnavailable))
                     continue
                 }
 
@@ -365,8 +369,11 @@ class GuardRuntime {
                 if !this.IsSupervisorCurrent(path, stateObj,
                     observationGeneration)
                     continue
-                if targetObservation.IsUnknown()
+                if targetObservation.IsUnknown() {
+                    this.HandleUncertainObservation(path, stateObj,
+                        targetObservation)
                     continue
+                }
                 stateObj.UncertainObservationCount := 0
                 isRunning := targetObservation.IsRunning()
                     ? targetObservation.PID : 0
@@ -388,8 +395,11 @@ class GuardRuntime {
                     if !this.IsSupervisorCurrent(path, stateObj,
                         observationGeneration)
                         continue
-                    if targetObservation.IsUnknown()
+                    if targetObservation.IsUnknown() {
+                        this.HandleUncertainObservation(path, stateObj,
+                            targetObservation)
                         continue
+                    }
                     isRunning := targetObservation.IsRunning()
                         ? targetObservation.PID : 0
                     if isRunning

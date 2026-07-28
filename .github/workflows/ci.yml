@@ -1,4 +1,5 @@
-# 提交与拉取请求的必需验证：固定 CI 工具链、完整检查、GUI 冒烟和可复现构建。
+# 分层持续集成：所有变更先走快速门禁，运行时变更再走真实 Windows/GUI，
+# 主分支代码与发行工程变更才执行双宿主可复现打包。
 name: CI
 
 on:
@@ -16,11 +17,121 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
+  changes:
     runs-on: windows-2022
-    timeout-minutes: 25
+    timeout-minutes: 5
+    outputs:
+      integration: ${{ steps.impact.outputs.integration }}
+      release: ${{ steps.impact.outputs.release }}
     steps:
-      - name: Checkout
+      - name: Checkout paths without large LFS payloads
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          lfs: false
+
+      - name: Classify required validation layers
+        id: impact
+        shell: pwsh
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: >-
+          .\tools\get-ci-impact.ps1
+          -BaseSha $env:BASE_SHA
+          -HeadSha $env:HEAD_SHA
+          -GitHubOutput $env:GITHUB_OUTPUT
+
+  fast:
+    needs: changes
+    runs-on: windows-2022
+    timeout-minutes: 12
+    steps:
+      - name: Checkout without large LFS payloads
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          lfs: false
+
+      - name: Restore verified tool cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .tools/cache
+            .tools/AutoHotkey-*
+            .tools/Ahk2Exe-*
+            .tools/actionlint-*
+            .tools/gitleaks-*
+          key: ${{ runner.os }}-tools-${{ hashFiles('tools/ci-toolchain.resolved.json', 'tools/toolchain.lock.json') }}
+
+      - name: Bootstrap repository CI toolchain snapshot
+        id: toolchain
+        shell: pwsh
+        run: |
+          $tools = .\tools\bootstrap-toolchain.ps1 `
+            -ResolvedToolchainPath .\tools\ci-toolchain.resolved.json
+          "actionlint=$($tools.ActionlintPath)" >> $env:GITHUB_OUTPUT
+          "gitleaks=$($tools.GitleaksPath)" >> $env:GITHUB_OUTPUT
+
+      - name: Run fast required validation
+        shell: pwsh
+        run: >-
+          .\tests\verify-fast.ps1
+          -ActionlintPath '${{ steps.toolchain.outputs.actionlint }}'
+          -GitleaksPath '${{ steps.toolchain.outputs.gitleaks }}'
+
+  windows-integration:
+    needs: changes
+    if: needs.changes.outputs.integration == 'true'
+    runs-on: windows-2022
+    timeout-minutes: 18
+    steps:
+      - name: Checkout complete runtime assets
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Restore verified tool cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .tools/cache
+            .tools/AutoHotkey-*
+            .tools/Ahk2Exe-*
+            .tools/actionlint-*
+            .tools/gitleaks-*
+          key: ${{ runner.os }}-tools-${{ hashFiles('tools/ci-toolchain.resolved.json', 'tools/toolchain.lock.json') }}
+
+      - name: Bootstrap repository CI toolchain snapshot
+        id: toolchain
+        shell: pwsh
+        run: |
+          $tools = .\tools\bootstrap-toolchain.ps1 `
+            -ResolvedToolchainPath .\tools\ci-toolchain.resolved.json
+          "ahk=$($tools.AutoHotkeyPath)" >> $env:GITHUB_OUTPUT
+
+      - name: Run real Windows process and GUI integration
+        shell: pwsh
+        run: >-
+          .\tests\verify-windows-integration.ps1
+          -AutoHotkeyPath '${{ steps.toolchain.outputs.ahk }}'
+          -SoakSeconds 15
+
+  release-package:
+    needs:
+      - changes
+      - fast
+    if: >-
+      needs.fast.result == 'success' &&
+      (github.event_name == 'workflow_dispatch' ||
+       needs.changes.outputs.release == 'true' ||
+       (github.event_name == 'push' &&
+        needs.changes.outputs.integration == 'true'))
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - name: Checkout complete release assets
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
@@ -45,22 +156,17 @@ jobs:
             -ResolvedToolchainPath .\tools\ci-toolchain.resolved.json
           "ahk=$($tools.AutoHotkeyPath)" >> $env:GITHUB_OUTPUT
           "compiler=$($tools.CompilerPath)" >> $env:GITHUB_OUTPUT
-          "actionlint=$($tools.ActionlintPath)" >> $env:GITHUB_OUTPUT
-          "gitleaks=$($tools.GitleaksPath)" >> $env:GITHUB_OUTPUT
           "ahk_source=$($tools.AutoHotkeySourcePath)" >> $env:GITHUB_OUTPUT
           "resolved=$($tools.ResolvedToolchainPath)" >> $env:GITHUB_OUTPUT
 
-      - name: Run complete release-shaped validation
+      - name: Build twice and verify reproducibility
         shell: pwsh
         run: >-
-          .\tools\invoke-release-validation.ps1
+          .\tests\reproducible-build.ps1
           -AutoHotkeyPath '${{ steps.toolchain.outputs.ahk }}'
           -CompilerPath '${{ steps.toolchain.outputs.compiler }}'
           -AutoHotkeySourcePath '${{ steps.toolchain.outputs.ahk_source }}'
           -ResolvedToolchainPath '${{ steps.toolchain.outputs.resolved }}'
-          -ActionlintPath '${{ steps.toolchain.outputs.actionlint }}'
-          -GitleaksPath '${{ steps.toolchain.outputs.gitleaks }}'
-          -SoakSeconds 15
           -SecondPowerShellPath powershell.exe
 
       - name: Preserve all build outputs

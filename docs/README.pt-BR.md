@@ -86,7 +86,7 @@ O Assistente de monitoramento de processos continuará sendo código aberto. Sua
 ## 1. Instalação e primeira execução
 
 1. Escolha em [Releases](https://github.com/realSilasYang/process-watchdog/releases) uma das três edições: EXE independente, ZIP portátil completo ou ZIP completo do código-fonte.
-2. O EXE independente dispensa o AutoHotkey; o ZIP portátil é indicado para uso permanente; o ZIP do código-fonte requer AutoHotkey v2 x64.
+2. O EXE independente dispensa o AutoHotkey e, na primeira execução, instala a carga verificada em `%LOCALAPPDATA%\ProcessWatchdog\Standalone`; o ZIP portátil permanece na pasta onde for totalmente extraído; o ZIP do código-fonte requer AutoHotkey v2 x64.
 3. Execute `进程守护小助手.exe`. O aplicativo solicitará privilégios de administrador e, conforme a configuração, mostrará a janela principal ou ficará na área de notificação.
 4. Selecione Adicionar para escolher um alvo ou arraste arquivos compatíveis para a janela principal.
 5. Abra o Log para ver as evidências de identidade, as verificações de estado, as tentativas de recuperação e os sinais de atualização usados de fato.
@@ -171,9 +171,9 @@ O Log de execução permite selecionar e copiar texto, maximizar e redimensionar
 
 Para um problema difícil, exporte um pacote de diagnóstico local pela janela do log. Ele contém resumos do aplicativo, Windows, AutoHotkey, DPI, identificadores de recurso, fase de monitoramento, avisos de configuração e log atual, sem upload automático.
 
-A configuração pessoal fica em `watchdog.ini` ao lado do programa e sessões de atualização inacabadas em `watchdog.maintenance.ini`. O Git ignora ambos e nenhuma versão os inclui ou sobrescreve. `config/watchdog.example.ini` apenas documenta campos e padrões atuais.
+A configuração pessoal fica em `watchdog.ini` no diretório real de execução, e as sessões inacabadas em `watchdog.maintenance.ini`. As edições portátil e de código-fonte usam a própria pasta de entrada; o EXE independente sempre usa `%LOCALAPPDATA%\ProcessWatchdog\Standalone`. O Git ignora os dois arquivos e nenhuma versão os inclui ou sobrescreve.
 
-O EXE e o código-fonte usam a pasta do próprio ponto de entrada como diretório de configuração. Juntos, compartilham os dois arquivos; em pastas distintas, ficam independentes. Um bloqueio de instância única em todo o sistema impede a execução simultânea. Atalhos e tarefa agendada apontam para a forma que criou ou alterou a integração por último, portanto escolha um único ponto de entrada diário por pasta. Para manter duas instalações com atualização independente, use pastas diferentes. Consulte [Configuração, backup e recuperação](en/configuration.md) e [Instalação, atualização e remoção](en/installation.md).
+Um EXE portátil e uma entrada de código-fonte só compartilham estado na mesma pasta; o EXE independente não usa a configuração ao lado do lançador baixado. O bloqueio global impede formas simultâneas, e os atalhos e a tarefa agendada apontam para a última forma real integrada. Consulte [Configuração, backup e recuperação](en/configuration.md) e [Instalação, atualização e remoção](en/installation.md).
 
 Logs podem conter caminhos, argumentos ou variáveis de ambiente. Revise e oculte dados sensíveis antes de publicar. Use os [formulários estruturados de Issue](https://github.com/realSilasYang/process-watchdog/issues/new/choose) para relatos comuns e o canal privado para vulnerabilidades ainda não corrigidas. Consulte [Diagnóstico local](en/diagnostics.md), [Solução de problemas](en/troubleshooting.md) e [Suporte](../.github/SUPPORT.en.md).
 
@@ -215,12 +215,12 @@ O script raiz apenas inclui módulos, monta dependências e inicia o aplicativo.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-gui-tests.ps1 `
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify-windows-integration.ps1 `
   -SoakSeconds 10
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\reproducible-build.ps1
 ```
 
-`verify.ps1` verifica hashes, análise AHK, restrições de arquitetura, testes do núcleo, limites do repositório, vazamentos no histórico Git, sintaxe dos fluxos e inicialização. `run-gui-tests.ps1` cria controles Windows reais e verifica troca imediata entre 13 idiomas e fontes, três níveis de janela e liberação de identificadores GDI/USER. `reproducible-build.ps1` gera duas vezes os pacotes EXE, fonte e SBOM e compara as somas.
+`verify.ps1` verifica hashes, análise AHK, restrições de arquitetura, testes do núcleo, limites do repositório, vazamentos no histórico Git, sintaxe dos fluxos e inicialização. `verify-windows-integration.ps1` valida as fontes completas, cria controles Windows reais e verifica 13 idiomas, três níveis de janela e liberação de identificadores GDI/USER. `reproducible-build.ps1` gera duas vezes as três edições e o SBOM e compara as somas.
 
 AutoHotkey e Ahk2Exe não são fixados previamente no repositório. Cada publicação manual consulta a versão estável mais recente do AutoHotkey e a versão publicada mais recente do Ahk2Exe, congela uma única resolução e usa exatamente a mesma nos testes, nas duas compilações, no SBOM e no pacote. Ferramentas de validação como actionlint e Gitleaks continuam fixadas. A versão registra as versões, fontes, commits e SHA-256 reais. Consulte [Avisos de terceiros](project/THIRD_PARTY_NOTICES.en.md).
 

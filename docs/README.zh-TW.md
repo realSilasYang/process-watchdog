@@ -86,7 +86,7 @@
 ## 1. 安裝與首次執行
 
 1. 從 [Releases](https://github.com/realSilasYang/process-watchdog/releases) 選擇獨立 EXE、完整可攜式 ZIP 或完整原始碼 ZIP 其中一種版本。
-2. 獨立 EXE 不需安裝 AutoHotkey；可攜式 ZIP 適合長期使用；原始碼 ZIP 需要 AutoHotkey v2 x64。
+2. 獨立 EXE 不需安裝 AutoHotkey，首次執行會把已驗證內容安裝到 `%LOCALAPPDATA%\ProcessWatchdog\Standalone`；可攜式 ZIP 從完整解壓縮的目錄執行；原始碼 ZIP 需要 AutoHotkey v2 x64。
 3. 執行 `进程守护小助手.exe`。程式會要求系統管理員權限，並依設定顯示主視窗或靜默常駐通知區域。
 4. 選擇「新增」來選取目標，也可以把支援的檔案拖曳到主視窗。
 5. 開啟「紀錄」，查看小助手實際採用的身分證據、狀態檢查、復原嘗試與更新訊號。
@@ -171,9 +171,9 @@
 
 難以定位的問題可從紀錄視窗匯出本機診斷套件。內容包括應用程式、Windows、AutoHotkey、DPI、資源控制代碼、守護階段、設定警告與目前紀錄摘要，但不會自動上傳。
 
-個人設定儲存在程式目錄的 `watchdog.ini`，未完成的軟體更新工作階段儲存在 `watchdog.maintenance.ini`。兩者都由 Git 忽略，發行套件不會攜帶或覆寫；`config/watchdog.example.ini` 只說明目前預設值與欄位。
+個人設定儲存在實際執行目錄的 `watchdog.ini`，未完成的軟體更新工作階段儲存在同一目錄的 `watchdog.maintenance.ini`。可攜式與原始碼版本使用各自進入點目錄；獨立 EXE 固定使用 `%LOCALAPPDATA%\ProcessWatchdog\Standalone`。兩個檔案都由 Git 忽略，發行套件不會攜帶或覆寫。
 
-EXE 與原始碼都以自身進入點檔案所在目錄作為設定目錄：同一目錄時共用上述兩個檔案，不同目錄時各自獨立。全域單一執行個體鎖會阻止兩種形式同時執行。捷徑與排程工作會指向最後建立或切換整合的執行形式，因此每個安裝目錄應只選一個日常進入點。同目錄共存只適合暫時切換測試；需要兩套可獨立更新的安裝時，應放在不同目錄。詳情請參閱[設定、備份與復原](en/configuration.md)與[安裝、升級與移除](en/installation.md)。
+可攜式 EXE 與原始碼進入點只有放在同一目錄時才共用狀態；獨立 EXE 不會讀取下載啟動檔旁的設定。全域單一執行個體鎖會阻止多種形式同時執行，捷徑與排程工作會指向最後整合的實際執行形式。詳情請參閱[設定、備份與復原](en/configuration.md)與[安裝、升級與移除](en/installation.md)。
 
 紀錄與診斷套件可能包含目標路徑、啟動參數或環境變數。公開提交前請自行檢查並移除敏感內容。一般問題請使用[結構化 Issue 表單](https://github.com/realSilasYang/process-watchdog/issues/new/choose)，尚未修正的安全性問題必須使用私密弱點回報。另請參閱[本機診斷套件](en/diagnostics.md)、[疑難排解](en/troubleshooting.md)與[取得協助](../.github/SUPPORT.en.md)。
 
@@ -215,12 +215,12 @@ process-watchdog/
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-gui-tests.ps1 `
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify-windows-integration.ps1 `
   -SoakSeconds 10
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\reproducible-build.ps1
 ```
 
-`verify.ps1` 檢查相依性雜湊、AHK 剖析、靜態架構限制、核心測試、儲存庫邊界、完整 Git 歷史洩漏、工作流程語法與啟動行為。`run-gui-tests.ps1` 建立真正的 Windows 控制項，涵蓋 13 種語言及字型即時切換、三層視窗與 GDI／USER 控制代碼回收。`reproducible-build.ps1` 連續建置兩次 EXE 套件、原始碼套件與 SBOM，並比較校驗清單雜湊。
+`verify.ps1` 檢查相依性雜湊、AHK 剖析、靜態架構限制、核心測試、儲存庫邊界、完整 Git 歷史洩漏、工作流程語法與啟動行為。`verify-windows-integration.ps1` 會驗證完整字型、建立真正的 Windows 控制項，並檢查 13 種語言、三層視窗與 GDI／USER 控制代碼回收。`reproducible-build.ps1` 連續建置兩次三種發行版本與 SBOM，並比較校驗清單雜湊。
 
 AutoHotkey 與 Ahk2Exe 不會預先鎖定在儲存庫中。每次手動正式發行都會重新查詢 AutoHotkey 最新穩定版與 Ahk2Exe 最新發行版，凍結同一份解析快照，再用它完成測試、兩次建置、SBOM 與封裝；actionlint 與 Gitleaks 等驗證工具仍固定版本。正式發行會保存實際版本、來源、提交與 SHA-256。第三方資料請參閱[第三方軟體聲明](project/THIRD_PARTY_NOTICES.en.md)。
 

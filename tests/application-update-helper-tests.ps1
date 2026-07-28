@@ -158,6 +158,126 @@ Assert-UpdateHelperTest (Test-CanonicalVersion '1.20.300') `
 Assert-UpdateHelperTest (-not (Test-CanonicalVersion '01.2.3')) `
     '带前导零的非规范版本被错误接受。'
 
+# GitHub API 的瞬态网络失败必须在后台助手内部退避重试，不能把一次连接抖动
+# 直接显示成检查更新失败。测试注入空等待，避免真实延迟。
+$script:RetryOperationAttempts = 0
+$retryResult = Invoke-WithRetry -OperationName 'test-api' -MaximumAttempts 4 `
+    -DelayAction { param([int]$Milliseconds) } -Operation {
+        $script:RetryOperationAttempts++
+        if ($script:RetryOperationAttempts -lt 3) {
+            throw [System.Net.WebException]::new('temporary failure',
+                [System.Net.WebExceptionStatus]::ConnectFailure)
+        }
+        return 'recovered'
+    }
+Assert-UpdateHelperTest ($retryResult -ceq 'recovered' -and
+    $script:RetryOperationAttempts -eq 3) `
+    '瞬态网络失败没有在有限退避后恢复。'
+
+# 大文件下载第一次只写入前半段便断线，第二次应从 .partial 的现有长度续传。
+$downloadTestRoot = Join-Path $env:TEMP `
+    ('ProcessWatchdogDownloadTest-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force -Path $downloadTestRoot | Out-Null
+try {
+    $downloadDestination = Join-Path $downloadTestRoot 'package.zip'
+    $downloadBytes = [System.Text.Encoding]::UTF8.GetBytes(
+        'resumable-download-payload')
+    $downloadSource = Join-Path $downloadTestRoot 'source.bin'
+    [System.IO.File]::WriteAllBytes($downloadSource, $downloadBytes)
+    $downloadHash = (Get-FileHash -Algorithm SHA256 `
+        -LiteralPath $downloadSource).Hash
+    $script:DownloadAttemptCount = 0
+    function Invoke-HttpDownloadAttempt {
+        param(
+            [string]$Uri,
+            [string]$PartialPath,
+            [int]$TimeoutSeconds
+        )
+        $script:DownloadAttemptCount++
+        $existingLength = if (Test-Path -LiteralPath $PartialPath) {
+            (Get-Item -LiteralPath $PartialPath).Length
+        } else { 0 }
+        if ($script:DownloadAttemptCount -eq 1) {
+            [System.IO.File]::WriteAllBytes($PartialPath,
+                $downloadBytes[0..7])
+            throw [System.Net.WebException]::new('connection interrupted',
+                [System.Net.WebExceptionStatus]::ConnectionClosed)
+        }
+        Assert-UpdateHelperTest ($existingLength -eq 8) `
+            '续传请求没有复用已下载的部分文件。'
+        $stream = [System.IO.File]::Open($PartialPath,
+            [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write,
+            [System.IO.FileShare]::None)
+        try {
+            $stream.Write($downloadBytes, [int]$existingLength,
+                $downloadBytes.Length - [int]$existingLength)
+        } finally {
+            $stream.Dispose()
+        }
+    }
+    Invoke-ResilientDownload -Uri 'https://example.invalid/package.zip' `
+        -DestinationPath $downloadDestination -ExpectedSha256 $downloadHash `
+        -MaximumAttempts 3 `
+        -DelayAction { param([int]$Milliseconds) } | Out-Null
+    Assert-UpdateHelperTest ($script:DownloadAttemptCount -eq 2 -and
+        (Get-FileHash -Algorithm SHA256 -LiteralPath $downloadDestination).Hash `
+            -ceq $downloadHash -and
+        -not (Test-Path -LiteralPath ($downloadDestination + '.partial'))) `
+        '断点续传没有生成完整且经过校验的下载文件。'
+} finally {
+    Remove-Item -LiteralPath $downloadTestRoot -Recurse -Force `
+        -ErrorAction SilentlyContinue
+}
+
+# 旧片段已经达到服务器文件长度但内容损坏时，Range 请求通常返回 416。
+# 更新器必须删除该片段并从零开始，不能把可恢复状态误报成永久下载失败。
+$stalePartialRoot = Join-Path $env:TEMP `
+    ('ProcessWatchdogStalePartialTest-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force -Path $stalePartialRoot | Out-Null
+try {
+    $staleDestination = Join-Path $stalePartialRoot 'package.zip'
+    $stalePartial = $staleDestination + '.partial'
+    $freshBytes = [System.Text.Encoding]::UTF8.GetBytes('fresh-package')
+    [System.IO.File]::WriteAllBytes($stalePartial,
+        [System.Text.Encoding]::UTF8.GetBytes('stale-package'))
+    $freshHashPath = Join-Path $stalePartialRoot 'expected.bin'
+    [System.IO.File]::WriteAllBytes($freshHashPath, $freshBytes)
+    $freshHash = (Get-FileHash -Algorithm SHA256 `
+        -LiteralPath $freshHashPath).Hash
+    $script:StalePartialAttempts = 0
+    function Invoke-HttpDownloadAttempt {
+        param(
+            [string]$Uri,
+            [string]$PartialPath,
+            [int]$TimeoutSeconds
+        )
+        $script:StalePartialAttempts++
+        if ($script:StalePartialAttempts -eq 1) {
+            Assert-UpdateHelperTest (Test-Path -LiteralPath $PartialPath) `
+                '416 场景没有读取已有片段。'
+            $rangeError = [System.Net.Http.HttpRequestException]::new(
+                'HTTP 416 while downloading test package')
+            $rangeError.Data['Retryable'] = $true
+            $rangeError.Data['ResetPartial'] = $true
+            throw $rangeError
+        }
+        Assert-UpdateHelperTest `
+            (-not (Test-Path -LiteralPath $PartialPath)) `
+            '收到 416 后没有删除失效片段。'
+        [System.IO.File]::WriteAllBytes($PartialPath, $freshBytes)
+    }
+    Invoke-ResilientDownload -Uri 'https://example.invalid/package.zip' `
+        -DestinationPath $staleDestination -ExpectedSha256 $freshHash `
+        -MaximumAttempts 3 `
+        -DelayAction { param([int]$Milliseconds) } | Out-Null
+    Assert-UpdateHelperTest ($script:StalePartialAttempts -eq 2 -and
+        (Get-FileHash -Algorithm SHA256 -LiteralPath $staleDestination).Hash `
+            -ceq $freshHash) 'HTTP 416 后没有完成干净重试。'
+} finally {
+    Remove-Item -LiteralPath $stalePartialRoot -Recurse -Force `
+        -ErrorAction SilentlyContinue
+}
+
 # 检查阶段只要求当前运行形态真正需要的附件。这样编译版不会因为某个源码附件
 # 暂缺而失去更新能力，Git 源码版也不需要下载包或校验清单。
 $script:MockRelease = $null
@@ -301,15 +421,17 @@ try {
     $script:MockDownloads = @{
         "https://example.invalid/$packageName" = $packagePath
     }
-    function Invoke-WebRequest {
+    function Invoke-ResilientDownload {
         param(
-            [switch]$UseBasicParsing,
             [string]$Uri,
-            [string]$OutFile,
-            [int]$TimeoutSec
+            [string]$DestinationPath,
+            [string]$ExpectedSha256 = '',
+            [int]$TimeoutSeconds = 300,
+            [int]$MaximumAttempts = 4,
+            [scriptblock]$DelayAction = { param([int]$Milliseconds) }
         )
         Copy-Item -LiteralPath $script:MockDownloads[$Uri] `
-            -Destination $OutFile
+            -Destination $DestinationPath
     }
 
     $script:PackageKind = 'source'

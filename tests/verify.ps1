@@ -10,16 +10,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-& (Join-Path $PSScriptRoot '..\tools\verify-dependencies.ps1')
-& (Join-Path $PSScriptRoot 'static-check.ps1')
-& (Join-Path $PSScriptRoot 'application-update-helper-tests.ps1')
-& (Join-Path $PSScriptRoot 'release-engineering-tests.ps1')
+& (Join-Path $PSScriptRoot 'verify-fast.ps1') `
+    -ActionlintPath $ActionlintPath -GitleaksPath $GitleaksPath
 & (Join-Path $PSScriptRoot 'run-core-tests.ps1') `
     -AutoHotkeyPath $AutoHotkeyPath
-& (Join-Path $PSScriptRoot 'repository-check.ps1')
-& (Join-Path $PSScriptRoot 'verify-publication.ps1') `
-    -GitleaksPath $GitleaksPath
-& (Join-Path $PSScriptRoot 'verify-workflows.ps1') `
-    -ActionlintPath $ActionlintPath
 
 Write-Host 'All required verification suites passed.'

@@ -85,8 +85,15 @@ Process Watchdog Assistant will remain open source. Long-term maintenance depend
 
 ## 1. Installation and first run
 
-1. Choose any one of these editions from [Releases](https://github.com/realSilasYang/process-watchdog/releases): standalone EXE, complete portable ZIP, or complete source ZIP.
-2. The standalone EXE needs no AutoHotkey and runs directly; the portable ZIP is intended for long-term extraction; the source ZIP requires AutoHotkey v2 x64 on the computer.
+1. Choose the standalone EXE, complete portable ZIP, or complete source ZIP from [Releases](https://github.com/realSilasYang/process-watchdog/releases).
+2. The downloads have different storage and runtime models:
+
+| Download | Best for | Runtime and configuration location |
+| --- | --- | --- |
+| Standalone EXE | One-file download with no AutoHotkey installation | On first run, verifies its embedded payload and installs it under `%LOCALAPPDATA%\ProcessWatchdog\Standalone`; the application, configuration, and later self-updates remain in that stable directory |
+| Complete portable ZIP | Visible, backup-friendly long-term or manual deployment | Run after fully extracting it; resources and `watchdog.ini` remain in the extracted directory, so the inner EXE cannot be copied out alone |
+| Complete source ZIP | Review, development, or source execution | Fully extract it and run the root AHK with local AutoHotkey v2 x64; configuration remains in the source directory |
+
 3. Run `进程守护小助手.exe`. The application requests administrator privileges, then shows the main window or starts in the system tray according to its settings.
 4. Select Add to choose a target, or drag supported files into the main window.
 5. Open Logs to see which identity evidence, state checks, recovery attempts, and update signals the assistant actually used.
@@ -94,13 +101,13 @@ Process Watchdog Assistant will remain open source. Long-term maintenance depend
 To run from source, install AutoHotkey v2 x64 and execute `进程守护小助手.ahk`.
 A Git clone also requires Git LFS and `git lfs pull` so the bundled font files
 are materialized instead of remaining pointer files. The source ZIP attached to
-a Release already contains those assets and does not require Git LFS. Official
-builds embed the AutoHotkey runtime that passed the complete release test suite,
+a Release already contains those assets and does not require Git LFS. The standalone
+EXE and portable ZIP embed the AutoHotkey runtime that passed the complete release test suite,
 so ordinary users do not need a separate AutoHotkey installation.
 
 ### Versions and runtime forms
 
-| Version | EXE edition | Source edition |
+| Version | Compiled editions (standalone EXE / portable ZIP) | Source edition |
 | --- | --- | --- |
 | Assistant | Read from EXE file metadata; a complete release package replaces it during updates | Read from `VERSION` beside the entry; updated by a safe Git fast-forward or source package |
 | AutoHotkey | Embedded and updated with a later assistant release package | Uses the local interpreter; assistant updates do not upgrade AutoHotkey for the user |
@@ -196,9 +203,9 @@ do not automatically receive a separate output file.
 
 For difficult problems, export a local diagnostics bundle from the log window. It includes application, Windows, AutoHotkey, DPI, resource-handle, monitoring phase, configuration-warning, and current-log summaries. Nothing is uploaded automatically.
 
-Personal configuration is stored in `watchdog.ini` beside the application; unfinished update sessions are stored in `watchdog.maintenance.ini`. Both are ignored by Git and are never shipped in a release. `config/watchdog.example.ini` only documents current defaults and fields.
+Personal configuration is stored in `watchdog.ini` under the actual runtime directory; unfinished update sessions use `watchdog.maintenance.ini` there. Portable and source editions use their entry directory. The standalone EXE always uses `%LOCALAPPDATA%\ProcessWatchdog\Standalone`. Both files are ignored by Git and never shipped in a release. `config/watchdog.example.ini` only documents current defaults and fields.
 
-Both forms use the directory containing their own entry file as the configuration directory. An EXE and source script in the same directory share both state files; different directories keep independent configurations. A machine-wide single-instance lock prevents the two forms from running concurrently. Shortcuts and the scheduled task point to whichever form most recently created or switched the integration, so choose one everyday entry per installation directory. Same-directory coexistence is suitable for temporary switching tests, not for independently auto-updating both release forms because they share release resources and one update manifest. Keep long-lived, independently updated forms in separate directories. See [Configuration, backup, and recovery](en/configuration.md) and [Installation, upgrades, and removal](en/installation.md).
+A portable EXE and source entry in one directory share personal state; separate directories remain independent. The standalone EXE does not share configuration with files beside the downloaded launcher. A machine-wide single-instance lock prevents forms from running concurrently. Shortcuts and the scheduled task point to whichever actual runtime form most recently created or switched the integration, so choose one everyday entry per installation. See [Configuration, backup, and recovery](en/configuration.md) and [Installation, upgrades, and removal](en/installation.md).
 
 Logs and diagnostics may contain target paths, launch arguments, or environment variables. Review and redact them before posting publicly. Use the [structured issue forms](https://github.com/realSilasYang/process-watchdog/issues/new/choose) for ordinary reports, and private vulnerability reporting for unresolved security issues. See [Local diagnostics](en/diagnostics.md), [Troubleshooting](en/troubleshooting.md), and [Support](../.github/SUPPORT.en.md).
 
@@ -261,15 +268,19 @@ The root script includes modules, wires dependencies, and starts the application
 Run in Windows PowerShell:
 
 ```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify-fast.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-gui-tests.ps1 `
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify-windows-integration.ps1 `
   -SoakSeconds 10
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\reproducible-build.ps1
 ```
 
-- `verify.ps1` checks dependency hashes, AHK parsing, static architectural constraints, core tests, repository boundaries, full-history leaks, workflow syntax, and startup behavior.
-- `run-gui-tests.ps1` creates real Windows controls, covers buttons, inputs, logs, image lists, three window levels, and in-process language/font switching across all 13 languages, then checks long-lived object identity and GDI/USER handle reclamation.
-- `reproducible-build.ps1` builds the EXE package, source package, and SBOM twice and compares their checksum hashes.
+- `verify-fast.ps1` avoids LFS font downloads and GUI startup while checking dependencies, static boundaries, update/install transactions, repository policy, leak history, and workflows.
+- `verify.ps1` adds all 39 AHK core and integration tests to the fast gate.
+- `verify-windows-integration.ps1` verifies complete font hashes and creates real Windows controls across 13 languages, three window levels, and GDI/USER handle reclamation.
+- `reproducible-build.ps1` builds the standalone EXE, portable ZIP, source ZIP, and SBOM twice, compares every SHA-256, and performs a two-pass empty-directory standalone launch.
+
+GitHub Actions classifies changed paths first. Documentation-only changes run only the fast gate; runtime changes add Windows/GUI integration; non-documentation pushes to `main` and release-engineering pull requests add reproducible packaging. A formal release still reruns every layer.
 
 AutoHotkey and Ahk2Exe versions are not pre-pinned in the repository. Every manual release queries the latest stable AutoHotkey release and latest published Ahk2Exe release, freezes one resolved snapshot, then uses that exact snapshot for tests, both builds, the SBOM, and packaging. Validation-only tools such as actionlint and Gitleaks remain pinned. The release records the actual versions, sources, commits, and SHA-256 values used. Third-party versions, sources, licenses, and hashes are documented in [Third-party notices](project/THIRD_PARTY_NOTICES.en.md).
 

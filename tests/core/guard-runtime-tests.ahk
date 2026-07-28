@@ -613,6 +613,37 @@ RunGuardRuntimeTests() {
     AssertGuardRuntime(!runtime.guardWorkGate.Busy,
         "探活异常后的下一轮监控无法正常结束")
 
+    ; 普通轮询暂时拿不到完整快照或得到 Unknown 时，必须明确投影为
+    ; “等待进程状态”，不能无限保留上一轮的运行中、疑似停止等旧状态。
+    unavailableSnapshotState := CreateGuardRuntimeSupervisor(scheduler)
+    states.Clear()
+    states[path] := unavailableSnapshotState
+    runtime.appOrder := [path]
+    runtime.processSnapshots.Index := ""
+    GuardRuntimeTestContext.Status := "旧的运行状态"
+    GuardRuntimeTestContext.StatusKind := GuardStatusKind.Running
+    GuardRuntimeTestContext.Observation := ProcessObservation.Unknown(
+        clock.Ticks, "process-command", "后台快照暂不可用",
+        ProcessObservationReason.SnapshotUnavailable)
+    guard.MonitorTick()
+    AssertGuardRuntime(GuardRuntimeTestContext.StatusKind
+            == GuardStatusKind.WaitingObservation
+        && unavailableSnapshotState.UncertainObservationCount == 1,
+        "普通轮询快照不可用时仍保留过期界面状态")
+
+    unknownAliasPath := "unknown-target.exe"
+    unknownAliasState := CreateGuardRuntimeSupervisor(scheduler)
+    states.Clear()
+    states[unknownAliasPath] := unknownAliasState
+    runtime.appOrder := [unknownAliasPath]
+    GuardRuntimeTestContext.Status := "旧的疑似停止状态"
+    GuardRuntimeTestContext.StatusKind := GuardStatusKind.SuspectedStop
+    guard.MonitorTick()
+    AssertGuardRuntime(GuardRuntimeTestContext.StatusKind
+            == GuardStatusKind.WaitingObservation
+        && unknownAliasState.UncertainObservationCount == 1,
+        "普通轮询收到 Unknown 后没有收敛为等待状态")
+
     ; 同一旧快照不能在连续轮次中两次证明停止；只有更新的采集时刻
     ; 才能从“疑似停止”推进到重启倒计时。
     staleEvidenceState := CreateGuardRuntimeSupervisor(scheduler)

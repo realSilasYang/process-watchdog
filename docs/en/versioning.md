@@ -17,24 +17,24 @@ official Release. It does not claim that a source user's local AutoHotkey is the
 latest version. Conversely, updating local AutoHotkey does not change the
 assistant version or its changelog.
 
-## EXE and source modes
+## The three downloads
 
-| Item | EXE edition | Source edition |
-| --- | --- | --- |
-| Entry | `进程守护小助手.exe` | Local `AutoHotkey64.exe` plus `进程守护小助手.ahk` |
-| AutoHotkey source | Embedded in the EXE | The AutoHotkey v2 x64 installation on this computer |
-| Separate AutoHotkey installation | Not required | Required |
-| Assistant automatic update | Downloads and verifies the complete Windows x64 package, validates startup, and restarts | Safely fast-forwards a Git checkout or downloads and verifies the source package, then validates and restarts with the same interpreter |
-| AutoHotkey updated with the assistant | Yes, from the newly tested embedded runtime | No; the user maintains the local interpreter separately |
-| Configuration directory | Directory containing the current EXE | Directory containing the current AHK entry |
+| Item | Standalone EXE | Complete portable ZIP | Complete source ZIP |
+| --- | --- | --- | --- |
+| Entry | One-file bootstrapper anywhere; starts the real EXE under local app data | `进程守护小助手.exe` in the fully extracted directory | Local `AutoHotkey64.exe` plus `进程守护小助手.ahk` |
+| AutoHotkey source | Embedded and installed under the stable root | Embedded in the EXE | The AutoHotkey v2 x64 installation on this computer |
+| Separate AutoHotkey installation | Not required | Not required | Required |
+| Assistant automatic update | Updates the inner compiled installation; an older bootstrapper never downgrades it | Updates the compiled files in the extracted directory | Safely fast-forwards a Git checkout or downloads and verifies the source package, then validates and restarts with the same interpreter |
+| AutoHotkey updated with the assistant | Yes | Yes | No; the user maintains the local interpreter separately |
+| Configuration directory | `%LOCALAPPDATA%\ProcessWatchdog\Standalone` | Directory containing the portable EXE | Directory containing the AHK entry |
 
-Both forms run the same functional code and configuration format, but they are
-not two independently updatable installations when placed in one directory.
-They then share `watchdog.ini`, `watchdog.maintenance.ini`, release resources,
-and one update manifest, and a global single-instance lock prevents concurrent
-execution. Keep long-lived installations in separate directories and recreate
-or switch shortcuts and the scheduled task from General for the form
-used every day.
+All three downloads run the same functional code and configuration format, but
+state is shared only when the real runtime directory is shared. Files beside the
+downloaded standalone bootstrapper do not participate. A portable EXE and source
+entry in one directory share personal state, release resources, and one update
+manifest. A global single-instance lock prevents concurrent forms. Keep long-lived
+installations under different runtime roots and recreate or switch shortcuts and
+the scheduled task from General for the form used every day.
 
 Automatic update accepts only canonical `major.minor.patch` stable versions and
 requires the target to be newer. It verifies checksums, package form, entry version,

@@ -86,7 +86,7 @@
 ## 1. 설치와 첫 실행
 
 1. [Releases](https://github.com/realSilasYang/process-watchdog/releases)에서 독립 EXE, 전체 포터블 ZIP, 전체 소스 ZIP 중 하나를 선택합니다.
-2. 독립 EXE는 AutoHotkey 없이 바로 실행할 수 있습니다. 포터블 ZIP은 장기 사용용이며, 소스 ZIP은 AutoHotkey v2 x64가 필요합니다.
+2. 독립 EXE는 AutoHotkey 없이 실행되며 첫 실행 때 검증된 내용을 `%LOCALAPPDATA%\ProcessWatchdog\Standalone`에 설치합니다. 포터블 ZIP은 완전히 푼 폴더에서 실행하고, 소스 ZIP은 AutoHotkey v2 x64가 필요합니다.
 3. `进程守护小助手.exe`를 실행합니다. 앱이 관리자 권한을 요청한 뒤 설정에 따라 기본 창을 표시하거나 시스템 트레이에 머뭅니다.
 4. 추가를 눌러 대상을 선택하거나 지원 파일을 기본 창으로 끌어 놓습니다.
 5. 로그에서 실제 사용한 식별 근거, 상태 확인, 복구 시도, 업데이트 신호를 확인합니다.
@@ -171,9 +171,9 @@ BAT 및 CMD 항목에만 배치 출력 로그 보기 명령이 추가로 표시�
 
 원인을 찾기 어려우면 로그 창에서 로컬 진단 패키지를 내보낼 수 있습니다. 앱, Windows, AutoHotkey, DPI, 리소스 핸들, 감시 단계, 구성 경고, 현재 로그 요약을 포함하지만 자동으로 업로드하지 않습니다.
 
-개인 설정은 프로그램 옆 `watchdog.ini`에, 끝나지 않은 업데이트 세션은 `watchdog.maintenance.ini`에 저장합니다. 두 파일은 Git에서 제외되고 릴리스에 포함되거나 업데이트 때 덮어쓰이지 않습니다. `config/watchdog.example.ini`는 현재 기본값과 필드만 설명합니다.
+개인 설정은 실제 실행 디렉터리의 `watchdog.ini`에, 끝나지 않은 업데이트 세션은 같은 위치의 `watchdog.maintenance.ini`에 저장합니다. 포터블판과 소스판은 각 진입 디렉터리를 사용하고, 독립 EXE는 항상 `%LOCALAPPDATA%\ProcessWatchdog\Standalone`을 사용합니다. 두 파일은 릴리스에 포함되거나 업데이트 때 덮어쓰이지 않습니다.
 
-EXE와 소스판은 각각 자신의 진입 파일이 있는 디렉터리를 설정 위치로 사용합니다. 같은 디렉터리에 있으면 두 상태 파일을 공유하고, 다른 디렉터리라면 독립됩니다. 시스템 전체 단일 인스턴스 잠금 때문에 두 형식을 동시에 실행할 수 없습니다. 바로 가기와 예약 작업은 마지막으로 통합을 만들거나 전환한 형식을 가리키므로 설치 디렉터리마다 일상 진입점 하나만 선택하세요. 두 형식을 독립적으로 자동 업데이트하려면 서로 다른 디렉터리에 둡니다. [구성, 백업, 복구](en/configuration.md) 및 [설치, 업그레이드, 제거](en/installation.md)를 참조하세요.
+포터블 EXE와 소스 진입점은 같은 폴더에 있을 때만 상태를 공유합니다. 독립 EXE는 다운로드한 실행 파일 옆의 설정을 사용하지 않습니다. 시스템 전체 단일 인스턴스 잠금은 여러 형식의 동시 실행을 막고, 바로 가기와 예약 작업은 마지막으로 통합한 실제 실행 형식을 가리킵니다. [구성, 백업, 복구](en/configuration.md) 및 [설치, 업그레이드, 제거](en/installation.md)를 참조하세요.
 
 로그와 진단 패키지에는 대상 경로, 시작 인수, 환경 변수가 포함될 수 있습니다. 공개 게시 전에 검토하고 민감한 내용을 가리세요. 일반 신고는 [구조화된 Issue 양식](https://github.com/realSilasYang/process-watchdog/issues/new/choose)을 사용하고, 해결되지 않은 보안 문제는 비공개 취약점 신고를 이용하세요. [로컬 진단](en/diagnostics.md), [문제 해결](en/troubleshooting.md), [지원](../.github/SUPPORT.en.md)도 참조하세요.
 
@@ -215,12 +215,12 @@ process-watchdog/
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-gui-tests.ps1 `
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify-windows-integration.ps1 `
   -SoakSeconds 10
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\reproducible-build.ps1
 ```
 
-`verify.ps1`은 종속성 해시, AHK 구문 분석, 정적 설계 제약, 핵심 테스트, 저장소 경계, 전체 Git 기록 유출, 워크플로 구문, 시작 동작을 검사합니다. `run-gui-tests.ps1`은 실제 Windows 컨트롤을 만들고 13개 언어/글꼴의 프로세스 내 전환, 3단계 창, GDI/USER 핸들 회수를 확인합니다. `reproducible-build.ps1`은 EXE, 소스, SBOM을 두 번 연속 빌드하고 체크섬을 비교합니다.
+`verify.ps1`은 종속성 해시, AHK 구문 분석, 정적 설계 제약, 핵심 테스트, 저장소 경계, 전체 Git 기록 유출, 워크플로 구문, 시작 동작을 검사합니다. `verify-windows-integration.ps1`은 전체 글꼴을 검증하고 실제 Windows 컨트롤에서 13개 언어, 3단계 창, GDI/USER 핸들 회수를 확인합니다. `reproducible-build.ps1`은 세 배포판과 SBOM을 두 번 빌드해 체크섬을 비교합니다.
 
 AutoHotkey와 Ahk2Exe는 저장소에서 미리 고정하지 않습니다. 수동 정식 릴리스마다 최신 안정 AutoHotkey와 최신 공개 Ahk2Exe를 조회하고 하나의 해석 결과를 고정한 뒤 같은 결과로 테스트, 이중 빌드, SBOM, 패키징을 수행합니다. actionlint, Gitleaks 같은 검증 전용 도구는 버전을 고정합니다. 실제 버전, 출처, 커밋, SHA-256은 릴리스에 저장합니다. [타사 소프트웨어 고지](project/THIRD_PARTY_NOTICES.en.md)를 참조하세요.
 

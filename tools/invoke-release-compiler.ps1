@@ -42,9 +42,11 @@ try {
     $process = [System.Diagnostics.Process]::Start($startInfo)
     $standardOutputTask = $process.StandardOutput.ReadToEndAsync()
     $standardErrorTask = $process.StandardError.ReadToEndAsync()
-    if (-not $process.WaitForExit(120000)) {
+    # 独立启动器会嵌入完整便携 ZIP。低负载 CI 主机写入大型 PE 资源可能超过
+    # 两分钟，但仍需有明确上限，避免编译器挂起无限占用发布任务。
+    if (-not $process.WaitForExit(600000)) {
         try { $process.Kill() } catch {}
-        throw 'Ahk2Exe timed out after 120 seconds.'
+        throw 'Ahk2Exe timed out after 600 seconds.'
     }
     $process.WaitForExit()
     $standardOutput = $standardOutputTask.GetAwaiter().GetResult()

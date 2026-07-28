@@ -401,12 +401,8 @@ Write-CanonicalJson $sourceUpdateManifest `
     (Join-Path $sourcePackageDirectory 'update-manifest.json') 5
 
 if (-not $SkipStartupValidation) {
-    $process = Start-Process -FilePath $executablePath `
-        -ArgumentList '--startup-validation' -PassThru -Wait `
-        -WindowStyle Hidden
-    if ($process.ExitCode -ne 0) {
-        throw "Compiled startup validation failed with exit code $($process.ExitCode)."
-    }
+    & (Join-Path $PSScriptRoot 'invoke-startup-validation.ps1') `
+        -ExecutablePath $executablePath
 }
 
 $archiveWriter = Join-Path $PSScriptRoot 'new-release-archive.ps1'
@@ -420,9 +416,75 @@ foreach ($archiveSpec in @(
         throw "Canonical archive host failed with exit code $LASTEXITCODE."
     }
 }
-# Release 附件保留一份与 ZIP 内完全相同的 EXE，便于独立留档、核验和生成溯源
-# 证明；它仍依赖完整发行包中的资源和 DLL，不作为单文件安装包使用。
-Copy-Item -LiteralPath $executablePath -Destination $standaloneExecutablePath
+# 独立 EXE 使用一个很小的 AHK 启动器内嵌完整便携 ZIP。首次运行时，启动器
+# 把经过 SHA-256 校验的载荷事务安装到 LOCALAPPDATA 的稳定目录；此后内层正式
+# 程序继续使用同一份个人配置和既有自动更新流程。
+$payloadSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $zipPath).Hash
+$standaloneScratchRoot = Join-Path $projectRoot '.build\standalone'
+if (Test-Path -LiteralPath $standaloneScratchRoot) {
+    Remove-Item -LiteralPath $standaloneScratchRoot -Recurse -Force
+}
+New-Item -ItemType Directory -Force -Path $standaloneScratchRoot | Out-Null
+$standaloneSourcePath = Join-Path $standaloneScratchRoot 'StandaloneLauncher.ahk'
+$standaloneScratchOutput = Join-Path $standaloneScratchRoot 'StandaloneLauncher.exe'
+$standalonePayloadPath = Join-Path $standaloneScratchRoot 'payload.zip'
+$standaloneInstallerPath = Join-Path $standaloneScratchRoot `
+    'standalone-install.ps1'
+$standaloneIconPath = Join-Path $standaloneScratchRoot 'watchdog.ico'
+Copy-Item -LiteralPath $zipPath -Destination $standalonePayloadPath
+Copy-Item -LiteralPath (Join-Path $projectRoot `
+    'runtime\standalone-install.ps1') -Destination $standaloneInstallerPath
+Copy-Item -LiteralPath (Join-Path $projectRoot 'assets\app\watchdog.ico') `
+    -Destination $standaloneIconPath
+$standaloneTemplate = Get-Content -LiteralPath (Join-Path $projectRoot `
+    'runtime\standalone-launcher.ahk') -Raw -Encoding UTF8
+foreach ($placeholder in @('__PAYLOAD_VERSION__', '__PAYLOAD_SHA256__',
+        '__PAYLOAD_ENTRY__')) {
+    if (-not $standaloneTemplate.Contains($placeholder)) {
+        throw "Standalone launcher template is missing: $placeholder"
+    }
+}
+$standaloneSource = $standaloneTemplate.Replace('__PAYLOAD_VERSION__', $version).Replace('__PAYLOAD_SHA256__', $payloadSha256).Replace('__PAYLOAD_ENTRY__', $executableName)
+[System.IO.File]::WriteAllText($standaloneSourcePath, $standaloneSource,
+    $script:utf8WithBom)
+
+$standaloneSubstituteProcess = Start-Process -FilePath 'subst.exe' `
+    -ArgumentList "$buildDriveLetter`:", $projectRoot -PassThru -Wait `
+    -WindowStyle Hidden
+if ($standaloneSubstituteProcess.ExitCode -ne 0) {
+    throw "Unable to allocate deterministic build drive $buildDriveLetter`: for standalone compilation."
+}
+try {
+    & $canonicalPowerShell -NoLogo -NoProfile -NonInteractive `
+        -ExecutionPolicy Bypass -File `
+        (Join-Path $PSScriptRoot 'invoke-release-compiler.ps1') `
+        -CompilerPath (ConvertTo-CompilerPath $CompilerPath) `
+        -SourcePath (ConvertTo-CompilerPath $standaloneSourcePath) `
+        -OutputPath (ConvertTo-CompilerPath $standaloneScratchOutput) `
+        -IconPath (ConvertTo-CompilerPath $standaloneIconPath) `
+        -BasePath (ConvertTo-CompilerPath $AutoHotkeyPath) `
+        -WorkingDirectory (ConvertTo-CompilerPath $standaloneScratchRoot)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Standalone compiler host failed with exit code $LASTEXITCODE."
+    }
+    Copy-Item -LiteralPath $standaloneScratchOutput `
+        -Destination $standaloneExecutablePath
+} finally {
+    $removeStandaloneDrive = Start-Process -FilePath 'subst.exe' `
+        -ArgumentList "$buildDriveLetter`:", '/D' -PassThru -Wait `
+        -WindowStyle Hidden
+    if ($removeStandaloneDrive.ExitCode -ne 0) {
+        Write-Warning "Unable to remove standalone build drive $buildDriveLetter`: ."
+    }
+    if (Test-Path -LiteralPath $standaloneScratchRoot) {
+        Remove-Item -LiteralPath $standaloneScratchRoot -Recurse -Force
+    }
+    $standaloneScratchParent = Split-Path -Parent $standaloneScratchRoot
+    if ((Test-Path -LiteralPath $standaloneScratchParent -PathType Container) `
+        -and -not (Get-ChildItem -LiteralPath $standaloneScratchParent -Force)) {
+        Remove-Item -LiteralPath $standaloneScratchParent -Force
+    }
+}
 
 $zipHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zipPath).Hash
 $executableHash = (Get-FileHash -Algorithm SHA256 `

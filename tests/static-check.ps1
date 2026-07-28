@@ -1,6 +1,9 @@
 ﻿# 源码结构、架构边界和高风险回归的静态门禁。
 # 检查结果基于明确语义钩子而非格式化风格，新增规则应说明它保护的真实故障模式。
 
+[CmdletBinding()]
+param([switch]$SkipPackagedFontContentValidation)
+
 $ErrorActionPreference = 'Stop'
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
@@ -465,14 +468,18 @@ try {
             $failures.Add("Missing packaged font: $($font.name)")
             continue
         }
-        $fontHash = (Get-FileHash -Algorithm SHA256 `
-            -LiteralPath $fontPath).Hash
         $fontLicense = [string]$font.license
-        if ($fontHash -ne [string]$font.sha256 -or
-            $fontLicense -notin @('OFL-1.1',
+        $metadataInvalid = $fontLicense -notin @('OFL-1.1',
                 'LicenseRef-Commercial-Apple-Fonts') -or
             ($fontLicense -eq 'LicenseRef-Commercial-Apple-Fonts' -and
-                [string]::IsNullOrWhiteSpace([string]$font.authorization))) {
+                [string]::IsNullOrWhiteSpace([string]$font.authorization))
+        if (-not $SkipPackagedFontContentValidation) {
+            $fontHash = (Get-FileHash -Algorithm SHA256 `
+                -LiteralPath $fontPath).Hash
+            $metadataInvalid = $metadataInvalid -or
+                $fontHash -ne [string]$font.sha256
+        }
+        if ($metadataInvalid) {
             $failures.Add("Packaged font metadata mismatch: $($font.name)")
         }
     }
@@ -946,11 +953,8 @@ foreach ($legacyConfigModelFunction in $legacyConfigModelFunctions) {
         $failures.Add("Legacy main-script configuration function remains: $legacyConfigModelFunction")
     }
 }
-if ($source -notmatch 'this\.configSaveRetryTimer\s*:=\s*ObjBindMethod\(this,[\s\S]{0,100}"RetryDirtyAppConfig"\)' -or
-    $source -notmatch 'SaveAppsToIni\(\)[\s\S]{0,4000}App\.appsDirty\s*:=\s*false[\s\S]{0,300}SetTimer\(App\.configSaveRetryTimer, 0\)[\s\S]{0,1000}App\.appsDirty\s*:=\s*true[\s\S]{0,700}SetTimer\(App\.configSaveRetryTimer, -retryDelayMs\)' -or
-    $source -notmatch 'ShutdownApplicationResources\(\*\)[\s\S]{0,200}App\.appsDirty[\s\S]{0,120}SaveAppsToIni\(\)') {
-    $failures.Add('Dirty app configuration must retry with backoff and flush during shutdown')
-}
+# 保存期间二次修改、最新修订追赶和失败重试由 main-integration-tests.ahk
+# 通过真实仓库写入验证，避免在这里固化局部变量名和语句顺序。
 foreach ($legacyConfigSymbol in @(
     'App\.iniPath',
     'EncodeIniField\s*\(',
@@ -966,12 +970,13 @@ foreach ($legacyConfigSymbol in @(
         $failures.Add("Legacy main-configuration ownership remains: $legacyConfigSymbol")
     }
 }
-if ($source -notmatch 'SaveAppsToIni\(\)[\s\S]{0,600}watchlistPersistenceService\.Save\(' -or
+if ($source -notmatch 'SaveAppsToIni\(markChanged := true\)[\s\S]{0,1800}watchlistPersistenceService\.Save\(' -or
     $watchlistPersistenceServiceSource -notmatch 'Repository\.ReplaceSections\(') {
     $failures.Add('Monitoring configuration must commit through the repository')
 }
-if ($source -notmatch 'SaveAppsToIni\(\)[\s\S]{0,180}previousCritical\s*:=\s*A_IsCritical[\s\S]{0,100}Critical\("On"\)[\s\S]{0,6500}Critical\(previousCritical\s*\?\s*previousCritical\s*:\s*"Off"\)') {
-    $failures.Add('Monitoring configuration snapshots must be captured and committed in one critical transaction')
+if ($source -notmatch 'SaveAppsToIni\(markChanged := true\)[\s\S]{0,220}previousCritical\s*:=\s*A_IsCritical[\s\S]{0,100}Critical\("On"\)' -or
+    $source -notmatch 'App\.appConfigSaveInProgress[\s\S]{0,6500}finally[\s\S]{0,180}App\.appConfigSaveInProgress\s*:=\s*false') {
+    $failures.Add('Monitoring configuration saves must serialize revision ownership and restore caller critical state')
 }
 if ($runtimeSettingsServiceSource -notmatch 'Save\(settings\)[\s\S]{0,300}Repository\.WriteValues\("Settings"' -or
     $source -notmatch 'runtimeSettingsService\.Apply\(App, savedSettings\)') {
@@ -1893,9 +1898,7 @@ foreach ($legacyObservationBridge in @(
         $failures.Add("Legacy process-observation bridge remains: $legacyObservationBridge")
     }
 }
-if ($guardRuntimeSource -notmatch 'MonitorTick\(\)[\s\S]{0,12000}targetObservation\.IsUnknown\(\)[\s\S]{0,100}continue') {
-    $failures.Add('Main monitoring must defer decisions for Unknown process observations')
-}
+# 快照不可用与 Unknown 投影由 guard-runtime-tests.ahk 的状态机行为断言覆盖。
 if ($guardRuntimeSource -notmatch 'RestartCore\(path,[\s\S]{0,6000}existingObservation\.IsUnknown\(\)[\s\S]{0,500}(?:BeginSnapshotWait|HandleUncertainObservation)') {
     $failures.Add('Restart duplicate protection must defer launch for Unknown observations')
 }
@@ -2706,7 +2709,6 @@ foreach ($saveWindowSource in @($settingsWindowSource,
 if ($guardMutationQueueSource -notmatch 'Enqueue\(callback, description := "", completionCallback := ""\)[\s\S]{0,800}CompletionCallback:\s*completionCallback' -or
     $guardMutationQueueSource -notmatch 'EnqueueExclusive\(owner, operationKey,[\s\S]{0,900}ExclusiveOperations\.Has\(key\)[\s\S]{0,800}ObjBindMethod\(this, "ReleaseExclusiveOperation"' -or
     $guardMutationQueueSource -notmatch 'finally this\.CompleteOperation\(operation\)' -or
-    $guardMutationQueueSource -notmatch 'Shutdown\(\)[\s\S]{0,700}this\.CompleteOperation\(operation\)' -or
     $maintenanceSettingsDialogSource -notmatch 'QueueExclusiveGuardMutation\(this, "resume-protection",[\s\S]{0,100}ObjBindMethod\(this, "ResumeProtectionTransaction"\)' -or
     $maintenanceSettingsDialogSource -match '\bresumePending\b|\bResumeProtectionCore\(') {
     $failures.Add('Exclusive guard mutations must release operation keys after success, failure, rejection and shutdown')

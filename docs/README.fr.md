@@ -86,7 +86,7 @@ L’Assistant de surveillance des processus restera un logiciel libre. Sa mainte
 ## 1. Installation et premier démarrage
 
 1. Choisissez dans les [Releases](https://github.com/realSilasYang/process-watchdog/releases) l’une des trois éditions : EXE autonome, ZIP portable complet ou ZIP complet du code source.
-2. L’EXE autonome ne nécessite pas AutoHotkey ; le ZIP portable convient à une utilisation durable ; le ZIP du code source exige AutoHotkey v2 x64.
+2. L’EXE autonome ne nécessite pas AutoHotkey et installe au premier lancement sa charge vérifiée dans `%LOCALAPPDATA%\ProcessWatchdog\Standalone` ; le ZIP portable reste dans le dossier où il est entièrement extrait ; le ZIP du code source exige AutoHotkey v2 x64.
 3. Lancez `进程守护小助手.exe`. L’application demande les droits administrateur, puis affiche la fenêtre principale ou reste dans la zone de notification selon les réglages.
 4. Choisissez Ajouter pour sélectionner une cible, ou faites glisser un fichier compatible dans la fenêtre principale.
 5. Ouvrez le journal pour voir les indices d’identité, contrôles d’état, tentatives de rétablissement et signaux de mise à jour effectivement utilisés.
@@ -171,9 +171,9 @@ Le journal d’exécution permet la sélection et la copie du texte, l’agrandi
 
 Pour un problème difficile, exportez un paquet de diagnostic local depuis le journal. Il contient des résumés de l’application, Windows, AutoHotkey, du DPI, des handles de ressources, de la phase de surveillance, des avertissements de configuration et du journal courant, sans aucun envoi automatique.
 
-La configuration personnelle se trouve dans `watchdog.ini` près du programme et les sessions de mise à jour inachevées dans `watchdog.maintenance.ini`. Git ignore ces deux fichiers, qui ne sont ni distribués ni écrasés. `config/watchdog.example.ini` documente uniquement les champs et valeurs par défaut actuels.
+La configuration personnelle se trouve dans `watchdog.ini` sous le dossier d’exécution réel et les sessions inachevées dans `watchdog.maintenance.ini`. Les éditions portable et source utilisent leur dossier d’entrée ; l’EXE autonome utilise toujours `%LOCALAPPDATA%\ProcessWatchdog\Standalone`. Git ignore ces deux fichiers, qui ne sont ni distribués ni écrasés.
 
-L’EXE et le mode source utilisent le dossier de leur propre point d’entrée comme dossier de configuration. Placés ensemble, ils partagent les deux fichiers ; dans des dossiers différents, ils sont indépendants. Un verrou d’instance unique à l’échelle du système empêche leur exécution simultanée. Les raccourcis et la tâche planifiée pointent vers le dernier mode ayant créé ou modifié l’intégration : choisissez donc un seul point d’entrée habituel par dossier. Pour conserver deux installations mises à jour indépendamment, placez-les dans deux dossiers. Consultez [Configuration, sauvegarde et récupération](en/configuration.md) et [Installation, mise à niveau et suppression](en/installation.md).
+Un EXE portable et une entrée source ne partagent leur état que dans le même dossier ; l’EXE autonome ne partage rien avec les fichiers placés près du lanceur téléchargé. Le verrou global empêche l’exécution simultanée des formes. Les raccourcis et la tâche planifiée ciblent la dernière forme réellement intégrée. Consultez [Configuration, sauvegarde et récupération](en/configuration.md) et [Installation, mise à niveau et suppression](en/installation.md).
 
 Les journaux peuvent contenir des chemins, arguments ou variables d’environnement. Relisez-les et masquez les données sensibles avant publication. Utilisez les [formulaires Issue structurés](https://github.com/realSilasYang/process-watchdog/issues/new/choose) pour un rapport ordinaire et le signalement privé pour une faille non corrigée. Consultez [Diagnostic local](en/diagnostics.md), [Dépannage](en/troubleshooting.md) et [Assistance](../.github/SUPPORT.en.md).
 
@@ -215,12 +215,12 @@ Le script racine se limite à inclure les modules, assembler les dépendances et
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-gui-tests.ps1 `
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify-windows-integration.ps1 `
   -SoakSeconds 10
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\reproducible-build.ps1
 ```
 
-`verify.ps1` contrôle les hachages, l’analyse AHK, les contraintes d’architecture, les tests du cœur, les limites du dépôt, les fuites dans tout l’historique Git, la syntaxe des workflows et le démarrage. `run-gui-tests.ps1` crée de vrais contrôles Windows et vérifie la commutation à chaud de 13 langues et polices, trois niveaux de fenêtres et la libération des handles GDI/USER. `reproducible-build.ps1` construit deux fois les paquets EXE, source et SBOM puis compare les sommes.
+`verify.ps1` contrôle les hachages, l’analyse AHK, les contraintes d’architecture, les tests du cœur, les limites du dépôt, les fuites dans tout l’historique Git, la syntaxe des workflows et le démarrage. `verify-windows-integration.ps1` valide les polices complètes, crée de vrais contrôles Windows et vérifie 13 langues, trois niveaux de fenêtres et la libération des handles GDI/USER. `reproducible-build.ps1` construit deux fois les trois éditions et le SBOM puis compare les sommes.
 
 AutoHotkey et Ahk2Exe ne sont pas figés à l’avance dans le dépôt. Chaque publication manuelle interroge la dernière version stable d’AutoHotkey et la dernière version publiée d’Ahk2Exe, fige une résolution unique, puis l’emploie pour les tests, les deux compilations, le SBOM et l’empaquetage. Les outils de validation tels qu’actionlint et Gitleaks restent épinglés. La version conserve les versions, sources, commits et SHA-256 réellement utilisés. Consultez les [avis relatifs aux logiciels tiers](project/THIRD_PARTY_NOTICES.en.md).
 

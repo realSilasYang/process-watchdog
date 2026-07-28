@@ -171,7 +171,7 @@ ReleaseApplicationMutex() {
 
 ShutdownApplicationResources(*) {
     if App.appsDirty
-        try SaveAppsToIni()
+        try SaveAppsToIni(false)
     try SetTimer(App.configSaveRetryTimer, 0)
     try App.ClearPendingProcessSnapshot()
     try App.applicationUpdateService.Shutdown()

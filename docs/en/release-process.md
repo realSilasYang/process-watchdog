@@ -20,20 +20,23 @@
    `tests/verify.ps1`. It scans the complete history with pinned Gitleaks and
    rejects committed personal configuration, probes, credentials, or local paths
    in current release text.
-3. Run `tests/run-gui-tests.ps1 -SoakSeconds 300`. Do not shorten the full
-   pre-release UI soak.
+3. Run `tests/verify-windows-integration.ps1 -SoakSeconds 300`. Do not shorten
+   the full pre-release core, font, and UI soak.
 4. Reconfirm that the commercial authorization for PingFang, SF Pro Text, and
    Apple SD Gothic Neo still covers the exact files in
    `assets/fonts/metadata.json`, Windows, the public repository, and Release
    distribution. Do not start a formal release without this confirmation.
-5. Run `tests/reproducible-build.ps1` and preserve the final SHA-256 output. CI,
-   dry runs, and formal releases build once with PowerShell 7 and once with
+5. Run `tests/reproducible-build.ps1` and preserve the final SHA-256 output.
+   Non-documentation `main` CI, release-engineering pull requests, dry runs, and
+   formal releases build once with PowerShell 7 and once with
    Windows PowerShell 5.1. Do not release if the standalone EXE, EXE ZIP, source
    ZIP, or standalone SBOM differs between the two hosts, or if
    `SHA256SUMS.txt` does not match.
 6. Ordinary CI uses the hash-pinned repository snapshot at
-   `tools/ci-toolchain.resolved.json` and a cache, so upstream changes cannot
-   destabilize unrelated commits. The dry run and formal release instead query
+   `tools/ci-toolchain.resolved.json` and classifies changed paths first.
+   Documentation-only changes run a no-LFS fast gate; runtime changes add real
+   Windows/GUI integration; non-documentation `main` pushes and release-engineering
+   pull requests add reproducible packaging. The dry run and formal release instead query
    the latest stable AutoHotkey and latest published Ahk2Exe, then freeze one
    `toolchain.resolved.json`. Confirm that the package contains the AutoHotkey
    license, corresponding source archive, resolved snapshot, and an SBOM

@@ -86,7 +86,7 @@ Der Prozessüberwachungs-Assistent bleibt Open Source. Seine langfristige Pflege
 ## 1. Installation und erster Start
 
 1. Wählen Sie unter [Releases](https://github.com/realSilasYang/process-watchdog/releases) eine der drei Ausgaben: eigenständige EXE, vollständiges portables ZIP oder vollständiges Quellcode-ZIP.
-2. Die eigenständige EXE benötigt kein AutoHotkey; das portable ZIP ist für die dauerhafte Nutzung vorgesehen; für das Quellcode-ZIP muss AutoHotkey v2 x64 installiert sein.
+2. Die eigenständige EXE benötigt kein AutoHotkey und installiert beim ersten Start ihr geprüftes Paket unter `%LOCALAPPDATA%\ProcessWatchdog\Standalone`; das portable ZIP bleibt nach vollständigem Entpacken im gewählten Ordner; für das Quellcode-ZIP muss AutoHotkey v2 x64 installiert sein.
 3. Starten Sie `进程守护小助手.exe`. Die Anwendung fordert Administratorrechte an und zeigt je nach Einstellung das Hauptfenster oder bleibt im Infobereich.
 4. Wählen Sie „Hinzufügen“ oder ziehen Sie unterstützte Dateien in das Hauptfenster.
 5. Öffnen Sie das Protokoll, um die tatsächlich verwendeten Identitätsbelege, Statusprüfungen, Wiederherstellungsversuche und Updatesignale zu sehen.
@@ -171,9 +171,9 @@ Im Laufzeitprotokoll können Text markiert und kopiert, das Fenster maximiert un
 
 Bei schwierigen Problemen lässt sich aus dem Protokollfenster ein lokales Diagnosepaket exportieren. Es enthält Zusammenfassungen zu Anwendung, Windows, AutoHotkey, DPI, Ressourcenhandles, Überwachungsphase, Konfigurationswarnungen und aktuellem Protokoll, wird aber nie automatisch hochgeladen.
 
-Persönliche Einstellungen liegen in `watchdog.ini` neben dem Programm, unvollständige Updatesitzungen in `watchdog.maintenance.ini`. Git ignoriert beide; Releases liefern oder überschreiben sie nicht. `config/watchdog.example.ini` dokumentiert nur aktuelle Felder und Standardwerte.
+Persönliche Einstellungen liegen im tatsächlichen Laufzeitordner in `watchdog.ini`, unvollständige Updatesitzungen in `watchdog.maintenance.ini`. Portable und Quellversion nutzen ihren Einstiegsordner; die eigenständige EXE nutzt immer `%LOCALAPPDATA%\ProcessWatchdog\Standalone`. Git ignoriert beide Dateien; Releases liefern oder überschreiben sie nicht.
 
-EXE und Quellversion nutzen jeweils den Ordner ihres Einstiegspunkts als Konfigurationsordner. Gemeinsam abgelegt teilen sie beide Dateien, in getrennten Ordnern sind sie unabhängig. Eine systemweite Einzelinstanzsperre verhindert parallele Ausführung. Verknüpfungen und geplante Aufgabe zeigen auf die zuletzt integrierte Form; wählen Sie daher je Installationsordner genau einen täglichen Einstieg. Für zwei unabhängig aktualisierte Installationen verwenden Sie getrennte Ordner. Siehe [Konfiguration, Sicherung und Wiederherstellung](en/configuration.md) und [Installation, Aktualisierung und Entfernung](en/installation.md).
+Portable EXE und Quellversion teilen den Zustand nur im selben Ordner; die eigenständige EXE teilt keine Konfiguration mit Dateien neben dem heruntergeladenen Starter. Eine systemweite Einzelinstanzsperre verhindert parallele Ausführung. Verknüpfungen und geplante Aufgabe zeigen auf die zuletzt integrierte tatsächliche Laufzeitform. Siehe [Konfiguration, Sicherung und Wiederherstellung](en/configuration.md) und [Installation, Aktualisierung und Entfernung](en/installation.md).
 
 Protokolle können Pfade, Argumente oder Umgebungsvariablen enthalten. Prüfen und schwärzen Sie sensible Angaben vor einer Veröffentlichung. Nutzen Sie [strukturierte Issue-Formulare](https://github.com/realSilasYang/process-watchdog/issues/new/choose) für normale Berichte und den privaten Kanal für nicht behobene Schwachstellen. Siehe [Lokale Diagnose](en/diagnostics.md), [Fehlerbehebung](en/troubleshooting.md) und [Support](../.github/SUPPORT.en.md).
 
@@ -215,12 +215,12 @@ Das Stammskript bindet nur Module ein, setzt Abhängigkeiten zusammen und starte
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-gui-tests.ps1 `
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify-windows-integration.ps1 `
   -SoakSeconds 10
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\reproducible-build.ps1
 ```
 
-`verify.ps1` prüft Hashes, AHK-Analyse, Architekturvorgaben, Kerntests, Repositorygrenzen, Lecks in der gesamten Git-Historie, Workflowsyntax und Start. `run-gui-tests.ps1` erzeugt echte Windows-Steuerelemente und prüft den sofortigen Wechsel zwischen 13 Sprachen und Schriften, drei Fensterebenen und die Freigabe von GDI-/USER-Handles. `reproducible-build.ps1` erstellt EXE-, Quell- und SBOM-Pakete zweimal und vergleicht die Prüfsummen.
+`verify.ps1` prüft Hashes, AHK-Analyse, Architekturvorgaben, Kerntests, Repositorygrenzen, Lecks in der gesamten Git-Historie, Workflowsyntax und Start. `verify-windows-integration.ps1` prüft vollständige Schriftressourcen, erzeugt echte Windows-Steuerelemente und testet 13 Sprachen, drei Fensterebenen sowie die Freigabe von GDI-/USER-Handles. `reproducible-build.ps1` erstellt die drei Ausgaben und das SBOM zweimal und vergleicht ihre Prüfsummen.
 
 AutoHotkey und Ahk2Exe werden im Repository nicht vorab festgelegt. Jede manuelle Veröffentlichung fragt die neueste stabile AutoHotkey-Version und die neueste veröffentlichte Ahk2Exe-Version ab, friert eine einzige Auflösung ein und nutzt genau diese für Tests, beide Builds, SBOM und Verpackung. Prüfwerkzeuge wie actionlint und Gitleaks bleiben festgelegt. Das Release speichert tatsächliche Versionen, Quellen, Commits und SHA-256. Siehe [Hinweise zu Drittsoftware](project/THIRD_PARTY_NOTICES.en.md).
 
