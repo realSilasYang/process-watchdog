@@ -35,4 +35,25 @@ Assert-CiImpact -Path @('assets/fonts/NotoSansCJK.ttc') -Integration $true `
 Assert-CiImpact -Path @() -Integration $false -Release $false `
     -Scenario 'empty comparison'
 
+# workflow_dispatch 没有比较基线，必须完整验证；同时覆盖 GitHub 输出中的
+# changed_count，防止单元素结果被 PowerShell 展开为字符串。
+$manualImpact = & $classifier -BaseSha '' -HeadSha ('a' * 40)
+if (-not $manualImpact.IntegrationRequired -or
+    -not $manualImpact.ReleaseRequired -or
+    $manualImpact.ChangedFiles.Count -ne 1) {
+    throw 'CI impact classification failed for workflow_dispatch.'
+}
+$githubOutput = [System.IO.Path]::GetTempFileName()
+try {
+    & $classifier -BaseSha '' -HeadSha ('a' * 40) -GitHubOutput $githubOutput
+    $outputLines = @(Get-Content -LiteralPath $githubOutput)
+    foreach ($expectedLine in @('integration=true', 'release=true', 'changed_count=1')) {
+        if ($expectedLine -notin $outputLines) {
+            throw "CI output is missing: $expectedLine"
+        }
+    }
+} finally {
+    Remove-Item -LiteralPath $githubOutput -Force -ErrorAction SilentlyContinue
+}
+
 Write-Host 'CI impact classifier tests passed.'

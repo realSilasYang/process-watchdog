@@ -67,6 +67,9 @@ $paths = if ($PSBoundParameters.ContainsKey('ChangedPath')) {
         }
     }
 }
+# PowerShell 会展开条件分支返回的单元素数组；统一重新装箱，避免严格模式下
+# 手动触发完整门禁时字符串没有 Count 属性。
+$paths = @($paths)
 
 $integrationRequired = $false
 $releaseRequired = $false
