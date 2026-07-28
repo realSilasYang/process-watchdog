@@ -75,8 +75,6 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   unaffected.
 - A Git source clone requires Git LFS and `git lfs pull`. The source ZIP attached
   to a Release already contains the complete font assets and needs no Git LFS.
-- Update protection remains disabled by default. Enable it per target and verify
-  its recognition during one real application update.
 
 ---
 

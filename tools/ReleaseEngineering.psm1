@@ -211,6 +211,64 @@ function Normalize-ReleaseBody {
     return ($Text -replace "`r`n", "`n").TrimEnd("`r", "`n")
 }
 
+function Assert-ReleaseNotesImportantSection {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$BodyPath
+    )
+
+    if (-not (Test-Path -LiteralPath $BodyPath -PathType Leaf)) {
+        throw "发行说明不存在：$BodyPath"
+    }
+    $body = Get-Content -LiteralPath $BodyPath -Raw -Encoding UTF8
+    $headings = [regex]::Matches($body, '(?m)^## ⚠️ 重要说明\r?$')
+    if ($headings.Count -gt 1) {
+        throw '发行说明最多只能包含一个“⚠️ 重要说明”章节。'
+    }
+    if ($headings.Count -eq 0) {
+        return
+    }
+
+    $heading = $headings[0]
+    $regularHeading = [regex]::Match($body,
+        '(?m)^## (?:✨ 新增|🚀 优化|🐛 修复|✅ 验证范围|🔒 安全)\r?$')
+    if ($regularHeading.Success -and $heading.Index -gt $regularHeading.Index) {
+        throw '“⚠️ 重要说明”必须位于常规变更章节之前。'
+    }
+
+    $sectionStart = $heading.Index + $heading.Length
+    $remaining = $body.Substring($sectionStart).TrimStart("`r", "`n")
+    $boundary = [regex]::Match($remaining, '(?m)^(?:---\r?$|## )')
+    $sectionText = if ($boundary.Success) {
+        $remaining.Substring(0, $boundary.Index).Trim()
+    } else {
+        $remaining.Trim()
+    }
+    $items = [regex]::Matches($sectionText,
+        '(?ms)^- (?<Text>.*?)(?=^- |\z)')
+    if ($items.Count -eq 0) {
+        throw '“⚠️ 重要说明”没有合格事项时必须连标题一起省略。'
+    }
+
+    $warningPattern = [regex]::new(
+        '不兼容|无法|不再|必须|请先|请在|否则|可能(?:导致|丢失)|' +
+        '会(?:导致|丢失|被(?:删除|重置|覆盖|忽略))|将被(?:删除|重置|覆盖|忽略)|' +
+        '迁移|备份|最低(?:版本|要求)|停止支持|不支持|破坏性|风险|' +
+        '不要(?:只|直接)|需要(?:先|重新|手动|额外|迁移|备份|卸载|安装|更新|升级|替换|配置)')
+    $placeholderPattern = [regex]::new(
+        '仅在存在|保留本节|待补充|TODO|TBD|示例')
+    foreach ($item in $items) {
+        $text = $item.Groups['Text'].Value.Trim()
+        if ($placeholderPattern.IsMatch($text)) {
+            throw '“⚠️ 重要说明”不能保留模板提示或占位文本。'
+        }
+        if (-not $warningPattern.IsMatch($text)) {
+            throw ('“⚠️ 重要说明”中的每一项都必须描述不兼容、数据风险、' +
+                '破坏性变化或用户必须执行的升级操作：' + $text)
+        }
+    }
+}
+
 function Assert-ReleaseNotesContent {
     [CmdletBinding()]
     param(
@@ -229,6 +287,7 @@ function Assert-ReleaseNotesContent {
     if ($body -notmatch "(?m)^# 🎉 进程守护小助手 v$escapedVersion\r?$") {
         throw '发行说明必须保留带 🎉 的版本标题。'
     }
+    Assert-ReleaseNotesImportantSection -BodyPath $BodyPath
     $assetHeadings = [regex]::Matches($body,
         '(?m)^## 📦 发布物说明\r?$')
     if ($assetHeadings.Count -ne 1) {
@@ -333,6 +392,7 @@ Export-ModuleMember -Function @(
     'Test-CanonicalReleaseVersion'
     'Get-ReleaseArtifactNames'
     'Assert-ReleaseArtifactInventory'
+    'Assert-ReleaseNotesImportantSection'
     'Assert-ReleaseNotesContent'
     'Resolve-ReleaseState'
     'Assert-ReleaseRecord'
