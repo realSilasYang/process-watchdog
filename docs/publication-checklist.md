@@ -8,7 +8,7 @@
 ## 创建仓库前
 
 - `tests/verify.ps1` 在完整、非浅克隆中通过。
-- `tests/run-gui-tests.ps1 -SoakSeconds 300` 通过，GDI 和 USER 增长均为零。
+- `tests/verify-windows-integration.ps1 -SoakSeconds 300` 通过，核心测试、完整字体哈希、GDI 和 USER 增长均符合要求。
 - 当前发行 EXE 与完成长时 GUI 压力测试的 EXE 哈希一致；若不一致，重新运行长测。
 - `tests/reproducible-build.ps1` 连续两次产生相同独立 EXE、EXE ZIP、源码 ZIP 和
   SBOM 哈希。
@@ -33,7 +33,8 @@
 4. 在“Settings → Code security”启用 Dependabot alerts、Dependabot security updates、
    Secret scanning、Push protection 和 Private Vulnerability Reporting。
 5. 为 `main` 建立规则集：禁止强制推送和删除，要求 Pull Request、讨论已解决、
-   分支保持最新，并要求 CI 的 `verify` 检查通过。只有一名维护者时审批数设为零，
+   分支保持最新，并要求 CI 的 `fast` 检查通过；运行时与发行工程分层由工作流按路径
+   自动追加。只有一名维护者时审批数设为零，
    避免作者无法批准自己的 PR；增加第二名维护者后再启用 CODEOWNERS 审批。
 6. 保留 Actions 的默认最小权限；发布工作流只使用文件内显式声明的 `contents`、
    `id-token` 和 `attestations` 权限。

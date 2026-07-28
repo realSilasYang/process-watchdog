@@ -73,6 +73,9 @@ $requiredFiles = @(
     'runtime\application-update.ps1',
     'runtime\application-update.strings.json',
     'tests\application-update-helper-tests.ps1',
+    'tests\ci-impact-tests.ps1',
+    'tests\verify-fast.ps1',
+    'tests\verify-windows-integration.ps1',
     '.github\workflows\ci.yml',
     '.github\workflows\release.yml',
     '.github\workflows\release-dry-run.yml',
@@ -84,6 +87,8 @@ $requiredFiles = @(
     'tools\resolve-release-state.ps1',
     'tools\invoke-release-validation.ps1',
     'tools\invoke-release-compiler.ps1',
+    'tools\invoke-startup-validation.ps1',
+    'tools\get-ci-impact.ps1',
     'tools\normalize-version-resource.ps1',
     'tools\new-release-archive.ps1',
     'tools\verify-github-release.ps1',
@@ -111,6 +116,8 @@ foreach ($relativePath in $requiredFiles) {
     }
 }
 
+# 本地开发应允许在暂存前验证新增文件；CI 的检出目录天然只包含已提交内容，
+# 因而“是否已跟踪”检查既不增加发布保障，反而迫使贡献者提前污染暂存区。
 $trackedFiles = @(git -c core.quotePath=false -C $projectRoot ls-files)
 if ($LASTEXITCODE -ne 0) {
     throw 'Unable to inspect tracked repository files.'
@@ -119,11 +126,6 @@ $trackedNormalized = [System.Collections.Generic.HashSet[string]]::new(
     [System.StringComparer]::OrdinalIgnoreCase)
 foreach ($trackedFile in $trackedFiles) {
     [void]$trackedNormalized.Add(($trackedFile -replace '/', '\'))
-}
-foreach ($relativePath in $requiredFiles) {
-    if (-not $trackedNormalized.Contains($relativePath)) {
-        throw "Required repository file is not tracked: $relativePath"
-    }
 }
 # 根目录只承载仓库和程序入口；新增资料必须进入职责明确的子目录，避免项目再次
 # 退化成版本文件、图片、示例配置和多语言文档混排的平面结构。
@@ -732,8 +734,14 @@ if (-not $ciWorkflow.Contains('path: dist/**') -or
     -not $ciWorkflow.Contains('include-hidden-files: true') -or
     -not $ciWorkflow.Contains('-SecondPowerShellPath powershell.exe') -or
     -not $ciWorkflow.Contains('tools\ci-toolchain.resolved.json') -or
-    -not $ciWorkflow.Contains('.\tools\invoke-release-validation.ps1')) {
-    throw 'CI must use the repository toolchain snapshot and retain all build outputs.'
+    -not $ciWorkflow.Contains('.\tools\get-ci-impact.ps1') -or
+    -not $ciWorkflow.Contains('.\tests\verify-fast.ps1') -or
+    -not $ciWorkflow.Contains('.\tests\verify-windows-integration.ps1') -or
+    -not $ciWorkflow.Contains('.\tests\reproducible-build.ps1') -or
+    -not $ciWorkflow.Contains('lfs: false') -or
+    -not $ciWorkflow.Contains('lfs: true') -or
+    $ciWorkflow.Contains('.\tools\invoke-release-validation.ps1')) {
+    throw 'CI must separate fast, Windows integration and reproducible release validation.'
 }
 
 $buildScript = Get-Content -LiteralPath (Join-Path $projectRoot `
@@ -757,7 +765,7 @@ $archiveWriterSource = Get-Content -LiteralPath (Join-Path $projectRoot `
     'tools\new-release-archive.ps1') -Raw -Encoding UTF8
 foreach ($archiveRequirement in @(
         '[System.StringComparer]::Ordinal',
-        '[System.IO.Compression.CompressionLevel]::NoCompression',
+        '[System.IO.Compression.CompressionLevel]::Optimal',
         '[System.IO.FileMode]::CreateNew')) {
     if (-not $archiveWriterSource.Contains($archiveRequirement)) {
         throw "Canonical archive writer is missing: $archiveRequirement"

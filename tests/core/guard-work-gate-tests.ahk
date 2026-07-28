@@ -123,13 +123,24 @@ RunGuardWorkGateTests() {
             ThrowGuardMutationError, "排他异常")
         && queue.Drain() && queue.ExclusiveCount == 0,
         "排他配置操作异常后没有可靠释放操作键")
-    queue.Enqueue(RecordGuardMutation.Bind(records, "discarded"))
-    queue.EnqueueExclusive(exclusiveOwner, "discarded-exclusive",
-        RecordGuardMutation.Bind(records, "discarded-exclusive"))
+    shutdownRecordStart := records.Length
+    shutdownErrorStart := errors.Length
+    queue.Enqueue(RecordGuardMutation.Bind(records, "shutdown-first"),
+        "退出排空一")
+    queue.Enqueue(ThrowGuardMutationError, "退出排空异常")
+    queue.EnqueueExclusive(exclusiveOwner, "shutdown-exclusive",
+        RecordGuardMutation.Bind(records, "shutdown-last"), "退出排空二")
     queue.Shutdown()
     AssertGuardWorkGate(queue.Count == 0 && queue.ExclusiveCount == 0
         && !queue.Drain(),
         "关闭配置队列后仍保留待处理操作或排他操作键")
+    AssertGuardWorkGate(records.Length == shutdownRecordStart + 2
+        && records[-2] == "shutdown-first"
+        && records[-1] == "shutdown-last",
+        "关闭配置队列时没有按顺序排空待处理操作")
+    AssertGuardWorkGate(errors.Length == shutdownErrorStart + 1
+        && InStr(errors[-1], "预期的配置变更异常|退出排空异常"),
+        "退出排空中的单项异常没有隔离并送达统一错误处理器")
 
     failedArmErrors := []
     failedArmQueue := FailingArmGuardMutationQueue(gate,

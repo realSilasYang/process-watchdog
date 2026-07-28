@@ -5,17 +5,28 @@
 ## Release package
 
 Each Release offers only three downloads: a standalone EXE, a complete portable
-ZIP, and a complete source ZIP. For long-term use, download and fully extract the
-Windows x64 portable ZIP. The standalone EXE is suitable for a quick run or for
-comparison with the packaged binary; the source ZIP is for review, development,
-and source-based execution. The EXE, `assets/`, and `third_party/` in the portable
-edition must keep their relative locations; do not copy only the EXE out of the ZIP.
+ZIP, and a complete source ZIP.
+
+- The standalone EXE embeds the complete portable package. On first run it verifies
+  the embedded SHA-256, version, and update manifest, then performs a rollback-safe
+  installation under `%LOCALAPPDATA%\ProcessWatchdog\Standalone`. Running the
+  launcher from any location starts that stable installation, and an older launcher
+  never downgrades an installation that has already updated itself.
+- The complete portable ZIP is for users who want explicit control over installation,
+  backup, and migration. Fully extract it and keep the EXE, `assets/`, and
+  `third_party/` at their relative paths; do not copy only the inner EXE.
+- The complete source ZIP is for review, development, and source execution and
+  requires local AutoHotkey v2 x64.
+
+Both compiled editions support long-term use. The standalone EXE keeps managed
+program files in a stable local-app-data directory, while the portable ZIP keeps
+program files and personal configuration in the directory selected by the user.
 
 `v1.0.0` predates self-update and contains no update helper, so it cannot initiate
 its own upgrade. Move to `v2.0.0` by downloading and fully replacing the package
 manually. Releases after that bootstrap step can use Check for Updates in Settings.
 
-Official packages include the required AutoHotkey runtime. AutoHotkey v2 x64 is
+The standalone EXE and portable ZIP include the required AutoHotkey runtime. AutoHotkey v2 x64 is
 needed only when running from source. `licenses/sources/` also contains the full
 AutoHotkey source archive for the exact embedded runtime. Its version, commit,
 and hashes are recorded in `build-metadata/toolchain.resolved.json`. This is the
@@ -50,8 +61,8 @@ runtime form, actual AutoHotkey version, and manual update check. Disabling
 automatic startup removes only a task created by this application whose ownership
 identity still matches.
 
-Both runtime forms are supported. An EXE-created shortcut points directly to the
-EXE. A source-created shortcut points to the current AutoHotkey interpreter and
+Both compiled and source runtime forms are supported. An EXE-created shortcut points
+to the actual runtime EXE. A source-created shortcut points to the current AutoHotkey interpreter and
 passes the main AHK file as an argument. The scheduled task records the current
 form in the same way. Desktop, Start menu, and scheduled-task entries use one
 product name, so only one form is integrated at a time:
@@ -63,7 +74,7 @@ product name, so only one form is integrated at a time:
 - Existing shortcuts and tasks need no rebuild when an automatic update keeps
   the entry path unchanged.
 
-If EXE and source entries temporarily share one directory, they share configuration
+If a portable EXE and source entry temporarily share one directory, they share configuration
 but also share release resources and the update manifest. Do not independently
 auto-update both forms in that layout. Keep long-lived, independently updated
 installations in separate directories, then recreate or switch the shortcuts and
@@ -75,9 +86,12 @@ Check for assistant updates at startup is enabled by default, and About offers
 an immediate check. A new release is announced first;
 files are never replaced silently. After confirmation:
 
-- Official EXE: downloads the complete Windows x64 ZIP, verifies it against the
-  SHA-256 digest supplied by the GitHub Release API, exits the main process,
-  replaces release-managed files from a temporary helper, and restarts.
+- Official compiled edition: downloads the complete Windows x64 ZIP, verifies it
+  against the SHA-256 digest supplied by the GitHub Release API, exits the main
+  process, replaces managed files in the actual runtime directory, and restarts.
+  A standalone installation updates the inner program under
+  `%LOCALAPPDATA%\ProcessWatchdog\Standalone`; the originally downloaded launcher
+  remains unchanged and continues to start the newer installed version.
 - Git source: requires every tracked file to be clean, allows only a fast-forward
   to the official release tag, and restarts through the original AutoHotkey
   interpreter. Local changes or divergent history are never overwritten.
@@ -103,6 +117,8 @@ moved to `[Recovery]` instead of being silently deleted.
 
 ## Remove
 
-Disable automatic startup from General, exit the application, and
-delete the extracted directory. Desktop and Start menu shortcuts created by the
-user can be deleted normally. The monitoring list is not stored in the registry.
+Disable automatic startup from General and exit the application. Delete the selected
+directory for portable or source installations. For a standalone installation,
+delete both the downloaded launcher and `%LOCALAPPDATA%\ProcessWatchdog\Standalone`.
+Desktop and Start menu shortcuts can be deleted normally. The monitoring list is
+not stored in the registry.

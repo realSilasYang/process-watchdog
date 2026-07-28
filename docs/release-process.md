@@ -17,16 +17,18 @@
    会使用锁定版本的 Gitleaks 扫描完整历史，并拒绝曾被提交的个人运行配置、临时
    探针、凭据及当前发布文本中的本机路径。
 3. 运行
-   `tests/run-gui-tests.ps1 -SoakSeconds 300`；发布前的完整 UI 场景压力测试
+   `tests/verify-windows-integration.ps1 -SoakSeconds 300`；发布前的完整核心、字体和 UI 场景压力测试
    不得缩短。
 4. 发布负责人重新确认 PingFang、SF Pro Text 与 Apple SD Gothic Neo 的商业授权
    仍覆盖 `assets/fonts/metadata.json` 所列精确文件、Windows、公开仓库和 Release
    分发；未确认时不得触发正式发布。
-5. 运行 `tests/reproducible-build.ps1`，保存脚本输出的最终 SHA-256；CI、演练和正式
-   发布会分别以 PowerShell 7 与 Windows PowerShell 5.1 构建并比较。两次 EXE、
+5. 运行 `tests/reproducible-build.ps1`，保存脚本输出的最终 SHA-256；主分支非文档 CI、
+   发行工程 Pull Request、演练和正式发布会分别以 PowerShell 7 与 Windows PowerShell 5.1 构建并比较。两次 EXE、
    EXE ZIP、源码 ZIP 或独立 SBOM 哈希不同，或 `SHA256SUMS.txt` 不匹配时不得发布。
-6. 普通 CI 使用仓库内经哈希固定的 `tools/ci-toolchain.resolved.json` 和缓存，避免
-   上游变化影响无关提交。发布演练与正式发布则重新查询 AutoHotkey 最新稳定版和
+6. 普通 CI 使用仓库内经哈希固定的 `tools/ci-toolchain.resolved.json` 和缓存，先按
+   路径分类：纯文档只运行不需要 LFS 的快速门禁；运行时变更增加真实 Windows／GUI；
+   主分支非文档变更和发行工程 Pull Request 再增加可复现打包，避免上游变化和大型
+   资源处理拖慢无关提交。发布演练与正式发布则重新查询 AutoHotkey 最新稳定版和
    Ahk2Exe 最新发布版，并冻结本次 `toolchain.resolved.json`。检查发行目录包含
    AutoHotkey 许可证、对应提交的完整源码归档和这份解析快照，且 SBOM 与实际归档
    哈希一致。

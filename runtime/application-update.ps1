@@ -37,6 +37,7 @@ Set-StrictMode -Version Latest
 [System.Net.ServicePointManager]::SecurityProtocol =
     [System.Net.ServicePointManager]::SecurityProtocol -bor
     [System.Net.SecurityProtocolType]::Tls12
+Add-Type -AssemblyName System.Net.Http
 
 if (-not $LocalizationPath) {
     $LocalizationPath = Join-Path $PSScriptRoot 'application-update.strings.json'
@@ -133,6 +134,77 @@ function Write-CheckResult {
     Move-Item -LiteralPath $temporaryPath -Destination $fullResultPath -Force
 }
 
+function Test-RetryableNetworkException {
+    param([System.Exception]$Exception)
+
+    if ($null -eq $Exception) {
+        return $false
+    }
+    if ($Exception.Data.Contains('Retryable')) {
+        return [bool]$Exception.Data['Retryable']
+    }
+    if ($Exception -is [System.Net.WebException]) {
+        if ($Exception.Status -eq
+            [System.Net.WebExceptionStatus]::ProtocolError -and
+            $null -ne $Exception.Response) {
+            $statusCode = [int]$Exception.Response.StatusCode
+            return $statusCode -in @(408, 425, 429, 500, 502, 503, 504)
+        }
+        return $Exception.Status -in @(
+            [System.Net.WebExceptionStatus]::ConnectFailure,
+            [System.Net.WebExceptionStatus]::ConnectionClosed,
+            [System.Net.WebExceptionStatus]::KeepAliveFailure,
+            [System.Net.WebExceptionStatus]::NameResolutionFailure,
+            [System.Net.WebExceptionStatus]::PipelineFailure,
+            [System.Net.WebExceptionStatus]::ProxyNameResolutionFailure,
+            [System.Net.WebExceptionStatus]::ReceiveFailure,
+            [System.Net.WebExceptionStatus]::RequestCanceled,
+            [System.Net.WebExceptionStatus]::SendFailure,
+            [System.Net.WebExceptionStatus]::Timeout)
+    }
+    if ($Exception -is [System.Net.Http.HttpRequestException] -or
+        $Exception -is [System.IO.IOException] -or
+        $Exception -is [System.Threading.Tasks.TaskCanceledException] -or
+        $Exception -is [System.TimeoutException]) {
+        return $true
+    }
+    return Test-RetryableNetworkException $Exception.InnerException
+}
+
+function Get-NetworkRetryDelayMilliseconds {
+    param([int]$FailedAttempt)
+
+    $exponent = [Math]::Max(0, [Math]::Min(4, $FailedAttempt - 1))
+    return [int][Math]::Min(8000, 500 * [Math]::Pow(2, $exponent))
+}
+
+function Invoke-WithRetry {
+    param(
+        [Parameter(Mandatory = $true)]
+        [scriptblock]$Operation,
+        [string]$OperationName = 'network operation',
+        [ValidateRange(1, 10)]
+        [int]$MaximumAttempts = 4,
+        [scriptblock]$DelayAction = {
+            param([int]$Milliseconds)
+            Start-Sleep -Milliseconds $Milliseconds
+        }
+    )
+
+    for ($attempt = 1; $attempt -le $MaximumAttempts; $attempt++) {
+        try {
+            return & $Operation
+        } catch {
+            if ($attempt -ge $MaximumAttempts -or
+                -not (Test-RetryableNetworkException $_.Exception)) {
+                throw
+            }
+            & $DelayAction (Get-NetworkRetryDelayMilliseconds $attempt)
+        }
+    }
+    throw "Unreachable retry state: $OperationName"
+}
+
 function Invoke-GitHubApi {
     param([string]$Uri)
 
@@ -141,9 +213,154 @@ function Invoke-GitHubApi {
         'User-Agent' = 'process-watchdog-updater'
         'X-GitHub-Api-Version' = '2022-11-28'
     }
-    $response = Invoke-RestMethod -UseBasicParsing -Headers $headers -Uri $Uri `
-        -TimeoutSec 30
-    return $response
+    return Invoke-WithRetry -OperationName 'GitHub API' -MaximumAttempts 4 `
+        -Operation {
+            Invoke-RestMethod -UseBasicParsing -Headers $headers -Uri $Uri `
+                -TimeoutSec 30
+        }
+}
+
+function Invoke-HttpDownloadAttempt {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Uri,
+        [Parameter(Mandatory = $true)]
+        [string]$PartialPath,
+        [ValidateRange(1, 3600)]
+        [int]$TimeoutSeconds = 300
+    )
+
+    Add-Type -AssemblyName System.Net.Http
+    $existingLength = if (Test-Path -LiteralPath $PartialPath -PathType Leaf) {
+        (Get-Item -LiteralPath $PartialPath).Length
+    } else { 0 }
+    $handler = [System.Net.Http.HttpClientHandler]::new()
+    $handler.AllowAutoRedirect = $true
+    $client = [System.Net.Http.HttpClient]::new($handler)
+    $client.Timeout = [TimeSpan]::FromSeconds($TimeoutSeconds)
+    $request = [System.Net.Http.HttpRequestMessage]::new(
+        [System.Net.Http.HttpMethod]::Get, $Uri)
+    [void]$request.Headers.UserAgent.ParseAdd('process-watchdog-updater')
+    if ($existingLength -gt 0) {
+        $request.Headers.Range =
+            [System.Net.Http.Headers.RangeHeaderValue]::new(
+                [long]$existingLength, $null)
+    }
+    $response = $null
+    $networkStream = $null
+    $fileStream = $null
+    try {
+        $responseTask = $client.SendAsync($request,
+            [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead)
+        $response = $responseTask.GetAwaiter().GetResult()
+        $statusCode = [int]$response.StatusCode
+        if ($statusCode -notin @(200, 206)) {
+            $statusError = [System.Net.Http.HttpRequestException]::new(
+                "HTTP $statusCode while downloading $Uri")
+            $rangeCannotResume = $statusCode -eq 416 -and $existingLength -gt 0
+            $statusError.Data['Retryable'] = $rangeCannotResume -or `
+                $statusCode -in @(408, 425, 429, 500, 502, 503, 504)
+            $statusError.Data['ResetPartial'] = $rangeCannotResume
+            throw $statusError
+        }
+        $append = $existingLength -gt 0 -and $statusCode -eq 206
+        $fileMode = if ($append) {
+            [System.IO.FileMode]::Append
+        } else {
+            # 服务端忽略 Range 并返回 200 时必须从头覆盖，不能把完整响应
+            # 追加到旧片段后面形成一个哈希必然错误的文件。
+            [System.IO.FileMode]::Create
+        }
+        $networkStreamTask = $response.Content.ReadAsStreamAsync()
+        $networkStream = $networkStreamTask.GetAwaiter().GetResult()
+        $fileStream = [System.IO.File]::Open($PartialPath, $fileMode,
+            [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+        $networkStream.CopyToAsync($fileStream).GetAwaiter().GetResult()
+        $fileStream.Flush($true)
+    } finally {
+        if ($fileStream) { $fileStream.Dispose() }
+        if ($networkStream) { $networkStream.Dispose() }
+        if ($response) { $response.Dispose() }
+        $request.Dispose()
+        $client.Dispose()
+        $handler.Dispose()
+    }
+}
+
+function Invoke-ResilientDownload {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Uri,
+        [Parameter(Mandatory = $true)]
+        [string]$DestinationPath,
+        [string]$ExpectedSha256 = '',
+        [ValidateRange(1, 10)]
+        [int]$MaximumAttempts = 4,
+        [ValidateRange(1, 3600)]
+        [int]$TimeoutSeconds = 300,
+        [scriptblock]$DelayAction = {
+            param([int]$Milliseconds)
+            Start-Sleep -Milliseconds $Milliseconds
+        }
+    )
+
+    $fullDestinationPath = [System.IO.Path]::GetFullPath($DestinationPath)
+    $partialPath = $fullDestinationPath + '.partial'
+    $destinationParent = Split-Path -Parent $fullDestinationPath
+    New-Item -ItemType Directory -Force -Path $destinationParent | Out-Null
+    if ($ExpectedSha256 -and $ExpectedSha256 -notmatch '^[0-9A-Fa-f]{64}$') {
+        throw (Get-UpdateText '更新包 SHA-256 校验失败：{0}' `
+            'Update package hash mismatch: {0}' @($ExpectedSha256))
+    }
+    $normalizedExpectedHash = $ExpectedSha256.ToUpperInvariant()
+    $hashFailures = 0
+    for ($attempt = 1; $attempt -le $MaximumAttempts; $attempt++) {
+        try {
+            if ($normalizedExpectedHash -and
+                (Test-Path -LiteralPath $partialPath -PathType Leaf) -and
+                (Get-FileHash -Algorithm SHA256 -LiteralPath $partialPath).Hash `
+                    -ceq $normalizedExpectedHash) {
+                # 上一进程可能在完整下载后、正式改名之前退出；直接复用已校验片段。
+            } else {
+                Invoke-HttpDownloadAttempt -Uri $Uri -PartialPath $partialPath `
+                    -TimeoutSeconds $TimeoutSeconds
+            }
+            if ($normalizedExpectedHash) {
+                $actualHash = (Get-FileHash -Algorithm SHA256 `
+                    -LiteralPath $partialPath).Hash
+                if ($actualHash -cne $normalizedExpectedHash) {
+                    $hashFailures++
+                    Remove-Item -LiteralPath $partialPath -Force `
+                        -ErrorAction SilentlyContinue
+                    if ($hashFailures -ge 2 -or
+                        $attempt -ge $MaximumAttempts) {
+                        throw (Get-UpdateText '更新包 SHA-256 校验失败：{0}' `
+                            'Update package hash mismatch: {0}' @($actualHash))
+                    }
+                    & $DelayAction `
+                        (Get-NetworkRetryDelayMilliseconds $attempt)
+                    continue
+                }
+            }
+            if (Test-Path -LiteralPath $fullDestinationPath) {
+                Remove-Item -LiteralPath $fullDestinationPath -Force
+            }
+            Move-Item -LiteralPath $partialPath `
+                -Destination $fullDestinationPath
+            return $fullDestinationPath
+        } catch {
+            if ($_.Exception.Data.Contains('ResetPartial') -and
+                [bool]$_.Exception.Data['ResetPartial']) {
+                Remove-Item -LiteralPath $partialPath -Force `
+                    -ErrorAction SilentlyContinue
+            }
+            if ($attempt -ge $MaximumAttempts -or
+                -not (Test-RetryableNetworkException $_.Exception)) {
+                throw
+            }
+            & $DelayAction (Get-NetworkRetryDelayMilliseconds $attempt)
+        }
+    }
 }
 
 function Get-UniqueReleaseAsset {
@@ -648,8 +865,6 @@ function Install-ArchivePackage {
         }
         $packageName = [System.IO.Path]::GetFileName(([Uri]$packageUrl).LocalPath)
         $packagePath = Join-Path $workRoot $packageName
-        Invoke-WebRequest -UseBasicParsing -Uri $packageUrl `
-            -OutFile $packagePath -TimeoutSec 300
         $expectedHash = if ($PackageKind -eq 'compiled') {
             $BinarySha256
         } else {
@@ -657,16 +872,13 @@ function Install-ArchivePackage {
         }
         if (-not $expectedHash) {
             $checksumsPath = Join-Path $workRoot 'SHA256SUMS.txt'
-            Invoke-WebRequest -UseBasicParsing -Uri $ChecksumsUrl `
-                -OutFile $checksumsPath -TimeoutSec 120
+            Invoke-ResilientDownload -Uri $ChecksumsUrl `
+                -DestinationPath $checksumsPath -TimeoutSeconds 120 | Out-Null
             $expectedHash = Get-ExpectedChecksum $checksumsPath $packageName
         }
-        $actualHash = (Get-FileHash -Algorithm SHA256 `
-            -LiteralPath $packagePath).Hash
-        if ($actualHash -ne $expectedHash) {
-            throw (Get-UpdateText '更新包 SHA-256 校验失败：{0}' `
-                'Update package hash mismatch: {0}' @($actualHash))
-        }
+        Invoke-ResilientDownload -Uri $packageUrl `
+            -DestinationPath $packagePath -ExpectedSha256 $expectedHash `
+            -TimeoutSeconds 300 | Out-Null
         Expand-Archive -LiteralPath $packagePath -DestinationPath $stage
 
         $manifestPath = Join-Path $stage 'update-manifest.json'

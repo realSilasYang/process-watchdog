@@ -71,18 +71,21 @@ interface.
 
 ## EXE and source configuration relationship
 
-The entry file's directory always determines the configuration location; the
-file type does not:
+The real runtime entry determines the configuration location. The downloaded
+standalone EXE is a bootstrapper, not a configuration root:
 
-- `进程守护小助手.exe` and `进程守护小助手.ahk` in the same directory share
+- The standalone EXE installs the complete application under
+  `%LOCALAPPDATA%\ProcessWatchdog\Standalone` and reads both personal-state files
+  there. Files beside the downloaded bootstrapper do not participate.
+- A portable `进程守护小助手.exe` and `进程守护小助手.ahk` in the same directory share
   `watchdog.ini` and `watchdog.maintenance.ini`.
 - In different directories, each form reads and writes its own local files;
   configurations are not synchronized automatically.
 - Both forms use exactly the same format. A machine-wide single-instance lock
   prevents them from running concurrently.
 - Exit the active instance before switching forms. Copy both state files to the
-  new entry directory when settings should follow; no copy is needed when the
-  entries already share one directory.
+  new actual runtime directory when settings should follow. For the standalone
+  EXE that destination is the `LOCALAPPDATA` path above.
 - Same-directory coexistence is recommended only for temporary switching tests.
   EXE and source packages share release directories and one
   `update-manifest.json`, so they are not two independently auto-updatable

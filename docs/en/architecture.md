@@ -115,9 +115,14 @@ official file. The transaction remains intact from the ordered runtime snapshot
 through replacement. Failure preserves the old file and schedules one
 exponential-backoff retry.
 
-Both EXE and source modes use `A_ScriptDir` as the configuration root. Entries in
-one directory share state; separate directories are independent, while the global
-mutex still permits only one running instance. A separate PowerShell process checks
+Portable EXE and source modes use `A_ScriptDir` as the configuration root. Entries
+in one directory share state and separate directories are independent. The standalone
+EXE is an outer bootstrapper: it verifies an embedded portable ZIP, transactionally
+installs it under `%LOCALAPPDATA%\ProcessWatchdog\Standalone` with staged extraction,
+managed-path backup, and rollback, then starts the real EXE there. Its `A_ScriptDir`,
+personal state, and later self-updates therefore remain under that stable root. A
+semantic-version comparison prevents an older bootstrapper from downgrading a newer
+installed payload. The global mutex still permits only one running instance. A separate PowerShell process checks
 for self-updates, and the main thread only reads one atomic result file every
 250 milliseconds. A process handle, rather than a reusable PID, determines worker
 completion and timeout. Results must belong to the running version, and each EXE,

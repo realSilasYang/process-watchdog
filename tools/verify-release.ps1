@@ -43,6 +43,8 @@ $requiredPaths = @(
     'update-manifest.json',
     'runtime\application-update.ps1',
     'runtime\application-update.strings.json',
+    'runtime\standalone-install.ps1',
+    'runtime\standalone-launcher.ahk',
     'licenses\AutoHotkey-LICENSE.txt',
     $autoHotkeySourceRelativePath,
     '.github\CONTRIBUTING.md',
@@ -231,10 +233,94 @@ if ($standaloneExecutable.VersionInfo.FileVersion -ne "$version.0" -or
     $standaloneExecutable.VersionInfo.ProductVersion -ne "$version.0") {
     throw "Standalone executable version metadata does not match VERSION $version."
 }
+$portableZipPath = [System.IO.Path]::ChangeExtension(
+    $standaloneExecutable.FullName, '.zip')
+if (-not (Test-Path -LiteralPath $portableZipPath -PathType Leaf)) {
+    throw 'Standalone executable verification requires the portable ZIP beside it.'
+}
 if ((Get-FileHash -Algorithm SHA256 -LiteralPath $executable.FullName).Hash `
-        -ne (Get-FileHash -Algorithm SHA256 `
+        -eq (Get-FileHash -Algorithm SHA256 `
             -LiteralPath $standaloneExecutable.FullName).Hash) {
-    throw 'Standalone executable does not match the executable inside the release package.'
+    throw 'Standalone executable is still the resource-dependent portable executable.'
+}
+if ($standaloneExecutable.Length -le
+        (Get-Item -LiteralPath $portableZipPath).Length) {
+    throw 'Standalone executable does not appear to contain the complete portable payload.'
+}
+
+# 只把独立 EXE 复制进空目录，并把 LOCALAPPDATA 指向隔离沙箱。成功启动校验
+# 证明它没有暗中依赖发布目录旁的 assets、runtime 或 third_party；第二次启动
+# 同时确认启动器不会覆盖已经存在的个人配置。
+$standaloneSandbox = Join-Path $env:TEMP `
+    ('ProcessWatchdogStandaloneReleaseTest-' +
+        [Guid]::NewGuid().ToString('N'))
+$standaloneEmptyDirectory = Join-Path $standaloneSandbox 'empty'
+$standaloneLocalAppData = Join-Path $standaloneSandbox 'local-app-data'
+New-Item -ItemType Directory -Force `
+    -Path $standaloneEmptyDirectory, $standaloneLocalAppData | Out-Null
+$isolatedStandalone = Join-Path $standaloneEmptyDirectory `
+    $standaloneExecutable.Name
+Copy-Item -LiteralPath $standaloneExecutable.FullName `
+    -Destination $isolatedStandalone
+try {
+    foreach ($validationPass in 1..2) {
+        if ($validationPass -eq 2) {
+            $extractedRoot = Join-Path $standaloneLocalAppData `
+                'ProcessWatchdog\Standalone'
+            $personalConfigPath = Join-Path $extractedRoot 'watchdog.ini'
+            $personalConfigContent = "[Settings]`r`nSentinel=preserve`r`n"
+            [System.IO.File]::WriteAllText($personalConfigPath, $personalConfigContent, [System.Text.Encoding]::Unicode)
+            $personalConfigHash = (Get-FileHash -Algorithm SHA256 `
+                -LiteralPath $personalConfigPath).Hash
+        }
+        & (Join-Path $PSScriptRoot 'invoke-startup-validation.ps1') `
+            -ExecutablePath $isolatedStandalone `
+            -WorkingDirectory $standaloneEmptyDirectory `
+            -LocalAppData $standaloneLocalAppData `
+            -TimeoutSeconds 180 `
+            -FailureLabel 'Standalone empty-directory validation'
+    }
+    $extractedRoot = Join-Path $standaloneLocalAppData `
+        'ProcessWatchdog\Standalone'
+    foreach ($requiredExtractedPath in @('VERSION', 'assets', 'runtime',
+            'third_party', '.standalone-payload.sha256')) {
+        if (-not (Test-Path -LiteralPath `
+                (Join-Path $extractedRoot $requiredExtractedPath))) {
+            throw "Standalone payload did not extract: $requiredExtractedPath"
+        }
+    }
+    if ((Get-FileHash -Algorithm SHA256 `
+            -LiteralPath (Join-Path $extractedRoot 'watchdog.ini')).Hash `
+            -ne $personalConfigHash) {
+        throw 'Standalone relaunch overwrote personal configuration.'
+    }
+
+    # 模拟自动更新已把稳定目录推进到更高版本，但其中一个资源随后损坏。
+    # 当前较旧启动器可以报错，却绝不能用自己的旧载荷覆盖该安装。
+    [System.IO.File]::WriteAllText((Join-Path $extractedRoot 'VERSION'),
+        "999.0.0`r`n", [System.Text.UTF8Encoding]::new($false))
+    Remove-Item -LiteralPath (Join-Path $extractedRoot 'assets') `
+        -Recurse -Force
+    try {
+        & (Join-Path $PSScriptRoot 'invoke-startup-validation.ps1') `
+            -ExecutablePath $isolatedStandalone `
+            -WorkingDirectory $standaloneEmptyDirectory `
+            -LocalAppData $standaloneLocalAppData `
+            -TimeoutSeconds 180 `
+            -FailureLabel 'Standalone downgrade protection validation'
+    } catch {
+        # 较新安装缺少资源时内层启动校验可以失败；这里只验证旧启动器没有降级。
+    }
+    if ((Get-Content -LiteralPath (Join-Path $extractedRoot 'VERSION') `
+            -Raw -Encoding UTF8).Trim() -cne '999.0.0' -or
+        (Test-Path -LiteralPath (Join-Path $extractedRoot 'assets'))) {
+        throw 'Standalone launcher downgraded a newer incomplete installation.'
+    }
+} finally {
+    if (Test-Path -LiteralPath $standaloneSandbox) {
+        Remove-Item -LiteralPath $standaloneSandbox -Recurse -Force `
+            -ErrorAction SilentlyContinue
+    }
 }
 $manifest = Get-Content -LiteralPath `
     (Join-Path $packageRoot 'build-manifest.json') -Raw -Encoding UTF8 |
@@ -475,7 +561,10 @@ foreach ($relativePath in @(
         'src\Update\ApplicationVersionInfo.ahk',
         'runtime\application-update.ps1',
         'runtime\application-update.strings.json',
+        'runtime\standalone-install.ps1',
+        'runtime\standalone-launcher.ahk',
         'tools\build-release.ps1',
+        'tools\invoke-startup-validation.ps1',
         'third_party\resvg\resvg.dll', 'update-manifest.json')) {
     if (-not (Test-Path -LiteralPath (Join-Path $sourceRoot $relativePath))) {
         throw "Source release package is missing: $relativePath"

@@ -36,6 +36,26 @@ class UnavailableIdentityTestInspector {
     }
 }
 
+class ReentrantWatchlistPersistenceTestService {
+    __New(innerService, targetPath) {
+        this.InnerService := innerService
+        this.TargetPath := targetPath
+        this.SaveCount := 0
+    }
+
+    Save(parameters*) {
+        global App
+        this.SaveCount++
+        saveResult := this.InnerService.Save(parameters*)
+        if this.SaveCount == 1 {
+            App.appStates[this.TargetPath].Args := "--二次修改"
+            if !SaveAppsToIni()
+                throw Error("保存重入请求没有被接受")
+        }
+        return saveResult
+    }
+}
+
 RunMainIntegrationTests() {
     global App
     ; 本用例校验中文界面的全角标点契约，不依赖执行测试的 Windows 语言。
@@ -430,6 +450,25 @@ RunMainIntegrationTests() {
         savedText := FileRead(configPath, "UTF-16")
         if !InStr(savedText, "; 每个 AppN 对应一个监控项")
             throw Error("监控项分区注释没有随事务写入")
+
+        ; 第一次提交完成但尚未退出保存函数时模拟用户再次修改。
+        ; 最新修订必须由同一保存者继续提交，不能被 isSaving 静默吞掉。
+        basePersistenceService := App.watchlistPersistenceService
+        reentrantService := ReentrantWatchlistPersistenceTestService(
+            basePersistenceService, A_AhkPath)
+        App.watchlistPersistenceService := reentrantService
+        App.appStates[A_AhkPath].Args := "--首次修改"
+        if !SaveAppsToIni()
+            throw Error("带重入修改的监控项保存失败")
+        App.watchlistPersistenceService := basePersistenceService
+        reentrantParts := StrSplit(App.configRepository
+            .ReadSectionEntries("Apps")[1].Value, "|")
+        if reentrantService.SaveCount != 2
+            || IniFieldCodec.Decode(reentrantParts[5]) != "--二次修改"
+            || App.appsDirty
+            || App.appConfigPersistedRevision != App.appConfigSaveRevision {
+            throw Error("保存期间发生的二次修改没有提交到最新修订")
+        }
 
         validRepository := App.configRepository
         App.SetConfigRepository(WatchdogConfigRepository(

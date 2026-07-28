@@ -963,42 +963,77 @@ ApplyState(stateArr, sourceStateArr := "", rollbackOnFailure := true) {
     return true
 }
 
-SaveAppsToIni() {
-    static isSaving := false
+SaveAppsToIni(markChanged := true) {
     previousCritical := A_IsCritical
     Critical("On")
-    if isSaving {
-        Critical(previousCritical ? previousCritical : "Off")
-        return false
-    }
-    isSaving := true
-    Critical(previousCritical ? previousCritical : "Off")
     try {
-        saveResult := App.watchlistPersistenceService.Save(App.appOrder,
-            App.appStates, App.configRecoveryEntries)
-        App.appOrder := saveResult.OrderedPaths
-        App.appsDirty := false
-        App.configSaveRetryDelayMs := 5000
-        try SetTimer(App.configSaveRetryTimer, 0)
-        return true
-    } catch as saveErr {
-        App.appsDirty := true
-        LogMsg(Tr("保存监控配置失败：{1}",
-            TrDiagnostic(saveErr.Message)))
-        nowTicks := GetTickCount64()
-        if (nowTicks - App.lastSaveWarningTicks > 10000) {
-            try TrayTip(Tr("监控配置尚未保存，请查看运行日志。"),
-                Tr("进程守护小助手"), 3)
-            App.lastSaveWarningTicks := nowTicks
+        if markChanged {
+            App.appConfigSaveRevision++
+            App.appsDirty := true
+        } else if !App.appsDirty {
+            return true
         }
-        retryDelayMs := App.configSaveRetryDelayMs
-        App.configSaveRetryDelayMs := Min(retryDelayMs * 2, 60000)
-        try SetTimer(App.configSaveRetryTimer, -retryDelayMs)
-        return false
+        ; 保存期间再次发生修改时只登记新修订，由当前保存者在本轮提交后
+        ; 继续追赶，避免重入调用被静默丢弃或并发写同一个 INI。
+        if App.appConfigSaveInProgress
+            return true
+        App.appConfigSaveInProgress := true
+    } finally {
+        Critical(previousCritical ? previousCritical : "Off")
+    }
+
+    try {
+        loop {
+            revisionCritical := A_IsCritical
+            Critical("On")
+            try saveRevision := App.appConfigSaveRevision
+            finally Critical(revisionCritical ? revisionCritical : "Off")
+
+            try {
+                saveResult := App.watchlistPersistenceService.Save(
+                    App.appOrder, App.appStates,
+                    App.configRecoveryEntries)
+            } catch as saveErr {
+                failureCritical := A_IsCritical
+                Critical("On")
+                try App.appsDirty := true
+                finally Critical(failureCritical ? failureCritical : "Off")
+                LogMsg(Tr("保存监控配置失败：{1}",
+                    TrDiagnostic(saveErr.Message)))
+                nowTicks := GetTickCount64()
+                if (nowTicks - App.lastSaveWarningTicks > 10000) {
+                    try TrayTip(Tr("监控配置尚未保存，请查看运行日志。"),
+                        Tr("进程守护小助手"), 3)
+                    App.lastSaveWarningTicks := nowTicks
+                }
+                retryDelayMs := App.configSaveRetryDelayMs
+                App.configSaveRetryDelayMs := Min(retryDelayMs * 2, 60000)
+                try SetTimer(App.configSaveRetryTimer, -retryDelayMs)
+                return false
+            }
+
+            successCritical := A_IsCritical
+            Critical("On")
+            try {
+                App.appConfigPersistedRevision := Max(
+                    App.appConfigPersistedRevision, saveRevision)
+                hasNewerRevision := App.appConfigSaveRevision > saveRevision
+                App.appsDirty := hasNewerRevision
+                if !hasNewerRevision {
+                    App.appOrder := saveResult.OrderedPaths
+                    App.configSaveRetryDelayMs := 5000
+                    try SetTimer(App.configSaveRetryTimer, 0)
+                }
+            } finally {
+                Critical(successCritical ? successCritical : "Off")
+            }
+            if !hasNewerRevision
+                return true
+        }
     } finally {
         finishCritical := A_IsCritical
         Critical("On")
-        try isSaving := false
+        try App.appConfigSaveInProgress := false
         finally Critical(finishCritical ? finishCritical : "Off")
     }
 }

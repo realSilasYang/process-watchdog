@@ -86,7 +86,7 @@ Process Watchdog Assistant は今後もオープンソースであり続けま�
 ## 1. インストールと初回起動
 
 1. [Releases](https://github.com/realSilasYang/process-watchdog/releases) から、単体 EXE、完全なポータブル ZIP、完全なソース ZIP のいずれかを選びます。
-2. 単体 EXE は AutoHotkey 不要でそのまま実行できます。ポータブル ZIP は継続利用向け、ソース ZIP は AutoHotkey v2 x64 が必要です。
+2. 単体 EXE は AutoHotkey 不要で、初回起動時に検証済みの内容を `%LOCALAPPDATA%\ProcessWatchdog\Standalone` へ配置します。ポータブル ZIP は完全に展開した任意のフォルダーで動作し、ソース ZIP は AutoHotkey v2 x64 が必要です。
 3. `进程守护小助手.exe` を実行します。管理者権限を要求した後、設定に応じてメイン画面を表示するか、通知領域に常駐します。
 4. ［追加］で対象を選ぶか、対応ファイルをメイン画面へドラッグ＆ドロップします。
 5. ［ログ］を開くと、識別根拠、状態確認、復旧試行、アップデート信号を確認できます。
@@ -171,9 +171,9 @@ BAT と CMD の項目に限り、［バッチ出力ログを表示］が追加�
 
 原因を特定しにくい場合は、ログ画面からローカル診断パッケージを出力できます。アプリ、Windows、AutoHotkey、DPI、リソース ハンドル、監視段階、設定警告、現在のログの要約を含みますが、自動では送信しません。
 
-個人設定はプログラムと同じ場所の `watchdog.ini`、未完了のアップデート セッションは `watchdog.maintenance.ini` に保存されます。どちらも Git の対象外で、配布物への同梱や更新時の上書きはありません。`config/watchdog.example.ini` は現在の既定値とフィールドを説明するだけです。
+個人設定は実際の実行フォルダーの `watchdog.ini`、未完了のアップデート セッションは同じ場所の `watchdog.maintenance.ini` に保存されます。ポータブル版とソース版は各エントリ フォルダー、単体 EXE は常に `%LOCALAPPDATA%\ProcessWatchdog\Standalone` を使います。どちらのファイルも配布物には含まれず、更新で上書きされません。
 
-EXE とソース版は、自分のエントリ ファイルがあるディレクトリを設定先にします。同じディレクトリなら上記 2 ファイルを共有し、別なら独立します。システム全体の単一インスタンス ロックにより両方を同時には動かせません。ショートカットとスケジュール タスクは、最後に作成または切り替えを行った実行形態を指すため、1 つのインストール先では日常利用する入口を 1 つに決めてください。独立して自動更新したい 2 形態は別ディレクトリに置きます。詳しくは[設定、バックアップ、復旧](en/configuration.md)と[インストール、更新、削除](en/installation.md)を参照してください。
+ポータブル EXE とソース エントリは同じフォルダーにある場合だけ状態を共有します。単体 EXE は、ダウンロードした起動ファイルの隣にある設定を使いません。全体の単一インスタンス ロックにより複数形態の同時実行はできず、ショートカットとスケジュール タスクは最後に統合した実際の形態を指します。詳しくは[設定、バックアップ、復旧](en/configuration.md)と[インストール、更新、削除](en/installation.md)を参照してください。
 
 ログと診断には対象パス、起動引数、環境変数が含まれることがあります。公開前に内容を確認し、必要な情報を伏せてください。通常の報告には[構造化 Issue フォーム](https://github.com/realSilasYang/process-watchdog/issues/new/choose)を使い、未修正のセキュリティ問題は非公開の脆弱性報告を利用してください。[ローカル診断](en/diagnostics.md)、[トラブルシューティング](en/troubleshooting.md)、[サポート](../.github/SUPPORT.en.md)も参照してください。
 
@@ -215,12 +215,12 @@ process-watchdog/
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-gui-tests.ps1 `
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify-windows-integration.ps1 `
   -SoakSeconds 10
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\reproducible-build.ps1
 ```
 
-`verify.ps1` は依存関係ハッシュ、AHK 構文解析、静的な設計制約、コア試験、リポジトリ境界、Git 全履歴の漏えい、ワークフロー構文、起動動作を確認します。`run-gui-tests.ps1` は実際の Windows コントロールを作り、13 言語とフォントのプロセス内切り替え、3 階層のウィンドウ、GDI／USER ハンドル解放を検証します。`reproducible-build.ps1` は EXE、ソース、SBOM を 2 回連続で構築し、チェックサムを比較します。
+`verify.ps1` は依存関係ハッシュ、AHK 構文解析、静的な設計制約、コア試験、リポジトリ境界、Git 全履歴の漏えい、ワークフロー構文、起動動作を確認します。`verify-windows-integration.ps1` は完全なフォントを検証し、実際の Windows コントロールで 13 言語、3 階層のウィンドウ、GDI／USER ハンドル解放を確認します。`reproducible-build.ps1` は 3 形態と SBOM を 2 回構築してチェックサムを比較します。
 
 AutoHotkey と Ahk2Exe はリポジトリに事前固定しません。手動の正式リリースごとに AutoHotkey の最新安定版と Ahk2Exe の最新公開版を調べ、同じ解決済みスナップショットで試験、2 回のビルド、SBOM、梱包を行います。actionlint と Gitleaks など検証専用ツールは固定版です。実際のバージョン、入手元、コミット、SHA-256 はリリースに保存します。[第三者ソフトウェアの表示](project/THIRD_PARTY_NOTICES.en.md)も参照してください。
 

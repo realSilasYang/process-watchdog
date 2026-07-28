@@ -59,12 +59,20 @@ $ci = Get-WorkflowText 'ci.yml'
 Assert-WorkflowContains 'ci.yml' $ci @(
     'tools\ci-toolchain.resolved.json'
     'actions/cache@'
-    '.\tools\invoke-release-validation.ps1'
+    '.\tools\get-ci-impact.ps1'
+    '.\tests\verify-fast.ps1'
+    '.\tests\verify-windows-integration.ps1'
+    '.\tests\reproducible-build.ps1'
     '-SecondPowerShellPath powershell.exe'
     'path: dist/**'
     'include-hidden-files: true'
     'fetch-depth: 0'
+    'lfs: false'
+    'lfs: true'
 )
+if ($ci.Contains('.\tools\invoke-release-validation.ps1')) {
+    throw 'CI 分层后不得在每个提交上重复执行完整发布门禁。'
+}
 if ($ci.Contains('"codex/**"') -or $ci.Contains("'codex/**'")) {
     throw 'CI 不应在拉取请求之外重复监听 codex 分支 push。'
 }

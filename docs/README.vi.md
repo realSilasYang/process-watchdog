@@ -86,7 +86,7 @@ Trợ lý giám sát tiến trình sẽ luôn là phần mềm nguồn mở. Vi�
 ## 1. Cài đặt và lần chạy đầu
 
 1. Trong [Releases](https://github.com/realSilasYang/process-watchdog/releases), hãy chọn một trong ba bản: EXE độc lập, ZIP di động đầy đủ hoặc ZIP mã nguồn đầy đủ.
-2. EXE độc lập chạy ngay mà không cần AutoHotkey; ZIP di động phù hợp để dùng lâu dài; ZIP mã nguồn cần AutoHotkey v2 x64.
+2. EXE độc lập không cần AutoHotkey và ở lần chạy đầu sẽ cài phần tải đã xác minh vào `%LOCALAPPDATA%\ProcessWatchdog\Standalone`; ZIP di động chạy trong thư mục được giải nén đầy đủ; ZIP mã nguồn cần AutoHotkey v2 x64.
 3. Chạy `进程守护小助手.exe`. Ứng dụng yêu cầu quyền quản trị, sau đó hiển thị cửa sổ chính hoặc nằm trong khay hệ thống tùy cài đặt.
 4. Chọn Thêm để chọn đích, hoặc kéo tệp được hỗ trợ vào cửa sổ chính.
 5. Mở Nhật ký để xem bằng chứng danh tính, kiểm tra trạng thái, lần thử khôi phục và tín hiệu cập nhật thực tế.
@@ -171,9 +171,9 @@ Nhật ký chạy cho phép chọn và sao chép văn bản, phóng to và đổ
 
 Với lỗi khó xác định, có thể xuất gói chẩn đoán cục bộ từ cửa sổ nhật ký. Gói này có thông tin ứng dụng, Windows, AutoHotkey, DPI, handle tài nguyên, giai đoạn giám sát, cảnh báo cấu hình và tóm tắt nhật ký hiện tại, nhưng không tự tải lên.
 
-Cấu hình cá nhân nằm trong `watchdog.ini` cạnh chương trình; phiên cập nhật chưa hoàn tất nằm trong `watchdog.maintenance.ini`. Cả hai bị Git bỏ qua và không có trong bản phát hành. `config/watchdog.example.ini` chỉ mô tả giá trị mặc định và trường hiện tại.
+Cấu hình cá nhân nằm trong `watchdog.ini` ở thư mục chạy thực tế; phiên cập nhật chưa hoàn tất nằm trong `watchdog.maintenance.ini` cùng nơi. Bản di động và mã nguồn dùng thư mục tệp vào của chúng; EXE độc lập luôn dùng `%LOCALAPPDATA%\ProcessWatchdog\Standalone`. Cả hai tệp bị Git bỏ qua và không có trong bản phát hành.
 
-Bản EXE và mã nguồn dùng thư mục chứa chính tệp vào của mình làm thư mục cấu hình. Nếu nằm cùng thư mục, chúng dùng chung hai tệp trạng thái; nếu nằm khác thư mục, cấu hình độc lập. Khóa một phiên bản trên toàn máy ngăn hai hình thức chạy đồng thời. Lối tắt và tác vụ theo lịch chỉ đến hình thức gần nhất đã tạo hoặc chuyển đổi tích hợp, vì vậy mỗi thư mục cài đặt chỉ nên có một tệp vào dùng hằng ngày. Nếu muốn duy trì hai bản cập nhật độc lập, hãy đặt ở hai thư mục khác nhau. Xem [Cấu hình, sao lưu và khôi phục](en/configuration.md) và [Cài đặt, nâng cấp và gỡ bỏ](en/installation.md).
+EXE di động và tệp vào mã nguồn chỉ dùng chung trạng thái khi ở cùng thư mục; EXE độc lập không dùng cấu hình cạnh tệp khởi động đã tải xuống. Khóa toàn máy ngăn nhiều hình thức chạy cùng lúc; lối tắt và tác vụ theo lịch trỏ tới hình thức chạy thực tế được tích hợp gần nhất. Xem [Cấu hình, sao lưu và khôi phục](en/configuration.md) và [Cài đặt, nâng cấp và gỡ bỏ](en/installation.md).
 
 Nhật ký và gói chẩn đoán có thể chứa đường dẫn, đối số hoặc biến môi trường. Hãy kiểm tra và che thông tin nhạy cảm trước khi đăng công khai. Dùng [biểu mẫu Issue có cấu trúc](https://github.com/realSilasYang/process-watchdog/issues/new/choose) cho báo cáo thông thường và kênh báo cáo riêng tư cho lỗ hổng chưa sửa. Xem [Chẩn đoán cục bộ](en/diagnostics.md), [Khắc phục sự cố](en/troubleshooting.md) và [Hỗ trợ](../.github/SUPPORT.en.md).
 
@@ -215,12 +215,12 @@ Tập lệnh gốc chỉ nạp mô-đun, nối phụ thuộc và khởi động 
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-gui-tests.ps1 `
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify-windows-integration.ps1 `
   -SoakSeconds 10
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\reproducible-build.ps1
 ```
 
-`verify.ps1` kiểm tra hàm băm phụ thuộc, phân tích AHK, ràng buộc kiến trúc, kiểm thử lõi, ranh giới kho mã, rò rỉ trong toàn bộ lịch sử Git, cú pháp quy trình và hành vi khởi động. `run-gui-tests.ps1` tạo control Windows thật, thử chuyển nóng 13 ngôn ngữ/phông, ba tầng cửa sổ và thu hồi handle GDI/USER. `reproducible-build.ps1` xây hai lần gói EXE, mã nguồn và SBOM rồi so sánh tổng kiểm.
+`verify.ps1` kiểm tra hàm băm phụ thuộc, phân tích AHK, ràng buộc kiến trúc, kiểm thử lõi, ranh giới kho mã, rò rỉ trong toàn bộ lịch sử Git, cú pháp quy trình và hành vi khởi động. `verify-windows-integration.ps1` xác minh đầy đủ tệp phông, tạo control Windows thật và thử 13 ngôn ngữ, ba tầng cửa sổ cùng việc thu hồi handle GDI/USER. `reproducible-build.ps1` xây hai lần ba bản phát hành và SBOM rồi so sánh tổng kiểm.
 
 AutoHotkey và Ahk2Exe không được khóa sẵn trong kho mã. Mỗi bản phát hành thủ công sẽ truy vấn bản AutoHotkey ổn định mới nhất và bản Ahk2Exe mới nhất, cố định một ảnh chụp đã giải quyết rồi dùng chính nó cho kiểm thử, hai bản dựng, SBOM và đóng gói. Công cụ kiểm tra như actionlint và Gitleaks vẫn được khóa phiên bản. Bản phát hành lưu phiên bản, nguồn, commit và SHA-256 thực tế. Xem [Thông báo phần mềm bên thứ ba](project/THIRD_PARTY_NOTICES.en.md).
 

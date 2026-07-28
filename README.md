@@ -85,20 +85,27 @@
 
 ## 1. 安装与首次运行
 
-1. 从 [Releases](https://github.com/realSilasYang/process-watchdog/releases) 选择以下任一版本：独立 EXE、完整便携 ZIP，或完整源码 ZIP。
-2. 独立 EXE 无需安装 AutoHotkey，下载后即可运行；便携 ZIP 适合长期解压使用；源码 ZIP 需要本机 AutoHotkey v2 x64。
+1. 从 [Releases](https://github.com/realSilasYang/process-watchdog/releases) 选择独立 EXE、完整便携 ZIP 或完整源码 ZIP。
+2. 三种下载的运行和存储方式不同：
+
+| 下载 | 适用场景 | 实际运行与配置位置 |
+| --- | --- | --- |
+| 独立 EXE | 单文件下载、无需安装 AutoHotkey | 首次运行校验内嵌载荷并安装到 `%LOCALAPPDATA%\ProcessWatchdog\Standalone`；程序、配置和后续自动更新都在该稳定目录中，移动或删除下载的引导 EXE 不会迁移配置 |
+| 完整便携 ZIP | 可见、可备份、可手动部署的长期安装 | 完整解压后运行；程序资源与 `watchdog.ini` 保存在解压目录，不可只取出其中的 EXE |
+| 完整源码 ZIP | 审阅、开发或源码运行 | 完整解压后用本机 AutoHotkey v2 x64 运行根 AHK；配置保存在源码目录 |
+
 3. 运行 `进程守护小助手.exe`。程序会请求管理员权限，并按设置显示主窗口或静默驻留系统托盘。
 4. 点击“添加”选择目标，或把支持的文件拖入主窗口。
 5. 从“帮助信息 → 运行日志”查看目标识别、状态检查、恢复重试和升级保护实际采用的证据。
 
 也可以从源码运行：安装 AutoHotkey v2 x64 后执行 `进程守护小助手.ahk`。通过 Git
 克隆仓库时还需安装 Git LFS 并执行 `git lfs pull`，以取得随包字体的完整二进制文件；
-Release 提供的源码 ZIP 已包含这些资源，不需要 Git LFS。正式发行包已经内嵌发布时
-通过完整测试的 AutoHotkey 运行时，普通用户无需另行安装。
+Release 提供的源码 ZIP 已包含这些资源，不需要 Git LFS。独立 EXE 与便携 ZIP 中的
+编译版已经内嵌发布时通过完整测试的 AutoHotkey 运行时，普通用户无需另行安装。
 
 ### 版本与运行方式
 
-| 版本 | EXE 版 | 源码版 |
+| 版本 | 编译版（独立 EXE／便携 ZIP） | 源码版 |
 | --- | --- | --- |
 | 小助手版本 | 来自 EXE 文件版本，更新时替换完整发行包 | 来自入口目录的 `VERSION`，通过 Git 快速前进或源码包更新 |
 | AutoHotkey 版本 | 已内嵌；随下一版小助手发行包一起更新 | 使用本机解释器；小助手更新不会替用户升级 AutoHotkey |
@@ -193,9 +200,9 @@ PowerShell、快捷方式以及启动前已经运行的批处理不会因此自�
 
 难以定位的问题可以在日志窗口导出本地诊断包。诊断包包含应用、Windows、AutoHotkey、DPI、资源句柄、守护阶段、配置警告和当前日志摘要，但不会自动上传。
 
-个人配置保存在程序目录的 `watchdog.ini`，未完成的软件升级会话保存在 `watchdog.maintenance.ini`。这两个文件均被 Git 忽略，发行包不会携带或覆盖它们；仓库中的 `config/watchdog.example.ini` 只用于说明当前默认值和字段。
+个人配置保存在实际运行目录的 `watchdog.ini`，未完成的软件升级会话保存在同目录的 `watchdog.maintenance.ini`。便携版和源码版以各自入口目录为实际运行目录；独立 EXE 则固定使用 `%LOCALAPPDATA%\ProcessWatchdog\Standalone`。这两个个人文件均被 Git 忽略，发行包不会携带或覆盖；仓库中的 `config/watchdog.example.ini` 只用于说明当前默认值和字段。
 
-EXE 与源码都以“自身入口文件所在目录”为配置目录：放在同一目录时共用上述两份文件，放在不同目录时各自独立。全局单实例锁会阻止两种形态同时运行。快捷方式和计划任务始终指向最后执行创建／切换操作的运行形态，因此一个安装目录只应选定一个日常入口。同目录共存适合临时切换验证，不适合把两套发行形态分别自动更新，因为二者共用发行资源和一份更新清单；需要长期保留两套可独立更新的安装时应放在不同目录。详细规则见[配置、备份与恢复](docs/configuration.md)和[安装、升级与卸载](docs/installation.md)。
+便携 EXE 与源码入口放在同一目录时共用个人状态，放在不同目录时彼此独立；独立 EXE 不与下载位置旁的文件共享配置。全局单实例锁会阻止不同形态同时运行。快捷方式和计划任务始终指向最后执行创建／切换操作的实际运行形态，因此每套安装只应选定一个日常入口。详细规则见[配置、备份与恢复](docs/configuration.md)和[安装、升级与卸载](docs/installation.md)。
 
 日志和诊断包可能包含目标路径、启动参数或环境变量。公开提交前应自行检查和脱敏。提交问题时请使用[结构化 Issue 模板](https://github.com/realSilasYang/process-watchdog/issues/new/choose)；尚未修复的安全问题必须使用私密漏洞报告入口。详细说明见[本地诊断包](docs/diagnostics.md)、[故障排查](docs/troubleshooting.md)和[获取帮助](.github/SUPPORT.md)。
 
@@ -258,15 +265,19 @@ process-watchdog/
 在 Windows PowerShell 中运行：
 
 ```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify-fast.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-gui-tests.ps1 `
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\verify-windows-integration.ps1 `
   -SoakSeconds 10
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\reproducible-build.ps1
 ```
 
-- `verify.ps1`：检查依赖哈希、AHK 解析、静态架构约束、核心测试、仓库边界、完整 Git 历史泄漏、工作流语法和启动行为。
-- `run-gui-tests.ps1`：创建真实 Windows 控件，覆盖按钮、输入框、日志、图标列表、三级窗口，以及 13 种语言和字体的进程内热切换，并检查长期对象身份与 GDI／USER 句柄回收。
-- `reproducible-build.ps1`：连续构建两次 EXE 包、源码包和 SBOM，并比较校验清单哈希。
+- `verify-fast.ps1`：不拉取 LFS 大字体、不打开 GUI，检查依赖、静态边界、更新与安装事务、仓库、泄漏和工作流，供每个提交快速反馈。
+- `verify.ps1`：在快速门禁之上运行 39 个 AHK 核心和集成测试。
+- `verify-windows-integration.ps1`：校验完整字体哈希，创建真实 Windows 控件，覆盖 13 种语言、三级窗口和 GDI／USER 句柄回收。
+- `reproducible-build.ps1`：连续构建两次独立 EXE、便携 ZIP、源码 ZIP 和 SBOM，比较逐项 SHA-256，并对单文件版执行空目录双启动。
+
+GitHub Actions 先按变更路径分类：纯文档只运行快速门禁；运行时代码增加 Windows／GUI 集成；主分支非文档变更和发行工程相关 Pull Request 才执行完整可复现打包。正式发布仍会重新执行全部三层，不以较快的普通 CI 代替发布验收。
 
 AutoHotkey 与 Ahk2Exe 不在仓库中预先锁定版本：每次人工正式发布都会重新查询 AutoHotkey 最新稳定版和 Ahk2Exe 最新发布版，先冻结本次解析快照，再用同一快照完成测试、双次构建、SBOM 和打包。actionlint 与 Gitleaks 等验证工具仍固定版本。最终实际版本、来源、提交和 SHA-256 随发行包保存。第三方详情见[第三方软件声明](docs/project/THIRD_PARTY_NOTICES.md)。
 

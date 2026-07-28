@@ -43,7 +43,7 @@ try {
     try {
         foreach ($relativePath in $relativePaths) {
             $entry = $archive.CreateEntry($relativePath,
-                [System.IO.Compression.CompressionLevel]::NoCompression)
+                [System.IO.Compression.CompressionLevel]::Optimal)
             $entry.LastWriteTime = [DateTimeOffset]::new(1980, 1, 1,
                 0, 0, 0, [TimeSpan]::Zero)
             $inputStream = [System.IO.File]::OpenRead(

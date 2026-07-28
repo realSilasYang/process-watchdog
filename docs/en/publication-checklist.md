@@ -9,7 +9,8 @@ actions on GitHub after repository creation and cannot be replaced by local test
 ## Before creating the repository
 
 - `tests/verify.ps1` passes in a complete, non-shallow clone.
-- `tests/run-gui-tests.ps1 -SoakSeconds 300` passes with zero GDI and USER growth.
+- `tests/verify-windows-integration.ps1 -SoakSeconds 300` passes with all core
+  tests, complete font hashes, and zero unexpected GDI or USER growth.
 - The release EXE hash matches the EXE used for the long GUI soak; otherwise rerun the soak.
 - `tests/reproducible-build.ps1` produces identical standalone EXE, EXE ZIP,
   source ZIP, and SBOM hashes twice.
@@ -38,7 +39,8 @@ actions on GitHub after repository creation and cannot be replaced by local test
 4. Under Settings → Code security, enable Dependabot alerts, Dependabot security
    updates, Secret scanning, Push protection, and Private Vulnerability Reporting.
 5. Protect `main`: disallow force-push and deletion; require pull requests,
-   resolved conversations, an up-to-date branch, and the CI `verify` check. With
+   resolved conversations, an up-to-date branch, and the CI `fast` check. Runtime
+   and release-engineering layers are added automatically from changed paths. With
    one maintainer, set approvals to zero; enable CODEOWNERS approval after a
    second maintainer exists.
 6. Keep default minimal Actions permissions. The release workflow should request
