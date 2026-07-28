@@ -23,6 +23,7 @@
 #Include ..\..\src\UI\WindowHierarchy.ahk
 #Include ..\..\app\UI\InteractionPresenter.ahk
 
+UiThemeService.Configure("dark")
 global App := {uiInteractions: UiInteractionRegistry()}
 global soakClickCount := 0
 
@@ -130,26 +131,32 @@ while GetTickCount64() < deadline {
     list := ""
     try {
         owner := Gui("+Resize", "Resource soak owner")
-        owner.BackColor := "1E1E1E"
-        owner.SetFont("s10 cFFFFFF", "Microsoft YaHei UI")
+        owner.BackColor := UiThemeService.Color("Window")
+        owner.SetFont("s10 c" UiThemeService.Color("Text"),
+            "Microsoft YaHei UI")
         inputBackground := owner.Add("Text",
-            "x10 y10 w190 h30 Background252526")
+            "x10 y10 w190 h30 Background" UiThemeService.Color("Input"))
         input := owner.Add("Edit",
-            "x14 y12 w182 h26 Background252526 cFFFFFF -E0x200",
+            "x14 y12 w182 h26 Background" UiThemeService.Color("Input")
+                " c" UiThemeService.Color("Text") " -E0x200",
             "iteration " iterations)
         RegisterTextInputControl(input)
         RegisterTextInputHitTarget(inputBackground, input)
 
         actionButton := owner.Add("Text",
-            "x210 y10 w88 h30 Center 0x200 Background3F6B5B cFFFFFF",
+            "x210 y10 w88 h30 Center 0x200 Background"
+                UiThemeService.Color("Add") " c"
+                UiThemeService.Color("ButtonText"),
             "Action")
-        if !RegisterSoakButton(actionButton, "3F6B5B",
+        if !RegisterSoakButton(actionButton, UiThemeService.Color("Add"),
             ButtonFeedbackMode.Persistent)
             FailSoak("button registration failed")
-        SetButtonTextColor(actionButton, "FFFFFF")
+        SetButtonTextColor(actionButton, UiThemeService.Color("ButtonText"))
 
         list := owner.Add("ListView",
-            "x10 y48 w288 h116 -Hdr Background202020 cFFFFFF",
+            "x10 y48 w288 h116 -Hdr Background"
+                UiThemeService.Color("Tooltip") " c"
+                UiThemeService.Color("Text"),
             ["Name", "State"])
         imageList := IL_Create(4, 4, true)
         if !imageList
@@ -164,7 +171,9 @@ while GetTickCount64() < deadline {
                 Mod(A_Index, 2) ? "Running" : "Paused")
 
         logEdit := owner.Add("Edit",
-            "x10 y172 w288 h86 ReadOnly Multi VScroll HScroll -Wrap Background252526 cFFFFFF -E0x200")
+            "x10 y172 w288 h86 ReadOnly Multi VScroll HScroll -Wrap Background"
+                UiThemeService.Color("Surface") " c"
+                UiThemeService.Color("Text") " -E0x200")
         RegisterTextInputControl(logEdit, true, true)
         logText := ""
         Loop 60
@@ -180,18 +189,22 @@ while GetTickCount64() < deadline {
             FailSoak("rounded button rendering failed")
 
         child := Gui("+Owner" owner.Hwnd, "Resource soak child")
-        child.BackColor := "1E1E1E"
+        child.BackColor := UiThemeService.Color("Window")
         childButton := child.Add("Text",
-            "x10 y10 w88 h30 Center 0x200 Background3A4656 cFFFFFF",
+            "x10 y10 w88 h30 Center 0x200 Background"
+                UiThemeService.Color("Toolbar") " c"
+                UiThemeService.Color("ToolbarText"),
             "Child")
-        if !RegisterSoakButton(childButton, "3A4656",
+        if !RegisterSoakButton(childButton,
+            UiThemeService.Color("Toolbar"),
             ButtonFeedbackMode.Dismissive)
             FailSoak("child button registration failed")
         child.Show("Hide w110 h52")
 
         grandchild := Gui("+Owner" child.Hwnd, "Resource soak grandchild")
-        grandchild.BackColor := "1E1E1E"
-        grandchild.Add("Text", "x8 y8 w94 h24 cFFFFFF BackgroundTrans",
+        grandchild.BackColor := UiThemeService.Color("Window")
+        grandchild.Add("Text", "x8 y8 w94 h24 c"
+            UiThemeService.Color("Text") " BackgroundTrans",
             "Nested owner")
         grandchild.Show("Hide w112 h42")
 

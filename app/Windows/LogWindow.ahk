@@ -48,7 +48,7 @@ class LogWindow extends ManagedWindow {
         DllCall("user32\ShowScrollBar", "Ptr", this.textEdit.Hwnd, "Int", Win32.SB_BOTH, "Int", 0)
         this.horizontalScrollbarVisible := false
         this.verticalScrollbarVisible := false
-        this.gui.Show("w620 h320")
+        ShowApplicationWindow(this.gui, "w620 h320")
         ; 先让窗口和日志正文进入屏幕，下一次消息循环再逐行测量滚动范围。
         SetTimer(this.initialLayoutTimer, -1)
         SetTimer(this.refreshTimer, 500)

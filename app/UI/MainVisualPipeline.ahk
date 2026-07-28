@@ -22,6 +22,32 @@ ApplyNativeWindowTheme(hWnd) {
     return true
 }
 
+; 所有生产子窗口统一经过此入口映射到屏幕。自动化测试可以保留真实窗口、
+; 控件和布局生命周期，同时禁止批量窗口闪现在用户桌面；正常运行不改变 Show
+; 的任何选项或时序。
+class ApplicationWindowPresenter {
+    static AutomationHidden := false
+
+    static SetAutomationHidden(hidden) {
+        this.AutomationHidden := !!hidden
+    }
+
+    static Show(guiObj, options := "") {
+        if !IsObject(guiObj)
+            return false
+        showOptions := Trim(String(options))
+        if this.AutomationHidden
+            && !RegExMatch(showOptions, "i)(^|\s)Hide(?:\s|$)")
+            showOptions := Trim("Hide " showOptions)
+        guiObj.Show(showOptions)
+        return true
+    }
+}
+
+ShowApplicationWindow(guiObj, options := "") {
+    return ApplicationWindowPresenter.Show(guiObj, options)
+}
+
 InitializeApplicationWindow(guiObj, fontOptions := "s10",
     fontName := "") {
     ; 应用窗口的标题栏、图标、客户区和正文默认字体必须作为一个整体初始化。

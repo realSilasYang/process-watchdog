@@ -127,7 +127,8 @@ class DarkTooltipWindow extends ManagedWindow {
         DllCall("user32\GetCursorPos", "Ptr", point)
         mouseX := NumGet(point, 0, "Int")
         mouseY := NumGet(point, 4, "Int")
-        this.gui.Show("x" (mouseX + 10) " y" (mouseY + 20) " NoActivate AutoSize")
+        ShowApplicationWindow(this.gui, "x" (mouseX + 10) " y"
+            (mouseY + 20) " NoActivate AutoSize")
     }
 
     ResizeTextControl(text) {

@@ -2585,8 +2585,8 @@ $settingsShowSource = [regex]::Match($settingsWindowSource,
     '(?ms)^    Show\(\*\)\s*\{.*?(?=^    GetTabButtonWidths\()').Value
 if (-not $settingsShowSource -or
     $settingsShowSource -notmatch 'SetButtonLucideIcon\(this\.taskButton, "loader-circle\.svg"[\s\S]{0,120}SetRegisteredButtonEnabled\(this\.taskButton, false\)' -or
-    $settingsShowSource -notmatch 'this\.gui\.Show\([^\r\n]*\)[\s\S]{0,180}SetTimer\(this\.taskStatusTimer, -1\)' -or
-    $settingsShowSource -match 'UpdateTaskButtonStatus\(\)[\s\S]{0,180}this\.gui\.Show\(' -or
+    $settingsShowSource -notmatch 'ShowApplicationWindow\(this\.gui,[\s\S]{0,100}\)[\s\S]{0,180}SetTimer\(this\.taskStatusTimer, -1\)' -or
+    $settingsShowSource -match 'UpdateTaskButtonStatus\(\)[\s\S]{0,180}ShowApplicationWindow\(' -or
     $settingsWindowSource -notmatch 'RefreshTaskStatusAfterShow\(\*\)[\s\S]{0,160}this\.UpdateTaskButtonStatus\(\)' -or
     $settingsWindowSource -notmatch 'UpdateTaskButtonStatus\(\)[\s\S]{0,900}SetRegisteredButtonEnabled\(this\.taskButton, true\)' -or
     $settingsWindowSource -notmatch 'Close\(\*\)[\s\S]{0,120}SetTimer\(this\.taskStatusTimer, 0\)') {
@@ -2797,6 +2797,7 @@ if ($mainVisualPipelineSource -notmatch 'SelectDirectoryWithModernDialog\([\s\S]
 # 应用窗口不得各自复制标题栏、图标、背景和默认字体初始化；UxTheme 私有
 # 序号也只能由主题服务解析，防止窗口创建时覆盖用户的进程级主题偏好。
 if ($mainVisualPipelineSource -notmatch 'InitializeApplicationWindow\(guiObj,[\s\S]{0,650}ApplyNativeWindowTheme\(hwnd\)[\s\S]{0,260}SetWindowIcon\(hwnd,[\s\S]{0,260}guiObj\.BackColor[\s\S]{0,260}guiObj\.SetFont' -or
+    $mainVisualPipelineSource -notmatch 'class ApplicationWindowPresenter[\s\S]{0,900}AutomationHidden[\s\S]{0,700}guiObj\.Show\(showOptions\)[\s\S]{0,300}ShowApplicationWindow\(guiObj' -or
     $source -match '\bSetDarkTitleBar\s*\(' -or
     $appModuleSource -match 'SetWindowIcon\(this\.gui\.Hwnd' -or
     $uiThemeServiceSource -notmatch 'GetUxThemeFunction\(ordinal\)[\s\S]{0,900}GetProcAddress' -or
@@ -2811,6 +2812,27 @@ foreach ($windowFile in Get-ChildItem -LiteralPath `
         $windowSource -notmatch '\bInitializeApplicationWindow\(this\.gui') {
         $failures.Add("Managed application window bypasses shared visual initialization: $($windowFile.Name)")
     }
+    if ($windowFile.Name -ne 'HistoryToastWindow.ahk' -and
+        $windowSource -match 'this\.gui\.Show\(') {
+        $failures.Add("Managed application window bypasses shared visibility policy: $($windowFile.Name)")
+    }
+}
+
+$displayHotSwitchTestSource = Get-Content -LiteralPath (Join-Path $projectRoot `
+    'tests\gui\display-hot-switch-tests.ahk') -Raw -Encoding UTF8
+$localizedWindowTestSource = Get-Content -LiteralPath (Join-Path $projectRoot `
+    'tests\gui\localized-window-smoke-tests.ahk') -Raw -Encoding UTF8
+$logWindowTestSource = Get-Content -LiteralPath (Join-Path $projectRoot `
+    'tests\gui\log-window-smoke-tests.ahk') -Raw -Encoding UTF8
+if ($displayHotSwitchTestSource -match
+        '(?:BackColor\s*:=\s*"[0-9A-Fa-f]{6}"|Background[0-9A-Fa-f]{6}|\bc(?:White|FFFFFF)\b)' -or
+    $displayHotSwitchTestSource -notmatch
+        'ApplicationWindowPresenter\.SetAutomationHidden\(true\)' -or
+    $localizedWindowTestSource -notmatch
+        'ApplicationWindowPresenter\.SetAutomationHidden\(true\)' -or
+    $logWindowTestSource -notmatch
+        'ApplicationWindowPresenter\.SetAutomationHidden\(true\)') {
+    $failures.Add('Automated production-window tests must use the active palette and remain hidden from the user desktop')
 }
 if ($interactionPresenterSource -notmatch 'SetRegisteredButtonEnabled\(ctrl, enabled\)[\s\S]{0,800}ClearHoveredButton\(hWnd\)[\s\S]{0,500}ctrl\.Enabled := enabled[\s\S]{0,220}RedrawRoundedButton\(hWnd\)' -or
     $customDisplayDialogSource -notmatch 'SetRegisteredButtonEnabled\(this\.defaultNameButton' -or

@@ -116,7 +116,8 @@ class AddItemDialog extends ManagedWindow {
         RegisterButtonClick(this.browseButton, ObjBindMethod(this, "ShowBrowseMenu"))
         RegisterButtonClick(this.okButton, ObjBindMethod(this, "Confirm"), ButtonFeedbackMode.Dismissive)
         RegisterButtonClick(this.cancelButton, ObjBindMethod(this, "Close"), ButtonFeedbackMode.Dismissive)
-        this.gui.Show("w" windowWidth " h" this.normalWindowHeight)
+        ShowApplicationWindow(this.gui,
+            "w" windowWidth " h" this.normalWindowHeight)
         if positionPointer
             MovePointerToControlCenter(this.searchButton)
         } catch as openErr {
@@ -182,7 +183,8 @@ class AddItemDialog extends ManagedWindow {
         windowHeight := active
             ? this.batchWindowHeight : this.normalWindowHeight
         if windowHeight > 0
-            try this.gui.Show("NoActivate h" windowHeight)
+            try ShowApplicationWindow(this.gui,
+                "NoActivate h" windowHeight)
     }
 
     StartBatchImport(rootPaths, directPaths := "") {

@@ -172,7 +172,7 @@ class MaintenanceSettingsDialog extends ManagedWindow {
             RegisterButtonClick(btnCancel, ObjBindMethod(this, "Close"), ButtonFeedbackMode.Dismissive)
             this.gui.OnEvent("Close", ObjBindMethod(this, "Close"))
             this.gui.OnEvent("Escape", ObjBindMethod(this, "Close"))
-            this.gui.Show("w" windowWidth " h435")
+            ShowApplicationWindow(this.gui, "w" windowWidth " h435")
             ShowSingleLineEditFromStart(targetInput.Edit)
         } catch as openErr {
             this.Close()
