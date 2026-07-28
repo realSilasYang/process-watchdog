@@ -368,12 +368,25 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         }
         initialSettingsControlCount := WinGetControlsHwnd(
             "ahk_id " settingsDialog.gui.Hwnd).Length
-        AssertLocalizedWindow(settingsDialog.EnsureTabBuilt(5)
+        AssertLocalizedWindow(settingsDialog.SwitchTab(5)
+            && settingsDialog.activeTab == 5
             && settingsDialog.tabBuilt[5]
             && settingsDialog.tabControls[5].Length > 0
             && WinGetControlsHwnd("ahk_id " settingsDialog.gui.Hwnd).Length
                 > initialSettingsControlCount,
-            language " 关于页没有在首次请求时延迟构建")
+            language " 关于页没有在首次切换的重绘事务中延迟构建")
+        AssertLocalizedWindow(settingsDialog.aboutLogo.Visible
+            && !settingsDialog.showAtStartupCheck.Visible
+            && !settingsDialog.saveButton.Visible
+            && !settingsDialog.cancelButton.Visible,
+            language " 首次切换关于页后仍显示其他页面或全局保存区")
+        AssertLocalizedWindow(settingsDialog.SwitchTab(1)
+            && settingsDialog.activeTab == 1
+            && settingsDialog.showAtStartupCheck.Visible
+            && !settingsDialog.aboutLogo.Visible
+            && settingsDialog.saveButton.Visible
+            && settingsDialog.cancelButton.Visible,
+            language " 关于页切回通用页后没有一次性恢复最终可见状态")
         WinHide("ahk_id " settingsDialog.gui.Hwnd)
         AssertWindowTitle(settingsDialog.gui, Tr("小助手设置"), language,
             "SettingsWindow")

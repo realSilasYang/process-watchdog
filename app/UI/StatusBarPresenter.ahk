@@ -201,10 +201,9 @@ class SvgStatusBarPresenter {
                 x += layout.IconSize + layout.IconGap
                 textExtent := RoundedButtonRenderer.MeasureText(memoryDc,
                     item.Text)
-                textRect := Buffer(16, 0)
-                NumPut("Int", x, "Int", 0,
-                    "Int", Min(width, x + textExtent.Width),
-                    "Int", height, textRect)
+                textRect := TextVisualAlignment.CreateCenteredTextRect(
+                    memoryDc, item.Text, x, 0,
+                    Min(width, x + textExtent.Width), height)
                 DllCall("user32\DrawTextW", "Ptr", memoryDc, "Str",
                     item.Text, "Int", -1, "Ptr", textRect,
                     "UInt", 0x00008824, "Int")

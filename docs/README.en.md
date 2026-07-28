@@ -32,11 +32,9 @@ The project provides light and dark GUIs, automatic recovery, update protection,
 
 # Interface Overview
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="images/process-watchdog-overview.png">
-  <source media="(prefers-color-scheme: light)" srcset="images/process-watchdog-overview-light.png">
-  <img src="images/process-watchdog-overview-light.png" alt="Process Watchdog Assistant main window in light and dark themes" width="100%">
-</picture>
+<p align="center">
+  <img src="images/process-watchdog-overview.png" alt="Process Watchdog Assistant main window" width="100%">
+</p>
 
 The main window keeps each target's order, application icon, display name, privilege requirement, and current state in one view. The command bar provides add, delete, pause, settings, help, and donation actions; Help lets users choose the guide, runtime log, or feedback page. The footer summarizes running, recovery, update, paused, and failed targets, while the runtime log exposes the evidence behind abnormal states.
 

@@ -18,6 +18,10 @@ actions on GitHub after repository creation and cannot be replaced by local test
 - `VERSION` agrees with both changelogs, and the target version tag does not exist.
 - The changelog consolidates related commits and clearly states migrations,
   defaults, privilege changes, and required user actions.
+- The changelog and Release notes retain their required emoji headings, and
+  `📦 Release Assets` lists all three exact file names, edition roles, included
+  content, AutoHotkey requirements, and intended uses as the final Release-notes
+  section.
 - Release notes identify physical Windows, DPI, multi-monitor, or high-contrast
   combinations that remain untested.
 

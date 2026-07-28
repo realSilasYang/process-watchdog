@@ -107,20 +107,22 @@ CreateMainImageList(statusIconIndices) {
     if !dpi
         dpi := 96
     iconResources.UpdateMainIconMetrics(dpi)
-    try DllCall("comctl32\ImageList_SetIconSize", "Ptr", imageList,
-        "Int", iconResources.MainIconCellPixelSize,
-        "Int", iconResources.MainIconCellPixelSize)
-    try {
-        AddMainStatusIcons(imageList, statusIconIndices)
-        if !AddMainAdminOverlayIcon(imageList)
-            throw Error("无法创建管理员运行盾牌图标")
-    }
-    catch {
+    iconSizeApplied := false
+    try iconSizeApplied := DllCall("comctl32\ImageList_SetIconSize",
+        "Ptr", imageList, "Int", iconResources.MainIconCellPixelSize,
+        "Int", iconResources.MainIconCellPixelSize, "Int") != 0
+    if !iconSizeApplied {
         try IL_Destroy(imageList)
-        statusIconIndices.Clear()
         iconResources.RestoreMainIconMetrics(previousMetrics)
         return 0
     }
+    ; 应用图标是主列表的基础能力；状态 SVG 与管理员角标属于增强层。
+    ; 单个增强资源异常时保留可用 ImageList，不能让所有应用图标一起消失。
+    try AddMainStatusIcons(imageList, statusIconIndices)
+    catch {
+        statusIconIndices.Clear()
+    }
+    try AddMainAdminOverlayIcon(imageList)
     return imageList
 }
 
@@ -502,21 +504,20 @@ CreatePaddedIconFromPremultipliedPixels(pixelBuffer, pixelWidth,
 
         DllCall("ntdll\RtlZeroMemory", "Ptr", colorBits,
             "UPtr", cellSize * cellSize * 4)
-        if offsetX == "" && offsetY == "" {
-            offsetX := Floor((cellSize - pixelWidth) / 2)
-            offsetY := Floor((cellSize - pixelHeight) / 2)
-        } else {
-            try {
-                offsetX := Integer(offsetX)
-                offsetY := Integer(offsetY)
-            } catch {
-                return 0
-            }
-            if offsetX < 0 || offsetY < 0
-                || offsetX + pixelWidth > cellSize
-                || offsetY + pixelHeight > cellSize
-                return 0
+        ; 两个方向独立解析：状态图标只覆盖纵向位置时，横向仍保持自动
+        ; 居中。旧实现会把空横坐标交给 Integer()，导致整个图标创建失败。
+        try {
+            offsetX := offsetX == ""
+                ? Floor((cellSize - pixelWidth) / 2) : Integer(offsetX)
+            offsetY := offsetY == ""
+                ? Floor((cellSize - pixelHeight) / 2) : Integer(offsetY)
+        } catch {
+            return 0
         }
+        if offsetX < 0 || offsetY < 0
+            || offsetX + pixelWidth > cellSize
+            || offsetY + pixelHeight > cellSize
+            return 0
         Loop pixelHeight {
             row := A_Index - 1
             destination := colorBits
@@ -688,11 +689,17 @@ CreatePaddedIconFromWicSource(wicSource, sourceWidth, sourceHeight,
         if removeLightMatte
             RemoveConnectedLightMatte(scaledPixels, scaledWidth,
                 scaledHeight)
-        positionedX := offsetX
-        positionedY := offsetY
-        if !(offsetX == "" && offsetY == "") {
-            positionedX += Floor((iconSize - scaledWidth) / 2)
-            positionedY += Floor((iconSize - scaledHeight) / 2)
+        ; offset 表示 iconSize 布局框在单元格中的左上角。某一方向留空时，
+        ; 该方向独立采用默认居中，不能因另一方向显式偏移而退回到左上角。
+        try {
+            positionedX := (offsetX == ""
+                ? Floor((cellSize - iconSize) / 2) : Integer(offsetX))
+                + Floor((iconSize - scaledWidth) / 2)
+            positionedY := (offsetY == ""
+                ? Floor((cellSize - iconSize) / 2) : Integer(offsetY))
+                + Floor((iconSize - scaledHeight) / 2)
+        } catch {
+            return 0
         }
         return CreatePaddedIconFromPremultipliedPixels(scaledPixels,
             scaledWidth, scaledHeight, cellSize, positionedX, positionedY)
@@ -1342,13 +1349,14 @@ GetStatusIconResourcePath(statusKind) {
     return A_ScriptDir "\assets\ui-icons\lucide\" resourceName
 }
 
-CreateStatusResourceIcon(statusKind, glyphSize, cellSize) {
+CreateStatusResourceIcon(statusKind, glyphSize, cellSize, offsetY := "") {
     resourcePath := GetStatusIconResourcePath(statusKind)
     if resourcePath == "" || !FileExist(resourcePath)
         return 0
     ; 状态图标全部来自随项目分发的 SVG 资源。CreateSvgPaddedIcon 只负责
     ; 使用 resvg/WIC 解码、缩放和居中，不再在运行时计算任何图标几何。
-    return CreateSvgPaddedIcon(resourcePath, glyphSize, cellSize, true)
+    return CreateSvgPaddedIcon(resourcePath, glyphSize, cellSize, true,
+        "", offsetY)
 }
 
 StatusIconVisualScale(statusKind) {
@@ -1357,10 +1365,30 @@ StatusIconVisualScale(statusKind) {
     return 1.00
 }
 
+GetMainStatusIconVerticalOffset(iconResources) {
+    try {
+        textCenterDelta := TextVisualAlignment.MeasureFontInkCenterDelta(
+            LocalizationService.GetUiFontName(), 12, 400,
+            iconResources.MainDpi,
+            Trim(StrReplace(Tr("✅ 运行中"), "✅", "")))
+        return Round(textCenterDelta)
+    } catch {
+        ; 字体度量是视觉增强，不得阻断主图像列表创建。
+        return 0
+    }
+}
+
 AddMainStatusIcons(imageList, statusIconIndices) {
     statusIconIndices.Clear()
     iconResources := App.iconResources
     glyphSize := Max(16, Round(20 * iconResources.MainDpi / 96))
+    centerY := Floor((iconResources.MainIconCellPixelSize - glyphSize) / 2)
+    verticalOffset := GetMainStatusIconVerticalOffset(iconResources)
+    ; ListView 原生文字仍按字体行框布局。把状态 SVG 在透明图标槽内移动到
+    ; 可见字形的中心，可在不接管选择、截断和键盘语义的前提下保持图文同轴。
+    statusIconY := Max(0, Min(
+        iconResources.MainIconCellPixelSize - glyphSize,
+        centerY + verticalOffset))
     iconIndexByResource := Map()
     iconIndexByResource.CaseSense := "Off"
     for statusKind, resourceFile in StatusIconResourceFiles() {
@@ -1371,8 +1399,16 @@ AddMainStatusIcons(imageList, statusIconIndices) {
         }
         visualSize := Min(iconResources.MainIconCellPixelSize - 2,
             Round(glyphSize * StatusIconVisualScale(statusKind)))
+        visualCenterY := Floor(
+            (iconResources.MainIconCellPixelSize - visualSize) / 2)
+        visualOffsetY := Max(0, Min(
+            iconResources.MainIconCellPixelSize - visualSize,
+            visualCenterY + (statusIconY - centerY)))
         statusIcon := CreateStatusResourceIcon(statusKind, visualSize,
-            iconResources.MainIconCellPixelSize)
+            iconResources.MainIconCellPixelSize, visualOffsetY)
+        if !statusIcon
+            statusIcon := CreateStatusResourceIcon(statusKind, visualSize,
+                iconResources.MainIconCellPixelSize)
         try iconIndex := statusIcon
                 ? IL_Add(imageList, "HICON:" statusIcon)
                 : 0
@@ -1382,6 +1418,70 @@ AddMainStatusIcons(imageList, statusIconIndices) {
         }
         statusIconIndices[statusKind] := iconIndex
         iconIndexByResource[resourceFile] := iconIndex
+    }
+}
+
+RefreshMainStatusIconAlignment() {
+    if !Main.HasOwnProp("appIcons") || !Main.appIcons
+        || !Main.HasOwnProp("statusIconIndices")
+        || !IsObject(Main.statusIconIndices)
+        return false
+    imageList := AcquireMainImageListUse(Main.appIcons)
+    if !imageList
+        return false
+    iconResources := App.iconResources
+    glyphSize := Max(16, Round(20 * iconResources.MainDpi / 96))
+    verticalOffset := GetMainStatusIconVerticalOffset(iconResources)
+    replacedIndices := Map()
+    succeeded := true
+    redrawSuspended := false
+    try {
+        if Main.HasOwnProp("lv") && Main.lv {
+            Main.lv.Opt("-Redraw")
+            redrawSuspended := true
+        }
+        for statusKind, resourceFile in StatusIconResourceFiles() {
+            if !Main.statusIconIndices.Has(statusKind)
+                continue
+            iconIndex := Main.statusIconIndices[statusKind]
+            if iconIndex <= 0 || replacedIndices.Has(iconIndex)
+                continue
+            visualSize := Min(iconResources.MainIconCellPixelSize - 2,
+                Round(glyphSize * StatusIconVisualScale(statusKind)))
+            visualCenterY := Floor(
+                (iconResources.MainIconCellPixelSize - visualSize) / 2)
+            visualOffsetY := Max(0, Min(
+                iconResources.MainIconCellPixelSize - visualSize,
+                visualCenterY + verticalOffset))
+            statusIcon := CreateStatusResourceIcon(statusKind, visualSize,
+                iconResources.MainIconCellPixelSize, visualOffsetY)
+            if !statusIcon {
+                succeeded := false
+                continue
+            }
+            try {
+                replacedIndex := DllCall("comctl32\ImageList_ReplaceIcon",
+                    "Ptr", imageList, "Int", iconIndex - 1,
+                    "Ptr", statusIcon, "Int")
+                if replacedIndex != iconIndex - 1
+                    succeeded := false
+                else
+                    replacedIndices[iconIndex] := true
+            } finally DllCall("user32\DestroyIcon", "Ptr", statusIcon)
+        }
+        if Main.HasOwnProp("lv") && Main.lv {
+            attachedImageList := SendMessage(Win32.LVM_GETIMAGELIST,
+                1, 0, Main.lv.Hwnd)
+            if attachedImageList != imageList {
+                Main.lv.SetImageList(imageList, 1)
+                Main.lv.IL := imageList
+            }
+        }
+        return succeeded
+    } finally {
+        if redrawSuspended
+            Main.lv.Opt("+Redraw")
+        ReleaseMainImageListUse(imageList)
     }
 }
 

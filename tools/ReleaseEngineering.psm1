@@ -211,6 +211,67 @@ function Normalize-ReleaseBody {
     return ($Text -replace "`r`n", "`n").TrimEnd("`r", "`n")
 }
 
+function Assert-ReleaseNotesContent {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Version,
+        [Parameter(Mandatory)][string]$BodyPath
+    )
+
+    if (-not (Test-CanonicalReleaseVersion $Version)) {
+        throw "发行说明使用了非规范版本号：$Version"
+    }
+    if (-not (Test-Path -LiteralPath $BodyPath -PathType Leaf)) {
+        throw "发行说明不存在：$BodyPath"
+    }
+    $body = Get-Content -LiteralPath $BodyPath -Raw -Encoding UTF8
+    $escapedVersion = [regex]::Escape($Version)
+    if ($body -notmatch "(?m)^# 🎉 进程守护小助手 v$escapedVersion\r?$") {
+        throw '发行说明必须保留带 🎉 的版本标题。'
+    }
+    $assetHeadings = [regex]::Matches($body,
+        '(?m)^## 📦 发布物说明\r?$')
+    if ($assetHeadings.Count -ne 1) {
+        throw '发行说明必须且只能包含一个“📦 发布物说明”章节。'
+    }
+    $assetHeading = $assetHeadings[0]
+    $sectionText = $body.Substring(
+        $assetHeading.Index + $assetHeading.Length).TrimStart("`r", "`n")
+    if ($sectionText -match '(?m)^(?:## |---\r?$)') {
+        throw '“📦 发布物说明”必须是发行说明的最后一个章节。'
+    }
+
+    $specifications = @(
+        @{
+            Name = "process-watchdog-$Version-windows-x64.exe"
+            Required = @('独立可执行版', '无需安装 AutoHotkey', '快速体验')
+        }
+        @{
+            Name = "process-watchdog-$Version-windows-x64.zip"
+            Required = @('完整便携版', 'EXE', '说明文档', '许可证', '字体',
+                '运行所需资源', '长期使用', '手动部署')
+        }
+        @{
+            Name = "process-watchdog-$Version-source.zip"
+            Required = @('完整源码版', 'AHK 源码', '模块', '测试', '文档',
+                '字体', '审阅', '开发', 'AutoHotkey v2 x64')
+        }
+    )
+    foreach ($specification in $specifications) {
+        $name = [string]$specification.Name
+        $lines = [regex]::Matches($sectionText,
+            '(?m)^- [^\r\n]*' + [regex]::Escape($name) + '[^\r\n]*\r?$')
+        if ($lines.Count -ne 1) {
+            throw "发布物说明必须且只能逐项说明一次：$name"
+        }
+        foreach ($requiredText in $specification.Required) {
+            if (-not $lines[0].Value.Contains([string]$requiredText)) {
+                throw "发布物说明不完整：$name 缺少必要信息：$requiredText"
+            }
+        }
+    }
+}
+
 function Assert-ReleaseRecord {
     [CmdletBinding()]
     param(
@@ -246,9 +307,7 @@ function Assert-ReleaseRecord {
     if ($target.ToLowerInvariant() -cne $CommitSha.ToLowerInvariant()) {
         throw "Release 指向了非预期提交：$target"
     }
-    if (-not (Test-Path -LiteralPath $BodyPath -PathType Leaf)) {
-        throw "发行说明不存在：$BodyPath"
-    }
+    Assert-ReleaseNotesContent -Version $Version -BodyPath $BodyPath
     $expectedBody = Get-Content -LiteralPath $BodyPath -Raw -Encoding UTF8
     $actualBody = [string](Get-ReleaseRecordValue $Release 'body' '')
     if ((Normalize-ReleaseBody $actualBody) -cne
@@ -274,6 +333,7 @@ Export-ModuleMember -Function @(
     'Test-CanonicalReleaseVersion'
     'Get-ReleaseArtifactNames'
     'Assert-ReleaseArtifactInventory'
+    'Assert-ReleaseNotesContent'
     'Resolve-ReleaseState'
     'Assert-ReleaseRecord'
 )

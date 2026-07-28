@@ -2,6 +2,160 @@
 ; 本模块统一处理悬浮、按下、抬起反馈、光标选择和输入框命中测试；原生子类回调
 ; 只记录短时交互状态，真正的功能回调在有效的鼠标抬起后分发，避免按下即误触。
 
+; Windows 的 DT_VCENTER 只会居中字体行框，而字体行框上下通常留白不对称。
+; Lucide SVG 按几何边界居中后，这种差异会表现为文字重心低于图标。本类测量
+; 实际可见字形相对基线的墨迹边界，供按钮、状态标签和原生列表图标共享。
+class TextVisualAlignment {
+    static InkBoundsCache := Map()
+    static InkBoundsCacheLimit := 512
+
+    static MeasureText(hdc, text) {
+        if !hdc || text == ""
+            return {Width: 0, Height: 0}
+        extent := Buffer(8, 0)
+        if !DllCall("gdi32\GetTextExtentPoint32W", "Ptr", hdc,
+                "Str", text, "Int", StrLen(text), "Ptr", extent, "Int")
+            return {Width: 0, Height: 0}
+        return {
+            Width: NumGet(extent, 0, "Int"),
+            Height: NumGet(extent, 4, "Int")
+        }
+    }
+
+    static GetFontCacheKey(hdc, textMetrics) {
+        faceName := ""
+        faceLength := DllCall("gdi32\GetTextFaceW", "Ptr", hdc,
+            "Int", 0, "Ptr", 0, "Int")
+        if faceLength > 1 {
+            faceBuffer := Buffer(faceLength * 2, 0)
+            if DllCall("gdi32\GetTextFaceW", "Ptr", hdc,
+                    "Int", faceLength, "Ptr", faceBuffer, "Int")
+                faceName := StrGet(faceBuffer)
+        }
+        return faceName Chr(31)
+            . NumGet(textMetrics, 0, "Int") Chr(31)
+            . NumGet(textMetrics, 4, "Int") Chr(31)
+            . NumGet(textMetrics, 12, "Int") Chr(31)
+            . NumGet(textMetrics, 28, "Int")
+    }
+
+    static MeasureInkBounds(hdc, text) {
+        if !hdc || text == ""
+            return false
+        textMetrics := Buffer(64, 0)
+        if !DllCall("gdi32\GetTextMetricsW", "Ptr", hdc,
+                "Ptr", textMetrics, "Int")
+            return false
+        extent := this.MeasureText(hdc, text)
+        lineHeight := extent.Height > 0 ? extent.Height
+            : NumGet(textMetrics, 0, "Int")
+        if lineHeight <= 0
+            return false
+        cacheKey := this.GetFontCacheKey(hdc, textMetrics)
+            . Chr(30) . text
+        if this.InkBoundsCache.Has(cacheKey)
+            return this.InkBoundsCache[cacheKey]
+
+        ; MAT2 使用 16.16 FIXED 单位矩阵，要求 GetGlyphOutline 返回未旋转字形。
+        transform := Buffer(16, 0)
+        NumPut("Short", 1, transform, 2)
+        NumPut("Short", 1, transform, 14)
+        glyphMetrics := Buffer(20, 0)
+        ascent := NumGet(textMetrics, 4, "Int")
+        inkTop := 0x7FFFFFFF
+        inkBottom := -0x7FFFFFFF
+        foundVisibleGlyph := false
+        Loop Parse text {
+            codePoint := Ord(A_LoopField)
+            ; GetGlyphOutlineW 接收 UTF-16 字符。补充平面字符交给字体行框回退，
+            ; 不让罕见字符破坏其余可测量文字的布局。
+            if codePoint > 0xFFFF
+                continue
+            glyphMetrics := Buffer(20, 0)
+            result := DllCall("gdi32\GetGlyphOutlineW", "Ptr", hdc,
+                "UInt", codePoint, "UInt", Win32.GGO_METRICS,
+                "Ptr", glyphMetrics, "UInt", 0, "Ptr", 0,
+                "Ptr", transform, "UInt")
+            if result == Win32.GDI_ERROR
+                continue
+            blackBoxHeight := NumGet(glyphMetrics, 4, "UInt")
+            if blackBoxHeight <= 0
+                continue
+            originY := NumGet(glyphMetrics, 12, "Int")
+            glyphTop := ascent - originY
+            glyphBottom := glyphTop + blackBoxHeight
+            inkTop := Min(inkTop, glyphTop)
+            inkBottom := Max(inkBottom, glyphBottom)
+            foundVisibleGlyph := true
+        }
+        if !foundVisibleGlyph
+            return false
+
+        result := {
+            Top: inkTop,
+            Bottom: inkBottom,
+            LineHeight: lineHeight,
+            CenterDelta: (inkTop + inkBottom - lineHeight) / 2
+        }
+        if this.InkBoundsCache.Count >= this.InkBoundsCacheLimit
+            this.InkBoundsCache.Clear()
+        this.InkBoundsCache[cacheKey] := result
+        return result
+    }
+
+    static GetTextCenterOffset(hdc, text, containerHeight) {
+        bounds := this.MeasureInkBounds(hdc, text)
+        if !bounds || containerHeight <= 0
+            return 0
+        lineTop := Floor((containerHeight - bounds.LineHeight) / 2)
+        currentInkCenter := lineTop + (bounds.Top + bounds.Bottom) / 2
+        return Round(containerHeight / 2 - currentInkCenter)
+    }
+
+    static CreateCenteredTextRect(hdc, text, left, top, right, bottom) {
+        offset := this.GetTextCenterOffset(hdc, text, bottom - top)
+        rect := Buffer(16, 0)
+        NumPut("Int", left, "Int", top + offset,
+            "Int", right, "Int", bottom + offset, rect)
+        return rect
+    }
+
+    static MeasureFontInkCenterDelta(fontName, pointSize, fontWeight,
+        dpi, sampleText) {
+        try dpi := Max(1, Integer(dpi))
+        catch
+            dpi := 96
+        pixelHeight := Max(1, Round(pointSize * dpi / 72))
+        fontHandle := DllCall("gdi32\CreateFontW",
+            "Int", -pixelHeight, "Int", 0, "Int", 0, "Int", 0,
+            "Int", fontWeight, "UInt", 0, "UInt", 0, "UInt", 0,
+            "UInt", 1, "UInt", 0, "UInt", 0, "UInt", 0,
+            "UInt", 0, "Str", fontName, "Ptr")
+        screenDc := DllCall("user32\GetDC", "Ptr", 0, "Ptr")
+        measureDc := screenDc ? DllCall("gdi32\CreateCompatibleDC",
+            "Ptr", screenDc, "Ptr") : 0
+        previousFont := 0
+        try {
+            if !fontHandle || !measureDc
+                return 0
+            previousFont := DllCall("gdi32\SelectObject", "Ptr",
+                measureDc, "Ptr", fontHandle, "Ptr")
+            bounds := this.MeasureInkBounds(measureDc, sampleText)
+            return bounds ? bounds.CenterDelta : 0
+        } finally {
+            if previousFont
+                DllCall("gdi32\SelectObject", "Ptr", measureDc,
+                    "Ptr", previousFont, "Ptr")
+            if measureDc
+                DllCall("gdi32\DeleteDC", "Ptr", measureDc)
+            if screenDc
+                DllCall("user32\ReleaseDC", "Ptr", 0, "Ptr", screenDc)
+            if fontHandle
+                DllCall("gdi32\DeleteObject", "Ptr", fontHandle)
+        }
+    }
+}
+
 class ButtonFeedbackMode {
     static Persistent := 0
     static Dismissive := 1
@@ -72,16 +226,7 @@ class RoundedButtonRenderer {
     }
 
     static MeasureText(hdc, text) {
-        if (text == "")
-            return {Width: 0, Height: 0}
-        extent := Buffer(8, 0)
-        if !DllCall("gdi32\GetTextExtentPoint32W", "Ptr", hdc, "Str", text,
-                "Int", StrLen(text), "Ptr", extent, "Int")
-            return {Width: 0, Height: 0}
-        return {
-            Width: NumGet(extent, 0, "Int"),
-            Height: NumGet(extent, 4, "Int")
-        }
+        return TextVisualAlignment.MeasureText(hdc, text)
     }
 
     static CreateIconFont(icon, dpi) {
@@ -310,9 +455,8 @@ class RoundedButtonRenderer {
                     return
                 }
                 textLeft := contentX + imageWidth + gap
-                textRect := Buffer(16, 0)
-                NumPut("Int", textLeft, "Int", 0,
-                    "Int", contentX + contentWidth, "Int", height, textRect)
+                textRect := TextVisualAlignment.CreateCenteredTextRect(hdc,
+                    text, textLeft, 0, contentX + contentWidth, height)
                 DllCall("user32\DrawTextW", "Ptr", hdc, "Str", text,
                     "Int", -1, "Ptr", textRect, "UInt", 0x00008824, "Int")
                 return
@@ -355,18 +499,16 @@ class RoundedButtonRenderer {
             else
                 contentX := Floor((width - contentWidth) / 2)
 
-            iconRect := Buffer(16, 0)
-            NumPut("Int", contentX, "Int", 0,
-                "Int", contentX + iconWidth, "Int", height, iconRect)
             DllCall("gdi32\SelectObject", "Ptr", hdc, "Ptr", iconFont, "Ptr")
+            iconRect := TextVisualAlignment.CreateCenteredTextRect(hdc,
+                icon.glyph, contentX, 0, contentX + iconWidth, height)
             DllCall("user32\DrawTextW", "Ptr", hdc, "Str", icon.glyph,
                 "Int", -1, "Ptr", iconRect, "UInt", 0x00008825, "Int")
 
             DllCall("gdi32\SelectObject", "Ptr", hdc, "Ptr", hFont, "Ptr")
             textLeft := contentX + iconWidth + gap
-            textRect := Buffer(16, 0)
-            NumPut("Int", textLeft, "Int", 0,
-                "Int", contentX + contentWidth, "Int", height, textRect)
+            textRect := TextVisualAlignment.CreateCenteredTextRect(hdc,
+                text, textLeft, 0, contentX + contentWidth, height)
             DllCall("user32\DrawTextW", "Ptr", hdc, "Str", text,
                 "Int", -1, "Ptr", textRect, "UInt", 0x00008824, "Int")
         } finally {

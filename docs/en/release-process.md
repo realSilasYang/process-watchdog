@@ -5,10 +5,13 @@
 1. Prepare user-facing entries with the [changelog template](changelog-template.md)
    and create `docs/release-notes/v<version>.md`, then update `VERSION`,
    `CHANGELOG.md`, and `docs/CHANGELOG.en.md`. The build
-   injects the executable file version from `VERSION`. A release heading is
-   `## [X.Y.Z] - YYYY-MM-DD`. Put
-   migrations, defaults, privilege changes, and required actions under Important
-   notes, and remove empty categories.
+   injects the executable file version from `VERSION`. Keep `📋` in the document
+   title and use `## 🎉 Version [X.Y.Z] - YYYY-MM-DD` for release headings. Put
+   migrations, defaults, privilege changes, and required actions under
+   `⚠️ Important Notes`, and remove empty categories. Every formal release keeps
+   `📦 Release Assets` and names all three files with their edition role, included
+   content, AutoHotkey requirement, and intended use. This is always the final
+   Release-notes section so readers can choose a download after reviewing changes.
 2. Confirm the repository is not shallow and contains every branch and tag. Run
    `tests/verify.ps1`. It scans the complete history with pinned Gitleaks and
    rejects committed personal configuration, probes, credentials, or local paths

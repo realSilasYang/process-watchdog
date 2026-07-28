@@ -2561,12 +2561,22 @@ if (-not $settingsWindowSource.Contains(
 }
 if ($settingsWindowSource -notmatch 'this\.tabBuilt\[1\]\s*:=\s*true' -or
     $settingsWindowSource -notmatch 'EnsureTabBuilt\(index\)' -or
-    $settingsWindowSource -notmatch 'SwitchTab\(index,[\s\S]{0,180}EnsureTabBuilt\(index\)' -or
+    $settingsWindowSource -notmatch 'SwitchTab\(index,[\s\S]{0,520}EnsureTabBuilt\(index\)' -or
     $settingsWindowSource -notmatch 'case 2: this\.BuildMonitoringTab\(\)' -or
     $settingsWindowSource -notmatch 'case 3: this\.BuildStopPolicyTab\(\)' -or
     $settingsWindowSource -notmatch 'case 4: this\.BuildLogTab\(\)' -or
     $settingsWindowSource -notmatch 'case 5: this\.BuildAboutTab\(\)') {
     $failures.Add('Settings must build only the visible general tab initially and create other pages on first selection')
+}
+$settingsTabSwitchSource = [regex]::Match($settingsWindowSource,
+    '(?ms)^    SuspendTabRedraw\(\)\s*\{.*?(?=^    BrowseLogDirectory\()').Value
+if ([string]::IsNullOrWhiteSpace($settingsTabSwitchSource) -or
+    $settingsTabSwitchSource -notmatch 'SuspendTabRedraw\(\)[\s\S]{0,700}Win32\.WM_SETREDRAW[\s\S]{0,80}"Ptr", false' -or
+    $settingsTabSwitchSource -notmatch 'ResumeTabRedraw\(transaction\)[\s\S]{0,700}Win32\.WM_SETREDRAW[\s\S]{0,80}"Ptr", true[\s\S]{0,260}Win32\.RDW_LAYOUT_REFRESH' -or
+    $settingsTabSwitchSource -notmatch 'SetTabButtonVisualState\(button,[\s\S]{0,700}state\.current\s*:=\s*normalColor[\s\S]{0,160}state\.textColor\s*:=\s*textColor' -or
+    $settingsTabSwitchSource -notmatch 'SwitchTab\(index,[\s\S]{0,260}redrawTransaction\s*:=\s*this\.SuspendTabRedraw\(\)[\s\S]{0,180}EnsureTabBuilt\(index\)' -or
+    $settingsTabSwitchSource -notmatch 'finally\s+this\.ResumeTabRedraw\(redrawTransaction\)') {
+    $failures.Add('Settings tab switches must build and update the complete page inside one redraw transaction, then restore painting in finally')
 }
 $settingsShowSource = [regex]::Match($settingsWindowSource,
     '(?ms)^    Show\(\*\)\s*\{.*?(?=^    GetTabButtonWidths\()').Value
@@ -2885,6 +2895,14 @@ foreach ($legacyIconField in @(
 if ($source -notmatch 'MainDpiChanged\([^)]*\)[\s\S]{0,600}CreateDpiRebuildRequest\(newDpi,[\s\S]{0,300}PreviousTimer[\s\S]{0,220}SetTimer\(rebuildRequest\.Timer, -250\)' -or
     $source -notmatch 'RebuildMainImageList\(rebuildGeneration, expectedDpi,[\s\S]{0,220}AcceptDpiRebuild\(rebuildGeneration\)[\s\S]{0,900}IsDpiRebuildCurrent\(rebuildGeneration\)') {
     $failures.Add('DPI icon rebuilding must reject stale delayed callbacks by generation')
+}
+if ($mainSource -notmatch 'RefreshMainWindowDisplay\(\)[\s\S]{0,500}Main\.lv\.SetFont\([^\r\n]+\)[\s\S]{0,120}RefreshMainStatusIconAlignment\(\)' -or
+    $mainVisualPipelineSource -notmatch 'RefreshMainStatusIconAlignment\(\)[\s\S]{0,1800}ImageList_ReplaceIcon' -or
+    $mainVisualPipelineSource -notmatch 'RefreshMainStatusIconAlignment\(\)[\s\S]{0,2600}Win32\.LVM_GETIMAGELIST[\s\S]{0,260}Main\.lv\.SetImageList\(imageList, 1\)' -or
+    $mainVisualPipelineSource -notmatch 'CreateMainImageList\(statusIconIndices\)[\s\S]{0,1200}try AddMainStatusIcons\(imageList, statusIconIndices\)[\s\S]{0,180}catch\s*\{[\s\S]{0,120}statusIconIndices\.Clear\(\)[\s\S]{0,180}try AddMainAdminOverlayIcon\(imageList\)' -or
+    $mainVisualPipelineSource -match 'throw Error\("无法创建管理员运行盾牌图标"\)' -or
+    $mainSource -match 'RefreshMainWindowDisplay\(\)[\s\S]{0,700}(?:CreateMainImageList|ScheduleMainImageListRebuild)') {
+    $failures.Add('Font hot-switch must preserve and repair the active image-list binding, while optional status or overlay failures keep application icons available')
 }
 foreach ($resourceShutdownHook in @(
     'ShutdownApplicationResources(*)',

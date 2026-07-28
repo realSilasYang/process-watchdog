@@ -32,11 +32,9 @@ Il progetto offre interfaccia chiara e scura, ripristino automatico, protezione 
 
 # Panoramica dell’interfaccia
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="images/process-watchdog-overview.png">
-  <source media="(prefers-color-scheme: light)" srcset="images/process-watchdog-overview-light.png">
-  <img src="images/process-watchdog-overview-light.png" alt="Finestra principale nei temi chiaro e scuro" width="100%">
-</picture>
+<p align="center">
+  <img src="images/process-watchdog-overview.png" alt="Finestra principale di Process Watchdog Assistant" width="100%">
+</p>
 
 La finestra principale riunisce l’ordine degli elementi sorvegliati, l’icona dell’app, il nome, i privilegi richiesti e lo stato corrente. La barra superiore consente di aggiungere, eliminare, sospendere, aprire le impostazioni, consultare l’aiuto o fare una donazione; da Aiuto si possono aprire il manuale e il registro di esecuzione. La barra inferiore riepiloga le destinazioni in esecuzione, ripristino, aggiornamento, pausa ed errore, mentre il registro espone le prove alla base di ciascuno stato anomalo.
 

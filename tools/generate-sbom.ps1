@@ -23,7 +23,7 @@ $toolchainLock = Get-Content -LiteralPath $ResolvedToolchainPath `
     -Raw -Encoding UTF8 | ConvertFrom-Json
 $changeLog = Get-Content -LiteralPath (Join-Path $projectRoot 'CHANGELOG.md') `
     -Raw -Encoding UTF8
-$releaseHeadingPattern = '(?m)^## \[' + [regex]::Escape($version) +
+$releaseHeadingPattern = '(?m)^## 🎉 版本 \[' + [regex]::Escape($version) +
     '\] - (\d{4}-\d{2}-\d{2})\r?$'
 $releaseHeading = [regex]::Match($changeLog, $releaseHeadingPattern)
 if (-not $releaseHeading.Success) {
