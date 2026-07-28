@@ -48,6 +48,12 @@ try {
     $archiveHash = (Get-FileHash -Algorithm SHA256 `
         -LiteralPath $archivePath).Hash
 
+    # 模拟从 PowerShell 7 或受限宿主启动后，Windows PowerShell 无法自动加载
+    # Get-FileHash 的环境；安装器的最低环境能力不得依赖该命令。
+    function Get-FileHash {
+        throw 'Standalone installer must not depend on Get-FileHash.'
+    }
+
     Set-Content -LiteralPath (Join-Path $installRoot 'OldWatchdog.exe') `
         -Encoding UTF8 -Value 'old entry'
     New-Item -ItemType Directory -Force `
