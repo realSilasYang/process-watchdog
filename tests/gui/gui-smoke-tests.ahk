@@ -351,6 +351,8 @@ try {
         && list.GetText(1, 1) == "Smoke target A"
         && list.GetText(1, 4) == "1",
         "Main ListView sequence did not refresh after deletion")
+    ; 连续列线验证需要相邻两行；补入纯测试行，不参与前面的排序和删除语义。
+    list.Add("", "Smoke target C", "Paused", "C:\SmokeC.exe", "2", "20")
     actionButton := owner.Add("Text",
         "x16 y216 w88 h30 Center 0x200 Background333333 cFFFFFF",
         "Action")
@@ -423,6 +425,10 @@ try {
     NumPut("Int", 0, itemRect, 0) ; LVIR_BOUNDS：读取整行边界
     AssertGuiSmoke(SendMessage(0x100E, 0, itemRect.Ptr, list.Hwnd),
         "Selected ListView item bounds were not readable")
+    secondItemRect := Buffer(16, 0)
+    NumPut("Int", 0, secondItemRect, 0)
+    AssertGuiSmoke(SendMessage(0x100E, 1, secondItemRect.Ptr, list.Hwnd),
+        "Second ListView item bounds were not readable")
     listDc := DllCall("user32\GetDC", "Ptr", list.Hwnd, "Ptr")
     try {
         cornerColor := DllCall("gdi32\GetPixel", "Ptr", listDc,
@@ -443,17 +449,37 @@ try {
             "Int", selectedRowMiddleY, "UInt")
         expectedSeparatorColor := RoundedButtonRenderer.ColorToBgr(
             UiThemeService.Color("Divider"))
+        firstSeparatorBreakY := -1
+        secondSeparatorBreakY := -1
+        scanTop := NumGet(itemRect, 4, "Int")
+        scanBottom := NumGet(secondItemRect, 12, "Int")
+        Loop Max(0, scanBottom - scanTop) {
+            scanY := scanTop + A_Index - 1
+            if firstSeparatorBreakY < 0
+                && DllCall("gdi32\GetPixel", "Ptr", listDc,
+                    "Int", sequenceWidth - 1, "Int", scanY, "UInt")
+                    != expectedSeparatorColor
+                firstSeparatorBreakY := scanY
+            if secondSeparatorBreakY < 0
+                && DllCall("gdi32\GetPixel", "Ptr", listDc,
+                    "Int", sequenceWidth + nameWidth - 1,
+                    "Int", scanY, "UInt") != expectedSeparatorColor
+                secondSeparatorBreakY := scanY
+        }
         AssertGuiSmoke(cornerColor == RoundedButtonRenderer.ColorToBgr(
                 UiThemeService.Color("Surface"))
             && selectedColor != RoundedButtonRenderer.ColorToBgr(
                 UiThemeService.Color("Surface"))
             && firstSeparatorColor == expectedSeparatorColor
-            && secondSeparatorColor == expectedSeparatorColor,
+            && secondSeparatorColor == expectedSeparatorColor
+            && firstSeparatorBreakY < 0
+            && secondSeparatorBreakY < 0,
             "ListView selected row did not preserve rounded surface corners: corner="
                 Format("0x{:06X}", cornerColor) " selected="
                 Format("0x{:06X}", selectedColor) " separators="
                 Format("0x{:06X}/0x{:06X}", firstSeparatorColor,
-                    secondSeparatorColor))
+                    secondSeparatorColor) " breaks=" firstSeparatorBreakY
+                    "/" secondSeparatorBreakY)
     } finally DllCall("user32\ReleaseDC", "Ptr", list.Hwnd,
         "Ptr", listDc)
     DllCall("user32\SetFocus", "Ptr", ownerEdit.Hwnd, "Ptr")
