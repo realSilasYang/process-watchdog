@@ -16,6 +16,7 @@ class UiThemeService {
     static Color(name) {
         colors := Map(
             "Window", "1E1E1E", "Surface", "252526",
+            "Divider", "3A3A3A",
             "Tooltip", "202020", "TooltipText", "F2F2F2")
         return colors.Has(name) ? colors[name] : "F2F2F2"
     }
@@ -431,13 +432,28 @@ try {
             "Int", NumGet(itemRect, 8, "Int") - Round(14 * dpi / 96),
             "Int", (NumGet(itemRect, 4, "Int")
                 + NumGet(itemRect, 12, "Int")) // 2, "UInt")
+        selectedRowMiddleY := (NumGet(itemRect, 4, "Int")
+            + NumGet(itemRect, 12, "Int")) // 2
+        nameWidth := SendMessage(Win32.LVM_GETCOLUMNWIDTH, 0, 0,
+            list.Hwnd)
+        firstSeparatorColor := DllCall("gdi32\GetPixel", "Ptr", listDc,
+            "Int", sequenceWidth - 1, "Int", selectedRowMiddleY, "UInt")
+        secondSeparatorColor := DllCall("gdi32\GetPixel", "Ptr", listDc,
+            "Int", sequenceWidth + nameWidth - 1,
+            "Int", selectedRowMiddleY, "UInt")
+        expectedSeparatorColor := RoundedButtonRenderer.ColorToBgr(
+            UiThemeService.Color("Divider"))
         AssertGuiSmoke(cornerColor == RoundedButtonRenderer.ColorToBgr(
                 UiThemeService.Color("Surface"))
             && selectedColor != RoundedButtonRenderer.ColorToBgr(
-                UiThemeService.Color("Surface")),
+                UiThemeService.Color("Surface"))
+            && firstSeparatorColor == expectedSeparatorColor
+            && secondSeparatorColor == expectedSeparatorColor,
             "ListView selected row did not preserve rounded surface corners: corner="
                 Format("0x{:06X}", cornerColor) " selected="
-                Format("0x{:06X}", selectedColor))
+                Format("0x{:06X}", selectedColor) " separators="
+                Format("0x{:06X}/0x{:06X}", firstSeparatorColor,
+                    secondSeparatorColor))
     } finally DllCall("user32\ReleaseDC", "Ptr", list.Hwnd,
         "Ptr", listDc)
     DllCall("user32\SetFocus", "Ptr", ownerEdit.Hwnd, "Ptr")
