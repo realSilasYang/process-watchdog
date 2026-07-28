@@ -35,7 +35,6 @@ class Win32 {
     static WM_COPYDATA := 0x004A
     static NM_CUSTOMDRAW := -12
     static CDDS_PREPAINT := 0x00000001
-    static CDDS_POSTPAINT := 0x00000002
     static CDDS_ITEMPREPAINT := 0x00010001
     static CDDS_ITEMPOSTPAINT := 0x00010002
     static CDRF_DODEFAULT := 0x00000000
@@ -62,14 +61,16 @@ class Win32 {
     static LVM_GETIMAGELIST := 0x1002
     static LVM_HITTEST := 0x1012
     static LVM_GETITEMSTATE := 0x102C
+    static LVM_SETEXTENDEDLISTVIEWSTYLE := 0x1036
+    static LVM_GETEXTENDEDLISTVIEWSTYLE := 0x1037
     static LVM_SETCOLUMNORDERARRAY := 0x103A
     static LVM_GETCOLUMNORDERARRAY := 0x103B
     static LVM_SETITEMW := 0x104C
-    static HDM_GETITEMCOUNT := 0x1200
     static LVIF_STATE := 0x00000008
     static LVIF_IMAGE := 0x00000002
     static LVIS_SELECTED := 0x00000002
     static LVIS_OVERLAYMASK := 0x00000F00
+    static LVS_EX_GRIDLINES := 0x00000001
     static ICON_SMALL := 0
     static ICON_BIG := 1
     static LR_LOADFROMFILE := 0x00000010
@@ -78,7 +79,6 @@ class Win32 {
     static IMAGE_CURSOR := 2
     static GGO_METRICS := 0
     static GDI_ERROR := 0xFFFFFFFF
-    static DC_BRUSH := 18
     static GENERIC_READ := 0x80000000
     static SIIGBF_BIGGERSIZEOK := 0x00000001
     static SIIGBF_THUMBNAILONLY := 0x00000008
