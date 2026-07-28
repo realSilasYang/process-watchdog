@@ -32,11 +32,9 @@
 
 # 界面概览
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/process-watchdog-overview.png">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/process-watchdog-overview-light.png">
-  <img src="docs/images/process-watchdog-overview-light.png" alt="进程守护小助手主界面，分别适配浅色与深色主题" width="100%">
-</picture>
+<p align="center">
+  <img src="docs/images/process-watchdog-overview.png" alt="进程守护小助手主界面" width="100%">
+</p>
 
 主窗口集中展示守护项顺序、应用图标、名称、权限要求和当前状态。顶部命令栏提供添加、删除、暂停、设置、帮助信息与捐赠入口；帮助信息中可继续选择使用说明、运行日志或提交反馈。窗口底部汇总运行、恢复、升级、暂停和失败数量，异常状态可以继续通过运行日志追踪到具体判断依据。
 

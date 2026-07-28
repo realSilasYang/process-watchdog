@@ -1,13 +1,47 @@
-# Changelog
+# 📋 Changelog
 
 [简体中文](../CHANGELOG.md) | **English**
 
 This project follows [Semantic Versioning](https://semver.org/) and uses change
 categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## 🚧 [Unreleased]
 
-### Fixed
+## 🎉 Version [2.0.1] - 2026-07-28
+
+### 📦 Release Assets
+
+- **`process-watchdog-2.0.1-windows-x64.exe` (standalone executable):** Requires no AutoHotkey installation and runs immediately after download; intended for a quick trial or users who need a single program file.
+- **`process-watchdog-2.0.1-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, fonts, and runtime resources; intended for long-term use after full extraction or for manual deployment.
+- **`process-watchdog-2.0.1-source.zip` (complete source package):** Includes the AHK source, modules, tests, documentation, and fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+
+---
+
+### 🚀 Improvements
+
+- Centered Lucide icons, button text, main-list status icons, and footer text by
+  their visible glyph bounds rather than asymmetric font line boxes, keeping a
+  common visual axis at both 100% and 300% DPI.
+- Made first-time Settings page construction, control visibility, and tab-state
+  updates complete within one redraw transaction, reducing text and page-content
+  flashes during tab switches.
+- Standardized all thirteen README languages on the latest main-window screenshot
+  as the single interface overview, removing the obsolete light image and dual-image
+  theme switcher.
+- Standardized changelogs and GitHub Releases on scannable emoji headings and
+  explicit asset contents, runtime requirements, and intended uses. Historical
+  notes now describe the assets that were actually published.
+
+---
+
+### 🐛 Fixed
+
+- Fixed font hot-switching or a failed status SVG or administrator overlay
+  detaching the main ListView image list and hiding some or all application icons.
+  An optional enhanced icon can no longer remove the base application icons.
+- Fixed status icons failing, shifting, or appearing at the cell's upper-left when
+  only a vertical offset was supplied and an empty horizontal coordinate was
+  parsed as an invalid integer.
 
 - Standardized UTF-8, JSON, compiler paths, and ZIP bytes across Windows
   PowerShell 5.1 and PowerShell 7. CI now compares its two release builds across
@@ -15,16 +49,23 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Made complete Actions artifacts retain hidden directories, preventing the
   upload step from filtering extracted `.github` community files. The three
   GitHub Release user assets were not affected by that filter.
+- Restored the CodeBookmark-aligned emoji headings and changelog categories.
+  Release validation now checks each public asset's exact name, edition role,
+  included content, runtime requirement, and intended use.
 
-## [2.0.0] - 2026-07-28
+---
 
-### Release editions
+## 🎉 Version [2.0.0] - 2026-07-28
 
-- `process-watchdog-2.0.0-windows-x64.exe`: Standalone executable. AutoHotkey is not required; download and run it directly.
-- `process-watchdog-2.0.0-windows-x64.zip`: Complete portable package with the EXE, documentation, licenses, fonts, and runtime resources for long-term extraction or manual deployment.
-- `process-watchdog-2.0.0-source.zip`: Complete source package with AHK source, modules, tests, documentation, and fonts. Source mode requires AutoHotkey v2 x64 on the computer.
+### 📦 Release Assets
 
-### Important notes
+- **`process-watchdog-2.0.0-windows-x64.exe` (standalone executable):** Requires no AutoHotkey installation and runs immediately after download; intended for a quick trial or users who need a single program file.
+- **`process-watchdog-2.0.0-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, fonts, and runtime resources; intended for long-term use after full extraction or for manual deployment.
+- **`process-watchdog-2.0.0-source.zip` (complete source package):** Includes the AHK source, modules, tests, documentation, and fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+
+---
+
+### ⚠️ Important Notes
 
 - `v1.0.0` cannot update itself. Moving to `v2.0.0` requires one manual download
   and complete package replacement; later EXE and source editions can use the
@@ -37,7 +78,9 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Update protection remains disabled by default. Enable it per target and verify
   its recognition during one real application update.
 
-### Added
+---
+
+### ✨ Added
 
 - Added complete self-update flows for EXE, Git source, and ordinary source
   editions, with background startup checks and manual checks. Updates verify the
@@ -57,7 +100,9 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   icons. BAT and CMD items can open a separate standard-output and error log when
   that batch target was actually launched and captured by the assistant.
 
-### Changed
+---
+
+### 🚀 Improvements
 
 - Reworked core scheduling, per-target controllers, task generations, and the
   mutation queue. Pause, resume, deletion, ordering, path changes, undo, and redo
@@ -100,7 +145,9 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   recover an orphaned same-commit tag, then audits the tag, commit, body, and
   asset hashes again after publication.
 
-### Fixed
+---
+
+### 🐛 Fixed
 
 - Fixed short-lived duplicate launchers, privilege mismatches, transient probe
   failures, and application updates being mistaken for a stopped target, which
@@ -124,9 +171,17 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   page now contains only the standalone EXE, portable ZIP, and source ZIP, while
   automatic update prefers the asset SHA-256 supplied by the GitHub Release API.
 
-## [1.0.0] - 2026-07-23
+## 🎉 Version [1.0.0] - 2026-07-23
 
-### Added
+### 📦 Release Assets
+
+- **`process-watchdog-1.0.0-windows-x64.zip` (complete Windows x64 package):** Contains the compiled application, documentation, licenses, status icons, and runtime dependencies; it runs after full extraction without a separate AutoHotkey installation.
+- **`process-watchdog-1.0.0-windows-x64.spdx.json` (SPDX software bill of materials):** Records the application, embedded AutoHotkey runtime, and third-party component versions, licenses, and sources for review and supply-chain verification.
+- **`SHA256SUMS.txt` (SHA-256 checksum list):** Records checksums for the Windows ZIP and SPDX file so downloads can be checked for completeness and transfer damage.
+
+---
+
+### ✨ Added
 
 - Monitoring for processes, scripts, and shortcuts.
 - Evidence-based three-state probing, shared scheduling, and automatic recovery.
@@ -138,7 +193,9 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   compatibility, and contribution documentation.
 - Full-history Gitleaks validation, CODEOWNERS, governance, and public-repository privacy checks.
 
-### Changed
+---
+
+### 🚀 Improvements
 
 - Separated personal runtime configuration from the tracked example configuration.
 - Moved core monitoring, inspection, execution, configuration, maintenance,
@@ -155,7 +212,9 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Updated GitHub Actions to current major versions based on Node.js 24 while
   retaining full commit-SHA pins.
 
-### Fixed
+---
+
+### 🐛 Fixed
 
 - The rounded-button renderer retains its GDI+ DLL module reference through
   initialization and can shut down and reinitialize reliably during exit/reload.
@@ -165,6 +224,7 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/realSilasYang/process-watchdog/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/realSilasYang/process-watchdog/releases/tag/v1.0.0

@@ -32,11 +32,9 @@
 
 # 介面概覽
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="images/process-watchdog-overview.png">
-  <source media="(prefers-color-scheme: light)" srcset="images/process-watchdog-overview-light.png">
-  <img src="images/process-watchdog-overview-light.png" alt="程序守護小助手的淺色與深色主介面" width="100%">
-</picture>
+<p align="center">
+  <img src="images/process-watchdog-overview.png" alt="程序守護小助手主介面" width="100%">
+</p>
 
 主視窗集中顯示守護項目的順序、應用程式圖示、名稱、權限要求與目前狀態。頂端命令列提供新增、刪除、暫停、設定、說明資訊與贊助入口；說明資訊可再開啟使用說明或執行紀錄。底部狀態列彙整執行中、復原、更新、暫停與失敗數量，異常狀態可從執行紀錄追查實際判斷依據。
 

@@ -32,11 +32,9 @@
 
 # Обзор интерфейса
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="images/process-watchdog-overview.png">
-  <source media="(prefers-color-scheme: light)" srcset="images/process-watchdog-overview-light.png">
-  <img src="images/process-watchdog-overview-light.png" alt="Главное окно в светлой и тёмной темах" width="100%">
-</picture>
+<p align="center">
+  <img src="images/process-watchdog-overview.png" alt="Главное окно Process Watchdog Assistant" width="100%">
+</p>
 
 В главном окне собраны порядок объектов наблюдения, значок приложения, имя, требования к правам и текущее состояние. Верхняя панель позволяет добавлять, удалять и приостанавливать объекты, открывать настройки, справку и окно пожертвований; из справки доступны руководство и журнал работы. Нижняя строка показывает число работающих, восстанавливаемых, обновляемых, приостановленных и неисправных объектов, а журнал объясняет доказательства каждого необычного состояния.
 

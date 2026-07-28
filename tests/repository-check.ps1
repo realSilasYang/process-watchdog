@@ -8,6 +8,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
+Import-Module (Join-Path $projectRoot 'tools\ReleaseEngineering.psm1') -Force
 $requiredFiles = @(
     'LICENSE',
     'README.md',
@@ -59,7 +60,6 @@ $requiredFiles = @(
     'assets\fonts\README.md',
     'assets\fonts\README.en.md',
     'docs\images\process-watchdog-overview.png',
-    'docs\images\process-watchdog-overview-light.png',
     '.editorconfig',
     '.mailmap',
     '.github\CODEOWNERS',
@@ -183,7 +183,8 @@ if (Get-ChildItem -LiteralPath $projectRoot -File -Filter '_codex_*') {
 }
 foreach ($obsoletePath in @(
         'README.en.md', 'CHANGELOG.en.md', 'watchdog.ico',
-        'watchdog.example.ini', 'docs\development')) {
+        'watchdog.example.ini', 'docs\development',
+        'docs\images\process-watchdog-overview-light.png')) {
     if (Test-Path -LiteralPath (Join-Path $projectRoot $obsoletePath)) {
         throw "Obsolete repository location remains: $obsoletePath"
     }
@@ -203,6 +204,96 @@ if (-not (Test-Path -LiteralPath $releaseNotesPath -PathType Leaf)) {
 $releaseNotesRelativePath = "docs/release-notes/v$version.md"
 if ($trackedFiles -notcontains $releaseNotesRelativePath) {
     throw "Current release notes are not tracked: $releaseNotesRelativePath"
+}
+Assert-ReleaseNotesContent -Version $version -BodyPath $releaseNotesPath
+$legacyReleaseNotesRelativePath = 'docs/release-notes/v1.0.0.md'
+$legacyReleaseNotesPath = Join-Path $projectRoot $legacyReleaseNotesRelativePath
+if (-not (Test-Path -LiteralPath $legacyReleaseNotesPath -PathType Leaf) -or
+    $trackedFiles -notcontains $legacyReleaseNotesRelativePath) {
+    throw "Historical release notes are missing or untracked: $legacyReleaseNotesRelativePath"
+}
+$legacyReleaseNotes = Get-Content -LiteralPath $legacyReleaseNotesPath `
+    -Raw -Encoding UTF8
+foreach ($marker in @(
+        '# 🎉 进程守护小助手 v1.0.0',
+        '## 📦 发布物说明',
+        'process-watchdog-1.0.0-windows-x64.zip',
+        'process-watchdog-1.0.0-windows-x64.spdx.json',
+        'SHA256SUMS.txt',
+        '无需另行安装 AutoHotkey',
+        '它不是可运行程序',
+        '已停止维护的历史版本',
+        '## ⚠️ 重要说明',
+        '## ✅ 验证范围')) {
+    if (-not $legacyReleaseNotes.Contains($marker)) {
+        throw "Historical v1.0.0 release notes are missing required marker: $marker"
+    }
+}
+if ($legacyReleaseNotes.Contains('恢复说明') -or
+    $legacyReleaseNotes.Contains('恢复附件')) {
+    throw 'Historical v1.0.0 release notes must not contain restoration details.'
+}
+$legacyAssetHeading = $legacyReleaseNotes.LastIndexOf(
+    '## 📦 发布物说明', [System.StringComparison]::Ordinal)
+if ($legacyAssetHeading -lt 0 -or
+    $legacyReleaseNotes.Substring($legacyAssetHeading) -match
+        '(?m)^## (?!📦 发布物说明)') {
+    throw 'Historical v1.0.0 release assets must be the final release-notes section.'
+}
+$changelogContracts = @(
+    @{
+        Path = 'CHANGELOG.md'
+        Title = '# 📋 更新日志'
+        VersionPattern = '(?m)^## 🎉 版本 \[' +
+            [regex]::Escape($version) + '\] - \d{4}-\d{2}-\d{2}\r?$'
+        AssetHeading = '### 📦 发布物说明'
+    }
+    @{
+        Path = 'docs\CHANGELOG.en.md'
+        Title = '# 📋 Changelog'
+        VersionPattern = '(?m)^## 🎉 Version \[' +
+            [regex]::Escape($version) + '\] - \d{4}-\d{2}-\d{2}\r?$'
+        AssetHeading = '### 📦 Release Assets'
+    }
+)
+foreach ($contract in $changelogContracts) {
+    $changelogPath = Join-Path $projectRoot $contract.Path
+    $changelogText = Get-Content -LiteralPath $changelogPath -Raw -Encoding UTF8
+    if (-not $changelogText.StartsWith($contract.Title + "`n") -and
+        -not $changelogText.StartsWith($contract.Title + "`r`n")) {
+        throw "Changelog is missing its required emoji title: $($contract.Path)"
+    }
+    if ($changelogText -notmatch $contract.VersionPattern) {
+        throw "Changelog is missing the emoji version heading for ${version}: $($contract.Path)"
+    }
+    if (-not $changelogText.Contains($contract.AssetHeading)) {
+        throw "Changelog is missing the release-assets heading: $($contract.Path)"
+    }
+    if ($changelogText -match '(?m)^## \[(?:\d|未发布|Unreleased)') {
+        throw "Legacy changelog headings must not return: $($contract.Path)"
+    }
+}
+
+$templateContracts = @(
+    @{
+        Path = 'docs\changelog-template.md'
+        Markers = @('# 📝 中文更新日志模板',
+            '## 🎉 版本 [X.Y.Z] - YYYY-MM-DD', '### 📦 发布物说明')
+    }
+    @{
+        Path = 'docs\en\changelog-template.md'
+        Markers = @('# 📝 English Changelog Template',
+            '## 🎉 Version [X.Y.Z] - YYYY-MM-DD', '### 📦 Release Assets')
+    }
+)
+foreach ($contract in $templateContracts) {
+    $templateText = Get-Content -LiteralPath `
+        (Join-Path $projectRoot $contract.Path) -Raw -Encoding UTF8
+    foreach ($marker in $contract.Markers) {
+        if (-not $templateText.Contains($marker)) {
+            throw "Changelog template is missing required marker '$marker': $($contract.Path)"
+        }
+    }
 }
 $mainScripts = @(Get-ChildItem -LiteralPath $projectRoot -File `
     -Filter '*.ahk' | Where-Object { $_.Name -notlike '_*' })
@@ -449,14 +540,13 @@ foreach ($readmeDefinition in $localizedReadmes) {
             throw "Localized README is missing $requiredTopic`: $($readmeDefinition.Path)"
         }
     }
-    foreach ($imageRequirement in @(
-            'media="(prefers-color-scheme: dark)"',
-            'media="(prefers-color-scheme: light)"',
-            'process-watchdog-overview.png',
-            'process-watchdog-overview-light.png')) {
-        if (-not $readme.Contains($imageRequirement)) {
-            throw "Localized README lacks theme-aware overview media: $($readmeDefinition.Path)"
-        }
+    $overviewReferences = [regex]::Matches($readme,
+        'process-watchdog-overview\.png')
+    if ($overviewReferences.Count -ne 1 -or
+        $readme.Contains('process-watchdog-overview-light.png') -or
+        $readme.Contains('media="(prefers-color-scheme:') -or
+        $readme.Contains('<picture>')) {
+        throw "Localized README must use the single canonical overview image exactly once: $($readmeDefinition.Path)"
     }
 }
 

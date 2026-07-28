@@ -17,6 +17,9 @@
 - `VERSION` 与两份 CHANGELOG 完全一致，目标版本标签尚不存在。
 - CHANGELOG 已按 `docs/changelog-template.md` 合并零散提交，并明确配置迁移、默认值、
   权限变化和用户必须执行的操作。
+- CHANGELOG 和 Release 说明保留规定的 Emoji 标题；`📦 发布物说明`逐项列出三个
+  准确文件名、版本定位、包含内容、AutoHotkey 要求和适用场景，并固定为 Release
+  正文最后一个章节。
 - Release 说明明确列出尚未完成的物理 Windows、DPI、多显示器或高对比度组合。
 
 ## GitHub 仓库设置

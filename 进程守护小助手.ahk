@@ -13,7 +13,7 @@
 
 ;@Ahk2Exe-SetName 进程守护小助手
 ;@Ahk2Exe-SetDescription 进程、脚本和快捷方式守护工具
-;@Ahk2Exe-SetVersion 2.0.0.0
+;@Ahk2Exe-SetVersion 2.0.1.0
 ;@Ahk2Exe-SetCopyright Copyright (c) 2026 进程守护小助手 contributors
 ;@Ahk2Exe-SetMainIcon assets\app\watchdog.ico
 
@@ -739,6 +739,7 @@ RefreshMainWindowDisplay() {
             Main.btnSet, Main.btnSupport, Main.btnDonate]
         button.SetFont("s10 bold", systemFontName)
     Main.lv.SetFont("s12 c" UiThemeService.Color("Text"), fontName)
+    RefreshMainStatusIconAlignment()
     if Main.HasOwnProp("listHeader") && IsObject(Main.listHeader)
         Main.listHeader.SetLabels([Tr("序号"), Tr("应用程序"), Tr("状态")])
     Main.statsText.SetFont("s10 bold c"

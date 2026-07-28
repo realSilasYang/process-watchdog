@@ -58,6 +58,7 @@ class Win32 {
     static LVM_GETCOLUMNWIDTH := 0x101D
     static LVM_GETCOLUMNW := 0x105F
     static LVM_GETHEADER := 0x101F
+    static LVM_GETIMAGELIST := 0x1002
     static LVM_HITTEST := 0x1012
     static LVM_GETITEMSTATE := 0x102C
     static LVM_SETCOLUMNORDERARRAY := 0x103A
@@ -73,6 +74,8 @@ class Win32 {
     static LR_DEFAULTSIZE := 0x00000040
     static IMAGE_ICON := 1
     static IMAGE_CURSOR := 2
+    static GGO_METRICS := 0
+    static GDI_ERROR := 0xFFFFFFFF
     static GENERIC_READ := 0x80000000
     static SIIGBF_BIGGERSIZEOK := 0x00000001
     static SIIGBF_THUMBNAILONLY := 0x00000008

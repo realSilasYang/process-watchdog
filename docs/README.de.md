@@ -32,11 +32,9 @@ Das Projekt bietet eine helle und dunkle Oberfläche, automatische Wiederherstel
 
 # Oberflächenübersicht
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="images/process-watchdog-overview.png">
-  <source media="(prefers-color-scheme: light)" srcset="images/process-watchdog-overview-light.png">
-  <img src="images/process-watchdog-overview-light.png" alt="Hauptfenster mit hellem und dunklem Design" width="100%">
-</picture>
+<p align="center">
+  <img src="images/process-watchdog-overview.png" alt="Hauptfenster von Process Watchdog Assistant" width="100%">
+</p>
 
 Das Hauptfenster zeigt Reihenfolge, Anwendungssymbol, Namen, Rechteanforderung und aktuellen Status aller überwachten Einträge. Über die obere Leiste können Einträge hinzugefügt, gelöscht und pausiert sowie Einstellungen, Hilfe und Spenden geöffnet werden; in der Hilfe stehen Handbuch und Laufzeitprotokoll bereit. Die untere Leiste fasst laufende, wiederherzustellende, aktualisierte, pausierte und fehlgeschlagene Ziele zusammen. Das Protokoll erläutert die Belege hinter ungewöhnlichen Zuständen.
 

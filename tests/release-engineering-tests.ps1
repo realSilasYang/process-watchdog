@@ -115,8 +115,40 @@ $recordRoot = Join-Path $env:TEMP `
 New-Item -ItemType Directory -Path $recordRoot | Out-Null
 try {
     $bodyPath = Join-Path $recordRoot 'body.md'
+    $validBody = @"
+# 🎉 进程守护小助手 v2.0.0
+
+## ✨ 新增
+
+- 测试正文
+
+---
+
+## 📦 发布物说明
+
+- **`process-watchdog-2.0.0-windows-x64.exe`（独立可执行版）**：无需安装 AutoHotkey，下载后即可运行，适合快速体验或只需要单个程序文件的用户。
+- **`process-watchdog-2.0.0-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证、字体及运行所需资源，适合完整解压后长期使用或手动部署。
+- **`process-watchdog-2.0.0-source.zip`（完整源码版）**：包含 AHK 源码、模块、测试、文档和字体资源，适合审阅、开发或从源码运行；本机需要 AutoHotkey v2 x64。
+"@
     Set-Content -LiteralPath $bodyPath -Encoding UTF8 `
-        -Value "# 进程守护小助手 v2.0.0`r`n`r`n测试正文"
+        -Value $validBody
+    Assert-ReleaseNotesContent -Version '2.0.0' -BodyPath $bodyPath
+    Set-Content -LiteralPath $bodyPath -Encoding UTF8 `
+        -Value ($validBody -replace '# 🎉', '#')
+    Assert-ReleaseFailure {
+        Assert-ReleaseNotesContent -Version '2.0.0' -BodyPath $bodyPath
+    } '发行说明标题缺少 Emoji 时未被拒绝。'
+    Set-Content -LiteralPath $bodyPath -Encoding UTF8 `
+        -Value ($validBody -replace '无需安装 AutoHotkey', '下载后直接运行')
+    Assert-ReleaseFailure {
+        Assert-ReleaseNotesContent -Version '2.0.0' -BodyPath $bodyPath
+    } '独立可执行版缺少 AutoHotkey 要求时未被拒绝。'
+    Set-Content -LiteralPath $bodyPath -Encoding UTF8 `
+        -Value ($validBody + "`r`n`r`n## 🐛 修复`r`n`r`n- 错误顺序")
+    Assert-ReleaseFailure {
+        Assert-ReleaseNotesContent -Version '2.0.0' -BodyPath $bodyPath
+    } '发布物说明后仍有其他章节时未被拒绝。'
+    Set-Content -LiteralPath $bodyPath -Encoding UTF8 -Value $validBody
     $assets = @(
         foreach ($name in $expectedNames) {
             $path = Join-Path $recordRoot $name
@@ -137,7 +169,7 @@ try {
         draft = $true
         prerelease = $false
         target_commitish = $commit
-        body = "# 进程守护小助手 v2.0.0`n`n测试正文`n"
+        body = $validBody
         assets = $assets
     }
     Assert-ReleaseRecord -Release $record -Version '2.0.0' `

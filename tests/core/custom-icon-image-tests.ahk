@@ -557,7 +557,7 @@ AssertStatusIconResources() {
     visualSource := FileRead(A_ScriptDir
         "\..\..\app\UI\MainVisualPipeline.ahk", "UTF-8")
     AssertCustomIcon(InStr(visualSource,
-        "CreateSvgPaddedIcon(resourcePath, glyphSize, cellSize, true)"),
+        "CreateSvgPaddedIcon(resourcePath, glyphSize, cellSize, true,"),
         "状态图标没有启用独立的高质量超采样渲染")
     for retiredFunction in ["StatusPointNearSegment", "StatusShapeContains",
         "StatusGlyphContains", "CreateStatusGlyphSnapshot",
@@ -615,6 +615,101 @@ AssertAdminOverlayIcon() {
             && InStr(visualSource, "Win32.SHIL_JUMBO"),
             "管理员盾牌没有从 Windows 高分辨率库存图标取得")
     } finally App.iconResources.RestoreMainIconMetrics(previousMetrics)
+}
+
+AssertCompleteMainImageList() {
+    global Main
+    testGui := Gui()
+    testList := testGui.Add("ListView", "w480 h220 Report", ["应用程序", "状态"])
+    imageList := 0
+    Main := {
+        gui: testGui,
+        lv: testList,
+        appIcons: 0,
+        statusIconIndices: Map()
+    }
+    try {
+        imageList := CreateMainImageList(Main.statusIconIndices)
+        AssertCustomIcon(imageList,
+            "完整主图像列表创建失败，ListView 会丢失全部应用和状态图标")
+        Main.appIcons := imageList
+        testList.SetImageList(imageList, 1)
+        testList.IL := imageList
+        attachedImageList := SendMessage(Win32.LVM_GETIMAGELIST,
+            1, 0, testList.Hwnd)
+        AssertCustomIcon(attachedImageList == imageList,
+            "主图像列表没有绑定到 ListView 的小图标槽")
+
+        verifiedStatusIndices := Map()
+        for statusKind in StatusIconResourceFiles() {
+            AssertCustomIcon(Main.statusIconIndices.Has(statusKind)
+                && Main.statusIconIndices[statusKind] > 0,
+                "状态图标没有进入完整主图像列表：" statusKind)
+            statusIconIndex := Main.statusIconIndices[statusKind]
+            if verifiedStatusIndices.Has(statusIconIndex)
+                continue
+            verifiedStatusIndices[statusIconIndex] := true
+            statusIconHandle := DllCall("comctl32\ImageList_GetIcon",
+                "Ptr", imageList, "Int", statusIconIndex - 1,
+                "UInt", Win32.ILD_TRANSPARENT, "Ptr")
+            try {
+                AssertCustomIcon(statusIconHandle,
+                    "无法从完整主图像列表读取状态图标：" statusKind)
+                statusSnapshot := ReadIconPixelSnapshot(statusIconHandle)
+                statusBounds := GetOpaqueIconRectangle(statusSnapshot)
+                AssertCustomIcon(statusBounds.Right >= statusBounds.Left
+                    && statusBounds.Bottom >= statusBounds.Top,
+                    "完整主图像列表中的状态图标内容为空：" statusKind)
+            } finally {
+                if statusIconHandle
+                    try DllCall("user32\DestroyIcon", "Ptr",
+                        statusIconHandle)
+            }
+        }
+
+        appIconIndex := GetMainListIconIndex(
+            A_WinDir "\System32\notepad.exe", "", imageList)
+        AssertCustomIcon(appIconIndex > 0,
+            "完整主图像列表无法继续加入应用程序图标")
+        appIconHandle := DllCall("comctl32\ImageList_GetIcon",
+            "Ptr", imageList, "Int", appIconIndex - 1,
+            "UInt", Win32.ILD_TRANSPARENT, "Ptr")
+        try {
+            AssertCustomIcon(appIconHandle,
+                "无法从完整主图像列表读取应用程序图标")
+            appSnapshot := ReadIconPixelSnapshot(appIconHandle)
+            appBounds := GetOpaqueIconRectangle(appSnapshot)
+            AssertCustomIcon(appBounds.Right >= appBounds.Left
+                && appBounds.Bottom >= appBounds.Top,
+                "完整主图像列表中的应用程序图标内容为空")
+        } finally {
+            if appIconHandle
+                try DllCall("user32\DestroyIcon", "Ptr", appIconHandle)
+        }
+        row := testList.Add("Icon" appIconIndex, "Notepad", "运行中")
+        AssertCustomIcon(row > 0
+            && SetMainListSubItemIcon(row,
+                Main.statusIconIndices[GuardStatusKind.Running])
+            && SendMessage(Win32.LVM_GETIMAGELIST,
+                1, 0, testList.Hwnd) == imageList,
+            "写入应用和状态图标后，ListView 丢失了主图像列表绑定")
+        testList.SetImageList(0, 1)
+        AssertCustomIcon(SendMessage(Win32.LVM_GETIMAGELIST,
+                1, 0, testList.Hwnd) == 0
+            && RefreshMainStatusIconAlignment()
+            && SendMessage(Win32.LVM_GETIMAGELIST,
+                1, 0, testList.Hwnd) == imageList,
+            "状态图标刷新没有修复意外丢失的主图像列表绑定")
+    } finally {
+        try testList.SetImageList(0, 1)
+        try testList.IL := 0
+        Main.appIcons := 0
+        if imageList {
+            ClearImageListIconCache(imageList)
+            try IL_Destroy(imageList)
+        }
+        try testGui.Destroy()
+    }
 }
 
 RunCustomIconImageTests() {
@@ -681,6 +776,7 @@ RunCustomIconImageTests() {
         AssertIndexedIconResourceSelection()
         AssertStatusIconResources()
         AssertAdminOverlayIcon()
+        AssertCompleteMainImageList()
 
         genericPixels := Buffer(8 * 8 * 4, 0)
         Loop 8 * 8

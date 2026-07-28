@@ -200,6 +200,93 @@ AssertRoundedButtonSvgImage() {
     }
 }
 
+AssertVisualTextCenter(fontName, pointSize, fontWeight, dpi, text) {
+    width := Max(160, Round(160 * dpi / 96))
+    height := Max(40, Round(40 * dpi / 96))
+    pixelHeight := Max(1, Round(pointSize * dpi / 72))
+    screenDc := DllCall("user32\GetDC", "Ptr", 0, "Ptr")
+    targetDc := screenDc ? DllCall("gdi32\CreateCompatibleDC",
+        "Ptr", screenDc, "Ptr") : 0
+    targetBitmap := targetDc ? DllCall("gdi32\CreateCompatibleBitmap",
+        "Ptr", screenDc, "Int", width, "Int", height, "Ptr") : 0
+    fontHandle := DllCall("gdi32\CreateFontW",
+        "Int", -pixelHeight, "Int", 0, "Int", 0, "Int", 0,
+        "Int", fontWeight, "UInt", 0, "UInt", 0, "UInt", 0,
+        "UInt", 1, "UInt", 0, "UInt", 0, "UInt", 0,
+        "UInt", 0, "Str", fontName, "Ptr")
+    previousBitmap := 0
+    previousFont := 0
+    try {
+        AssertRoundedButtonRenderer(screenDc && targetDc && targetBitmap
+            && fontHandle, "无法创建字形视觉中心验证画布")
+        previousBitmap := DllCall("gdi32\SelectObject", "Ptr", targetDc,
+            "Ptr", targetBitmap, "Ptr")
+        previousFont := DllCall("gdi32\SelectObject", "Ptr", targetDc,
+            "Ptr", fontHandle, "Ptr")
+        DllCall("gdi32\PatBlt", "Ptr", targetDc, "Int", 0, "Int", 0,
+            "Int", width, "Int", height, "UInt", 0x00000042, "Int")
+        DllCall("gdi32\SetBkMode", "Ptr", targetDc, "Int", 1)
+        DllCall("gdi32\SetTextColor", "Ptr", targetDc,
+            "UInt", 0x00FFFFFF)
+        textRect := TextVisualAlignment.CreateCenteredTextRect(targetDc,
+            text, 0, 0, width, height)
+        DllCall("user32\DrawTextW", "Ptr", targetDc, "Str", text,
+            "Int", -1, "Ptr", textRect, "UInt", 0x00000825, "Int")
+
+        minimumY := height
+        maximumY := -1
+        Loop height {
+            y := A_Index - 1
+            Loop width {
+                x := A_Index - 1
+                if DllCall("gdi32\GetPixel", "Ptr", targetDc,
+                        "Int", x, "Int", y, "UInt") != 0 {
+                    minimumY := Min(minimumY, y)
+                    maximumY := Max(maximumY, y)
+                }
+            }
+        }
+        AssertRoundedButtonRenderer(maximumY >= minimumY,
+            "视觉中心验证没有绘制出文字像素：" text)
+        visibleCenter := (minimumY + maximumY + 1) / 2
+        AssertRoundedButtonRenderer(Abs(visibleCenter - height / 2) <= 1,
+            "文字可见墨迹未居中：DPI=" dpi "，偏差="
+                Round(visibleCenter - height / 2, 2))
+    } finally {
+        if previousFont
+            DllCall("gdi32\SelectObject", "Ptr", targetDc,
+                "Ptr", previousFont)
+        if previousBitmap
+            DllCall("gdi32\SelectObject", "Ptr", targetDc,
+                "Ptr", previousBitmap)
+        if fontHandle
+            DllCall("gdi32\DeleteObject", "Ptr", fontHandle)
+        if targetBitmap
+            DllCall("gdi32\DeleteObject", "Ptr", targetBitmap)
+        if targetDc
+            DllCall("gdi32\DeleteDC", "Ptr", targetDc)
+        if screenDc
+            DllCall("user32\ReleaseDC", "Ptr", 0, "Ptr", screenDc)
+    }
+}
+
+AssertTextVisualAlignment() {
+    TextVisualAlignment.InkBoundsCache.Clear()
+    systemFont := LocalizationService.GetLanguageSystemUiFontName()
+    AssertVisualTextCenter(systemFont, 10, 700, 96, Tr("帮助信息"))
+    AssertVisualTextCenter(systemFont, 10, 700, 288, Tr("帮助信息"))
+    AssertVisualTextCenter("Segoe UI", 10, 700, 96, "Settings")
+    cachedCount := TextVisualAlignment.InkBoundsCache.Count
+    delta := TextVisualAlignment.MeasureFontInkCenterDelta(
+        systemFont, 12, 400, 96,
+        Trim(StrReplace(Tr("✅ 运行中"), "✅", "")))
+    AssertRoundedButtonRenderer(IsNumber(delta),
+        "ListView 状态图标未获得有效的字体视觉中心偏移")
+    AssertRoundedButtonRenderer(cachedCount > 0
+        && TextVisualAlignment.InkBoundsCache.Count >= cachedCount,
+        "字形视觉中心缓存没有复用已测量字体与文本")
+}
+
 AssertLucideSvgAssets() {
     renderer := SvgRenderLibrary(A_ScriptDir
         "\..\..\third_party\resvg\resvg.dll")
@@ -275,6 +362,7 @@ RunRoundedButtonRendererTests() {
     AssertRoundedButtonSurfaceColor(UiThemeService.Color("PauseDisabled"))
     AssertRoundedSelectionMask()
     AssertRoundedButtonSvgImage()
+    AssertTextVisualAlignment()
     AssertLucideSvgAssets()
     RoundedButtonRenderer.Shutdown()
 }

@@ -32,11 +32,9 @@ Dự án có giao diện sáng và tối, khôi phục tự động, bảo vệ 
 
 # Tổng quan giao diện
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="images/process-watchdog-overview.png">
-  <source media="(prefers-color-scheme: light)" srcset="images/process-watchdog-overview-light.png">
-  <img src="images/process-watchdog-overview-light.png" alt="Cửa sổ chính ở giao diện sáng và tối" width="100%">
-</picture>
+<p align="center">
+  <img src="images/process-watchdog-overview.png" alt="Cửa sổ chính của Process Watchdog Assistant" width="100%">
+</p>
 
 Cửa sổ chính hiển thị thứ tự mục giám sát, biểu tượng ứng dụng, tên, yêu cầu đặc quyền và trạng thái hiện tại. Thanh lệnh có các thao tác Thêm, Xóa, Tạm dừng, Cài đặt, Thông tin trợ giúp và Ủng hộ; từ Thông tin trợ giúp có thể mở hướng dẫn hoặc nhật ký chạy. Thanh dưới cùng tổng hợp số mục đang chạy, đang khôi phục, đang cập nhật, tạm dừng và thất bại; nhật ký giải thích bằng chứng đứng sau từng trạng thái bất thường.
 

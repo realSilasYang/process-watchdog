@@ -653,32 +653,96 @@ class SettingsWindow extends ManagedWindow {
         } finally this.fontRefreshInProgress := false
     }
 
+    SuspendTabRedraw() {
+        transaction := {Active: false, Hwnd: 0}
+        if !this.IsOpen()
+            return transaction
+        hwnd := this.gui.Hwnd
+        if !DllCall("user32\IsWindowVisible", "Ptr", hwnd, "Int")
+            return transaction
+
+        ; 父窗口暂停绘制后，批量显隐子控件不会把中间状态提交到屏幕。不能对
+        ; 隐藏页子控件逐个发送 WM_SETREDRAW：DefWindowProc 会改写 WS_VISIBLE，
+        ; 恢复时反而可能让本应隐藏的控件重新出现。
+        transaction.Hwnd := hwnd
+        transaction.Active := true
+        try {
+            DllCall("user32\SendMessageW", "Ptr", hwnd,
+                "UInt", Win32.WM_SETREDRAW, "Ptr", false,
+                "Ptr", 0, "Ptr")
+        } catch as suspendError {
+            this.ResumeTabRedraw(transaction)
+            throw suspendError
+        }
+        return transaction
+    }
+
+    ResumeTabRedraw(transaction) {
+        if !IsObject(transaction) || !transaction.Active
+            return
+        transaction.Active := false
+        hwnd := transaction.Hwnd
+        if !DllCall("user32\IsWindow", "Ptr", hwnd, "Int")
+            return
+        DllCall("user32\SendMessageW", "Ptr", hwnd,
+            "UInt", Win32.WM_SETREDRAW, "Ptr", true, "Ptr", 0, "Ptr")
+        DllCall("user32\RedrawWindow", "Ptr", hwnd, "Ptr", 0,
+            "Ptr", 0, "UInt", Win32.RDW_LAYOUT_REFRESH, "Int")
+    }
+
+    SetTabButtonVisualState(button, normalColor, textColor) {
+        SetHoverButtonColors(button, normalColor)
+        try hwnd := button.Hwnd
+        catch
+            return false
+        if !App.uiInteractions.HasButton(hwnd) {
+            SetButtonBackground(button, normalColor)
+            SetButtonTextColor(button, textColor)
+            return false
+        }
+        ; 切页事务结束时由父窗口统一重绘。这里只更新所有者绘制状态，不让
+        ; 背景色、文字色各自生成一帧；抬起后 50 ms 反馈尚未结束时仍保留
+        ; 当前按压色，随后定时器会恢复到这里写入的新 normal。
+        state := App.uiInteractions.GetButton(hwnd)
+        if !state.HasOwnProp("releaseResetTimer") || !state.releaseResetTimer
+            state.current := normalColor
+        state.textColor := textColor
+        return true
+    }
+
     SwitchTab(index, *) {
         if (index < 1 || index > this.tabControls.Length)
             return
-        if !this.EnsureTabBuilt(index)
-            return
-        for tabIndex, controls in this.tabControls {
-            isVisible := tabIndex == index
-            for control in controls
-                try control.Visible := isVisible
-        }
-        for buttonIndex, button in this.tabButtons {
-            isActive := this.tabButtonPages[buttonIndex] == index
-            normalColor := isActive ? UiThemeService.Color("TabActive")
-                : UiThemeService.Color("Tab")
-            textColor := isActive ? UiThemeService.Color("TabActiveText")
-                : UiThemeService.Color("TabText")
-            SetHoverButtonColors(button, normalColor)
-            SetButtonBackground(button, normalColor)
-            SetButtonTextColor(button, textColor)
-        }
-        this.activeTab := index
-        showSettingsActions := index != 5
-        if this.saveButton
-            try this.saveButton.Visible := showSettingsActions
-        if this.cancelButton
-            try this.cancelButton.Visible := showSettingsActions
+        if this.activeTab == index
+            return true
+
+        redrawTransaction := this.SuspendTabRedraw()
+        try {
+            ; 首次访问页面时，控件的创建和初始隐藏也必须位于同一绘制事务中，
+            ; 否则新控件会在 AddTabControl 隐藏它之前短暂出现在当前页面。
+            if !this.EnsureTabBuilt(index)
+                return
+            for tabIndex, controls in this.tabControls {
+                isVisible := tabIndex == index
+                for control in controls
+                    try control.Visible := isVisible
+            }
+            for buttonIndex, button in this.tabButtons {
+                isActive := this.tabButtonPages[buttonIndex] == index
+                normalColor := isActive ? UiThemeService.Color("TabActive")
+                    : UiThemeService.Color("Tab")
+                textColor := isActive ? UiThemeService.Color("TabActiveText")
+                    : UiThemeService.Color("TabText")
+                this.SetTabButtonVisualState(button, normalColor, textColor)
+            }
+            this.activeTab := index
+            showSettingsActions := index != 5
+            if this.saveButton
+                try this.saveButton.Visible := showSettingsActions
+            if this.cancelButton
+                try this.cancelButton.Visible := showSettingsActions
+            return true
+        } finally this.ResumeTabRedraw(redrawTransaction)
     }
 
     BrowseLogDirectory(*) {
