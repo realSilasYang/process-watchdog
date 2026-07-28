@@ -1860,6 +1860,13 @@ GetMainListIconIndex(path, stateObj, imageList) {
     finally ReleaseMainImageListUse(imageList)
 }
 
+ScheduleMainListNativeSurfaceRefresh(delayMs := 15) {
+    if !Main.HasOwnProp("listSelectionPresenter")
+        || !IsObject(Main.listSelectionPresenter)
+        return false
+    return Main.listSelectionPresenter.ScheduleNativeSurfaceRefresh(delayMs)
+}
+
 SetMainListAdminOverlay(row, isAdmin) {
     if !Main.lv || row < 1 || row > Main.lv.GetCount()
         return false
@@ -1868,8 +1875,11 @@ SetMainListAdminOverlay(row, isAdmin) {
     NumPut("Int", row - 1, item, 4)
     NumPut("UInt", isAdmin ? (1 << 8) : 0, item, 12)
     NumPut("UInt", Win32.LVIS_OVERLAYMASK, item, 16)
-    return SendMessage(Win32.LVM_SETITEMW, 0, item.Ptr,
+    updated := SendMessage(Win32.LVM_SETITEMW, 0, item.Ptr,
         Main.lv.Hwnd) != 0
+    if updated
+        ScheduleMainListNativeSurfaceRefresh()
+    return updated
 }
 
 RefreshMainListDisplay(path) {
@@ -2020,6 +2030,7 @@ SetMainStatusSortKey(row, stateObj := "", descending := "") {
     sequence := Main.lv.GetText(row, 4)
     Main.lv.Modify(row, "Col5", GetMainStatusSortKey(stateObj, sequence,
         descending))
+    ScheduleMainListNativeSurfaceRefresh()
     return true
 }
 
@@ -2035,6 +2046,7 @@ RefreshMainStatusSortKeys(descending := "", scheduleSort := true) {
     }
     if refreshed && scheduleSort
         ScheduleMainListTemporarySortRefresh(5)
+    ScheduleMainListNativeSurfaceRefresh()
     return refreshed
 }
 
@@ -2047,8 +2059,11 @@ SetMainListSubItemIcon(row, iconIndex) {
     NumPut("Int", 1, listItem, 8) ; 状态列的零基子项索引
     NumPut("Int", iconIndex > 0 ? iconIndex - 1 : -1,
         listItem, A_PtrSize == 8 ? 36 : 28)
-    return SendMessage(Win32.LVM_SETITEMW, 0,
+    updated := SendMessage(Win32.LVM_SETITEMW, 0,
         listItem.Ptr, Main.lv.Hwnd) != 0
+    if updated
+        ScheduleMainListNativeSurfaceRefresh()
+    return updated
 }
 
 SetMainListStatus(row, statusText) {

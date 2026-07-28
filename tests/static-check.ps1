@@ -180,11 +180,12 @@ if (-not $mainSource.Contains('#Include app\UI\ListViewSelectionPresenter.ahk') 
     -not $listViewSelectionPresenterSource.Contains('Win32.CDRF_NOTIFYPOSTPAINT') -or
     -not $listViewSelectionPresenterSource.Contains('Win32.LVM_GETITEMSTATE') -or
     -not $listViewSelectionPresenterSource.Contains('Win32.LVIS_SELECTED') -or
-    -not $listViewSelectionPresenterSource.Contains('Win32.LVM_REDRAWITEMS') -or
-    -not $listViewSelectionPresenterSource.Contains('Win32.LVM_SETEXTENDEDLISTVIEWSTYLE') -or
-    -not $listViewSelectionPresenterSource.Contains('Win32.LVS_EX_GRIDLINES, 0, listView.Hwnd') -or
+    -not $listViewSelectionPresenterSource.Contains('ScheduleNativeSurfaceRefresh(delayMs := 15)') -or
+    -not $listViewSelectionPresenterSource.Contains('Win32.RDW_CONTROL_REFRESH') -or
     -not $listViewSelectionPresenterSource.Contains('MaskOutsideRoundedRectangle(hdc,') -or
-    $listViewSelectionPresenterSource.Contains('ColumnSeparators') -or
+    $listViewSelectionPresenterSource.Contains('DrawColumnSeparators') -or
+    $listViewSelectionPresenterSource.Contains('SetDCBrushColor') -or
+    -not $mainVisualPipelineSource.Contains('ScheduleMainListNativeSurfaceRefresh(delayMs := 15)') -or
     -not $source.Contains('Main.listSelectionPresenter.RefreshItem(Item)') -or
     -not $source.Contains('Main.listSelectionPresenter.Dispose()')) {
     $failures.Add('Main ListView selection must use a DPI-aware rounded background while preserving native item content and cleanup')

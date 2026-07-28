@@ -161,15 +161,9 @@ try {
     ownerEdit := owner.Add("Edit",
         "x16 y42 w260 h28 Background252526 cFFFFFF", "editable")
     list := owner.Add("ListView",
-        ; 测试夹具先故意启用 GRIDLINES，呈现器必须只清除这一位。
-        "x16 y82 w380 h120 Report +LV0x10003 -Hdr Background252526 cFFFFFF",
+        "x16 y82 w380 h120 Report +LV0x10002 -Hdr Background252526 cFFFFFF",
         ["Name", "State", "Path", "Sequence", "StatusKey"])
     listSelectionPresenter := ListViewSelectionPresenter(list)
-    listExtendedStyle := SendMessage(Win32.LVM_GETEXTENDEDLISTVIEWSTYLE,
-        0, 0, list.Hwnd)
-    AssertGuiSmoke(!(listExtendedStyle & Win32.LVS_EX_GRIDLINES)
-        && (listExtendedStyle & 0x10002) == 0x10002,
-        "Main ListView separators were not hidden without changing other styles")
     list.ModifyCol(1, 220)
     list.ModifyCol(2, 110)
     list.ModifyCol(3, 0)
@@ -356,6 +350,7 @@ try {
         && list.GetText(1, 1) == "Smoke target A"
         && list.GetText(1, 4) == "1",
         "Main ListView sequence did not refresh after deletion")
+    list.Add("", "Smoke target C", "Paused", "C:\SmokeC.exe", "2", "20")
     actionButton := owner.Add("Text",
         "x16 y216 w88 h30 Center 0x200 Background333333 cFFFFFF",
         "Action")
@@ -409,6 +404,56 @@ try {
         - NumGet(headerCellRect, 0, "Int")
     AssertGuiSmoke(Abs(headerSequenceWidth - sequenceWidth) <= 1,
         "Pseudo header sequence cell did not align with the native DPI-scaled column")
+    ; 模拟守护状态的单行更新，再由呈现器合并为一次原生整控件绘制。
+    ; 两行和空白区的同一列边界必须保持同色，证明没有退回逐段自绘。
+    list.Modify(2, "Col2", "Updated")
+    AssertGuiSmoke(listSelectionPresenter.ScheduleNativeSurfaceRefresh(1),
+        "Native ListView surface refresh was not scheduled")
+    Sleep(30)
+    firstDividerItemRect := Buffer(16, 0)
+    secondDividerItemRect := Buffer(16, 0)
+    NumPut("Int", 0, firstDividerItemRect, 0)
+    NumPut("Int", 0, secondDividerItemRect, 0)
+    AssertGuiSmoke(SendMessage(0x100E, 0, firstDividerItemRect.Ptr,
+            list.Hwnd)
+        && SendMessage(0x100E, 1, secondDividerItemRect.Ptr, list.Hwnd),
+        "Native ListView divider item bounds were not readable")
+    listClientRect := Buffer(16, 0)
+    AssertGuiSmoke(DllCall("user32\GetClientRect", "Ptr", list.Hwnd,
+        "Ptr", listClientRect, "Int"), "ListView client bounds were not readable")
+    dividerDc := DllCall("user32\GetDC", "Ptr", list.Hwnd, "Ptr")
+    AssertGuiSmoke(dividerDc, "Native ListView divider pixels were not readable")
+    try {
+        surfaceColor := RoundedButtonRenderer.ColorToBgr(
+            UiThemeService.Color("Surface"))
+        blankY := Min(NumGet(listClientRect, 12, "Int") - 3,
+            NumGet(secondDividerItemRect, 12, "Int") + 8)
+        dividerX := -1
+        dividerColor := surfaceColor
+        for candidateX in [sequenceWidth - 1, sequenceWidth,
+                sequenceWidth + 1] {
+            candidateColor := DllCall("gdi32\GetPixel", "Ptr", dividerDc,
+                "Int", candidateX, "Int", blankY, "UInt")
+            if candidateColor != surfaceColor {
+                dividerX := candidateX
+                dividerColor := candidateColor
+                break
+            }
+        }
+        firstRowDividerColor := dividerX < 0 ? surfaceColor
+            : DllCall("gdi32\GetPixel", "Ptr", dividerDc, "Int", dividerX,
+                "Int", (NumGet(firstDividerItemRect, 4, "Int")
+                    + NumGet(firstDividerItemRect, 12, "Int")) // 2, "UInt")
+        secondRowDividerColor := dividerX < 0 ? surfaceColor
+            : DllCall("gdi32\GetPixel", "Ptr", dividerDc, "Int", dividerX,
+                "Int", (NumGet(secondDividerItemRect, 4, "Int")
+                    + NumGet(secondDividerItemRect, 12, "Int")) // 2, "UInt")
+        AssertGuiSmoke(dividerX >= 0
+            && firstRowDividerColor == dividerColor
+            && secondRowDividerColor == dividerColor,
+            "Native ListView column divider was interrupted after an item update")
+    } finally DllCall("user32\ReleaseDC", "Ptr", list.Hwnd,
+        "Ptr", dividerDc)
     list.Modify(1, "Select Focus")
     ; 右键菜单接管焦点时，自绘通知可能不再携带 CDIS_SELECTED；真实行状态
     ; 仍须触发后绘制，确保圆角选中态不会退回原生矩形。
