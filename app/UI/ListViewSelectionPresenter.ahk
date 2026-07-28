@@ -48,6 +48,74 @@ class ListViewSelectionPresenter {
         return redrawRequested != 0
     }
 
+    DrawColumnSeparators(listView, hdc) {
+        if !hdc || !IsObject(listView) || !listView.Hwnd
+            return false
+        hHeader := SendMessage(Win32.LVM_GETHEADER, 0, 0, listView.Hwnd)
+        if !hHeader
+            return false
+        ; 隐藏的原生表头仍持有列顺序和实时像素宽度。
+        columnCount := SendMessage(Win32.HDM_GETITEMCOUNT, 0, 0, hHeader)
+        if columnCount <= 1
+            return true
+        order := Buffer(columnCount * 4, 0)
+        if !SendMessage(Win32.LVM_GETCOLUMNORDERARRAY, columnCount,
+                order.Ptr, listView.Hwnd)
+            return false
+
+        visibleWidths := []
+        Loop columnCount {
+            columnIndex := NumGet(order, (A_Index - 1) * 4, "Int")
+            width := SendMessage(Win32.LVM_GETCOLUMNWIDTH, columnIndex,
+                0, listView.Hwnd)
+            if width > 0
+                visibleWidths.Push(width)
+        }
+        if visibleWidths.Length <= 1
+            return true
+
+        clientRect := Buffer(16, 0)
+        if !DllCall("user32\GetClientRect", "Ptr", listView.Hwnd,
+                "Ptr", clientRect, "Int")
+            return false
+        clientLeft := NumGet(clientRect, 0, "Int")
+        clientTop := NumGet(clientRect, 4, "Int")
+        clientRight := NumGet(clientRect, 8, "Int")
+        clientBottom := NumGet(clientRect, 12, "Int")
+        if clientRight <= clientLeft || clientBottom <= clientTop
+            return false
+
+        ; DC_BRUSH 随绘制上下文复用，不在滚动和选择重绘中反复创建 GDI 对象。
+        brush := DllCall("gdi32\GetStockObject", "Int", Win32.DC_BRUSH,
+            "Ptr")
+        if !brush
+            return false
+        previousBrushColor := DllCall("gdi32\SetDCBrushColor", "Ptr", hdc,
+            "UInt", RoundedButtonRenderer.ColorToBgr(
+                UiThemeService.Color("Divider")), "UInt")
+        separatorRect := Buffer(16, 0)
+        boundaryX := clientLeft
+        try {
+            for visibleIndex, width in visibleWidths {
+                boundaryX += width
+                if visibleIndex >= visibleWidths.Length
+                    break
+                ; 边界落在左列最后一个像素上，与原生报表视图的列线对齐。
+                lineX := boundaryX - 1
+                if lineX < clientLeft || lineX >= clientRight
+                    continue
+                NumPut("Int", lineX, separatorRect, 0)
+                NumPut("Int", clientTop, separatorRect, 4)
+                NumPut("Int", lineX + 1, separatorRect, 8)
+                NumPut("Int", clientBottom, separatorRect, 12)
+                DllCall("user32\FillRect", "Ptr", hdc,
+                    "Ptr", separatorRect, "Ptr", brush, "Int")
+            }
+        } finally DllCall("gdi32\SetDCBrushColor", "Ptr", hdc,
+            "UInt", previousBrushColor, "UInt")
+        return true
+    }
+
     HandleCustomDraw(listView, lParam) {
         if !lParam || !this.attached || listView.Hwnd != this.listView.Hwnd
             return
@@ -55,6 +123,13 @@ class ListViewSelectionPresenter {
         drawStage := NumGet(lParam, drawStageOffset, "UInt")
         if drawStage == Win32.CDDS_PREPAINT
             return Win32.CDRF_NOTIFYITEMDRAW
+                | Win32.CDRF_NOTIFYPOSTPAINT
+        if drawStage == Win32.CDDS_POSTPAINT {
+            hdcOffset := A_PtrSize == 8 ? 32 : 16
+            hdc := NumGet(lParam, hdcOffset, "Ptr")
+            this.DrawColumnSeparators(listView, hdc)
+            return Win32.CDRF_DODEFAULT
+        }
         if drawStage != Win32.CDDS_ITEMPREPAINT
             && drawStage != Win32.CDDS_ITEMPOSTPAINT
             return
