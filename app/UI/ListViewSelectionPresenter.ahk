@@ -10,25 +10,24 @@ class ListViewSelectionPresenter {
     __New(listView) {
         this.listView := listView
         this.notifyCallback := ObjBindMethod(this, "HandleCustomDraw")
+        this.nativeRefreshCallback := ObjBindMethod(this,
+            "RefreshNativeSurface")
         this.attached := false
         if IsObject(listView) && listView.Hwnd {
-            ; 主列表不显示列间分隔线。按位清除 GRIDLINES，保留子项图标、
-            ; 双缓冲等其它扩展样式，也不再通过自绘模拟列线。
-            SendMessage(Win32.LVM_SETEXTENDEDLISTVIEWSTYLE,
-                Win32.LVS_EX_GRIDLINES, 0, listView.Hwnd)
             listView.OnNotify(Win32.NM_CUSTOMDRAW, this.notifyCallback)
             this.attached := true
         }
     }
 
     Dispose(*) {
-        if !this.attached
-            return
+        try SetTimer(this.nativeRefreshCallback, 0)
+        if this.attached
+            try this.listView.OnNotify(Win32.NM_CUSTOMDRAW,
+                this.notifyCallback, -1)
         this.attached := false
-        try this.listView.OnNotify(Win32.NM_CUSTOMDRAW,
-            this.notifyCallback, -1)
         this.listView := ""
         this.notifyCallback := ""
+        this.nativeRefreshCallback := ""
     }
 
     IsNotificationItemSelected(listView, lParam, itemState) {
@@ -45,11 +44,32 @@ class ListViewSelectionPresenter {
     RefreshItem(row) {
         if !this.attached || row <= 0 || row > this.listView.GetCount()
             return false
-        itemIndex := row - 1
-        redrawRequested := SendMessage(Win32.LVM_REDRAWITEMS,
-            itemIndex, itemIndex, this.listView.Hwnd)
-        DllCall("user32\UpdateWindow", "Ptr", this.listView.Hwnd, "Int")
-        return redrawRequested != 0
+        return this.RefreshNativeSurface()
+    }
+
+    ScheduleNativeSurfaceRefresh(delayMs := 15) {
+        if !this.attached || !IsObject(this.listView)
+            || !this.listView.Hwnd
+            return false
+        try delayMs := Max(1, Integer(delayMs))
+        catch
+            delayMs := 15
+        ; 多个状态字段常在同一轮一起变化；反复设置同一个单次计时器即可
+        ; 合并为一次原生整控件绘制，避免逐行刷新留下断开的列边界。
+        SetTimer(this.nativeRefreshCallback, -delayMs)
+        return true
+    }
+
+    RefreshNativeSurface(*) {
+        if !this.attached || !IsObject(this.listView)
+            || !this.listView.Hwnd
+            return false
+        try SetTimer(this.nativeRefreshCallback, 0)
+        ; 不自行画线；让 Windows ListView 像搜索窗口一样完成一次原生绘制，
+        ; 双缓冲会在整帧完成后提交，列边界因此保持连续且不会闪烁。
+        return DllCall("user32\RedrawWindow", "Ptr", this.listView.Hwnd,
+            "Ptr", 0, "Ptr", 0, "UInt", Win32.RDW_CONTROL_REFRESH,
+            "Int") != 0
     }
 
     HandleCustomDraw(listView, lParam) {
