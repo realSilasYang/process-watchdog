@@ -206,6 +206,11 @@ if ($trackedFiles -notcontains $releaseNotesRelativePath) {
     throw "Current release notes are not tracked: $releaseNotesRelativePath"
 }
 Assert-ReleaseNotesContent -Version $version -BodyPath $releaseNotesPath
+$allReleaseNotes = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot `
+    'docs\release-notes') -File -Filter 'v*.md')
+foreach ($releaseNotesFile in $allReleaseNotes) {
+    Assert-ReleaseNotesImportantSection -BodyPath $releaseNotesFile.FullName
+}
 $legacyReleaseNotesRelativePath = 'docs/release-notes/v1.0.0.md'
 $legacyReleaseNotesPath = Join-Path $projectRoot $legacyReleaseNotesRelativePath
 if (-not (Test-Path -LiteralPath $legacyReleaseNotesPath -PathType Leaf) -or
@@ -222,7 +227,7 @@ foreach ($marker in @(
         'SHA256SUMS.txt',
         '无需另行安装 AutoHotkey',
         '它不是可运行程序',
-        '已停止维护的历史版本',
+        '必须先退出旧实例',
         '## ⚠️ 重要说明',
         '## ✅ 验证范围')) {
     if (-not $legacyReleaseNotes.Contains($marker)) {
@@ -278,12 +283,15 @@ $templateContracts = @(
     @{
         Path = 'docs\changelog-template.md'
         Markers = @('# 📝 中文更新日志模板',
-            '## 🎉 版本 [X.Y.Z] - YYYY-MM-DD', '### 📦 发布物说明')
+            '## 🎉 版本 [X.Y.Z] - YYYY-MM-DD', '### 📦 发布物说明',
+            '模板默认不生成“重要说明”', '没有合格事项时连标题一起删除')
     }
     @{
         Path = 'docs\en\changelog-template.md'
         Markers = @('# 📝 English Changelog Template',
-            '## 🎉 Version [X.Y.Z] - YYYY-MM-DD', '### 📦 Release Assets')
+            '## 🎉 Version [X.Y.Z] - YYYY-MM-DD', '### 📦 Release Assets',
+            'does not generate Important Notes by default',
+            'Remove the heading when no item qualifies')
     }
 )
 foreach ($contract in $templateContracts) {

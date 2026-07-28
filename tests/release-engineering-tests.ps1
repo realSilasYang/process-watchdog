@@ -133,6 +133,72 @@ try {
     Set-Content -LiteralPath $bodyPath -Encoding UTF8 `
         -Value $validBody
     Assert-ReleaseNotesContent -Version '2.0.0' -BodyPath $bodyPath
+    $validWarningBody = $validBody -replace '## ✨ 新增', @"
+## ⚠️ 重要说明
+
+- 旧版无法自动更新，升级前必须退出旧实例并完整替换发行包。
+
+---
+
+## ✨ 新增
+"@
+    Set-Content -LiteralPath $bodyPath -Encoding UTF8 `
+        -Value $validWarningBody
+    Assert-ReleaseNotesContent -Version '2.0.0' -BodyPath $bodyPath
+    $ordinaryImportantBody = $validBody -replace '## ✨ 新增', @"
+## ⚠️ 重要说明
+
+- 本版本配置保持兼容，可以直接升级。
+
+---
+
+## ✨ 新增
+"@
+    Set-Content -LiteralPath $bodyPath -Encoding UTF8 `
+        -Value $ordinaryImportantBody
+    Assert-ReleaseFailure {
+        Assert-ReleaseNotesContent -Version '2.0.0' -BodyPath $bodyPath
+    } '普通兼容性说明被错误接受为重要说明。'
+    $emptyImportantBody = $validBody -replace '## ✨ 新增', @"
+## ⚠️ 重要说明
+
+---
+
+## ✨ 新增
+"@
+    Set-Content -LiteralPath $bodyPath -Encoding UTF8 `
+        -Value $emptyImportantBody
+    Assert-ReleaseFailure {
+        Assert-ReleaseNotesContent -Version '2.0.0' -BodyPath $bodyPath
+    } '空的重要说明章节未被拒绝。'
+    $placeholderImportantBody = $validBody -replace '## ✨ 新增', @"
+## ⚠️ 重要说明
+
+- 仅在存在不兼容变化时保留本节，并补充迁移方法。
+
+---
+
+## ✨ 新增
+"@
+    Set-Content -LiteralPath $bodyPath -Encoding UTF8 `
+        -Value $placeholderImportantBody
+    Assert-ReleaseFailure {
+        Assert-ReleaseNotesContent -Version '2.0.0' -BodyPath $bodyPath
+    } '重要说明模板占位文本未被拒绝。'
+    $lateImportantBody = $validBody -replace '## 📦 发布物说明', @"
+## ⚠️ 重要说明
+
+- 旧版无法自动更新，升级前必须完整替换发行包。
+
+---
+
+## 📦 发布物说明
+"@
+    Set-Content -LiteralPath $bodyPath -Encoding UTF8 `
+        -Value $lateImportantBody
+    Assert-ReleaseFailure {
+        Assert-ReleaseNotesContent -Version '2.0.0' -BodyPath $bodyPath
+    } '位于常规章节之后的重要说明未被拒绝。'
     Set-Content -LiteralPath $bodyPath -Encoding UTF8 `
         -Value ($validBody -replace '# 🎉', '#')
     Assert-ReleaseFailure {

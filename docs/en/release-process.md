@@ -6,9 +6,13 @@
    and create `docs/release-notes/v<version>.md`, then update `VERSION`,
    `CHANGELOG.md`, and `docs/CHANGELOG.en.md`. The build
    injects the executable file version from `VERSION`. Keep `📋` in the document
-   title and use `## 🎉 Version [X.Y.Z] - YYYY-MM-DD` for release headings. Put
-   migrations, defaults, privilege changes, and required actions under
-   `⚠️ Important Notes`, and remove empty categories. Every formal release keeps
+   title and use `## 🎉 Version [X.Y.Z] - YYYY-MM-DD` for release headings.
+   `⚠️ Important Notes` is not a required module and is omitted by default. Add it
+   only for incompatible data or configuration, data-loss risk, breaking changes
+   to minimum environments, privileges, or defaults, or mandatory migration,
+   backup, or replacement steps. State the affected users, risk, and required
+   action. Unchanged compatibility, direct-upgrade availability, download advice,
+   feature summaries, and ordinary usage tips do not belong there. Every formal release keeps
    `📦 Release Assets` and names all three files with their edition role, included
    content, AutoHotkey requirement, and intended use. This is always the final
    Release-notes section so readers can choose a download after reviewing changes.

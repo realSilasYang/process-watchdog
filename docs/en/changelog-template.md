@@ -4,7 +4,9 @@
 
 For a release, copy the block below beneath Unreleased in
 `docs/CHANGELOG.en.md`, then move released entries into it. Always keep Release
-Assets; retain only the other categories that are actually present.
+Assets; retain only the other categories that are actually present. The template
+does not generate Important Notes by default; add that section manually only for
+breaking changes or mandatory upgrade actions.
 
 ```markdown
 ## 🎉 Version [X.Y.Z] - YYYY-MM-DD
@@ -14,13 +16,6 @@ Assets; retain only the other categories that are actually present.
 - **`process-watchdog-X.Y.Z-windows-x64.exe` (standalone executable):** Requires no AutoHotkey installation and runs immediately after download; intended for a quick trial or users who need a single program file.
 - **`process-watchdog-X.Y.Z-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, fonts, and runtime resources; intended for long-term use after full extraction or for manual deployment.
 - **`process-watchdog-X.Y.Z-source.zip` (complete source package):** Includes the AHK source, modules, tests, documentation, and fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
-
----
-
-### ⚠️ Important Notes
-
-- **Upgrade notice**: Keep this section only for migration, incompatibility,
-  privilege, or required-action changes. Give exact steps and failure recovery.
 
 ---
 
@@ -56,9 +51,17 @@ Assets; retain only the other categories that are actually present.
 - Every formal version keeps `📦 Release Assets` and lists all three exact file
   names, edition roles, included content, AutoHotkey requirements, and intended
   use. Release validation rejects a generic “see attachments” entry.
+- `⚠️ Important Notes` is an optional warning section and is omitted by default.
+  Add it only when existing data or configuration is incompatible, data may be
+  lost, minimum-environment or privilege changes are breaking, changed defaults
+  create an upgrade risk, or users must migrate, back up, or replace files.
+- Do not classify unchanged compatibility, direct-upgrade availability, portable
+  package recommendations, edition selection, feature summaries, ordinary usage
+  advice, or validation scope as Important Notes. When the section exists, every
+  item states who is affected, the concrete risk, and the required action, and the
+  section precedes standard categories. Remove the heading when no item qualifies.
 - Standard categories are `✨ Added`, `🚀 Improvements`, and `🐛 Fixed`; remove
-  empty categories. `⚠️ Important Notes` comes before them, and `🔒 Security`
-  appears only after coordinated disclosure.
+  empty categories. `🔒 Security` appears only after coordinated disclosure.
 - Start each item with a bold feature or problem phrase, then explain the
   user-visible change, scope, and benefit in complete English.
 - Combine commits for one feature. Do not list commit subjects, filenames,
