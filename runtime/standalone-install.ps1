@@ -56,6 +56,22 @@ function ConvertTo-StandaloneVersion {
     }
 }
 
+function Get-StandaloneSha256 {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    # 独立启动器可能继承裁剪过的 PSModulePath；直接使用 .NET，避免哈希校验
+    # 依赖 Microsoft.PowerShell.Utility 模块能否自动发现。
+    $stream = [System.IO.File]::OpenRead($Path)
+    $algorithm = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $hashBytes = $algorithm.ComputeHash($stream)
+        return [System.BitConverter]::ToString($hashBytes).Replace('-', '')
+    } finally {
+        $algorithm.Dispose()
+        $stream.Dispose()
+    }
+}
+
 function Get-MinimalManagedPaths {
     param([string[]]$RelativePaths)
 
@@ -115,7 +131,7 @@ if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) {
 if ($ExpectedSha256 -notmatch '^[0-9A-Fa-f]{64}$') {
     throw 'Standalone payload SHA-256 is invalid.'
 }
-$actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash
+$actualHash = Get-StandaloneSha256 $archive
 if ($actualHash -cne $ExpectedSha256.ToUpperInvariant()) {
     throw "Standalone payload SHA-256 mismatch: $actualHash"
 }
