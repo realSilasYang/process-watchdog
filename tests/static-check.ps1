@@ -182,7 +182,8 @@ if (-not $mainSource.Contains('#Include app\UI\ListViewSelectionPresenter.ahk') 
     -not $listViewSelectionPresenterSource.Contains('Win32.LVM_GETITEMSTATE') -or
     -not $listViewSelectionPresenterSource.Contains('Win32.LVIS_SELECTED') -or
     -not $listViewSelectionPresenterSource.Contains('Win32.LVM_REDRAWITEMS') -or
-    -not $listViewSelectionPresenterSource.Contains('DrawColumnSeparators(listView, hdc)') -or
+    -not $listViewSelectionPresenterSource.Contains('PrepareColumnSeparators(listView)') -or
+    -not $listViewSelectionPresenterSource.Contains('DrawColumnSeparators(hdc, requestedTop') -or
     -not $listViewSelectionPresenterSource.Contains('Win32.LVM_GETCOLUMNORDERARRAY') -or
     -not $listViewSelectionPresenterSource.Contains('UiThemeService.Color("Divider")') -or
     -not $listViewSelectionPresenterSource.Contains('MaskOutsideRoundedRectangle(hdc,') -or
