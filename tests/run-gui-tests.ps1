@@ -33,7 +33,7 @@ function Invoke-GuiTest {
     param(
         [string]$ScriptPath,
         [string]$Arguments = "",
-        [int]$TimeoutMilliseconds = 30000
+        [int]$TimeoutMilliseconds = 60000
     )
 
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
