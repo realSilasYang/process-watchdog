@@ -211,6 +211,25 @@ function Normalize-ReleaseBody {
     return ($Text -replace "`r`n", "`n").TrimEnd("`r", "`n")
 }
 
+function Assert-ReleaseNotesNoValidationSection {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$BodyPath
+    )
+
+    if (-not (Test-Path -LiteralPath $BodyPath -PathType Leaf)) {
+        throw "发行说明不存在：$BodyPath"
+    }
+    $body = Get-Content -LiteralPath $BodyPath -Raw -Encoding UTF8
+    $validationHeadingPattern =
+        '(?mi)^##\s+(?:✅\s*)?(?:验证范围|驗證範圍|测试范围|測試範圍|' +
+        'Validation\s+Scope|Verification\s+Scope|Test\s+Coverage)\s*\r?$'
+    if ($body -match $validationHeadingPattern) {
+        throw ('发行说明不得包含验证范围章节；自动化结果、人工矩阵和未覆盖环境' +
+            '应记录在专门的验证证据与 Actions 日志中。')
+    }
+}
+
 function Assert-ReleaseNotesImportantSection {
     [CmdletBinding()]
     param(
@@ -231,7 +250,7 @@ function Assert-ReleaseNotesImportantSection {
 
     $heading = $headings[0]
     $regularHeading = [regex]::Match($body,
-        '(?m)^## (?:✨ 新增|🚀 优化|🐛 修复|✅ 验证范围|🔒 安全)\r?$')
+        '(?m)^## (?:✨ 新增|🚀 优化|🐛 修复|🔒 安全)\r?$')
     if ($regularHeading.Success -and $heading.Index -gt $regularHeading.Index) {
         throw '“⚠️ 重要说明”必须位于常规变更章节之前。'
     }
@@ -287,6 +306,7 @@ function Assert-ReleaseNotesContent {
     if ($body -notmatch "(?m)^# 🎉 进程守护小助手 v$escapedVersion\r?$") {
         throw '发行说明必须保留带 🎉 的版本标题。'
     }
+    Assert-ReleaseNotesNoValidationSection -BodyPath $BodyPath
     Assert-ReleaseNotesImportantSection -BodyPath $BodyPath
     $assetHeadings = [regex]::Matches($body,
         '(?m)^## 📦 发布物说明\r?$')
@@ -392,6 +412,7 @@ Export-ModuleMember -Function @(
     'Test-CanonicalReleaseVersion'
     'Get-ReleaseArtifactNames'
     'Assert-ReleaseArtifactInventory'
+    'Assert-ReleaseNotesNoValidationSection'
     'Assert-ReleaseNotesImportantSection'
     'Assert-ReleaseNotesContent'
     'Resolve-ReleaseState'

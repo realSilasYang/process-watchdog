@@ -22,7 +22,8 @@
 - CHANGELOG 和 Release 说明保留规定的 Emoji 标题；`📦 发布物说明`逐项列出三个
   准确文件名、版本定位、包含内容、AutoHotkey 要求和适用场景，并固定为 Release
   正文最后一个章节。
-- Release 说明明确列出尚未完成的物理 Windows、DPI、多显示器或高对比度组合。
+- CHANGELOG 和 Release Notes 均不包含“✅ 验证范围”章节；测试数量、浸泡结果、
+  构建哈希及尚未完成的物理矩阵只保存在验证证据和 Actions 日志中。
 
 ## GitHub 仓库设置
 

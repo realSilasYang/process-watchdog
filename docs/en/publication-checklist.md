@@ -26,8 +26,9 @@ actions on GitHub after repository creation and cannot be replaced by local test
   `📦 Release Assets` lists all three exact file names, edition roles, included
   content, AutoHotkey requirements, and intended uses as the final Release-notes
   section.
-- Release notes identify physical Windows, DPI, multi-monitor, or high-contrast
-  combinations that remain untested.
+- Neither changelogs nor Release notes contain a `✅ Validation Scope` section.
+  Test counts, soak results, build hashes, and incomplete physical matrices stay
+  in validation evidence and Actions logs.
 
 ## GitHub repository settings
 

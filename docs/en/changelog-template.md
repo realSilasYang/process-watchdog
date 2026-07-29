@@ -62,6 +62,10 @@ breaking changes or mandatory upgrade actions.
   section precedes standard categories. Remove the heading when no item qualifies.
 - Standard categories are `✨ Added`, `🚀 Improvements`, and `🐛 Fixed`; remove
   empty categories. `🔒 Security` appears only after coordinated disclosure.
+- Neither changelogs nor Release notes may contain a `✅ Validation Scope` section
+  or enumerate test counts, soak iterations, build hashes, or incomplete manual
+  matrices. Keep that evidence in dedicated validation records, CI/Release
+  Actions logs, and complete build artifacts.
 - Start each item with a bold feature or problem phrase, then explain the
   user-visible change, scope, and benefit in complete English.
 - Combine commits for one feature. Do not list commit subjects, filenames,
