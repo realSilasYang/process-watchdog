@@ -1151,21 +1151,28 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         AssertLocalizedWindow(addWindow.searchButton.Text == Tr("搜索...")
             && addWindow.browseButton.Text == Tr("选择...")
             && addWindow.okButton.Text == Tr("确 定")
-            && addWindow.cancelButton.Text == Tr("取 消")
+            && addWindow.cancelButton.Text == Tr("取 消"),
+            language " 添加窗口按钮文字没有使用当前语言")
+        AssertLocalizedWindow(addSearchState.HasOwnProp("buttonImage")
             && addSearchState.buttonImage.sourcePath
                 == GetApplicationAssetPath("ui-icons\lucide\search.svg")
+            && addBrowseState.HasOwnProp("buttonImage")
             && addBrowseState.buttonImage.sourcePath
                 == GetApplicationAssetPath(
-                    "ui-icons\lucide\folder-open.svg")
-            && !addOkState.HasOwnProp("buttonImage")
+                    "ui-icons\lucide\folder-open.svg"),
+            language " 添加窗口搜索或选择按钮没有使用预期 SVG 图标")
+        AssertLocalizedWindow(!addOkState.HasOwnProp("buttonImage")
             && !addOkState.HasOwnProp("buttonIcon")
             && !addCancelState.HasOwnProp("buttonImage")
             && !addCancelState.HasOwnProp("buttonIcon")
             && !RegExMatch(addWindow.okButton.Text addWindow.cancelButton.Text,
-                "[✔❌]")
-            && addPointerOnSearchButton
-            && addHintTextWidth <= addHintRect.Right - addHintRect.Left,
-            language " 添加窗口功能 SVG、初始鼠标位置或纯文字确定／取消按钮不正确")
+                "[✔❌]"),
+            language " 添加窗口确定／取消按钮不应带有图标或 Emoji")
+        AssertLocalizedWindow(addPointerOnSearchButton,
+            language " 添加窗口首次显示后鼠标没有位于搜索按钮中心")
+        AssertLocalizedWindow(addHintTextWidth <= addHintRect.Right
+                - addHintRect.Left,
+            language " 添加窗口路径提示文字超出控件宽度")
         addBottomGap := addClientRect.Height - addOkRect.Bottom
         AssertLocalizedWindow(
             addUtilityHintGap >= Round(10 * addDpiScale)

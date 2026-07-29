@@ -61,7 +61,7 @@ The assistant is intended for ordinary applications, scripts, and shortcuts that
 - Hard real-time systems, highly available clusters, or security-isolated process orchestration.
 - Aggressive recovery policies that force every unknown process state to mean stopped.
 
-The current physical display-scaling matrix covers 100% through 200%. Other scales and continuous per-monitor DPI changes cannot be considered verified from code alone. See [Compatibility and known limitations](en/compatibility.md) for the complete boundary.
+A complete GUI automation run is recorded on real Windows 11 at 200% DPI, with rendering calculations covered by regression tests at 100% and 300%. Manual visual checks at every scale, continuous per-monitor DPI changes, and high contrast remain unverified and must not be inferred from code alone. See the [GUI validation record](../tests/gui/VALIDATION-EVIDENCE.en.md) and [Compatibility and known limitations](en/compatibility.md).
 
 ---
 
@@ -130,7 +130,9 @@ The six main-window buttons have the following roles:
 | Help | Choose the built-in user guide, this session's runtime log, or the GitHub feedback page |
 | Donate | Show the WeChat Pay and Alipay QR codes that support ongoing maintenance |
 
-An item can define its launch entry, working directory, arguments, and administrator requirement. An LNK remains the launch entry while the resolved application path is stored separately for process identification. Indirect shortcuts created by installers therefore do not have to be replaced manually with a version-specific internal EXE.
+An item can define its launch entry, working directory, arguments, environment variables, and administrator requirement. A direct script can also select any runtime and runtime arguments in Process Identification and Launch Settings, including a Python virtual environment, AutoHotkey, PowerShell, Node.js, or Java. The fixed order is runtime arguments, target path, then target arguments; leaving the runtime blank preserves the default launch behavior. An LNK remains the launch entry while the resolved application path is stored separately for process identification. Indirect shortcuts created by installers therefore do not have to be replaced manually with a version-specific internal EXE.
+
+Application search requires a running Everything background instance. The bundled `Everything64.dll` is only an SDK client for that instance and contains no indexer. If the background instance is not running, the assistant searches bounded local installation hints and starts Everything silently when found; if it is not installed, the search window links to the official latest-version download page. See [Common scenarios](en/quick-start.md) for examples.
 
 Right-click an item in the main list to:
 

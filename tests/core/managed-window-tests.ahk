@@ -85,6 +85,7 @@ class FakeManagedWindowHierarchy {
         this.Locked := false
         this.ActivatedHwnd := 0
         this.ReleaseCount := 0
+        this.PrepareRestoreCount := 0
     }
 
     Acquire(ownerGui, childHwnd := 0) {
@@ -109,6 +110,11 @@ class FakeManagedWindowHierarchy {
         if !IsObject(closeContext)
             return
         this.Events.Push("complete:" closeContext.OwnerHwnd)
+    }
+
+    PrepareChildRestore(childHwnd) {
+        this.PrepareRestoreCount++
+        return false
     }
 
     IsOwnerLocked(guiObj) {
@@ -176,10 +182,12 @@ RunManagedWindowTests() {
     hierarchy.Locked := true
     AssertManagedWindow(window.ShowExisting()
         && hierarchy.ActivatedHwnd == 200
+        && hierarchy.PrepareRestoreCount == 1
         && factory.Created[1].ShowCount == 0,
         "存在更深层窗口时错误显示了直接所有者")
     hierarchy.Locked := false
     AssertManagedWindow(window.ShowExisting()
+        && hierarchy.PrepareRestoreCount == 2
         && factory.Created[1].ShowCount == 1,
         "未锁定的既有窗口没有恢复显示")
 

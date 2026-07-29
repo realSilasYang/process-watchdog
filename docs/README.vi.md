@@ -61,7 +61,7 @@ Phù hợp với ứng dụng, tập lệnh và lối tắt thông thường c�
 - Hệ thống thời gian thực cứng, cụm khả dụng cao hoặc điều phối tiến trình cần ranh giới cách ly bảo mật.
 - Chính sách cực đoan coi mọi trạng thái tiến trình chưa rõ là đã dừng.
 
-Ma trận kiểm thử tỷ lệ hiển thị trên thiết bị thật hiện bao phủ 100% đến 200%. Các tỷ lệ khác và việc chuyển DPI liên tục giữa màn hình không thể được coi là đã xác minh chỉ từ mã nguồn. Xem [Khả năng tương thích và giới hạn đã biết](en/compatibility.md).
+Đã ghi nhận một lượt tự động hóa GUI đầy đủ trên Windows 11 với DPI thực 200%, đồng thời phép tính dựng hình ở 100% và 300% được bao phủ bằng kiểm thử hồi quy. Việc kiểm tra trực quan thủ công ở mọi tỷ lệ, chuyển DPI liên tục giữa các màn hình và chế độ tương phản cao vẫn chưa được xác minh, không được suy ra chỉ từ mã nguồn. Xem [hồ sơ xác minh GUI](../tests/gui/VALIDATION-EVIDENCE.en.md) và [Khả năng tương thích và giới hạn đã biết](en/compatibility.md).
 
 ---
 

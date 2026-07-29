@@ -182,7 +182,10 @@ ShutdownApplicationResources(*) {
 }
 
 OnManagedWindowSystemCommand(wParam, lParam, msg, hwnd) {
-    if ((wParam & 0xFFF0) == Win32.SC_MINIMIZE
+    command := wParam & 0xFFF0
+    if (command == Win32.SC_MINIMIZE
         && WindowHierarchy.MinimizeChildIndependently(hwnd))
         return 0
+    if (command == Win32.SC_RESTORE || command == Win32.SC_MAXIMIZE)
+        WindowHierarchy.PrepareChildRestore(hwnd)
 }

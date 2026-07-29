@@ -24,6 +24,11 @@ replace.
 | Minimizing a child does not minimize its parent | Not tested | Not tested | Not tested | Not tested |
 | Cross-monitor drag and continuous DPI changes | N/A | Not tested | Not tested | Not tested |
 
+On 2026-07-29 the complete GUI automation suite passed on real Windows 11 at
+200% DPI. This is not a manual visual sign-off, so every matrix cell remains
+pending. See the reproducible device, theme, resource, and accessibility facts
+in the [GUI validation record](VALIDATION-EVIDENCE.en.md).
+
 Also check:
 
 - Light, dark, and Windows high-contrast modes.

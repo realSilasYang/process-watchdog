@@ -61,7 +61,7 @@ Está dirigido a aplicaciones, scripts y accesos directos normales que deban seg
 - Sistemas de tiempo real estricto, clústeres de alta disponibilidad u orquestación de procesos que requiera aislamiento de seguridad.
 - Políticas agresivas que fuercen cualquier estado desconocido a significar «detenido».
 
-La matriz física comprobada de escalado cubre actualmente del 100 % al 200 %. Otros factores y los cambios continuos de DPI entre monitores no pueden considerarse verificados solo por el código. Consulta [Compatibilidad y limitaciones conocidas](en/compatibility.md).
+Hay una ejecución completa de automatización GUI documentada en Windows 11 con DPI real del 200 %, y las pruebas de regresión cubren los cálculos de renderizado al 100 % y al 300 %. Las revisiones visuales manuales en cada escala, los cambios continuos de DPI entre monitores y el alto contraste siguen sin verificarse y no deben deducirse solo del código. Consulta el [registro de validación GUI](../tests/gui/VALIDATION-EVIDENCE.en.md) y [Compatibilidad y limitaciones conocidas](en/compatibility.md).
 
 ---
 

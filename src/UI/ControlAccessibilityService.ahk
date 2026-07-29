@@ -26,15 +26,19 @@ class ControlAccessibilityService {
                 "Int", 0, "Ptr", this.GetRoleGuid(), "Ptr", roleValue,
                 "Int") < 0
                 return false
+            ; 角色属性一旦写入就立即登记，确保随后写入默认操作失败或抛出异常时，
+            ; ClearButton 仍能识别这次半完成注册并把已经写入的属性一并撤销。
+            this.ActiveButtons[hwnd] := true
             if ComCall(7, service, "Ptr", hwnd, "Int", this.ObjectIdClient,
                 "Int", 0, "Ptr", this.GetDefaultActionGuid(), "WStr",
                 String(defaultAction), "Int") < 0 {
                 this.ClearButton(hwnd)
                 return false
             }
-            this.ActiveButtons[hwnd] := true
             return true
         } catch {
+            if this.ActiveButtons.Has(hwnd)
+                this.ClearButton(hwnd)
             return false
         }
     }

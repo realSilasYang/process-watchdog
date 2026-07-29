@@ -343,6 +343,112 @@ AssertLucideSvgAssets() {
     } finally renderer.Shutdown()
 }
 
+ReadAccessibleButtonProperties(hwnd) {
+    accessibleIid := ControlAccessibilityService.CreateGuid(
+        "{618736E0-3C3D-11CF-810C-00AA00389B71}")
+    accessible := 0
+    if DllCall("oleacc\AccessibleObjectFromWindow", "Ptr", hwnd,
+        "UInt", ControlAccessibilityService.ObjectIdClient, "Ptr",
+        accessibleIid, "Ptr*", &accessible, "Int") < 0 || !accessible
+        throw Error("无法读取按钮的 Windows 辅助功能对象")
+    childVariant := ControlAccessibilityService.CreateIntegerVariant(0)
+    name := 0
+    action := 0
+    roleVariant := Buffer(24, 0)
+    try {
+        nameResult := ComCall(10, accessible, "Ptr", childVariant,
+            "Ptr*", &name, "Int")
+        roleResult := ComCall(13, accessible, "Ptr", childVariant,
+            "Ptr", roleVariant, "Int")
+        actionResult := ComCall(20, accessible, "Ptr", childVariant,
+            "Ptr*", &action, "Int")
+        return {
+            NameResult: nameResult,
+            Name: name ? StrGet(name, "UTF-16") : "",
+            RoleResult: roleResult,
+            RoleVariantType: NumGet(roleVariant, 0, "UShort"),
+            Role: NumGet(roleVariant, 8, "Int"),
+            ActionResult: actionResult,
+            DefaultAction: action ? StrGet(action, "UTF-16") : ""
+        }
+    } finally {
+        if name
+            DllCall("oleaut32\SysFreeString", "Ptr", name)
+        if action
+            DllCall("oleaut32\SysFreeString", "Ptr", action)
+        ObjRelease(accessible)
+    }
+}
+
+AccessibilityTestButtonClick(*) {
+    global accessibilityTestClickCount
+    accessibilityTestClickCount++
+}
+
+AssertRoundedButtonAccessibility() {
+    global App, accessibilityTestClickCount
+    App := {uiInteractions: UiInteractionRegistry()}
+    LocalizationService.Configure("zh-CN")
+    UiThemeService.Configure("light")
+    testGui := Gui("+ToolWindow", "Accessibility test")
+    firstButton := testGui.Add("Text", "x12 y12 w130 h34 +0x100",
+        "初始按钮名称")
+    secondButton := testGui.Add("Text", "x12 y54 w130 h34 +0x100",
+        "第二个按钮")
+    accessibilityTestClickCount := 0
+    try {
+        RegisterHoverButton(firstButton, UiThemeService.Color("Primary"))
+        RegisterHoverButton(secondButton, UiThemeService.Color("Toolbar"))
+        RegisterButtonClick(firstButton, AccessibilityTestButtonClick)
+        testGui.Show("w156 h104")
+
+        initialProperties := ReadAccessibleButtonProperties(firstButton.Hwnd)
+        AssertRoundedButtonRenderer(initialProperties.NameResult >= 0
+            && initialProperties.Name == "初始按钮名称"
+            && initialProperties.RoleResult >= 0
+            && initialProperties.RoleVariantType == 3
+            && initialProperties.Role == ControlAccessibilityService.RolePushButton
+            && initialProperties.ActionResult >= 0
+            && initialProperties.DefaultAction == Tr("按下"),
+            "自绘按钮没有公开正确的名称、按钮角色或默认操作")
+
+        firstButton.Text := "更新后的按钮名称"
+        updatedProperties := ReadAccessibleButtonProperties(firstButton.Hwnd)
+        AssertRoundedButtonRenderer(updatedProperties.Name == "更新后的按钮名称",
+            "辅助功能名称没有随按钮当前文字更新")
+
+        ; 键盘消息会进入全局按键钩子；这里直接调用钩子，避免核心测试向当前
+        ; 桌面投递真实按键而干扰正在使用电脑的用户。
+        ControlFocus(firstButton)
+        Global_KeyDown(13, 0, Win32.WM_KEYDOWN, firstButton.Hwnd)
+        Global_KeyDown(32, 0, Win32.WM_KEYDOWN, firstButton.Hwnd)
+        AssertRoundedButtonRenderer(accessibilityTestClickCount == 2,
+            "Enter 或 Space 没有触发已注册的圆角按钮")
+
+        ; 真实 Tab 导航由 Windows 对带 WS_TABSTOP 的控件完成；低层样式断言保证
+        ; 自绘转换没有丢失该系统导航契约，完整键盘路径由 Windows GUI 冒烟测试覆盖。
+        firstStyle := DllCall("user32\GetWindowLongPtrW", "Ptr",
+            firstButton.Hwnd, "Int", Win32.GWL_STYLE, "Ptr")
+        secondStyle := DllCall("user32\GetWindowLongPtrW", "Ptr",
+            secondButton.Hwnd, "Int", Win32.GWL_STYLE, "Ptr")
+        AssertRoundedButtonRenderer((firstStyle & 0x10000) != 0
+                && (secondStyle & 0x10000) != 0,
+            "自绘按钮没有保留 Tab 焦点导航所需的 WS_TABSTOP")
+
+        AssertRoundedButtonRenderer(
+            ControlAccessibilityService.ClearButton(firstButton.Hwnd),
+            "自绘按钮的辅助功能属性无法清理")
+        clearedProperties := ReadAccessibleButtonProperties(firstButton.Hwnd)
+        AssertRoundedButtonRenderer(
+            clearedProperties.Role != ControlAccessibilityService.RolePushButton,
+            "辅助功能属性清理后仍遗留按钮角色")
+    } finally {
+        try UnregisterGuiControls(testGui.Hwnd)
+        try testGui.Destroy()
+        ControlAccessibilityService.Shutdown()
+    }
+}
+
 RunRoundedButtonRendererTests() {
     AssertRoundedButtonRenderer(RoundedButtonRenderer.EnsureStarted(),
         "GDI+ 按钮渲染器无法初始化")
@@ -364,5 +470,6 @@ RunRoundedButtonRendererTests() {
     AssertRoundedButtonSvgImage()
     AssertTextVisualAlignment()
     AssertLucideSvgAssets()
+    AssertRoundedButtonAccessibility()
     RoundedButtonRenderer.Shutdown()
 }

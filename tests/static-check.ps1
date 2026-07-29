@@ -53,6 +53,9 @@ $historyToastSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\Windows\HistoryToastWindow.ahk') -Raw -Encoding UTF8
 $guardRuntimeSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\GuardRuntime.ahk') -Raw -Encoding UTF8
 $targetLauncherSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Execution\TargetLauncher.ahk') -Raw -Encoding UTF8
+$everythingRuntimeServiceSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'src\Execution\EverythingRuntimeService.ahk') `
+    -Raw -Encoding UTF8
 $targetStopperSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Execution\TargetStopper.ahk') -Raw -Encoding UTF8
 $maintenanceStateMachineSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Maintenance\MaintenanceStateMachine.ahk') -Raw -Encoding UTF8
 $maintenanceActorMatcherSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Maintenance\MaintenanceActorMatcher.ahk') -Raw -Encoding UTF8
@@ -70,6 +73,7 @@ $fileScanServiceSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\I
 $iconResourceRegistrySource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\UI\IconResourceRegistry.ahk') -Raw -Encoding UTF8
 $svgRenderLibrarySource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\UI\SvgRenderLibrary.ahk') -Raw -Encoding UTF8
 $uiInteractionRegistrySource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\UI\UiInteractionRegistry.ahk') -Raw -Encoding UTF8
+$controlAccessibilitySource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\UI\ControlAccessibilityService.ahk') -Raw -Encoding UTF8
 $mainListProjectionSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\UI\MainListProjection.ahk') -Raw -Encoding UTF8
 $listViewPseudoHeaderSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'src\UI\ListViewPseudoHeader.ahk') -Raw -Encoding UTF8
@@ -111,6 +115,10 @@ $displayHotSwitchTestSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'tests\gui\display-hot-switch-tests.ahk') `
     -Raw -Encoding UTF8
 $readmeSource = Get-Content -LiteralPath (Join-Path $projectRoot 'README.md') -Raw -Encoding UTF8
+$documentationSource = $readmeSource + "`n" + ((Get-ChildItem -LiteralPath `
+    (Join-Path $projectRoot 'docs') -Recurse -Filter '*.md' -File |
+    ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 }) `
+    -join "`n")
 $allModuleSource = (Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src') -Recurse -Filter '*.ahk' -File |
     ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 }) -join "`n"
 $iniText = Get-Content -LiteralPath $iniPath -Raw -Encoding Unicode
@@ -978,6 +986,66 @@ if ($source -notmatch 'SaveAppsToIni\(markChanged := true\)[\s\S]{0,1800}watchli
     $watchlistPersistenceServiceSource -notmatch 'Repository\.ReplaceSections\(') {
     $failures.Add('Monitoring configuration must commit through the repository')
 }
+if ($source -notmatch '#Include src\\UI\\ControlAccessibilityService\.ahk' -or
+    $controlAccessibilitySource -notmatch 'class ControlAccessibilityService' -or
+    $interactionPresenterSource -notmatch 'ControlAccessibilityService\.RegisterButton' -or
+    $interactionPresenterSource -notmatch 'ControlAccessibilityService\.ClearButton') {
+    $failures.Add('Owner-drawn buttons must retain shared MSAA button semantics and symmetric cleanup')
+}
+foreach ($launchPersistenceHook in @(
+    'ReadSectionMap("Launch")',
+    '{Name: "Launch", Entries: launchEntries}',
+    'RuntimePath: runtimePath',
+    'RuntimeArgs: runtimeArguments',
+    'Launch: launchValues.Has(appEntry.Key)',
+    '"Launch"]'
+)) {
+    if (-not $watchlistPersistenceServiceSource.Contains($launchPersistenceHook)) {
+        $failures.Add("Launch configuration is missing from watchlist persistence: $launchPersistenceHook")
+    }
+}
+foreach ($launchSnapshotHook in @(
+    'RuntimePath: stateObj.HasOwnProp("RuntimePath")',
+    'RuntimeArgs: stateObj.HasOwnProp("RuntimeArgs")',
+    'RuntimePath: item.HasOwnProp("RuntimePath")',
+    'RuntimeArgs: item.HasOwnProp("RuntimeArgs")',
+    'this.PathsEquivalent.Call(first.RuntimePath,',
+    'first.RuntimeArgs == second.RuntimeArgs'
+)) {
+    if (-not $appConfigSnapshotServiceSource.Contains($launchSnapshotHook)) {
+        $failures.Add("Launch configuration is missing from ordered snapshots or history equality: $launchSnapshotHook")
+    }
+}
+foreach ($launchRuntimeHook in @(
+    'this.RuntimePath := ""',
+    'this.RuntimeArgs := ""'
+)) {
+    if (-not $targetSupervisorSource.Contains($launchRuntimeHook)) {
+        $failures.Add("Target supervisor is missing launch configuration state: $launchRuntimeHook")
+    }
+}
+foreach ($launchRegistrationHook in @(
+    'RuntimePath: runtimePath, RuntimeArgs: runtimeArguments',
+    'record.ShortcutArgs, record.Display, record.RuntimePath,',
+    'item.RuntimePath, item.RuntimeArgs)',
+    '"RuntimePath", "RuntimeArgs"]'
+)) {
+    if (-not $source.Contains($launchRegistrationHook)) {
+        $failures.Add("Launch configuration is missing from registration or undo/redo restoration: $launchRegistrationHook")
+    }
+}
+if ($targetSpecsServiceSource -notmatch 'StateValue\(stateObj, "RuntimePath"[\s\S]{0,120}StateValue\(stateObj, "RuntimeArgs"' -or
+    $targetSpecsServiceSource -notmatch 'RuntimePath:\s*this\.StateValue\(stateObj, "RuntimePath"[\s\S]{0,160}RuntimeArguments:\s*this\.StateValue\(stateObj, "RuntimeArgs"') {
+    $failures.Add('Runtime path and arguments must invalidate target-spec caches and rebuild LaunchSpec')
+}
+if ($configRepositorySource -notmatch '\{Name:\s*"Launch",\s*Lines:' -or
+    $iniText -notmatch '(?m)^\[Launch\]\r?$' -or
+    $iniText -notmatch 'AppN 与 \[Apps\] 中同名项目一一对应，依次保存启动程序或解释器路径及其参数') {
+    $failures.Add('The repository and UTF-16 example configuration must document the Launch section in place')
+}
+if ($documentationSource.Contains('Python 虚拟环境变量不能可靠替换 .py 文件关联所用的解释器')) {
+    $failures.Add('Obsolete Python-specific shortcut workaround returned to user documentation')
+}
 if ($source -notmatch 'SaveAppsToIni\(markChanged := true\)[\s\S]{0,220}previousCritical\s*:=\s*A_IsCritical[\s\S]{0,100}Critical\("On"\)' -or
     $source -notmatch 'App\.appConfigSaveInProgress[\s\S]{0,6500}finally[\s\S]{0,180}App\.appConfigSaveInProgress\s*:=\s*false') {
     $failures.Add('Monitoring configuration saves must serialize revision ownership and restore caller critical state')
@@ -1263,6 +1331,9 @@ foreach ($launcherHook in @(
     'class TargetLauncher',
     'BuildInvocation(spec, ahkPath := "", isCompiled := false,',
     'Launch(spec, ahkPath := "", isCompiled := false,',
+    'spec.RuntimePath',
+    'spec.RuntimeArguments',
+    'ExpandEnvironmentValue(variableValue)',
     'ParseEnvironment(environmentText)',
     'Run(invocation.Command, invocation.WorkingDirectory,',
     'kernel32\SetEnvironmentVariableW'
@@ -1275,6 +1346,26 @@ if ($targetLauncherSource -notmatch 'if\s+!customEnvironment\.Count[\s\S]{0,220}
     $targetLauncherSource -notmatch 'previousCritical\s*:=\s*A_IsCritical[\s\S]{0,100}Critical\("On"\)[\s\S]{0,1100}Critical\(previousCritical \? previousCritical : "Off"\)' -or
     $targetLauncherSource -notmatch 'CaptureEnvironment\(variableName\)[\s\S]{0,700}GetEnvironmentVariableW') {
     $failures.Add('Custom launch environments must be isolated and restored without slowing ordinary launches')
+}
+foreach ($everythingRuntimeHook in @(
+    'class EverythingRuntimeService',
+    'static DownloadUrl := "https://www.voidtools.com/downloads/"',
+    'FindExecutable(forceRefresh := false)',
+    'StartSilently()',
+    '"-startup", "Hide"',
+    'AddRegistryCandidates(candidates)',
+    'AddKnownPathCandidates(candidates)',
+    'AddEnvironmentPathCandidates(candidates)',
+    'AddShortcutCandidates(candidates)'
+)) {
+    if (-not $everythingRuntimeServiceSource.Contains($everythingRuntimeHook)) {
+        $failures.Add("Everything runtime discovery lost a bounded startup hook: $everythingRuntimeHook")
+    }
+}
+if (-not $mainSource.Contains('#Include src\Execution\EverythingRuntimeService.ahk') -or
+    $source -notmatch 'everythingRuntimeService\s*:=\s*EverythingRuntimeService\(\)[\s\S]{0,26000}everythingRuntimeService\.StartSilently\(\)' -or
+    $source -notmatch 'EverythingRuntimeService\.DownloadUrl') {
+    $failures.Add('Application search must use the shared Everything discovery service and official download URL')
 }
 foreach ($stopperHook in @(
     'class TargetStopStage',
@@ -1665,7 +1756,10 @@ if ($source -match 'if\s*\([^\r\n]*stateObj\.State[^\r\n]*\)[\s\S]{0,180}(?:Sche
 foreach ($snapshotIndexHook in @(
     'class ProcessSnapshotIndex',
     'ObserveImagePath(targetPath)',
-    'ObserveCommandTarget(targetPath)',
+    'ObserveCommandTarget(targetPath, launcherPath := "")',
+    'ObserveCustomRuntimeTarget(targetPath, launcherPath)',
+    'GetLauncherMatchStatus(processInfo, launcherPath)',
+    'CommandLineContainsTarget(commandLine, targetPath)',
     'ObserveExecutableInRoot(rootPath, preferredName := "")',
     'ProcessObservation.Unknown'
 )) {
@@ -1778,7 +1872,7 @@ foreach ($targetProbeHook in @(
     'ObserveCommandTarget(targetPath, snapshotIndex := ""',
     'ObserveAutoHotkeyScript(targetPath, maximumSnapshotAgeMs := 0)',
     'ObserveWorkingDirectory(workingDirectory, preferredName := ""',
-    'snapshotIndex.ObserveCommandTarget(targetPath)',
+    'snapshotIndex.ObserveCommandTarget(targetPath, launcherPath)',
     'snapshotIndex.ObserveImagePath(targetPath)'
 )) {
     if (-not $targetProbeSource.Contains($targetProbeHook)) {
@@ -2074,29 +2168,35 @@ foreach ($projectionMutationCheck in @(
 if ($appConfigSnapshotServiceSource -notmatch 'SnapshotsEqual\(first, second\)[\s\S]{0,1200}DisplayConfigCodec\.Equals\(first\.Display, second\.Display\)') {
     $failures.Add('Display customization must participate in undo snapshots')
 }
-if ($source -notmatch 'RegisterApp\(item\.Path,[\s\S]{0,350}item\.ShortcutArgs, item\.Display\)') {
-    $failures.Add('Undo restore must recreate deleted items with their display customization')
+if ($source -notmatch 'RegisterApp\(item\.Path,[\s\S]{0,450}item\.ShortcutArgs, item\.Display,[\s\S]{0,100}item\.RuntimePath, item\.RuntimeArgs\)') {
+    $failures.Add('Undo restore must recreate deleted items with display and launch customization')
 }
 foreach ($windowIsolationHook in @(
     'OnMessage(Win32.WM_SYSCOMMAND, OnManagedWindowSystemCommand)',
     'WindowHierarchy.MinimizeChildIndependently(hwnd)',
+    'WindowHierarchy.PrepareChildRestore(hwnd)',
     '#Include src\UI\WindowHierarchy.ahk'
 )) {
     if (-not $source.Contains($windowIsolationHook)) {
         $failures.Add("Missing independent child-window minimize hook: $windowIsolationHook")
     }
 }
-$independentMinimizeMatch = [regex]::Match($windowHierarchySource,
-    '(?ms)^\s*static MinimizeChildIndependently\(childHwnd\)\s*\{.*?^\s*\}')
-if (-not $independentMinimizeMatch.Success -or
-    $windowHierarchySource -notmatch 'SetNativeOwner\(childHwnd, 0\)[\s\S]*?MinimizeWindow\(childHwnd\)[\s\S]*?SetNativeOwner\(childHwnd, ownerHwnd\)') {
-    $failures.Add('Owned child minimization must detach, minimize only the child, and restore its owner')
+if ($windowHierarchySource -notmatch 'MinimizeChildIndependently\(childHwnd\)[\s\S]*?SetNativeOwner\(childHwnd, 0\)[\s\S]*?PromoteToTaskbar\(childHwnd\)[\s\S]*?SuspendedChildren\[childHwnd\]\s*:=\s*\{[\s\S]*?MinimizeWindow\(childHwnd\)[\s\S]*?RegisterTaskbarTab\(childHwnd\)' -or
+    $windowHierarchySource -notmatch 'PrepareChildRestore\(childHwnd\)[\s\S]*?UnregisterTaskbarTab\(childHwnd\)[\s\S]*?RestoreTaskbarStyle\(childHwnd,[\s\S]*?SetNativeOwner\(childHwnd, ownerHwnd\)[\s\S]*?SuspendedChildren\.Delete\(childHwnd\)' -or
+    $windowHierarchySource -notmatch 'PromoteToTaskbar\(childHwnd\)[\s\S]*?WS_EX_APPWINDOW[\s\S]*?WS_EX_TOOLWINDOW[\s\S]*?RefreshWindowFrame\(childHwnd\)' -or
+    $windowHierarchySource -notmatch 'RegisterTaskbarTab\(childHwnd\)[\s\S]*?ComCall\(4,[\s\S]*?UnregisterTaskbarTab\(childHwnd\)[\s\S]*?ComCall\(5,' -or
+    $windowHierarchySource -notmatch 'MinimizeWindow\(hwnd\)[\s\S]*?SW_HIDE[\s\S]*?SW_SHOWMINNOACTIVE') {
+    $failures.Add('Owned child minimization must detach its owner, enter the taskbar, and restore both styles and modal ownership')
+}
+if ($windowHierarchySource -match 'AppUserModelID|SHGetPropertyStoreForWindow') {
+    $failures.Add('Minimized child windows must remain grouped under the assistant taskbar icon')
 }
 foreach ($windowHierarchyBoundary in @(
     'class WindowHierarchyPlatform',
     'class WindowHierarchyManager',
     'class WindowHierarchy',
     'OwnerLocks := Map()',
+    'SuspendedChildren: Map()',
     'entry.Children[childHwnd] := entry.Children.Get(childHwnd, 0) + 1',
     'IsValidLease(lease)',
     'visited := Map()'
@@ -2462,14 +2562,19 @@ if ($applicationSearchSource -notmatch 'third_party\\everything\\Everything64\.d
     $applicationSearchSource -match 'SourceOrder|ModifyCol\(4' -or
     $applicationSearchSource -notmatch 'Column:\s*3, Label:\s*Tr\("扩展名"\)' -or
     $everythingConsumeSource -notmatch 'SplitPath\(name, , , &extension\)[\s\S]{0,420}extension\s*:=\s*StrLower\(extension\)[\s\S]{0,320}this\.lv\.Add\("Icon" iconIndex, name, fullPath, extension\)' -or
-    $applicationSearchSource -notmatch 'OnSearchChanged\(\*\)[\s\S]{0,180}Trim\(this\.searchEdit\.Value\)\s*==\s*""[\s\S]{0,100}ShowEmptySearchState\(\)' -or
-    $applicationSearchSource -notmatch 'ShowEmptySearchState\(\)[\s\S]{0,500}CancelEverythingResultLoad\(\)[\s\S]{0,500}resultStatusText\.Text\s*:=\s*""' -or
+    $applicationSearchSource -notmatch 'SearchDebounceMilliseconds\s*:=\s*300' -or
+    $applicationSearchSource -notmatch 'OnSearchChanged\(\*\)[\s\S]{0,420}ResetSearchResults\(\)[\s\S]{0,220}-ApplicationSearchDialog\.SearchDebounceMilliseconds' -or
+    $applicationSearchSource -notmatch 'ResetSearchResults\(resetUnavailableLog := true\)[\s\S]{0,300}CancelEverythingResultLoad\(\)' -or
+    $applicationSearchSource -notmatch 'ShowEmptySearchState\(\)[\s\S]{0,180}ResetSearchResults\(\)' -or
+    $applicationSearchSource -notmatch 'ResetSearchResults\(resetUnavailableLog := true\)[\s\S]{0,800}SetEverythingStatus\(""\)' -or
     $applicationSearchSource -match 'LoadNativeApps|FilterNativeList|PollNativeScan|App\.fileScanner' -or
     $applicationSearchSource -notmatch 'ConsumeEverythingResultBatch\(\*\)[\s\S]{0,500}everythingResultIndex \+ 8' -or
     $applicationSearchSource -match 'everythingDllName|A_ScriptDir\s*"\\"\s*this\.everything') {
     $failures.Add('Application search must use only the pinned Everything DLL, request all results, and populate them in bounded UI batches')
 }
 if ($applicationSearchSource -notmatch 'this\.listHeader\s*:=\s*ListViewPseudoHeader\(' -or
+    $applicationSearchSource -notmatch 'this\.listSelectionPresenter\s*:=\s*ListViewSelectionPresenter\(this\.lv, 4\)' -or
+    $applicationSearchSource -notmatch 'this\.listSelectionPresenter\.Dispose\(\)[\s\S]{0,180}this\.DestroyGui\(\)' -or
     $applicationSearchSource -notmatch 'LayoutListHeader\(windowWidth\)' -or
     $applicationSearchSource -notmatch 'OnSortChanged:\s*ObjBindMethod\(this,\s*"OnListSortChanged"\)' -or
     $applicationSearchSource -notmatch 'RestoreResultOrder\(\)[\s\S]{0,900}for rowData in this\.resultRows' -or
@@ -2862,7 +2967,7 @@ if ($source -notmatch 'AcquireMainImageListUse\(imageList\)[\s\S]{0,180}iconReso
     $shutdownApplicationUiSource -notmatch 'mainImageList\s*:=\s*Main\.appIcons[\s\S]*Main\.appIcons\s*:=\s*0[\s\S]*Main\.lv\.SetImageList\(0, 1\)[\s\S]*RetireMainImageList\(mainImageList\)' -or
     $applicationSearchSource -notmatch 'AcquireImageListUse\(\)[\s\S]{0,420}App\.iconResources\.AcquireImageList\(this\.imageList' -or
     $applicationSearchSource -notmatch 'RetireImageList\(imageList\)[\s\S]{0,260}App\.iconResources\.RetireImageList\(imageList, this\.imageList\)' -or
-    $applicationSearchSource -notmatch 'imageList\s*:=\s*this\.imageList[\s\S]{0,180}this\.DestroyGui\(\)[\s\S]{0,100}this\.RetireImageList\(imageList\)' -or
+    $applicationSearchSource -notmatch 'imageList\s*:=\s*this\.imageList[\s\S]{0,360}this\.DestroyGui\(\)[\s\S]{0,100}this\.RetireImageList\(imageList\)' -or
     $applicationSearchSource -notmatch 'ReleaseImageListUse\(imageList\)[\s\S]{0,300}App\.iconResources\.ReleaseImageList\(imageList\)[\s\S]{0,180}IL_Destroy\(imageList\)' -or
     $applicationSearchSource -match 'activeImageListUsers|retiredImageLists') {
     $failures.Add('Attached image lists must be detached or outlive their native ListView controls')

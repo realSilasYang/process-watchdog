@@ -964,6 +964,7 @@ UnregisterGuiControls(guiHwnd) {
     for controlHwnd in hoverHandles {
         RoundedButtonInputRouter.Detach(controlHwnd)
         CancelButtonReleaseReset(controlHwnd)
+        ControlAccessibilityService.ClearButton(controlHwnd)
         if (App.uiInteractions.PressedButton == controlHwnd)
             CancelButtonPress()
         App.uiInteractions.RemoveButton(controlHwnd)
@@ -1141,6 +1142,7 @@ ButtonControlSubclassProc(hWnd, message, wParam, lParam, subclassId, referenceDa
                 HandleButtonCaptureChanged(hWnd)
             case Win32.WM_NCDESTROY:
                 RoundedButtonInputRouter.Detach(hWnd)
+                ControlAccessibilityService.ClearButton(hWnd)
         }
     } catch {
         ; Win32 子类回调不能让 AHK 异常越过原生窗口过程边界。
@@ -1224,6 +1226,7 @@ OnRoundedButtonFocusChanged(wParam, lParam, msg, hwnd) {
 ShutdownRoundedButtonRenderer(*) {
     RoundedButtonInputRouter.Shutdown()
     RoundedButtonRenderer.Shutdown()
+    ControlAccessibilityService.Shutdown()
 }
 
 RegisterHoverButton(ctrl, normalColor := "333333", hoverColor := "", pressedColor := "",
@@ -1262,6 +1265,9 @@ RegisterHoverButton(ctrl, normalColor := "333333", hoverColor := "", pressedColo
     }
     if !App.uiInteractions.RegisterButton(hWnd, state)
         return
+    ; owner-draw 会改变原生 Static/Button 的可访问角色；保留动态文字名称，并补回
+    ; 标准按钮角色与默认操作，让 Narrator 等工具可发现且可解释此控件。
+    ControlAccessibilityService.RegisterButton(hWnd, Tr("按下"))
     state.roundedOwnerDraw := EnableRoundedButtonRendering(ctrl)
     if state.roundedOwnerDraw
         RedrawRoundedButton(hWnd)
