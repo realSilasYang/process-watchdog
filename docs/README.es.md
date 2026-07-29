@@ -75,7 +75,7 @@ Hay una ejecución completa de automatización GUI documentada en Windows 11 con
 
 # Apoya el proyecto
 
-El Asistente de supervisión de procesos seguirá siendo de código abierto. Su mantenimiento a largo plazo depende del apoyo y el ánimo de la comunidad. Si te ha ahorrado tiempo al diagnosticar fallos o recuperar aplicaciones, puedes realizar una donación voluntaria con uno de estos códigos QR. Las aportaciones se destinan al mantenimiento, las pruebas de compatibilidad y futuras versiones.
+Si el asistente te ha ahorrado tiempo al diagnosticar fallos o recuperar aplicaciones, puedes apoyar al autor con uno de los códigos QR siguientes. Elige cómo deseas colaborar:
 
 <p align="center">
   <img src="../assets/donate/微信个人收款码.png" width="220" alt="Código QR de donación por WeChat Pay">

@@ -75,7 +75,7 @@ Un ciclo completo di automazione GUI è documentato su Windows 11 con DPI reale 
 
 # Sostieni il progetto
 
-L’Assistente di sorveglianza dei processi resterà open source. La sua manutenzione a lungo termine dipende dal sostegno e dall’incoraggiamento della comunità. Se ti ha fatto risparmiare tempo nella diagnosi o nel ripristino di applicazioni, puoi fare una donazione volontaria con uno dei codici QR seguenti. I contributi finanziano manutenzione, test di compatibilità e nuove versioni.
+Se l’assistente ti ha fatto risparmiare tempo nella diagnosi o nel ripristino di applicazioni, puoi sostenere l’autore con uno dei codici QR seguenti. Scegli come vuoi contribuire:
 
 <p align="center">
   <img src="../assets/donate/微信个人收款码.png" width="220" alt="Codice QR per donazione WeChat Pay">

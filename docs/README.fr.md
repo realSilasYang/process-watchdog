@@ -75,7 +75,7 @@ Une exécution complète de l’automatisation GUI est documentée sous Windows 
 
 # Soutenir le projet
 
-L’Assistant de surveillance des processus restera un logiciel libre. Sa maintenance à long terme dépend du soutien et des encouragements de la communauté. S’il vous a fait gagner du temps lors d’un diagnostic ou du rétablissement d’une application, vous pouvez faire un don volontaire au moyen de l’un des codes QR ci-dessous. Les dons financent la maintenance, les essais de compatibilité et les prochaines versions.
+Si l’assistant vous a fait gagner du temps lors d’un diagnostic ou du rétablissement d’une application, vous pouvez soutenir l’auteur au moyen de l’un des codes QR ci-dessous. Choisissez votre façon de contribuer :
 
 <p align="center">
   <img src="../assets/donate/微信个人收款码.png" width="220" alt="Code QR de don WeChat Pay">

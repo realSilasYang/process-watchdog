@@ -75,7 +75,7 @@ Phù hợp với ứng dụng, tập lệnh và lối tắt thông thường c�
 
 # Ủng hộ dự án
 
-Trợ lý giám sát tiến trình sẽ luôn là phần mềm nguồn mở. Việc bảo trì lâu dài phụ thuộc vào sự ủng hộ và động viên của cộng đồng. Nếu trợ lý đã giúp bạn tiết kiệm thời gian tìm lỗi hoặc khôi phục ứng dụng, bạn có thể tự nguyện ủng hộ bằng một trong hai mã QR dưới đây. Khoản ủng hộ được dùng cho bảo trì, kiểm thử tương thích và các bản phát hành tiếp theo.
+Nếu trợ lý đã giúp bạn tiết kiệm thời gian tìm lỗi hoặc khôi phục ứng dụng, hãy ủng hộ tác giả qua một trong hai mã QR dưới đây. Vui lòng chọn cách ủng hộ:
 
 <p align="center">
   <img src="../assets/donate/微信个人收款码.png" width="220" alt="Mã QR ủng hộ qua WeChat Pay">

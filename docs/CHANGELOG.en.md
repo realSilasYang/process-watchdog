@@ -29,6 +29,7 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Main-window command buttons**: Add, Pause/Resume, and Delete now use fixed icon slots. Pause and Resume use a common geometric canvas, while character icons are centered from their rendered raster ink. Text and icons no longer shift across state changes, theme switches, or high-DPI redraws.
 - **Target-state presentation**: Waiting for path confirmation has a dedicated status icon and exception priority. List sorting, the status bar, and the supervisor now distinguish a missing target, pending confirmation, and normal initialization.
 - **README branding and interface overview**: All thirteen language home pages now use the same centered high-resolution transparent logo, following the CodeBookmark structure, and continue to share the updated current main-window preview.
+- **Donation copy**: The Donate button now uses a shorter tooltip, while the donation window and all thirteen README languages guide users directly to the available support methods.
 
 ---
 

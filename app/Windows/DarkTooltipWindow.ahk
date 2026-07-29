@@ -68,7 +68,7 @@ class DarkTooltipWindow extends ManagedWindow {
                 } else if (control == Main.btnSupport) {
                     text := Tr("打开帮助信息`n可选择查看使用说明、运行日志或提交反馈")
                 } else if (control == Main.btnDonate) {
-                    text := Tr("支持开源项目`n可使用微信支付或支付宝扫码捐赠")
+                    text := Tr("快揭不开锅了（≥Д≤）")
                 }
             }
             if (text != "") {

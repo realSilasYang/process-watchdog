@@ -75,7 +75,7 @@ Há uma execução completa de automação da GUI documentada no Windows 11 com 
 
 # Apoie o projeto
 
-O Assistente de monitoramento de processos continuará sendo código aberto. Sua manutenção de longo prazo depende do apoio e do incentivo da comunidade. Se ele poupou seu tempo ao diagnosticar falhas ou recuperar aplicativos, você pode fazer uma doação voluntária por um dos códigos QR abaixo. As contribuições financiam a manutenção, os testes de compatibilidade e as próximas versões.
+Se o assistente poupou seu tempo ao diagnosticar falhas ou recuperar aplicativos, você pode apoiar o autor por um dos códigos QR abaixo. Escolha como deseja contribuir:
 
 <p align="center">
   <img src="../assets/donate/微信个人收款码.png" width="220" alt="Código QR para doação via WeChat Pay">
