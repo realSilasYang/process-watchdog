@@ -258,6 +258,9 @@ class WatchdogConfigRepository {
             {Name: "Display", Lines: [
                 this.Text("; 仅保存主窗口显示名称和图标来源，不参与进程识别、启动或升级保护。"),
                 this.Text("; AppN 与 [Apps] 中同名项目一一对应；留空的项目使用目标自身的名称和图标。")]},
+            {Name: "Launch", Lines: [
+                this.Text("; AppN 与 [Apps] 中同名项目一一对应，依次保存启动程序或解释器路径及其参数。"),
+                this.Text("; 两个字段均为 <HEX> 编码；留空时由小助手按目标类型使用默认启动方式。")]},
             {Name: "Recovery", Lines: [
                 this.Text("; 无法安全解析的监控记录会暂存于此，避免静默丢失；正常情况下无需手动修改。")]}
         ]

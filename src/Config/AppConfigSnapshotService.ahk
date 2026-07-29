@@ -24,6 +24,8 @@ class AppConfigSnapshotService {
                 Args: "",
                 ShortcutArgs: "",
                 EnvVars: "",
+                RuntimePath: "",
+                RuntimeArgs: "",
                 ResolvedTarget: "",
                 ResolvedTargetManual: false,
                 Maintenance: this.MaintenanceConfigCodec.CreateDefault(path),
@@ -48,6 +50,10 @@ class AppConfigSnapshotService {
             ShortcutArgs: stateObj.HasOwnProp("ShortcutArgs")
                 ? stateObj.ShortcutArgs : "",
             EnvVars: stateObj.HasOwnProp("EnvVars") ? stateObj.EnvVars : "",
+            RuntimePath: stateObj.HasOwnProp("RuntimePath")
+                ? stateObj.RuntimePath : "",
+            RuntimeArgs: stateObj.HasOwnProp("RuntimeArgs")
+                ? stateObj.RuntimeArgs : "",
             ResolvedTarget: resolvedTarget,
             ResolvedTargetManual: stateObj.HasOwnProp("ResolvedTargetManual")
                 && stateObj.ResolvedTargetManual,
@@ -78,6 +84,10 @@ class AppConfigSnapshotService {
             ShortcutArgs: item.HasOwnProp("ShortcutArgs")
                 ? item.ShortcutArgs : "",
             EnvVars: item.HasOwnProp("EnvVars") ? item.EnvVars : "",
+            RuntimePath: item.HasOwnProp("RuntimePath")
+                ? item.RuntimePath : "",
+            RuntimeArgs: item.HasOwnProp("RuntimeArgs")
+                ? item.RuntimeArgs : "",
             ResolvedTarget: resolvedTarget,
             ResolvedTargetManual: item.HasOwnProp("ResolvedTargetManual")
                 && item.ResolvedTargetManual,
@@ -113,6 +123,9 @@ class AppConfigSnapshotService {
             && first.Args == second.Args
             && first.ShortcutArgs == second.ShortcutArgs
             && first.EnvVars == second.EnvVars
+            && this.PathsEquivalent.Call(first.RuntimePath,
+                second.RuntimePath)
+            && first.RuntimeArgs == second.RuntimeArgs
             && this.PathsEquivalent.Call(first.ResolvedTarget,
                 second.ResolvedTarget)
             && !!first.ResolvedTargetManual == !!second.ResolvedTargetManual

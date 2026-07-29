@@ -23,6 +23,8 @@ class TargetSpecsService {
             this.StateValue(stateObj, "Args", ""),
             this.StateValue(stateObj, "ShortcutArgs", ""),
             this.StateValue(stateObj, "EnvVars", ""),
+            this.StateValue(stateObj, "RuntimePath", ""),
+            this.StateValue(stateObj, "RuntimeArgs", ""),
             this.StateValue(stateObj, "RunAsAdmin", 0) ? "1" : "0"]
         fingerprint := ""
         for index, value in values
@@ -59,6 +61,8 @@ class TargetSpecsService {
             WorkingDirectory: workingDirectory,
             ShortcutWorkingDirectory: shortcutWorkingDirectory,
             Environment: this.StateValue(stateObj, "EnvVars", ""),
+            RuntimePath: this.StateValue(stateObj, "RuntimePath", ""),
+            RuntimeArguments: this.StateValue(stateObj, "RuntimeArgs", ""),
             RunAsAdmin: this.StateValue(stateObj, "RunAsAdmin", false),
             ShortcutReadable: shortcutInfo.Readable,
             ShortcutTargetsGenericLauncher: shortcutInfo.Readable

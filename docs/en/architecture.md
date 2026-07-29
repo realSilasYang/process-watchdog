@@ -60,6 +60,21 @@ arguments, MSI component, and installation-directory candidates for probing. If
 the shortcut temporarily disappears, only a previously confirmed target may be
 used for recovery. Equally ranked candidates are never resolved by guessing.
 
+A direct script may additionally specify a runtime path and runtime arguments.
+`TargetLauncher` builds the command in the order runtime, runtime arguments,
+quoted target path, and target arguments. Python virtual environments,
+AutoHotkey, PowerShell, Node.js, Java, Ruby, Perl, PHP, Lua, Bash, and other
+runtimes therefore share one launch model. Leaving the runtime blank preserves
+the target type's default launch behavior. An LNK remains the launch entry and
+is never bypassed by a custom runtime. A custom runtime is recorded in the
+`LaunchSpec` and also adds its full executable path as a constraint to the
+corresponding script `ProbeSpec`. Probing still requires the target path in the
+runtime command line, so another script hosted by the same runtime cannot be
+mistaken for the target. Environment values expand `%VARIABLE%` references
+before launch and temporarily override the assistant's process environment only
+around the one `Run` call; the original environment is restored
+unconditionally.
+
 `ProcessSnapshotService` indexes each WMI snapshot by path, name, and command
 target. An expired snapshot, inconsistent record count, unreadable fields, or a
 missing creation identity yields unknown without clearing a known identity. PID
@@ -152,8 +167,13 @@ Enabled|RunAsAdmin|Path|WorkDir|Args|EnvVars|ResolvedTarget|ResolvedTargetManual
 
 Boolean fields accept only `0` or `1`; non-empty text must decode losslessly. A
 wrong field count, legacy plain text, or damaged encoding is not registered as a
-target. Its original application, display, and update values are moved to
-`[Recovery]`.
+target. Its original application, display, launch, and update values are moved
+to `[Recovery]`. The optional `[Launch]` section uses the matching `AppN` key for
+two independent `<HEX>` fields: runtime path and runtime arguments. It is
+rewritten in the same atomic transaction as `[Apps]`, `[Maintenance]`,
+`[Display]`, and `[Recovery]`. This keeps the existing nine-field record stable
+while ensuring ordering, undo, redo, and recovery never drop launch-environment
+data.
 
 Undo and redo use ordered configuration snapshots and per-field three-way
 merging. Undo reverses only fields changed by the original operation that still
@@ -172,12 +192,16 @@ replace the main list's custom order. Each field cycles through ascending,
 descending, and custom/source order; the third click restores a hidden stable
 order column.
 
-`WindowHierarchyManager` uses reference-counted leases for ownership. Native
-ownership is temporarily detached while a child minimizes so the main window is
-not minimized with it. The final lease restores interaction from the owner's
-original visibility, enabled, and minimized state. Explicit close, construction
-failure, and external native destruction all converge on one idempotent cleanup
-order.
+`WindowHierarchyManager` uses reference-counted leases for ownership. While a
+child is minimized, native ownership is detached, `WS_EX_APPWINDOW` is applied,
+and `WS_EX_TOOLWINDOW` is removed. The window is hidden, shown again minimized,
+and registered through `ITaskbarList` as a separate window entry under the same
+assistant taskbar icon, without minimizing the main window. Before a taskbar
+restore, the entry is unregistered, the original extended style and owner are
+reinstated, and the direct parent's modal state is rebuilt. The final lease
+restores interaction from the owner's original visibility, enabled, and
+minimized state. Explicit close, construction failure, and external native
+destruction all converge on one idempotent cleanup order.
 
 `UiInteractionRegistry` owns button, text-input, hover, and press state. Destroyed
 controls lose every reference, and disabled buttons do not use a hand cursor.

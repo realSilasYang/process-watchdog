@@ -15,8 +15,36 @@ MSI 快捷方式或目标路径会随版本变化的软件，会结合安装目�
 
 ## 守护脚本和命令行工具
 
-支持 AHK、Python、JavaScript、PowerShell、BAT 和 CMD。脚本目标需要命令行
-证据；证据快照尚未完成时状态为“等待检查”，不会把未知状态误判为停止。
+支持 AHK、Python、JavaScript、PowerShell、BAT、CMD、Ruby、Perl、PHP、Lua、
+JAR 和 Shell 等目标。脚本目标需要命令行证据；证据快照尚未完成时状态为“等待
+检查”，不会把未知状态误判为停止。
+
+右键直接脚本并打开“进程识别与启动设置”，可以配置通用启动环境：
+
+| 设置 | 作用 | 示例 |
+| --- | --- | --- |
+| 启动程序或解释器 | 固定实际执行脚本的运行时 | 虚拟环境的 `python.exe`、`AutoHotkey64.exe`、`pwsh.exe`、`node.exe`、`java.exe` |
+| 启动程序参数 | 放在目标路径之前，属于运行时本身 | PowerShell 的 `-NoProfile -File`、Java 的 `-jar`、AutoHotkey 的 `/ErrorStdOut` |
+| 工作目录 | 为相对文件、模块和配置提供 CWD | 项目根目录或脚本所在目录 |
+| 目标参数 | 放在目标路径之后，传给脚本或任务 | `--config production.json` |
+| 环境变量 | 逐行临时覆盖启动环境 | `NODE_ENV=production`、`PATH=C:\Tools;%PATH%` |
+
+实际命令顺序是 `"启动程序" 启动程序参数 "目标路径" 目标参数`。所有字段只在
+小助手下次启动目标时生效，不会重启或修改已经运行的进程。留空启动程序即可沿用
+目标类型的默认方式。快捷方式和普通 EXE 不显示运行时字段：LNK 必须保留安装器、
+工作目录和内置参数等启动语义，EXE 则直接运行；如需复杂包装流程，可创建明确的
+启动脚本或快捷方式后再加入守护。
+
+## 使用 Everything 搜索程序
+
+小助手附带的 `Everything64.dll` 是 Everything SDK 的 IPC 客户端，只负责向已经
+运行的 Everything 后台实例提交查询；它不包含索引器，不能单独扫描磁盘或替代
+Everything 完整版。打开搜索窗口时，如果没有可用后台实例，小助手会在注册表、
+常见安装目录、`PATH`、桌面和开始菜单快捷方式中进行有界查找；找到
+`Everything.exe` 后使用官方 `-startup` 参数静默启动，再继续搜索。
+
+如果本机没有 Everything，搜索窗口会提供可点击的官方最新版下载地址。小助手不会
+退回主线程全盘扫描，也不设置应用层结果上限；文件夹批量导入不依赖 Everything。
 
 ## 需要管理员权限的程序
 

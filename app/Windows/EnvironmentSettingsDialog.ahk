@@ -1,6 +1,6 @@
 ; 单个守护项的进程身份与启动环境设置窗口。
-; 快捷方式继续作为稳定的启动入口，解析后的真实进程只负责运行状态判断；工作目录、
-; 附加参数与环境变量只改变小助手今后的启动行为，不扰动当前正在运行的目标。
+; 快捷方式继续作为稳定的启动入口，解析后的真实进程只负责运行状态判断；直接脚本
+; 可交给任意可执行运行时启动，工作目录、两级参数与环境变量均不改变探活身份。
 
 class EnvironmentSettingsDialog extends ManagedWindow {
     __New(mainGui) {
@@ -8,6 +8,9 @@ class EnvironmentSettingsDialog extends ManagedWindow {
         this.path := ""
         this.state := ""
         this.isShortcut := false
+        this.supportsCustomRuntime := false
+        this.runtimePathEdit := ""
+        this.runtimeArgsEdit := ""
         this.workDirEdit := ""
         this.argsEdit := ""
         this.envEdit := ""
@@ -34,6 +37,8 @@ class EnvironmentSettingsDialog extends ManagedWindow {
         this.state := stateObj
         SplitPath(path, , , &pathExtension)
         this.isShortcut := StrLower(pathExtension) == "lnk"
+        this.supportsCustomRuntime := TargetSpecFactory
+            .SupportsCustomRuntime(path)
 
         isCompact := LocalizationService.UsesCompactLayout()
         windowWidth := isCompact ? 680 : 820
@@ -45,6 +50,9 @@ class EnvironmentSettingsDialog extends ManagedWindow {
         rightWidth := contentWidth - leftWidth - columnGap
         fieldButtonWidth := isCompact ? 94 : 126
         fieldInputWidth := rightWidth - fieldButtonWidth - 10
+        contentBottomY := this.supportsCustomRuntime ? 674 : 466
+        actionY := contentBottomY + 14
+        windowHeight := contentBottomY + 59
 
         if !this.CreateOwnedGui(this.owner, "-MinimizeBox -MaximizeBox",
             Tr("进程识别与启动设置"))
@@ -67,7 +75,8 @@ class EnvironmentSettingsDialog extends ManagedWindow {
             this.launchSectionTitle := this.AddSectionTitle(rightX, 88,
                 rightWidth, Tr("启动环境"))
             dividerX := contentX + leftWidth + Floor(columnGap / 2)
-            this.gui.Add("Text", "x" dividerX " y88 w1 h369 Background"
+            this.gui.Add("Text", "x" dividerX " y88 w1 h"
+                (contentBottomY - 97) " Background"
                 UiThemeService.Color("Divider"))
 
             if this.isShortcut
@@ -78,15 +87,16 @@ class EnvironmentSettingsDialog extends ManagedWindow {
             this.BuildLaunchEnvironmentSection(rightX, rightWidth,
                 fieldInputWidth, fieldButtonWidth, stateObj)
 
-            this.gui.Add("Text", "x" contentX " y466 w" contentWidth
+            this.gui.Add("Text", "x" contentX " y" contentBottomY " w"
+                contentWidth
                 " h1 Background" UiThemeService.Color("Divider"))
             actionStartX := Round((windowWidth - 170) / 2)
             btnSave := this.gui.Add("Text", "x" actionStartX
-                " y480 w80 h28 Center 0x200 Background"
+                " y" actionY " w80 h28 Center 0x200 Background"
                     UiThemeService.Color("Primary") " c"
                     UiThemeService.Color("ButtonText"), Tr("保存"))
             btnCancel := this.gui.Add("Text", "x" (actionStartX + 90)
-                " y480 w80 h28 Center 0x200 Background"
+                " y" actionY " w80 h28 Center 0x200 Background"
                     UiThemeService.Color("Toolbar") " c"
                     UiThemeService.Color("ToolbarText"), Tr("取消"))
             RegisterHoverButton(btnSave, UiThemeService.Color("Primary"))
@@ -98,7 +108,8 @@ class EnvironmentSettingsDialog extends ManagedWindow {
 
             this.gui.OnEvent("Close", ObjBindMethod(this, "Close"))
             this.gui.OnEvent("Escape", ObjBindMethod(this, "Close"))
-            ShowApplicationWindow(this.gui, "w" windowWidth " h525")
+            ShowApplicationWindow(this.gui, "w" windowWidth " h"
+                windowHeight)
             ShowSingleLineEditFromStart(targetInput.Edit)
             if this.resolvedTargetEdit
                 ShowSingleLineEditFromStart(this.resolvedTargetEdit)
@@ -225,43 +236,97 @@ class EnvironmentSettingsDialog extends ManagedWindow {
             " h42 BackgroundTrans c" UiThemeService.Color("HintText"),
             Tr("这些设置仅在小助手下次启动目标时生效，不会重启当前进程。"))
 
-        this.gui.Add("Text", "x" x " y163 w" width
+        workDirLabelY := 163
+        if this.supportsCustomRuntime {
+            this.gui.Add("Text", "x" x " y157 w" width
+                " h20 BackgroundTrans", Tr("启动程序或解释器："))
+            runtimePathInput := AddCenteredSingleLineEdit(this.gui, x, 179,
+                inputWidth, 26,
+                stateObj.HasOwnProp("RuntimePath")
+                    ? stateObj.RuntimePath : "", "",
+                UiThemeService.Color("Input"))
+            this.runtimePathEdit := runtimePathInput.Edit
+            btnBrowseRuntime := this.gui.Add("Text", "x"
+                (x + inputWidth + 10) " y179 w" actionWidth
+                " h26 Center 0x200 Background"
+                    UiThemeService.Color("Toolbar") " c"
+                    UiThemeService.Color("ToolbarText"), Tr("选择程序"))
+            this.gui.Add("Text", "x" x " y211 w" width
+                " h48 BackgroundTrans c" UiThemeService.Color("HintText"),
+                Tr("留空时按目标类型自动启动；可选择 Python、AutoHotkey、PowerShell、Node.js、Java 等运行时。"))
+
+            this.gui.Add("Text", "x" x " y263 w" width
+                " h20 BackgroundTrans", Tr("启动程序参数："))
+            runtimeArgsInput := AddCenteredSingleLineEdit(this.gui, x, 285,
+                width, 26,
+                stateObj.HasOwnProp("RuntimeArgs")
+                    ? stateObj.RuntimeArgs : "", "",
+                UiThemeService.Color("Input"))
+            this.runtimeArgsEdit := runtimeArgsInput.Edit
+            this.gui.Add("Text", "x" x " y317 w" width
+                " h48 BackgroundTrans c" UiThemeService.Color("HintText"),
+                Tr("参数顺序为：启动程序参数、目标路径、目标参数；例如 Java 使用 -jar。"))
+            RegisterHoverButton(btnBrowseRuntime,
+                UiThemeService.Color("Toolbar"))
+            SetButtonLucideIcon(btnBrowseRuntime, "folder-open.svg", 14, 6)
+            RegisterButtonClick(btnBrowseRuntime,
+                ObjBindMethod(this, "BrowseRuntime"))
+            workDirLabelY := 371
+        }
+
+        workDirEditY := workDirLabelY + 22
+        workDirHintY := workDirEditY + 32
+        targetArgsLabelY := workDirHintY + 38
+        targetArgsEditY := targetArgsLabelY + 22
+        targetArgsHintY := targetArgsEditY + 32
+        environmentLabelY := targetArgsHintY + 26
+        environmentEditY := environmentLabelY + 30
+        environmentHintY := environmentEditY + 73
+
+        this.gui.Add("Text", "x" x " y" workDirLabelY " w" width
             " h20 BackgroundTrans", Tr("工作目录（CWD）："))
-        workDirInput := AddCenteredSingleLineEdit(this.gui, x, 185,
+        workDirInput := AddCenteredSingleLineEdit(this.gui, x, workDirEditY,
             inputWidth, 26,
             stateObj.HasOwnProp("WorkDir") ? stateObj.WorkDir : "", "",
             UiThemeService.Color("Input"))
         this.workDirEdit := workDirInput.Edit
         btnBrowseWorkDir := this.gui.Add("Text", "x"
-            (x + inputWidth + 10) " y185 w" actionWidth
+            (x + inputWidth + 10) " y" workDirEditY " w" actionWidth
             " h26 Center 0x200 Background" UiThemeService.Color("Toolbar")
             " c" UiThemeService.Color("ToolbarText"), Tr("选择文件夹"))
-        this.gui.Add("Text", "x" x " y217 w" width
+        this.gui.Add("Text", "x" x " y" workDirHintY " w" width
             " h32 BackgroundTrans c" UiThemeService.Color("HintText"),
             Tr("留空时使用快捷方式工作目录或程序所在目录。"))
 
-        this.gui.Add("Text", "x" x " y255 w" width
-            " h20 BackgroundTrans", Tr("启动参数（Args）："))
-        argsInput := AddCenteredSingleLineEdit(this.gui, x, 277, width,
+        this.gui.Add("Text", "x" x " y" targetArgsLabelY " w" width
+            " h20 BackgroundTrans", Tr("目标参数（Args）："))
+        argsInput := AddCenteredSingleLineEdit(this.gui, x, targetArgsEditY,
+            width,
             26, stateObj.HasOwnProp("Args") ? stateObj.Args : "", "",
             UiThemeService.Color("Input"))
         this.argsEdit := argsInput.Edit
-        this.gui.Add("Text", "x" x " y309 w" width
+        this.gui.Add("Text", "x" x " y" targetArgsHintY " w" width
             " h20 BackgroundTrans c" UiThemeService.Color("HintText"),
             Tr("留空时不附加额外参数。"))
 
-        this.gui.Add("Text", "x" x " y335 w" width
+        this.gui.Add("Text", "x" x " y" environmentLabelY " w" width
             " h36 BackgroundTrans", Tr("环境变量（每行一个 KEY=VALUE）："))
-        this.envEdit := this.gui.Add("Edit", "x" x " y365 w" width
+        this.envEdit := this.gui.Add("Edit", "x" x " y" environmentEditY
+            " w" width
             " h67 Background" UiThemeService.Color("Input") " c"
                 UiThemeService.Color("Text") " -E0x200 Multi -VScroll",
             stateObj.HasOwnProp("EnvVars") ? stateObj.EnvVars : "")
         RegisterTextInputControl(this.envEdit)
-        this.gui.Add("Text", "x" x " y438 w" width
+        this.gui.Add("Text", "x" x " y" environmentHintY " w" width
             " h20 BackgroundTrans c" UiThemeService.Color("HintText"),
-            Tr("留空时继承小助手当前环境。"))
+            Tr("留空时继承小助手当前环境；值中可用 %变量名% 引用已有环境变量。"))
 
-        for inputControl in [this.workDirEdit, this.argsEdit, this.envEdit]
+        inputControls := [this.workDirEdit, this.argsEdit, this.envEdit]
+        if this.runtimePathEdit {
+            inputControls.Push(this.runtimePathEdit)
+            inputControls.Push(this.runtimeArgsEdit)
+        }
+        for inputControl in inputControls
             SetDarkControl(inputControl.Hwnd)
         RegisterHoverButton(btnBrowseWorkDir,
             UiThemeService.Color("Toolbar"))
@@ -362,6 +427,19 @@ class EnvironmentSettingsDialog extends ManagedWindow {
             this.workDirEdit.Value, Tr("选择工作目录"))
         if selected && this.IsOpen()
             this.workDirEdit.Value := selected
+    }
+
+    BrowseRuntime(*) {
+        if !this.IsOpen() || !this.runtimePathEdit
+            return
+        this.gui.Opt("+OwnDialogs")
+        selected := SelectFileWithNamedFilter(this.gui.Hwnd,
+            this.runtimePathEdit.Value, Tr("选择启动程序或解释器"),
+            Tr("可执行程序"), "*.exe;*.com")
+        if selected && this.IsOpen() {
+            this.runtimePathEdit.Value := selected
+            ShowSingleLineEditFromStart(this.runtimePathEdit)
+        }
     }
 
     BrowseResolvedTarget(*) {
@@ -474,6 +552,22 @@ class EnvironmentSettingsDialog extends ManagedWindow {
             return
         }
         nextArgs := Trim(this.argsEdit.Value)
+        nextRuntimePath := this.runtimePathEdit
+            ? NormalizeTargetPath(this.runtimePathEdit.Value) : ""
+        nextRuntimeArgs := this.runtimeArgsEdit
+            ? Trim(this.runtimeArgsEdit.Value) : ""
+        if (nextRuntimePath == "" && nextRuntimeArgs != "") {
+            ShowDarkMsgBoxDeferred(
+                Tr("请先选择启动程序或解释器，再填写它的参数。"),
+                Tr("启动程序未设置"), "Error", this.gui)
+            return
+        }
+        if (nextRuntimePath != ""
+            && (!FileExist(nextRuntimePath) || DirExist(nextRuntimePath))) {
+            ShowDarkMsgBoxDeferred(Tr("启动程序或解释器不存在：{1}",
+                nextRuntimePath), Tr("启动程序无效"), "Error", this.gui)
+            return
+        }
         environmentResult := App.targetLauncher.ValidateEnvironment(
             Trim(this.envEdit.Value, "`r`n"))
         if !environmentResult.Valid {
@@ -487,9 +581,15 @@ class EnvironmentSettingsDialog extends ManagedWindow {
         identityChanged := !PathsEquivalent(this.state.ResolvedTarget,
             resolvedTarget)
             || this.state.ResolvedTargetManual != resolvedTargetManual
+        currentRuntimePath := this.state.HasOwnProp("RuntimePath")
+            ? this.state.RuntimePath : ""
+        currentRuntimeArgs := this.state.HasOwnProp("RuntimeArgs")
+            ? this.state.RuntimeArgs : ""
         settingsChanged := identityChanged || this.state.WorkDir != nextWorkDir
             || this.state.Args != nextArgs
             || this.state.EnvVars != nextEnvVars
+            || !PathsEquivalent(currentRuntimePath, nextRuntimePath)
+            || currentRuntimeArgs != nextRuntimeArgs
         if !settingsChanged {
             this.state.ShortcutTargetSource := resolutionSource
             this.state.ShortcutResolveCheckedTicks := GetTickCount64()
@@ -513,6 +613,8 @@ class EnvironmentSettingsDialog extends ManagedWindow {
         stateObj.WorkDir := nextWorkDir
         stateObj.Args := nextArgs
         stateObj.EnvVars := nextEnvVars
+        stateObj.RuntimePath := nextRuntimePath
+        stateObj.RuntimeArgs := nextRuntimeArgs
         stateObj.ResolvedTarget := resolvedTarget
         stateObj.ResolvedTargetManual := resolvedTargetManual
         stateObj.ShortcutTargetSource := resolutionSource
@@ -587,6 +689,9 @@ class EnvironmentSettingsDialog extends ManagedWindow {
         this.path := ""
         this.state := ""
         this.isShortcut := false
+        this.supportsCustomRuntime := false
+        this.runtimePathEdit := ""
+        this.runtimeArgsEdit := ""
         this.workDirEdit := ""
         this.argsEdit := ""
         this.envEdit := ""

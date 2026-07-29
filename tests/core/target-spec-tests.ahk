@@ -30,7 +30,8 @@ RunTargetSpecTests() {
         "管理员启动要求没有进入启动规格")
 
     scriptPlan := TargetSpecFactory.Create("C:\Jobs\main.py", {
-        EntryExists: true
+        EntryExists: true, RuntimePath: "C:\Python\python.exe",
+        RuntimeArguments: "-I -u"
     })
     AssertTargetSpecEqual(TargetProbeKind.CommandTarget,
         scriptPlan.Probe.Kind, "绝对脚本应使用命令目标探活")
@@ -40,11 +41,30 @@ RunTargetSpecTests() {
         "C:\Jobs\main.py"), "绝对脚本路径应构成精确身份")
     AssertTargetSpec(!TargetSpecFactory.IsPreciseProcessIdentityPath("main.py"),
         "相对脚本路径不得构成可持久化的精确身份")
+    AssertTargetSpec(scriptPlan.Launch.RuntimePath
+            == "C:\Python\python.exe"
+        && scriptPlan.Launch.RuntimeArguments == "-I -u"
+        && scriptPlan.Probe.LauncherPath == "C:\Python\python.exe",
+        "通用运行时设置没有进入直接脚本启动规格")
+    AssertTargetSpec(TargetSpecFactory.SupportsCustomRuntime(
+            "C:\Jobs\main.py")
+        && TargetSpecFactory.SupportsCustomRuntime("C:\Jobs\service.jar")
+        && TargetSpecFactory.SupportsCustomRuntime("C:\Jobs\console.msc")
+        && !TargetSpecFactory.SupportsCustomRuntime("C:\Apps\Tool.exe")
+        && !TargetSpecFactory.SupportsCustomRuntime("C:\Links\Tool.lnk"),
+        "自定义运行时适用目标分类错误")
+    extensionlessPlan := TargetSpecFactory.Create("C:\Jobs\worker", {
+        EntryExists: true, RuntimePath: "C:\Tools\runtime.exe"
+    })
+    AssertTargetSpecEqual(TargetProbeKind.CommandTarget,
+        extensionlessPlan.Probe.Kind,
+        "自定义运行时目标没有统一按命令行中的目标路径探活")
 
     shortcutPlan := TargetSpecFactory.Create("C:\Links\Tool.lnk", {
         EntryExists: true, ResolvedTarget: "C:\Apps\Tool.exe",
         ResolvedTargetExists: true, Arguments: "--user",
-        ShortcutArguments: "--embedded", WorkingDirectory: "C:\Custom"
+        ShortcutArguments: "--embedded", WorkingDirectory: "C:\Custom",
+        RuntimePath: "C:\Python\python.exe", RuntimeArguments: "-I"
     })
     AssertTargetSpecEqual("C:\Links\Tool.lnk",
         shortcutPlan.Launch.TargetPath, "存在的快捷方式应保持为启动入口")
@@ -52,6 +72,8 @@ RunTargetSpecTests() {
         "通过快捷方式启动时不得重复追加内置参数")
     AssertTargetSpec(shortcutPlan.Launch.UsesShortcutEntry,
         "快捷方式启动入口标记缺失")
+    AssertTargetSpec(shortcutPlan.Launch.RuntimePath == "",
+        "快捷方式不应被自定义运行时绕过原启动入口")
     AssertTargetSpecEqual("C:\Apps\Tool.exe",
         shortcutPlan.Probe.TargetPath, "快捷方式探活必须使用真实进程身份")
 

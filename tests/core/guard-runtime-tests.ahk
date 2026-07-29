@@ -454,6 +454,33 @@ RunGuardRuntimeTests() {
         && !stateObj.IsSnapshotWaitCurrent(),
         "消费新快照后没有收敛为运行状态")
 
+    ; 后台 WMI 已完成但主线程暂时繁忙时，发布回调可能比等待截止点稍晚到达。
+    ; 只要超时任务尚未消费等待状态且请求代际一致，就应接受这份证据。
+    lateDeliveryState := CreateGuardRuntimeSupervisor(scheduler)
+    states[path] := lateDeliveryState
+    lateDueTicks := clock.Ticks + 100
+    lateTask := guard.ScheduleVerificationFor(path, lateDeliveryState, 100)
+    lateRequestTicks := clock.Ticks + 1
+    lateDeliveryState.BeginSnapshotWait("Verify", lateRequestTicks,
+        lateDueTicks, lateDueTicks)
+    clock.Ticks := lateDueTicks + 1
+    lateDeliverySnapshot := ProcessSnapshotIndex([], clock.Ticks, true)
+    lateDeliverySnapshot.RequestTicks := lateRequestTicks
+    GuardRuntimeTestContext.SnapshotObservation := ProcessObservation.Running(
+        102, "CREATION-102", clock.Ticks, "process-command")
+    AssertGuardRuntime(guard.OnSnapshotPublished([], lateDeliverySnapshot)
+        && lateTask.Cancelled
+        && lateDeliveryState.SnapshotReadyIndex == lateDeliverySnapshot,
+        "同代快照仅因主线程交付略晚就被错误丢弃")
+    scheduler.RunDue(clock.Ticks + 1)
+    AssertGuardRuntime(lateDeliveryState.PID == 102
+        && lateDeliveryState.PIDCreationIdentity == "CREATION-102"
+        && lateDeliveryState.VerifyTask == "",
+        "略晚交付的启动验证快照没有收敛为运行状态")
+
+    states[path] := stateObj
+    GuardRuntimeTestContext.SnapshotObservation := ProcessObservation.Running(
+        99, "CREATION-99", clock.Ticks, "process-command")
     stateObj.PID := 0
     GuardRuntimeTestContext.Observation := ProcessObservation.Unknown(
         clock.Ticks, "process-command", "没有足够新的进程快照",

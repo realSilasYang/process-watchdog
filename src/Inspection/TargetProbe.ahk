@@ -29,7 +29,9 @@ class TargetProbe {
                     snapshotIndex)
             case TargetProbeKind.CommandTarget:
                 return this.ObserveCommandTarget(probeSpec.TargetPath,
-                    snapshotIndex, maximumSnapshotAgeMs)
+                    snapshotIndex, maximumSnapshotAgeMs,
+                    probeSpec.HasOwnProp("LauncherPath")
+                        ? probeSpec.LauncherPath : "")
             case TargetProbeKind.WorkingDirectory:
                 return this.ObserveWorkingDirectory(probeSpec.WorkingDirectory,
                     probeSpec.PreferredName, snapshotIndex,
@@ -94,7 +96,7 @@ class TargetProbe {
     }
 
     ObserveCommandTarget(targetPath, snapshotIndex := "",
-        maximumSnapshotAgeMs := 0) {
+        maximumSnapshotAgeMs := 0, launcherPath := "") {
         SplitPath(targetPath, , , &targetExtension)
         if StrLower(targetExtension) == "ahk" {
             autoHotkeyObservation := this.ObserveAutoHotkeyScript(targetPath,
@@ -109,7 +111,7 @@ class TargetProbe {
                 "没有足够新的进程快照",
                 ProcessObservationReason.SnapshotUnavailable)
         }
-        return snapshotIndex.ObserveCommandTarget(targetPath)
+        return snapshotIndex.ObserveCommandTarget(targetPath, launcherPath)
     }
 
     ObserveAutoHotkeyScript(targetPath, maximumSnapshotAgeMs := 0) {

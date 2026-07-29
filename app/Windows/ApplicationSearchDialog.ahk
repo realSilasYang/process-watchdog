@@ -1,12 +1,18 @@
 ; 已安装应用搜索窗口。
-; 程序搜索只使用随包 Everything SDK 与正在运行的 Everything 服务；查询结果不设
-; 数量上限，并通过短批次逐步加入列表，避免一次提取大量图标时长时间阻塞界面。
+; 程序搜索使用随包 Everything SDK；后台实例缺失时先从有界本机来源定位并启动，
+; 查询结果不设上限，并通过短批次逐步加入列表，避免图标提取长时间阻塞界面。
 
 class ApplicationSearchDialog extends ManagedWindow {
+    static SearchDebounceMilliseconds := 300
+    static StartupRetryMilliseconds := 200
+    static StartupTimeoutMilliseconds := 8000
+    static EverythingErrorIpc := 2
+
     __New(ownerDialog) {
         this.ownerDialog := ownerDialog
         this.lv := ""
         this.listHeader := ""
+        this.listSelectionPresenter := ""
         this.searchLabel := ""
         this.searchLabelPresenter := ""
         this.searchInputX := 95
@@ -15,6 +21,7 @@ class ApplicationSearchDialog extends ManagedWindow {
         this.searchEdit := ""
         this.searchEditBackground := ""
         this.resultStatusText := ""
+        this.everythingDownloadLink := ""
         this.selectButton := ""
         this.imageList := 0
         this.hoverRow := 0
@@ -28,11 +35,16 @@ class ApplicationSearchDialog extends ManagedWindow {
         this.resultRows := []
         this.everythingSearchSessionId := 0
         this.everythingUnavailableLogged := false
+        this.everythingRuntimeService := EverythingRuntimeService()
+        this.everythingStartupDeadline := 0
+        this.everythingStartupPath := ""
         this.mouseHandler := ObjBindMethod(this, "OnMouseMove")
         this.mouseHandlerRegistered := false
         this.resultConsumeTimer := ObjBindMethod(this,
             "ConsumeEverythingResultBatch")
         this.searchTimer := ObjBindMethod(this, "RunDeferredSearch")
+        this.everythingStartupTimer := ObjBindMethod(this,
+            "RetryEverythingStartup")
     }
 
     LoadEverythingLibrary() {
@@ -112,12 +124,21 @@ class ApplicationSearchDialog extends ManagedWindow {
         this.resultStatusText := this.gui.Add("Text",
             "x20 y49 w660 h22 c" UiThemeService.Color("MutedText")
                 " Background" UiThemeService.Color("Window"), "")
+        this.everythingDownloadLink := this.gui.Add("Text",
+            "x20 y49 w660 h22 +0x100 Hidden c"
+                UiThemeService.Color("Link") " Background"
+                UiThemeService.Color("Window"), "")
+        this.everythingDownloadLink.SetFont("Underline")
+        RegisterHandCursorControl(this.everythingDownloadLink)
+        RegisterButtonClick(this.everythingDownloadLink,
+            ObjBindMethod(this, "OpenEverythingDownloadPage"))
         this.lv := this.gui.Add("ListView",
             "x20 y103 w660 h232 Report Background"
                 UiThemeService.Color("Surface") " c"
                 UiThemeService.Color("Text") " -E0x200 -Multi -Hdr",
             [Tr("名称"), Tr("路径"), Tr("扩展名")])
         SetDarkListView(this.lv.Hwnd)
+        this.listSelectionPresenter := ListViewSelectionPresenter(this.lv, 4)
         this.listHeader := ListViewPseudoHeader(this.gui, this.lv, [
             {Column: 1, Label: Tr("名称"), SortOptions: "Logical"},
             {Column: 2, Label: Tr("路径"), SortOptions: "Logical"},
@@ -171,6 +192,8 @@ class ApplicationSearchDialog extends ManagedWindow {
             Width - this.searchInputX - 20)
         try this.searchEdit.Move(,, Width - this.searchInputX - 20)
         try MoveAndRefreshResizableText(this.resultStatusText, "", "",
+            Width - 40, "")
+        try MoveAndRefreshResizableText(this.everythingDownloadLink, "", "",
             Width - 40, "")
         try this.lv.Move(20, 103, Width - 40, Height - 168)
         this.LayoutListHeader(Width)
@@ -365,13 +388,13 @@ class ApplicationSearchDialog extends ManagedWindow {
             this.RefreshListWidthIfChanged()
             this.everythingUnavailableLogged := false
             if resultCount {
-                this.resultStatusText.Text := Tr(
+                this.SetEverythingStatus(Tr(
                     "正在载入 Everything 搜索结果：{1}／{2}", 0,
-                    resultCount)
+                    resultCount))
                 SetTimer(this.resultConsumeTimer, 15)
             } else {
-                this.resultStatusText.Text := Tr(
-                    "Everything 搜索结果：{1} 项", 0)
+                this.SetEverythingStatus(Tr(
+                    "Everything 搜索结果：{1} 项", 0))
             }
         } finally {
             Critical(previousCritical ? previousCritical : "Off")
@@ -430,13 +453,14 @@ class ApplicationSearchDialog extends ManagedWindow {
                 if IsObject(this.listHeader)
                     && this.listHeader.HasActiveSort()
                     this.listHeader.ApplyCurrentSort()
-                this.resultStatusText.Text := Tr(
+                this.SetEverythingStatus(Tr(
                     "Everything 搜索结果：{1} 项",
-                    this.everythingResultCount)
+                    this.everythingResultCount))
             } else {
-                this.resultStatusText.Text := Tr(
+                this.SetEverythingStatus(Tr(
                     "正在载入 Everything 搜索结果：{1}／{2}",
                     this.everythingResultIndex, this.everythingResultCount)
+                )
             }
         } catch as resultError {
             this.ShowEverythingUnavailable(resultError)
@@ -452,11 +476,16 @@ class ApplicationSearchDialog extends ManagedWindow {
 
     OnSearchChanged(*) {
         SetTimer(this.searchTimer, 0)
-        if Trim(this.searchEdit.Value) == "" {
-            this.ShowEmptySearchState()
+        if !this.IsOpen()
             return
-        }
-        SetTimer(this.searchTimer, -150)
+        keyword := Trim(this.searchEdit.Value)
+        ; 每次输入都立即作废旧 Everything 会话及其分批图标提取；只有输入
+        ; 连续静止一个完整防抖周期后，才允许最新关键字发起一次查询。
+        this.ResetSearchResults()
+        if keyword == ""
+            return
+        SetTimer(this.searchTimer,
+            -ApplicationSearchDialog.SearchDebounceMilliseconds)
     }
 
     RunDeferredSearch(*) {
@@ -473,11 +502,17 @@ class ApplicationSearchDialog extends ManagedWindow {
         if Trim(this.searchEdit.Value) == ""
             return this.ShowEmptySearchState()
         if !this.everythingLib && !this.LoadEverythingLibrary() {
-            this.ShowEverythingUnavailable()
+            this.ShowEverythingComponentUnavailable()
             return false
         }
-        if this.SearchEverything()
+        if this.SearchEverything() {
+            this.CancelEverythingStartup()
             return true
+        }
+        errorCode := this.GetEverythingLastError()
+        if (errorCode == 0
+            || errorCode == ApplicationSearchDialog.EverythingErrorIpc)
+            return this.BeginEverythingStartup()
         this.ShowEverythingUnavailable()
         return false
     }
@@ -485,6 +520,13 @@ class ApplicationSearchDialog extends ManagedWindow {
     ShowEmptySearchState() {
         if !this.IsOpen()
             return false
+        return this.ResetSearchResults()
+    }
+
+    ResetSearchResults(resetUnavailableLog := true) {
+        if !this.IsOpen()
+            return false
+        this.CancelEverythingStartup()
         this.CancelEverythingResultLoad()
         this.tooltip.Hide()
         this.hoverRow := 0
@@ -495,24 +537,16 @@ class ApplicationSearchDialog extends ManagedWindow {
         }
         this.resultRows := []
         this.RefreshListWidthIfChanged()
-        if this.resultStatusText
-            this.resultStatusText.Text := ""
-        this.everythingUnavailableLogged := false
+        this.SetEverythingStatus("")
+        if resetUnavailableLog
+            this.everythingUnavailableLogged := false
         return true
     }
 
     ShowEverythingUnavailable(failure := "") {
-        this.CancelEverythingResultLoad()
-        if this.lv {
-            this.lv.Opt("-Redraw")
-            try this.lv.Delete()
-            finally this.lv.Opt("+Redraw")
-        }
-        this.resultRows := []
-        this.RefreshListWidthIfChanged()
-        if this.resultStatusText
-            this.resultStatusText.Text := Tr(
-                "Everything 搜索不可用，请确认 Everything 正在运行。")
+        this.ResetSearchResults(false)
+        this.SetEverythingStatus(Tr(
+            "Everything 搜索暂时不可用，请稍后重试。"))
         if this.everythingUnavailableLogged
             return
         this.everythingUnavailableLogged := true
@@ -520,8 +554,100 @@ class ApplicationSearchDialog extends ManagedWindow {
         diagnosticSuffix := errorCode ? " [Everything=" errorCode "]" : ""
         if failure is Error
             diagnosticSuffix .= " " TrDiagnostic(failure.Message)
-        LogMsg(Tr("Everything 搜索不可用，请确认 Everything 正在运行。")
+        LogMsg(Tr("Everything 搜索暂时不可用，请稍后重试。")
             diagnosticSuffix)
+    }
+
+    ShowEverythingComponentUnavailable() {
+        this.ResetSearchResults(false)
+        this.SetEverythingStatus(Tr(
+            "Everything 搜索组件缺失或无法加载，请完整解压或重新安装小助手。"))
+        if this.everythingUnavailableLogged
+            return
+        this.everythingUnavailableLogged := true
+        LogMsg(Tr(
+            "Everything 搜索组件缺失或无法加载，请完整解压或重新安装小助手。"))
+    }
+
+    BeginEverythingStartup() {
+        this.ResetSearchResults(false)
+        startResult := this.everythingRuntimeService.StartSilently()
+        if !startResult.Found {
+            this.ShowEverythingDownloadLink()
+            return false
+        }
+        if !startResult.Started {
+            this.SetEverythingStatus(Tr(
+                "已找到 Everything，但无法后台启动，请手动启动后重试。"))
+            if !this.everythingUnavailableLogged {
+                this.everythingUnavailableLogged := true
+                LogMsg(Tr("后台启动 Everything 失败：{1}",
+                    TrDiagnostic(startResult.Failure)))
+            }
+            return false
+        }
+
+        this.everythingStartupPath := startResult.Path
+        this.everythingStartupDeadline := GetTickCount64()
+            + ApplicationSearchDialog.StartupTimeoutMilliseconds
+        this.SetEverythingStatus(Tr(
+            "正在后台启动 Everything 并等待搜索服务就绪..."))
+        SetTimer(this.everythingStartupTimer,
+            ApplicationSearchDialog.StartupRetryMilliseconds)
+        LogMsg(Tr("已在后台启动 Everything：{1}", startResult.Path))
+        return true
+    }
+
+    RetryEverythingStartup(*) {
+        if !this.IsOpen() || Trim(this.searchEdit.Value) == "" {
+            this.CancelEverythingStartup()
+            return
+        }
+        if this.SearchEverything() {
+            this.CancelEverythingStartup()
+            return
+        }
+        if GetTickCount64() < this.everythingStartupDeadline
+            return
+        startupPath := this.everythingStartupPath
+        this.CancelEverythingStartup()
+        this.ShowEverythingUnavailable()
+        LogMsg(Tr("等待 Everything 搜索服务就绪超时：{1}", startupPath))
+    }
+
+    CancelEverythingStartup() {
+        try SetTimer(this.everythingStartupTimer, 0)
+        this.everythingStartupDeadline := 0
+        this.everythingStartupPath := ""
+    }
+
+    ShowEverythingDownloadLink() {
+        this.ResetSearchResults(false)
+        if this.resultStatusText
+            this.resultStatusText.Visible := false
+        if this.everythingDownloadLink {
+            this.everythingDownloadLink.Text := Tr(
+                "未找到 Everything，点击前往官网下载最新版：{1}",
+                EverythingRuntimeService.DownloadUrl)
+            this.everythingDownloadLink.Visible := true
+        }
+        if !this.everythingUnavailableLogged {
+            this.everythingUnavailableLogged := true
+            LogMsg(Tr("本机未找到 Everything；程序搜索需要 Everything 后台服务。"))
+        }
+    }
+
+    SetEverythingStatus(text) {
+        if this.everythingDownloadLink
+            this.everythingDownloadLink.Visible := false
+        if this.resultStatusText {
+            this.resultStatusText.Visible := true
+            this.resultStatusText.Text := text
+        }
+    }
+
+    OpenEverythingDownloadPage(*) {
+        try Run(EverythingRuntimeService.DownloadUrl)
     }
 
     GetEverythingLastError() {
@@ -562,6 +688,7 @@ class ApplicationSearchDialog extends ManagedWindow {
 
     Close(*) {
         try SetTimer(this.searchTimer, 0)
+        this.CancelEverythingStartup()
         this.CancelEverythingResultLoad()
         if this.mouseHandlerRegistered {
             try OnMessage(Win32.WM_MOUSEMOVE, this.mouseHandler, 0)
@@ -573,10 +700,13 @@ class ApplicationSearchDialog extends ManagedWindow {
         this.tooltip.Hide()
         if this.searchLabelPresenter
             try this.searchLabelPresenter.Dispose()
+        if this.listSelectionPresenter
+            try this.listSelectionPresenter.Dispose()
         this.DestroyGui()
         this.RetireImageList(imageList)
         this.lv := ""
         this.listHeader := ""
+        this.listSelectionPresenter := ""
         this.searchLabel := ""
         this.searchLabelPresenter := ""
         this.searchInputX := 95
@@ -585,6 +715,7 @@ class ApplicationSearchDialog extends ManagedWindow {
         this.searchEdit := ""
         this.searchEditBackground := ""
         this.resultStatusText := ""
+        this.everythingDownloadLink := ""
         this.selectButton := ""
         this.resultRows := []
         this.hoverRow := 0

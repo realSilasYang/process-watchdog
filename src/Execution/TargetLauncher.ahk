@@ -34,7 +34,21 @@ class TargetLauncher {
         options := ""
         command := ""
 
-        switch spec.Kind {
+        if (spec.RuntimePath != "") {
+            runtimeArguments := spec.RuntimeArguments != ""
+                ? " " spec.RuntimeArguments : ""
+            if (spec.Kind == TargetLaunchKind.Batch) {
+                if (outputLogPath == "")
+                    throw ValueError("批处理启动需要输出日志路径")
+                command := runVerb . 'cmd /d /c ""' . spec.RuntimePath . '"'
+                    . runtimeArguments . ' "' . targetPath . '"' . arguments
+                    . ' >> "' . outputLogPath . '" 2>&1"'
+                options := "Hide"
+            } else {
+                command := runVerb . '"' . spec.RuntimePath . '"'
+                    . runtimeArguments . ' "' . targetPath . '"' . arguments
+            }
+        } else switch spec.Kind {
             case TargetLaunchKind.Batch:
                 if (outputLogPath == "")
                     throw ValueError("批处理启动需要输出日志路径")
@@ -86,7 +100,8 @@ class TargetLauncher {
             for variableName, variableValue in customEnvironment {
                 originalEnvironment[variableName] :=
                     this.CaptureEnvironment(variableName)
-                EnvSet(variableName, variableValue)
+                EnvSet(variableName,
+                    this.ExpandEnvironmentValue(variableValue))
             }
             Run(invocation.Command, invocation.WorkingDirectory,
                 invocation.Options, &newPID)
@@ -106,6 +121,20 @@ class TargetLauncher {
             }
         }
         return TargetLaunchResult(newPID, invocation)
+    }
+
+    ExpandEnvironmentValue(value) {
+        value := String(value)
+        requiredLength := DllCall("kernel32\ExpandEnvironmentStringsW",
+            "WStr", value, "Ptr", 0, "UInt", 0, "UInt")
+        if !requiredLength
+            return value
+        valueBuffer := Buffer(requiredLength * 2, 0)
+        copiedLength := DllCall("kernel32\ExpandEnvironmentStringsW",
+            "WStr", value, "Ptr", valueBuffer,
+            "UInt", requiredLength, "UInt")
+        return copiedLength ? StrGet(valueBuffer, copiedLength - 1,
+            "UTF-16") : value
     }
 
     CaptureEnvironment(variableName) {

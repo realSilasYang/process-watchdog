@@ -334,6 +334,10 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         executablePath := A_WinDir "\System32\notepad.exe"
         executableState := CreateLocalizedSmokeState(executablePath,
             A_WinDir "\System32")
+        scriptPath := A_Temp "\Localized Runtime Smoke.py"
+        scriptState := CreateLocalizedSmokeState(scriptPath, A_Temp)
+        scriptState.RuntimePath := A_AhkPath
+        scriptState.RuntimeArgs := "/ErrorStdOut"
         shortcutPath := A_Temp "\Localized Smoke Shortcut.lnk"
         try FileDelete(shortcutPath)
         shortcutState := CreateLocalizedSmokeState(shortcutPath,
@@ -1245,6 +1249,9 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
                 && addWindow.search.listHeader.Columns[3].Label
                     == Tr("扩展名")
                 && addWindow.search.listHeader.RestoreColumn == 0
+                && IsObject(addWindow.search.listSelectionPresenter)
+                && addWindow.search.listSelectionPresenter.attached
+                && addWindow.search.listSelectionPresenter.radiusDip == 4
                 && addWindow.search.searchInputX == 52
                 && searchEditFocusedOnOpen,
                 language " 程序搜索栏、初始焦点或 SVG 搜索图标不正确")
@@ -1323,8 +1330,33 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
                 && !addWindow.search.everythingLib,
                 language " 空搜索词仍启动查询或保留搜索进度")
 
-            ; 强制模拟 SDK 缺失，确认 Everything 不可用时只显示错误，绝不
-            ; 偷偷启动仍为文件夹批量导入保留的后台扫描器。
+            ; 非空输入也要立即停止旧结果消费，并在完整防抖周期内保持空闲。
+            addWindow.search.lv.Add("", "stale.exe", executablePath, "exe")
+            addWindow.search.everythingResultCount := 1
+            addWindow.search.everythingResultIndex := 1
+            SetTimer(addWindow.search.resultConsumeTimer, 60000)
+            debounceSessionBeforeInput :=
+                addWindow.search.everythingSearchSessionId
+            addWindow.search.searchEdit.Value := "note"
+            addWindow.search.OnSearchChanged()
+            Sleep(40)
+            addWindow.search.searchEdit.Value := "notepad"
+            addWindow.search.OnSearchChanged()
+            Sleep(80)
+            AssertLocalizedWindow(
+                addWindow.search.everythingSearchSessionId
+                    >= debounceSessionBeforeInput + 2
+                && addWindow.search.everythingResultCount == 0
+                && addWindow.search.everythingResultIndex == 0
+                && addWindow.search.resultStatusText.Text == ""
+                && addWindow.search.lv.GetCount() == 0
+                && !addWindow.search.everythingLib,
+                language " 连续输入未被防抖或仍在消费旧搜索结果")
+            SetTimer(addWindow.search.searchTimer, 0)
+
+            ; 强制模拟 SDK 缺失。组件本身不完整时应直接提示重新安装；只有
+            ; SDK 可用但 IPC 后台未就绪时才进入 Everything 发现与静默启动。
+            ; 两种情况都绝不能回退到为文件夹批量导入保留的后台扫描器。
             if addWindow.search.everythingLib {
                 DllCall("kernel32\FreeLibrary", "Ptr",
                     addWindow.search.everythingLib)
@@ -1338,8 +1370,8 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             AssertLocalizedWindow(!addWindow.search.RunEverythingSearch()
                 && App.fileScanner.Workers.Count == workerCountBeforeSearch
                 && addWindow.search.resultStatusText.Text == Tr(
-                    "Everything 搜索不可用，请确认 Everything 正在运行。"),
-                language " Everything 不可用时仍触发了内置搜索回退")
+                    "Everything 搜索组件缺失或无法加载，请完整解压或重新安装小助手。"),
+                language " Everything SDK 缺失时仍触发了内置搜索回退")
             searchSessionBeforeClose :=
                 addWindow.search.everythingSearchSessionId
             searchLabelHwnd := addWindow.search.searchLabel.Hwnd
@@ -1556,6 +1588,22 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             "EnvironmentSettingsDialog direct target")
         AssertLocalizedWindow(!environmentWindow.resolvedTargetEdit,
             language " 直接目标错误显示了快捷方式真实进程编辑器")
+        environmentWindow.Close()
+
+        environmentWindow.Show(scriptPath, scriptState)
+        WinHide("ahk_id " environmentWindow.gui.Hwnd)
+        AssertLocalizedWindow(environmentWindow.supportsCustomRuntime
+            && environmentWindow.runtimePathEdit
+            && environmentWindow.runtimeArgsEdit
+            && PathsEquivalent(environmentWindow.runtimePathEdit.Value,
+                A_AhkPath)
+            && environmentWindow.runtimeArgsEdit.Value == "/ErrorStdOut"
+            && App.uiInteractions.GetButton(
+                FindChildControlByText(environmentWindow.gui.Hwnd,
+                    Tr("选择程序"))).buttonImage.sourcePath
+                == GetApplicationAssetPath(
+                    "ui-icons\lucide\folder-open.svg"),
+            language " 直接脚本没有显示通用运行时路径、参数或浏览操作")
         environmentWindow.Close()
 
         maintenanceWindow := MaintenanceSettingsDialog(owner)

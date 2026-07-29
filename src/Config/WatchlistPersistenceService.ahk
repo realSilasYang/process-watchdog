@@ -1,6 +1,6 @@
 ; 守护列表与升级、展示配置的持久化服务。
 ; 加载时保留 INI 中的条目顺序，损坏记录进入恢复区而不是静默丢弃；
-; 保存时把三类配置作为一个一致快照提交，并原样保留仍无法解析的恢复记录。
+; 保存时把启动、升级和展示配置作为一个一致快照提交，并原样保留仍无法解析的恢复记录。
 
 class WatchlistPersistenceService {
     __New(repository, fieldCodec, maintenanceConfigCodec, displayConfigCodec,
@@ -22,12 +22,13 @@ class WatchlistPersistenceService {
         }
         maintenanceValues := this.Repository.ReadSectionMap("Maintenance")
         displayValues := this.Repository.ReadSectionMap("Display")
+        launchValues := this.Repository.ReadSectionMap("Launch")
         for appEntry in this.Repository.ReadSectionEntries("Apps") {
             recoveryEntry := this.CreateRecoveryEntry(appEntry,
-                maintenanceValues, displayValues)
+                maintenanceValues, displayValues, launchValues)
             try {
                 record := this.ParseRecord(appEntry, maintenanceValues,
-                    displayValues)
+                    displayValues, launchValues)
                 if !registerCallback.Call(record)
                     throw this.CreateLoadError("Apps", "目标路径",
                         "与已加载项目重复，或目标格式无效")
@@ -50,6 +51,7 @@ class WatchlistPersistenceService {
         appEntries := []
         maintenanceEntries := []
         displayEntries := []
+        launchEntries := []
         for index, savePath in orderedPaths {
             snapshot := this.SnapshotService.CreateSnapshot(savePath,
                 appStates[savePath])
@@ -70,18 +72,24 @@ class WatchlistPersistenceService {
                 displayEntries.Push({Key: "App" index,
                     Value: this.DisplayConfigCodec.Serialize(snapshot.Display)})
             }
+            if (snapshot.RuntimePath != "" || snapshot.RuntimeArgs != "") {
+                launchEntries.Push({Key: "App" index,
+                    Value: this.FieldCodec.Encode(snapshot.RuntimePath) "|"
+                        . this.FieldCodec.Encode(snapshot.RuntimeArgs)})
+            }
         }
         serializedRecovery := this.SerializeRecoveryEntries(recoveryEntries)
         this.Repository.ReplaceSections([
             {Name: "Apps", Entries: appEntries},
             {Name: "Maintenance", Entries: maintenanceEntries},
             {Name: "Display", Entries: displayEntries},
+            {Name: "Launch", Entries: launchEntries},
             {Name: "Recovery", Entries: serializedRecovery}
         ])
         return {OrderedPaths: orderedPaths, SavedCount: appEntries.Length}
     }
 
-    ParseRecord(appEntry, maintenanceValues, displayValues) {
+    ParseRecord(appEntry, maintenanceValues, displayValues, launchValues) {
         if (appEntry.Value == "")
             throw this.CreateLoadError("Apps", "整条记录", "内容为空")
         parts := StrSplit(appEntry.Value, "|")
@@ -131,6 +139,21 @@ class WatchlistPersistenceService {
                     this.NormalizeDiagnosticText(displayError.Message,
                         "内容无法解析"))
         }
+        runtimePath := ""
+        runtimeArguments := ""
+        if launchValues.Has(appEntry.Key) {
+            launchValue := launchValues[appEntry.Key]
+            launchParts := StrSplit(launchValue, "|")
+            if (launchParts.Length != 2)
+                throw this.CreateLoadError("Launch", "整条启动配置",
+                    "字段数量应为 2，实际为 " launchParts.Length)
+            this.ValidateEncodedField(launchParts[1], "启动程序或解释器",
+                true, "Launch")
+            this.ValidateEncodedField(launchParts[2], "解释器参数",
+                true, "Launch")
+            runtimePath := this.FieldCodec.Decode(launchParts[1])
+            runtimeArguments := this.FieldCodec.Decode(launchParts[2])
+        }
         return {
             Key: appEntry.Key,
             Path: targetPath,
@@ -139,6 +162,8 @@ class WatchlistPersistenceService {
             WorkDir: workDir,
             Args: arguments,
             EnvVars: environment,
+            RuntimePath: runtimePath,
+            RuntimeArgs: runtimeArguments,
             Maintenance: maintenanceConfig,
             ResolvedTarget: resolvedTarget,
             ResolvedTargetManual: resolvedTargetManual,
@@ -155,14 +180,17 @@ class WatchlistPersistenceService {
         return recoveryEntries
     }
 
-    CreateRecoveryEntry(appEntry, maintenanceValues, displayValues) {
+    CreateRecoveryEntry(appEntry, maintenanceValues, displayValues,
+        launchValues) {
         return {
             Key: appEntry.Key,
             Value: appEntry.Value,
             Maintenance: maintenanceValues.Has(appEntry.Key)
                 ? maintenanceValues[appEntry.Key] : "",
             Display: displayValues.Has(appEntry.Key)
-                ? displayValues[appEntry.Key] : ""
+                ? displayValues[appEntry.Key] : "",
+            Launch: launchValues.Has(appEntry.Key)
+                ? launchValues[appEntry.Key] : ""
         }
     }
 
@@ -220,7 +248,8 @@ class WatchlistPersistenceService {
                     Value: recoveryEntry.SerializedValue})
                 continue
             }
-            for propertyName in ["Key", "Value", "Maintenance", "Display"] {
+            for propertyName in ["Key", "Value", "Maintenance", "Display",
+                "Launch"] {
                 if !recoveryEntry.HasOwnProp(propertyName)
                     throw ValueError("恢复记录缺少字段: " propertyName)
             }
@@ -232,6 +261,8 @@ class WatchlistPersistenceService {
                 this.FieldCodec.Encode(recoveryEntry.Maintenance)
             recoveryValue .= "`nDisplay="
                 this.FieldCodec.Encode(recoveryEntry.Display)
+            recoveryValue .= "`nLaunch="
+                this.FieldCodec.Encode(recoveryEntry.Launch)
             serialized.Push({Key: "Entry" index,
                 Value: this.FieldCodec.Encode(recoveryValue)})
         }
