@@ -153,6 +153,7 @@ owner := ""
 child := ""
 historyToast := ""
 listSelectionPresenter := ""
+testFailure := ""
 try {
     owner := Gui("+Resize +MinSize420x260", "GUI smoke owner")
     owner.BackColor := "1E1E1E"
@@ -192,9 +193,6 @@ try {
             headerCell.Hwnd, "Int", -16, "Ptr")
         AssertGuiSmoke(!(headerStyle & 0x00010000),
             "Pseudo header field remained keyboard-selectable through Tab")
-        DllCall("user32\SetFocus", "Ptr", headerCell.Hwnd, "Ptr")
-        AssertGuiSmoke(DllCall("user32\GetFocus", "Ptr") == list.Hwnd,
-            "Pseudo header field retained focus instead of rejecting selection")
         AssertGuiSmoke(SendMessage(0x0301, 0, 0, headerCell.Hwnd) == 0,
             "Pseudo header field did not reject native copy requests")
         AssertGuiSmoke(!pseudoHeader.SetCellTextNoErase(headerCell,
@@ -369,6 +367,14 @@ try {
             "Str", "DarkMode_Explorer", "Ptr", 0)
     }
     owner.Show("w430 h270")
+    ; 焦点重定向必须在真实可见窗口中验证。隐藏父窗口时，Windows 可以合法
+    ; 拒绝把焦点交给其子控件，不能据此判断伪表头输入保护失效。
+    DllCall("user32\SetFocus", "Ptr", list.Hwnd, "Ptr")
+    for headerCell in pseudoHeader.Cells {
+        DllCall("user32\SetFocus", "Ptr", headerCell.Hwnd, "Ptr")
+        AssertGuiSmoke(DllCall("user32\GetFocus", "Ptr") == list.Hwnd,
+            "Pseudo header field retained focus instead of rejecting selection")
+    }
 
     AssertGuiSmoke(DllCall("user32\IsWindow", "Ptr", owner.Hwnd, "Int"),
         "Owner GUI handle was not created")
@@ -666,6 +672,11 @@ try {
     imageList := IL_Create(2, 2, true)
     AssertGuiSmoke(imageList != 0, "ImageList creation failed")
     IL_Destroy(imageList)
+} catch as testError {
+    ; GUI 测试运行在无人值守的 CI 桌面上，异常必须进入标准错误并退出；
+    ; 让 AHK 显示模态错误框会把真实断言伪装成外层超时。
+    testFailure := testError.File " (" testError.Line "): "
+        testError.Message "`n" testError.Stack
 } finally {
     if historyToast
         try historyToast.Close()
@@ -676,6 +687,11 @@ try {
     if owner
         try owner.Destroy()
     try RoundedButtonRenderer.Shutdown()
+}
+
+if testFailure {
+    FileAppend(testFailure "`n", "**")
+    ExitApp(1)
 }
 
 FileAppend("GUI_SMOKE|PASS|dpi=" dpi "|sequenceWidth=" sequenceWidth "`n", "*")
