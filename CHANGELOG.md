@@ -7,6 +7,37 @@
 
 ## 🚧 [未发布]
 
+## 🎉 版本 [2.0.2] - 2026-07-29
+
+### 📦 发布物说明
+
+- **`process-watchdog-2.0.2-windows-x64.exe`（独立可执行版）**：无需安装 AutoHotkey，下载后即可运行，适合快速体验或只需要单个程序文件的用户。
+- **`process-watchdog-2.0.2-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证、字体及运行所需资源，适合完整解压后长期使用或手动部署。
+- **`process-watchdog-2.0.2-source.zip`（完整源码版）**：包含 AHK 源码、模块、测试、文档和字体资源，适合审阅、开发或从源码运行；本机需要 AutoHotkey v2 x64。
+
+---
+
+### ✨ 新增
+
+- **运行时与搜索发现**：为脚本守护增加通用运行时、解释器、参数和环境配置；Everything 未运行时可静默发现并启动本机实例，未安装时提供官方获取入口。
+- **GUI 可访问性语义**：为自绘按钮补充 Windows 按钮角色、本地化默认操作和键盘激活支持，并覆盖生命周期清理。
+
+---
+
+### 🚀 优化
+
+- **窗口层级与任务栏行为**：下级窗口最小化时不再联动最小化上级窗口；恢复时重建所有权、模态状态和任务栏分组，焦点返回直接上级。
+- **发布与验证证据**：发行包包含可离线查看的 GUI 验证记录；发布门禁覆盖 13 种语言、主题热切换、窗口资源浸泡和发行包 Markdown 链接。
+- **界面概览**：README 的唯一主界面预览更新为当前版本截图，并保持所有发行文档引用同一资源。
+
+---
+
+### 🐛 修复
+
+- **窗口销毁清理**：修复独立 GUI 测试夹具遗漏无障碍服务依赖导致的 `#Warn` 和交互注册残留误报。
+- **发行包文档链接**：修复便携包未包含 GUI 验证记录、导致 README 离线相对链接失效的问题。
+- **添加窗口初始指针**：窗口激活完成后确认指针仍位于搜索按钮，避免复杂启动时序下指针被系统恢复到旧位置。
+
 ## 🎉 版本 [2.0.1] - 2026-07-28
 
 ### 📦 发布物说明
@@ -170,7 +201,8 @@
 - 后台文件扫描使用 `DirExist` 明确区分目录边界，临时文件遇到瞬时占用时执行
   短时有界重试；测试分别报告结果协议、实际文件集合和清理失败。
 
-[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.1...HEAD
+[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.2...HEAD
+[2.0.2]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/realSilasYang/process-watchdog/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/realSilasYang/process-watchdog/releases/tag/v1.0.0

@@ -30,6 +30,13 @@ AssertLocalizedWindow(condition, message) {
         throw Error(message)
 }
 
+WaitForLocalizedPointerButton(hWnd, timeoutMs := 200) {
+    deadline := A_TickCount + timeoutMs
+    while !IsPointerInsideButton(hWnd) && A_TickCount < deadline
+        Sleep(10)
+    return IsPointerInsideButton(hWnd)
+}
+
 LocalizedWindowNoop(*) {
 }
 
@@ -1104,7 +1111,7 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
 
         addWindow := AddItemDialog(owner)
         addWindow.Show()
-        addPointerOnSearchButton := IsPointerInsideButton(
+        addPointerOnSearchButton := WaitForLocalizedPointerButton(
             addWindow.searchButton.Hwnd)
         WinHide("ahk_id " addWindow.gui.Hwnd)
         AssertWindowTitle(addWindow.gui, Tr("添加监控项"), language,
