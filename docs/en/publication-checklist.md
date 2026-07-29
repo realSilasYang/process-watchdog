@@ -67,10 +67,11 @@ actions on GitHub after repository creation and cannot be replaced by local test
   three assets match the explicit allowlist. An interrupted run may resume only
   the draft from the same commit and never overwrite a published release.
 - After publication, audit the remote tag, commit, title, body, and GitHub SHA-256
-  for all three assets again. Preserve a failed public audit and issue a patch;
-  never delete or overwrite it.
-- After extraction, repeat the layout checks covered by
-  `tools/verify-release.ps1` and confirm no personal configuration is present.
+  for all three assets. Then let `tools/verify-downloaded-release.ps1` download
+  the three hosted editions, extract both ZIPs, and rerun the complete structural
+  verifier against the formal build snapshot embedded in the package. Confirm
+  that personal configuration is absent. Preserve a failed public audit and
+  issue a patch; never delete or overwrite it.
 - Open the AutoHotkey license, corresponding source archive, resolved toolchain snapshot, and
   third-party licenses from the package.
 - Reconfirm that the commercial authorization for PingFang, SF Pro Text, and
@@ -84,7 +85,9 @@ actions on GitHub after repository creation and cannot be replaced by local test
   private security reporting, and Release downloads.
 - Preview all Chinese and English bug, feature, and improvement forms and verify
   fields, labels, support links, and the private-security route.
-- Download the GitHub-hosted artifacts and compare their SHA-256 values with the build output.
+- Confirm that the workflow's download-after-publication audit passed. For an
+  independent rerun, use `tools/verify-downloaded-release.ps1 -Version <version>
+  -CommitSha <tag commit>`.
 - Confirm provenance shows the correct repository, workflow, commit, and tag.
 - Record post-release findings. Any behavior or format change updates the
   changelog and migration instructions.
