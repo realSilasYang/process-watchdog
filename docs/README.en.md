@@ -1,4 +1,6 @@
 <div align="center">
+  <img src="../assets/app/watchdog-logo.png" width="112" height="112" alt="Process Watchdog Assistant Logo">
+
   <p><a href="../README.md">简体中文</a> · <a href="./README.zh-HK.md">繁體中文（香港）</a> · <a href="./README.zh-TW.md">繁體中文（台灣）</a> · <strong>English</strong> · <a href="./README.ja.md">日本語</a> · <a href="./README.vi.md">Tiếng Việt</a> · <a href="./README.ko.md">한국어</a> · <a href="./README.es.md">Español</a> · <a href="./README.fr.md">Français</a> · <a href="./README.pt-BR.md">Português</a> · <a href="./README.ru.md">Русский</a> · <a href="./README.de.md">Deutsch</a> · <a href="./README.it.md">Italiano</a></p>
 
   <h1>Process Watchdog Assistant</h1>
@@ -43,7 +45,7 @@ The main window keeps each target's order, application icon, display name, privi
 - Monitor EXE, AHK, Python, JavaScript, PowerShell, BAT, CMD, and LNK targets.
 - Use `Running`, `Stopped`, and `Unknown` probe results; an unknown result never triggers a blind restart.
 - Give every target its own controller, generation, and task tokens, so stale callbacks become invalid immediately after pausing, deletion, or path changes.
-- Resolve a directly added file by its Windows file ID after a rename or same-volume move, then ask for confirmation instead of guessing from similar files in the folder.
+- After a rename or same-volume move, recover a directly added file when the file system permits reopening it by Windows file ID, then ask for confirmation. If that capability is unavailable, accept only a complete rename event and never guess from similar files in the folder.
 - Enforce an administrator requirement when configured; report a privilege mismatch for an existing process and elevate a manual restart.
 - Keep update protection off by default. When enabled, combine updater processes, parent-child relationships, installation-directory activity, and file stability before pausing or resuming monitoring.
 - Replace configuration atomically. Records that cannot be parsed are moved to `[Recovery]` instead of being silently discarded.
