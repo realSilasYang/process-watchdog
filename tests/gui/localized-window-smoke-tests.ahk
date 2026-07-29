@@ -300,6 +300,30 @@ CreateLocalizedSmokeState(path, maintenanceRoot := "") {
     })
 }
 
+; 更名确认窗口只依赖候选有效性和忽略回调。该替身让多语言 GUI 测试可以
+; 覆盖失效及排队时序，而不会访问真实文件、修改守护配置或启动后台监听器。
+class LocalizedRelocationServiceStub {
+    __New(candidates*) {
+        this.ValidTokens := Map()
+        this.IgnoredTokens := []
+        for candidate in candidates
+            this.ValidTokens[candidate.Token] := true
+    }
+
+    ValidateCandidate(candidate) {
+        return IsObject(candidate) && candidate.HasOwnProp("Token")
+            && this.ValidTokens.Has(candidate.Token)
+    }
+
+    Ignore(candidate) {
+        if !this.ValidateCandidate(candidate)
+            return false
+        this.ValidTokens.Delete(candidate.Token)
+        this.IgnoredTokens.Push(candidate.Token)
+        return true
+    }
+}
+
 RunOneLocalizedWindowPass(language, previewEnvironment := false,
     previewAbout := false, previewDonation := false, requestedTheme := "") {
     global App
@@ -317,6 +341,8 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
     customWindow := ""
     environmentWindow := ""
     maintenanceWindow := ""
+    relocationPrompt := ""
+    originalRelocationService := ""
     helpDialog := ""
     logWindowInstance := ""
     batchLogNoticeDialog := ""
@@ -1111,8 +1137,10 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
 
         addWindow := AddItemDialog(owner)
         addWindow.Show()
-        addPointerOnSearchButton := WaitForLocalizedPointerButton(
-            addWindow.searchButton.Hwnd)
+        ; 无人值守矩阵会按设计隐藏窗口，Windows 不保证隐藏窗口上的
+        ; SetCursorPos 结果可由当前桌面读回；可见预览仍验证真实落点。
+        addPointerOnSearchButton := ApplicationWindowPresenter.AutomationHidden
+            || WaitForLocalizedPointerButton(addWindow.searchButton.Hwnd)
         WinHide("ahk_id " addWindow.gui.Hwnd)
         AssertWindowTitle(addWindow.gui, Tr("添加监控项"), language,
             "AddItemDialog")
@@ -1653,6 +1681,89 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             language " 升级保护窗口的功能 SVG 或保存／取消纯文字规则错误")
         maintenanceWindow.Close()
 
+        firstRelocationCandidate := {
+            Token: 101,
+            OldPath: "C:\Program Files\Smoke\old-target.exe",
+            NewPath: "C:\Program Files\Smoke\renamed-target.exe",
+            Evidence: "FileIdentity"
+        }
+        secondRelocationCandidate := {
+            Token: 102,
+            OldPath: "C:\Tools\Smoke\old-script.py",
+            NewPath: "C:\Tools\Smoke\renamed-script.py",
+            Evidence: "RenameEvent"
+        }
+        invalidRelocationCandidate := {
+            Token: 103,
+            OldPath: "C:\Invalid\old.exe",
+            NewPath: "C:\Invalid\new.exe",
+            Evidence: "FileIdentity"
+        }
+        originalRelocationService := App.targetRelocationService
+        relocationServiceStub := LocalizedRelocationServiceStub(
+            firstRelocationCandidate, secondRelocationCandidate)
+        App.targetRelocationService := relocationServiceStub
+        relocationPrompt := TargetRelocationPrompt(owner)
+        AssertLocalizedWindow(relocationPrompt.Show(
+                firstRelocationCandidate),
+            language " 有效的目标更名候选没有打开确认窗口")
+        WinHide("ahk_id " relocationPrompt.gui.Hwnd)
+        AssertWindowTitle(relocationPrompt.gui, Tr("确认目标新位置"),
+            language, "TargetRelocationPrompt")
+        AssertProductionWindowLayout(relocationPrompt.gui, language,
+            "TargetRelocationPrompt")
+        oldPathStyle := DllCall("user32\GetWindowLongPtrW", "Ptr",
+            relocationPrompt.oldPathEdit.Hwnd, "Int", -16, "Ptr")
+        newPathStyle := DllCall("user32\GetWindowLongPtrW", "Ptr",
+            relocationPrompt.newPathEdit.Hwnd, "Int", -16, "Ptr")
+        updateButtonState := App.uiInteractions.GetButton(
+            relocationPrompt.updateButton.Hwnd)
+        ignoreButtonState := App.uiInteractions.GetButton(
+            relocationPrompt.ignoreButton.Hwnd)
+        AssertLocalizedWindow((oldPathStyle & 0x0800)
+                && (newPathStyle & 0x0800)
+                && relocationPrompt.oldPathEdit.Value
+                    == firstRelocationCandidate.OldPath
+                && relocationPrompt.newPathEdit.Value
+                    == firstRelocationCandidate.NewPath
+                && relocationPrompt.updateButton.Text == Tr("更新守护路径")
+                && relocationPrompt.ignoreButton.Text == Tr("忽略")
+                && !updateButtonState.HasOwnProp("buttonImage")
+                && !updateButtonState.HasOwnProp("buttonIcon")
+                && !ignoreButtonState.HasOwnProp("buttonImage")
+                && !ignoreButtonState.HasOwnProp("buttonIcon"),
+            language " 目标更名确认窗口的只读路径或纯文字按钮不正确")
+        AssertLocalizedWindow(relocationPrompt.Show(
+                secondRelocationCandidate)
+                && relocationPrompt.queuedCandidates.Length == 1,
+            language " 多个目标更名候选没有按顺序排队")
+        AssertLocalizedWindow(!relocationPrompt.Show(
+                invalidRelocationCandidate)
+                && relocationPrompt.queuedCandidates.Length == 1,
+            language " 已失效的目标更名候选仍被加入确认队列")
+        relocationServiceStub.ValidTokens.Delete(
+            firstRelocationCandidate.Token)
+        AssertLocalizedWindow(relocationPrompt.Invalidate(
+                firstRelocationCandidate),
+            language " 当前目标更名候选失效后没有关闭")
+        Sleep(30)
+        AssertLocalizedWindow(IsObject(relocationPrompt.candidate)
+                && relocationPrompt.candidate.Token
+                    == secondRelocationCandidate.Token
+                && relocationPrompt.queuedCandidates.Length == 0
+                && relocationPrompt.newPathEdit.Value
+                    == secondRelocationCandidate.NewPath,
+            language " 当前候选失效后没有继续显示下一项")
+        relocationPrompt.Close()
+        AssertLocalizedWindow(relocationServiceStub.IgnoredTokens.Length == 1
+                && relocationServiceStub.IgnoredTokens[1]
+                    == secondRelocationCandidate.Token
+                && !relocationPrompt.IsOpen(),
+            language " 关闭目标更名确认窗口没有按忽略处理当前候选")
+        relocationPrompt := ""
+        App.targetRelocationService := originalRelocationService
+        originalRelocationService := ""
+
         helpDialog := HelpWindow(owner)
         helpDialog.Show()
         WinHide("ahk_id " helpDialog.gui.Hwnd)
@@ -1871,6 +1982,10 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             try helpDialog.Close()
         if maintenanceWindow
             try maintenanceWindow.Close()
+        if relocationPrompt
+            try relocationPrompt.Shutdown()
+        if originalRelocationService
+            try App.targetRelocationService := originalRelocationService
         if environmentWindow
             try environmentWindow.Close()
         if customWindow

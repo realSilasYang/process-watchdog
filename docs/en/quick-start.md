@@ -16,6 +16,29 @@ For MSI shortcuts or applications whose internal path changes with each version,
 the assistant combines installation-directory candidates with current process
 evidence to choose the main program conservatively.
 
+## When a target file is renamed or moved
+
+If a directly added EXE or script is renamed while the assistant is running,
+moved elsewhere on the same volume, or moved because a parent folder was
+renamed, the assistant first resolves the same file by its Windows volume
+serial number and file ID. On a file system without usable file IDs, an
+explicit rename event is used as a fallback. A different EXE is never guessed
+merely because it is the only one left in the old folder.
+
+When a candidate is found, pending restart work for that item is frozen and a
+confirmation window shows the previous path, new path, and identity evidence.
+Update monitored path preserves the display name, icon, arguments, environment,
+runtime, and update-protection settings, and the change can be undone. Ignore
+keeps the old path and returns the item to its normal missing-target state.
+Rename confirmation is suppressed while update protection is evaluating or
+handling an update, so an updater's backup file is not presented as a new
+target.
+
+Reliable automatic recovery is not possible if the file was renamed while the
+assistant was not running, moved to another volume, or stored on a file system
+that supplies neither a stable file ID nor a complete rename event. In those
+cases, edit the path manually by double-clicking it in the main list.
+
 ## Monitor scripts and command-line tools
 
 AHK, Python, JavaScript, PowerShell, BAT, CMD, Ruby, Perl, PHP, Lua, JAR, and

@@ -7,6 +7,37 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.0.3] - 2026-07-29
+
+### 📦 Release Assets
+
+- **`process-watchdog-2.0.3-windows-x64.exe` (standalone executable):** Requires no AutoHotkey installation and runs immediately after download; intended for a quick trial or users who need a single program file.
+- **`process-watchdog-2.0.3-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, fonts, and runtime resources; intended for long-term use after full extraction or for manual deployment.
+- **`process-watchdog-2.0.3-source.zip` (complete source package):** Includes the AHK source, modules, tests, documentation, and fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+
+---
+
+### ✨ Added
+
+- **Renamed and moved target recovery**: A directly added program or script can be recovered by its Windows file identity after it is renamed, its parent directory is renamed, or it is moved within the same volume while the assistant is running. On file systems without stable file IDs, only a complete Windows rename event is accepted as fallback evidence; similar names are never guessed.
+- **Path confirmation and history**: Detection freezes restart work only for the affected item and presents the previous path, new path, and evidence in a localized confirmation window. Confirmation changes only the monitored path, preserves the name, icon, arguments, environment, runtime, and update-protection settings, and supports undo and redo.
+
+---
+
+### 🚀 Improvements
+
+- **Main-window command buttons**: Add, Pause/Resume, and Delete now use fixed icon slots. Pause and Resume use a common geometric canvas, while character icons are centered from their rendered raster ink. Text and icons no longer shift across state changes, theme switches, or high-DPI redraws.
+- **Target-state presentation**: Waiting for path confirmation has a dedicated status icon and exception priority. List sorting, the status bar, and the supervisor now distinguish a missing target, pending confirmation, and normal initialization.
+- **Interface overview**: All thirteen README languages continue to share one canonical preview, now updated to the current main-window screenshot.
+
+---
+
+### 🐛 Fixed
+
+- **Resume after a paused target was renamed**: Fixed an item remaining indefinitely in Initializing after its target was renamed while monitoring was paused. A stale directory-activity signal no longer blocks recovery when update protection is disabled.
+- **Missing-target detection order**: File identity is checked before restart decisions when the target was renamed but its old process is still alive, process snapshots are temporarily unavailable, or a single-instance notice has just closed. This prevents path changes from being treated as application stops and avoids duplicate launches.
+- **Transactional path migration**: Manual path edits and automatic recovery now share target-conflict, shortcut, and runtime-configuration validation. A failed configuration write rolls the whole transition back, preventing disagreement among the list, runtime state, and INI persistence.
+
 ## 🎉 Version [2.0.2] - 2026-07-29
 
 ### 📦 Release Assets
@@ -253,7 +284,8 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.2...HEAD
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.3...HEAD
+[2.0.3]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.2...v2.0.3
 [2.0.2]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/realSilasYang/process-watchdog/compare/v1.0.0...v2.0.0

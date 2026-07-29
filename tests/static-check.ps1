@@ -48,9 +48,15 @@ $targetSupervisorSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\
 $targetSpecsSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\TargetSpecs.ahk') -Raw -Encoding UTF8
 $targetSpecsServiceSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\TargetSpecsService.ahk') -Raw -Encoding UTF8
 $targetIdentityServiceSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\TargetIdentityService.ahk') -Raw -Encoding UTF8
+$targetRelocationServiceSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'src\Core\TargetRelocationService.ahk') `
+    -Raw -Encoding UTF8
 $appConfigHistoryServiceSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\AppConfigHistoryService.ahk') -Raw -Encoding UTF8
 $historyToastSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\Windows\HistoryToastWindow.ahk') -Raw -Encoding UTF8
+$targetRelocationPromptSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\Windows\TargetRelocationPrompt.ahk') `
+    -Raw -Encoding UTF8
 $guardRuntimeSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\GuardRuntime.ahk') -Raw -Encoding UTF8
 $targetLauncherSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Execution\TargetLauncher.ahk') -Raw -Encoding UTF8
 $everythingRuntimeServiceSource = Get-Content -LiteralPath `
@@ -328,6 +334,16 @@ foreach ($requiredMainCommandText in @(
 if ($mainSource -match
         'SetButtonLucideIcon\(Main\.btn(?:Add|Pause|Del)\s*,') {
     $failures.Add('Main add/pause/delete commands must not be rebound to Lucide SVG icons')
+}
+if (-not $mainSource.Contains('SetButtonLeadingTextSlot(Main.btnAdd, 20, 4)') -or
+    -not $mainSource.Contains('SetButtonLeadingTextSlot(Main.btnPause, 20, 4)') -or
+    -not $mainSource.Contains('SetButtonLeadingTextSlot(Main.btnDel, 20, 4)') -or
+    -not $interactionPresenterSource.Contains('DrawLeadingCommandSymbol(hdc, symbol, left, top, right, bottom,') -or
+    -not $interactionPresenterSource.Contains('state.leadingTextVisualSizeDip * dpi / 96') -or
+    -not $interactionPresenterSource.Contains('CreateRasterCenteredTextRect(hdc, text, left, top, right,') -or
+    -not $interactionPresenterSource.Contains('RasterInkBoundsCache') -or
+    -not $interactionPresenterSource.Contains('"Ptr", leadingRect, "UInt", 0x00000825')) {
+    $failures.Add('Main add/pause/delete symbols must use one fixed icon slot and text layout')
 }
 if ($interactionPresenterSource -notmatch
         'SetButtonLucideIcon\(ctrl, iconName,[\s\S]{0,500}GetApplicationAssetPath\([\s\S]{0,160}ui-icons\\lucide\\') {
@@ -2283,6 +2299,8 @@ else {
         'ApplyAppConfigTransition(item.Path,',
         'App.appConfigSnapshotService.MergeTransitionOrder(currentState,',
         'SyncMainListToConfigState(projectedItems)',
+        'if !SaveAppsToIni()',
+        'ApplyState(currentState, "", false)',
         'RestoreMainListInteraction(interaction)'
     )) {
         if (-not $applyStateSource.Contains($requiredDifferentialHook)) {
@@ -3123,6 +3141,37 @@ if ($source -notmatch 'ShutdownApplication\(\*\)\s*\{[\s\S]{0,220}App\.shutdownS
 if ($source -match 'OnExit\([^\r\n]*,\s*(?:-100|50|100)\s*\)' -or
     $guardRuntimeSource -match '\bExitHandler\b') {
     $failures.Add('Legacy multi-hook shutdown priority state must not remain')
+}
+
+# 直接文件目标更名只能由强身份证据触发，并必须复用可撤销的路径迁移事务。
+# 这一门禁防止后续把“同目录相似文件”之类启发式重新接回核心守护路径。
+if (-not $mainSource.Contains('#Include src\Core\TargetRelocationService.ahk') -or
+    -not $mainSource.Contains('#Include app\Windows\TargetRelocationPrompt.ahk') -or
+    -not $targetRelocationServiceSource.Contains('class TargetRelocationService') -or
+    -not $targetRelocationServiceSource.Contains('ResolveIdentityPath.Call(path, identity)') -or
+    -not $targetRelocationServiceSource.Contains('FILE_ACTION_RENAMED_OLD_NAME := 4') -or
+    -not $targetRelocationServiceSource.Contains('FILE_ACTION_RENAMED_NEW_NAME := 5') -or
+    -not $targetRelocationServiceSource.Contains('IsMaintenanceBusy(path, stateObj)') -or
+    -not $targetRelocationServiceSource.Contains('this.Callbacks.IsMaintenanceProtectionEnabled.Call(path,') -or
+    -not $source.Contains('IsMaintenanceProtectionEnabled: ObjBindMethod(') -or
+    -not $targetRelocationServiceSource.Contains('stateObj.Generation != currentCandidate.Generation') -or
+    -not $targetFileInspectorSource.Contains('OpenFileById') -or
+    -not $targetFileInspectorSource.Contains('GetFinalPathNameByHandleW') -or
+    -not $source.Contains('PrepareWatchPathTransition(previousPath, requestedPath)') -or
+    -not $source.Contains('PrepareWatchPathTransitionFromState(previousPath, requestedPath,') -or
+    -not $source.Contains('ApplyWatchPathTransition(previousPath, requestedPath,') -or
+    -not $source.Contains('ApplyWatchPathTransition(previousPath, newPath)') -or
+    $source -notmatch 'ApplyWatchPathTransition\(candidate\.OldPath,\s*candidate\.NewPath,\s*"relocate-path"\)' -or
+    $source -notmatch 'ApplyState\(transition\.TargetState,\s*transition\.BeforeState\)\s*App\.appConfigHistoryService\.Commit' -or
+    -not $source.Contains('if selectedBefore {') -or
+    -not $source.Contains('migratedRow := FindRow(transition.NewPath)') -or
+    -not $targetRelocationPromptSource.Contains('class TargetRelocationPrompt extends ManagedWindow') -or
+    -not $source.Contains('this.targetRelocation := TargetRelocationPrompt(mainGui)')) {
+    $failures.Add('Renamed direct targets must use strong file identity, a confirmed shared migration transaction, and managed-window lifecycle')
+}
+if ($targetRelocationServiceSource -match '(?i)unique.*exe|only.*exe|single.*exe' -or
+    $targetRelocationServiceSource -match '(?i)Loop Files.*\*\.exe') {
+    $failures.Add('Renamed-target recovery must never guess from a unique or scanned EXE candidate')
 }
 
 if ($failures.Count) {

@@ -39,6 +39,7 @@ RunTargetFileInspectorTests() {
     inspector := CreateTargetFileInspectorForTest()
     testId := DllCall("kernel32\GetCurrentProcessId", "UInt")
     scriptPath := A_Temp "\watchdog-target-file-" testId ".ahk"
+    renamedScriptPath := A_Temp "\watchdog-target-file-renamed-" testId ".ahk"
     sameSizePath := A_Temp "\watchdog-target-same-size-" testId ".ahk"
     emptyPath := A_Temp "\watchdog-target-empty-" testId ".ahk"
     damagedExePath := A_Temp "\watchdog-target-damaged-" testId ".exe"
@@ -46,7 +47,7 @@ RunTargetFileInspectorTests() {
     directoryPath := A_Temp "\watchdog-target-directory-" testId ".exe"
     try {
         for path in [scriptPath, sameSizePath, emptyPath, damagedExePath,
-            missingPath]
+            missingPath, renamedScriptPath]
             try FileDelete(path)
         try DirDelete(directoryPath)
         FileAppend("#Requires AutoHotkey v2.0`n", scriptPath, "UTF-8")
@@ -110,9 +111,21 @@ RunTargetFileInspectorTests() {
             && !inspector.IsWithinRoot("C:\Product2\App.exe", "C:\Product")
             && !inspector.IsWithinRoot("", "C:\Product"),
             "路径作用根边界判断错误")
+
+        originalIdentity := inspector.GetIdentity(scriptPath)
+        AssertTargetFileInspector(originalIdentity.Available
+            && originalIdentity.NativeIdentityAvailable,
+            "测试文件没有取得可用于更名恢复的 Windows 文件身份")
+        FileMove(scriptPath, renamedScriptPath)
+        resolvedRenamedPath := inspector.ResolveCurrentPath(scriptPath,
+            originalIdentity)
+        AssertTargetFileInspector(TargetFileTestCanonical(resolvedRenamedPath)
+            == TargetFileTestCanonical(renamedScriptPath),
+            "同一文件更名后没有通过文件 ID 找回当前路径")
+        FileMove(renamedScriptPath, scriptPath)
     } finally {
         for path in [scriptPath, sameSizePath, emptyPath, damagedExePath,
-            missingPath]
+            missingPath, renamedScriptPath]
             try FileDelete(path)
         try DirDelete(directoryPath)
     }

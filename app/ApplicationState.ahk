@@ -170,6 +170,34 @@ class ApplicationState {
             UpdateState: UpdateState,
             WatcherFactory: DirectoryChangeWatcher
         })
+        this.targetRelocationService := TargetRelocationService(this, {
+            CanonicalPath: GetCanonicalPath,
+            DirectoryExists: (path) => !!DirExist(path),
+            FindConflict: ObjBindMethod(this.targetIdentityService,
+                "FindConflict"),
+            GetIdentity: ObjBindMethod(this.targetFileInspector,
+                "GetIdentity"),
+            HasRecentMaintenanceSignal: ObjBindMethod(
+                this.maintenanceCoordinator, "HasRecentSignal"),
+            IsMaintenanceBlocking: ObjBindMethod(
+                this.maintenanceCoordinator, "IsBlocking"),
+            IsMaintenanceProtectionEnabled: ObjBindMethod(
+                this.maintenanceCoordinator, "IsProtectionEnabled"),
+            Localize: Tr,
+            LocalizeDiagnostic: TrDiagnostic,
+            Log: LogMsg,
+            NormalizePath: NormalizeTargetPath,
+            Now: GetTickCount64,
+            OnCandidate: QueueTargetRelocationPrompt,
+            OnCandidateInvalidated: InvalidateTargetRelocationPrompt,
+            PathsEquivalent: PathsEquivalent,
+            ResetState: ResetTargetRelocationState,
+            ResolveIdentityPath: ObjBindMethod(this.targetFileInspector,
+                "ResolveCurrentPath"),
+            TargetExists: (path) => !!FileExist(path) && !DirExist(path),
+            UpdateState: UpdateState,
+            WatcherFactory: DirectoryChangeWatcher
+        })
         this.guardRuntime := GuardRuntime(this, {
             ClearProcessIdentity: ClearStateProcessIdentity,
             GetLogFilePath: GetLogFilePath,

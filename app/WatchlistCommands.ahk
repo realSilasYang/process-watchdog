@@ -311,6 +311,197 @@ ProcessEditFinish(GuiCtrlObj, Item, sessionId := 0) {
     finally App.guardWorkGate.Leave()
 }
 
+PrepareWatchPathTransition(previousPath, requestedPath) {
+    return PrepareWatchPathTransitionFromState(previousPath, requestedPath,
+        CaptureAppConfigState())
+}
+
+; 把路径迁移的快照变换与 GUI 捕获分离，便于逐字段验证且保证手工编辑、
+; 自动找回都走同一规则。这里只构造目标状态，不修改运行态或持久化文件。
+PrepareWatchPathTransitionFromState(previousPath, requestedPath,
+    beforeState) {
+    previousPath := NormalizeTargetPath(previousPath)
+    newPath := NormalizeTargetPath(requestedPath)
+    if (newPath == "" || PathsEquivalent(newPath, previousPath))
+        return {Changed: false, PreviousPath: previousPath, NewPath: previousPath}
+    if DirExist(newPath)
+        throw Error(Tr("监控项不能指向文件夹：{1}", newPath))
+    if !App.appStates.Has(previousPath)
+        throw Error(Tr("监控项路径无效：{1}", previousPath))
+    if App.appStates.Has(newPath)
+        throw Error(Tr("拒绝将应用路径改为已存在的监控项：{1}", newPath))
+
+    prospectiveResolvedTarget := ""
+    prospectiveResolutionSource := ""
+    prospectiveShortcutArgs := ""
+    prospectiveWorkingDirectory := ""
+    SplitPath(newPath, , , &prospectiveExtension)
+    if (StrLower(prospectiveExtension) == "lnk") {
+        prospectiveResolvedTarget := App.shortcutTargetResolver
+            .ResolveForState(newPath, "", &prospectiveResolutionSource)
+        descriptor := App.shortcutTargetResolver.Read(newPath)
+        if descriptor.Readable {
+            prospectiveWorkingDirectory := descriptor.WorkingDirectory
+            prospectiveShortcutArgs := descriptor.Arguments
+        }
+    }
+    prospectiveIdentity := prospectiveResolvedTarget != ""
+        ? prospectiveResolvedTarget
+        : (App.shortcutTargetResolver.IsPotentialProcessTarget(newPath)
+            ? newPath : "")
+    identityConflict := App.targetIdentityService.FindConflict(
+        prospectiveIdentity, previousPath)
+    if identityConflict != "" {
+        throw Error(Tr("拒绝修改路径，真实进程已由其它项目守护：{1}",
+            identityConflict))
+    }
+
+    if Type(beforeState) != "Array"
+        throw Error(Tr("监控项路径无效：{1}", previousPath))
+    targetState := App.appConfigSnapshotService.PrepareState(beforeState).Items
+    pathChanged := false
+    for targetItem in targetState {
+        if !PathsEquivalent(targetItem.Path, previousPath)
+            continue
+        targetItem.Path := newPath
+        targetItem.ResolvedTarget := prospectiveResolvedTarget
+        targetItem.ResolvedTargetManual := false
+        targetItem.ShortcutArgs := prospectiveShortcutArgs
+        if !TargetSpecFactory.SupportsCustomRuntime(newPath) {
+            targetItem.RuntimePath := ""
+            targetItem.RuntimeArgs := ""
+        }
+        if prospectiveWorkingDirectory != ""
+            targetItem.WorkDir := prospectiveWorkingDirectory
+        targetItem.Maintenance := App.maintenanceConfigCodec
+            .NormalizeSnapshot(targetItem.Maintenance, newPath,
+                prospectiveResolvedTarget)
+        pathChanged := true
+        break
+    }
+    if !pathChanged
+        throw Error(Tr("监控项路径无效：{1}", previousPath))
+    return {
+        Changed: true,
+        PreviousPath: previousPath,
+        NewPath: newPath,
+        BeforeState: beforeState,
+        TargetState: targetState
+    }
+}
+
+ApplyWatchPathTransition(previousPath, requestedPath,
+    historyKind := "edit-path") {
+    transition := PrepareWatchPathTransition(previousPath, requestedPath)
+    if !transition.Changed
+        return false
+    selectedBefore := false
+    row := 0
+    Loop {
+        row := Main.lv.GetNext(row)
+        if !row
+            break
+        if PathsEquivalent(Main.lv.GetText(row, 3), transition.PreviousPath) {
+            selectedBefore := true
+            break
+        }
+    }
+    ApplyState(transition.TargetState, transition.BeforeState)
+    App.appConfigHistoryService.Commit(transition.BeforeState,
+        transition.TargetState, CreateAppHistoryAction(historyKind,
+            [transition.PreviousPath, transition.NewPath]))
+    if selectedBefore {
+        migratedRow := FindRow(transition.NewPath)
+        if migratedRow > 0
+            Main.lv.Modify(migratedRow, "Select Focus Vis")
+    }
+    return true
+}
+
+QueueTargetRelocationPrompt(candidate) {
+    if App.shutdownStarted
+        return false
+    SetTimer(ShowTargetRelocationPrompt.Bind(candidate), -1)
+    return true
+}
+
+ShowTargetRelocationPrompt(candidate, *) {
+    if App.shutdownStarted || !IsSet(GuiModules)
+        return false
+    if !App.targetRelocationService.ValidateCandidate(candidate) {
+        App.targetRelocationService.Invalidate(candidate)
+        return false
+    }
+    GuiModules.targetRelocation.Show(candidate)
+    return true
+}
+
+InvalidateTargetRelocationPrompt(candidate) {
+    if App.shutdownStarted
+        return false
+    SetTimer(CloseInvalidTargetRelocationPrompt.Bind(candidate), -1)
+    return true
+}
+
+CloseInvalidTargetRelocationPrompt(candidate, *) {
+    if IsSet(GuiModules)
+        GuiModules.targetRelocation.Invalidate(candidate)
+}
+
+QueueTargetRelocationConfirmation(candidate) {
+    if !App.targetRelocationService.ValidateCandidate(candidate)
+        return false
+    return QueueExclusiveGuardMutation(candidate.State, "relocate-path",
+        ConfirmTargetRelocationCore.Bind(candidate),
+        Tr("自动识别目标新位置"))
+}
+
+ConfirmTargetRelocationCore(candidate) {
+    if !App.targetRelocationService.ValidateCandidate(candidate) {
+        App.targetRelocationService.Invalidate(candidate)
+        LogMsg(Tr("检测到的目标新位置已失效，请重新操作。"))
+        return false
+    }
+    try {
+        if !ApplyWatchPathTransition(candidate.OldPath, candidate.NewPath,
+            "relocate-path")
+            throw Error(Tr("监控项路径无效：{1}", candidate.OldPath))
+        App.targetRelocationService.Complete(candidate)
+        App.targetRelocationService.SyncTargets()
+        LogMsg(Tr("已更新已更名的守护目标：{1} -> {2}",
+            candidate.OldPath, candidate.NewPath))
+        return true
+    } catch as relocationError {
+        App.targetRelocationService.Invalidate(candidate)
+        throw relocationError
+    }
+}
+
+IgnoreTargetRelocation(candidate) {
+    return App.targetRelocationService.Ignore(candidate)
+}
+
+ResetTargetRelocationState(path, stateObj) {
+    if !App.appStates.Has(path) || App.appStates[path] != stateObj
+        return false
+    stateObj.RelocationPending := false
+    if FileExist(path) && !DirExist(path) {
+        stateObj.ResetGuardAttemptState()
+        stateObj.TransitionTo(GuardPhase.Initializing)
+        UpdateState(path, Tr("初始化..."), stateObj, stateObj.Generation,
+            true, GuardStatusKind.Initializing)
+        return true
+    }
+    SplitPath(path, , , &extension)
+    isScript := RegExMatch(extension,
+        "i)^(ahk|py|pyw|js|vbs|vbe|wsf|ps1|bat|cmd|rb|pl|php|lua|jar|sh|bash)$")
+    App.maintenanceCoordinator.MarkTargetMissing(path, stateObj,
+        isScript ? Tr("❌ 脚本不存在") : Tr("❌ 程序不存在"),
+        isScript ? GuardStatusKind.ScriptMissing
+            : GuardStatusKind.ProgramMissing)
+    return true
+}
+
 ProcessEditFinishCore(GuiCtrlObj, Item, sessionId := 0) {
     if (sessionId && sessionId != App.editSessionId)
         return
@@ -318,73 +509,9 @@ ProcessEditFinishCore(GuiCtrlObj, Item, sessionId := 0) {
         newPath := NormalizeTargetPath(GuiCtrlObj.GetText(Item, 1))
         previousPath := GuiCtrlObj.GetText(Item, 3)
 
-        if (newPath != "" && newPath != previousPath) {
-            prospectiveResolvedTarget := ""
-            prospectiveResolutionSource := ""
-            prospectiveShortcutArgs := ""
-            prospectiveWorkingDirectory := ""
-            SplitPath(newPath, , , &prospectiveExtension)
-            if (StrLower(prospectiveExtension) == "lnk") {
-                prospectiveResolvedTarget := App.shortcutTargetResolver
-                    .ResolveForState(newPath, "", &prospectiveResolutionSource)
-                descriptor := App.shortcutTargetResolver.Read(newPath)
-                if descriptor.Readable {
-                    prospectiveWorkingDirectory := descriptor.WorkingDirectory
-                    prospectiveShortcutArgs := descriptor.Arguments
-                }
-            }
-            prospectiveIdentity := prospectiveResolvedTarget != ""
-                ? prospectiveResolvedTarget
-                : (App.shortcutTargetResolver.IsPotentialProcessTarget(newPath)
-                    ? newPath : "")
-            identityConflict := App.targetIdentityService.FindConflict(
-                prospectiveIdentity, previousPath)
-            if DirExist(newPath) {
-                newPath := previousPath
-            } else if !App.appStates.Has(previousPath) {
-                ; 状态已被其它操作移除时，不能只改 ListView 而留下无状态孤儿行。
-                newPath := previousPath
-            } else if App.appStates.Has(newPath) {
-                LogMsg(Tr("拒绝将应用路径改为已存在的监控项：{1}", newPath))
-                newPath := previousPath
-            } else if (identityConflict != "") {
-                LogMsg(Tr("拒绝修改路径，真实进程已由其它项目守护：{1}",
-                    identityConflict))
-                newPath := previousPath
-            } else {
-                undoState := CaptureAppConfigState()
-                if Type(undoState) != "Array"
-                    throw Error(Tr("监控项路径无效：{1}", previousPath))
-                targetState := App.appConfigSnapshotService
-                    .PrepareState(undoState).Items
-                pathChanged := false
-                for targetItem in targetState {
-                    if !PathsEquivalent(targetItem.Path, previousPath)
-                        continue
-                    targetItem.Path := newPath
-                    targetItem.ResolvedTarget := prospectiveResolvedTarget
-                    targetItem.ResolvedTargetManual := false
-                    targetItem.ShortcutArgs := prospectiveShortcutArgs
-                    if !TargetSpecFactory.SupportsCustomRuntime(newPath) {
-                        targetItem.RuntimePath := ""
-                        targetItem.RuntimeArgs := ""
-                    }
-                    if (prospectiveWorkingDirectory != "")
-                        targetItem.WorkDir := prospectiveWorkingDirectory
-                    targetItem.Maintenance := App.maintenanceConfigCodec
-                        .NormalizeSnapshot(targetItem.Maintenance, newPath,
-                            prospectiveResolvedTarget)
-                    pathChanged := true
-                    break
-                }
-                if !pathChanged
-                    throw Error(Tr("监控项路径无效：{1}", previousPath))
-                ApplyState(targetState, undoState)
-                App.appConfigHistoryService.Commit(undoState, targetState,
-                    CreateAppHistoryAction("edit-path",
-                        [previousPath, newPath]))
+        if (newPath != "" && !PathsEquivalent(newPath, previousPath)) {
+            if ApplyWatchPathTransition(previousPath, newPath)
                 LogMsg(Tr("已更新应用程序路径。"))
-            }
         }
 
         realPath := GuiCtrlObj.GetText(Item, 3)
@@ -618,6 +745,7 @@ FormatHistoryAction(entry) {
         case "delete": label := Tr("删除")
         case "toggle-pause": label := GetHistoryPauseActionLabel(entry, paths)
         case "edit-path": label := Tr("编辑完整路径")
+        case "relocate-path": label := Tr("更新已更名的守护目标")
         case "reorder": label := Tr("调整守护顺序")
         case "run-as-admin": label := Tr("管理员运行状态")
         case "display": label := Tr("自定义名称和图标")
@@ -952,7 +1080,8 @@ ApplyState(stateArr, sourceStateArr := "", rollbackOnFailure := true) {
         SyncMainListToConfigState(projectedItems)
         if journalChanged
             App.maintenanceCoordinator.SaveJournal()
-        SaveAppsToIni()
+        if !SaveAppsToIni()
+            throw Error(Tr("监控配置尚未保存，请查看运行日志。"))
     } catch as applyError {
         if rollbackOnFailure && Type(currentState) == "Array" {
             try ApplyState(currentState, "", false)

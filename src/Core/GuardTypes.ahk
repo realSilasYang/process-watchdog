@@ -97,6 +97,7 @@ class GuardStatusKind {
     static TargetMissing := "TargetMissing"
     static ProgramMissing := "ProgramMissing"
     static ScriptMissing := "ScriptMissing"
+    static RelocationPending := "RelocationPending"
     static SafeStartWait := "SafeStartWait"
     static LaunchRetry := "LaunchRetry"
     static MaintenanceArbitrating := "MaintenanceArbitrating"

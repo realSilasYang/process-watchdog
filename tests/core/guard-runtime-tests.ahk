@@ -29,6 +29,7 @@ class GuardRuntimeFakeMaintenance {
     __New() {
         this.Blocking := false
         this.Stopped := false
+        this.SubjectExists := true
     }
 
     IsBlocking(*) {
@@ -44,7 +45,7 @@ class GuardRuntimeFakeMaintenance {
     }
 
     TargetSubjectExists(*) {
-        return true
+        return this.SubjectExists
     }
 
     CanSafelyLaunch(path, stateObj, &reason) {
@@ -69,6 +70,35 @@ class GuardRuntimeFakeMaintenance {
 
     Enter(*) {
         return false
+    }
+
+    Shutdown() {
+        this.Stopped := true
+    }
+}
+
+class GuardRuntimeFakeRelocation {
+    __New() {
+        this.DetectResult := false
+        this.DetectCount := 0
+        this.ObserveCount := 0
+        this.Stopped := false
+    }
+
+    Start() {
+        return true
+    }
+
+    ObserveAvailable(*) {
+        this.ObserveCount++
+        return false
+    }
+
+    TryDetect(path, stateObj) {
+        this.DetectCount++
+        if this.DetectResult
+            stateObj.RelocationPending := true
+        return this.DetectResult
     }
 
     Shutdown() {
@@ -271,6 +301,7 @@ RunGuardRuntimeTests() {
     maintenance := GuardRuntimeFakeMaintenance()
     launcher := GuardRuntimeFakeLauncher()
     inspector := GuardRuntimeFakeInspector(clock)
+    relocation := GuardRuntimeFakeRelocation()
     states := Map()
     states.CaseSense := "Off"
     runtime := {
@@ -283,6 +314,7 @@ RunGuardRuntimeTests() {
         maintenanceCoordinator: maintenance,
         processSnapshots: GuardRuntimeFakeSnapshots(clock),
         processInspector: inspector,
+        targetRelocationService: relocation,
         targetLauncher: launcher
     }
     callbacks := {
@@ -640,6 +672,27 @@ RunGuardRuntimeTests() {
     AssertGuardRuntime(!runtime.guardWorkGate.Busy,
         "探活异常后的下一轮监控无法正常结束")
 
+    ; 文件更名与旧进程是否仍存活无关，也不能依赖进程快照可用。目标引用
+    ; 消失后应先用文件身份找回路径，命中候选时本轮不得继续探活或重启。
+    relocatedState := CreateGuardRuntimeSupervisor(scheduler)
+    states.Clear()
+    states[path] := relocatedState
+    runtime.appOrder := [path]
+    maintenance.SubjectExists := false
+    relocation.DetectResult := true
+    relocation.DetectCount := 0
+    GuardRuntimeTestContext.ThrowOnObserve := true
+    guard.MonitorTick()
+    GuardRuntimeTestContext.ThrowOnObserve := false
+    AssertGuardRuntime(relocation.DetectCount == 1
+            && relocatedState.RelocationPending
+            && relocatedState.RestartTask == ""
+            && relocatedState.VerifyTask == "",
+        "目标更名识别仍依赖进程停止或快照可用后才执行")
+    maintenance.SubjectExists := true
+    relocation.DetectResult := false
+    relocatedState.RelocationPending := false
+
     ; 普通轮询暂时拿不到完整快照或得到 Unknown 时，必须明确投影为
     ; “等待进程状态”，不能无限保留上一轮的运行中、疑似停止等旧状态。
     unavailableSnapshotState := CreateGuardRuntimeSupervisor(scheduler)
@@ -832,6 +885,8 @@ RunGuardRuntimeTests() {
         "运行时关闭没有停止共享调度器")
     AssertGuardRuntime(maintenance.Stopped,
         "运行时关闭没有清理升级编排器")
+    AssertGuardRuntime(relocation.Stopped,
+        "运行时关闭没有清理目标更名识别服务")
     GuardRuntimeTestContext.ThrowOnObserve := true
     guard.MonitorTick()
     GuardRuntimeTestContext.ThrowOnObserve := false

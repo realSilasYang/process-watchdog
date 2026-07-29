@@ -26,6 +26,9 @@ class GuardRuntime {
             return false
         this.Running := true
         try {
+            if this.Runtime.HasOwnProp("targetRelocationService")
+                && !this.Runtime.targetRelocationService.Start()
+                this.Log(this.Text("守护目标更名识别服务未能启动。"))
             SetTimer(this.MonitorTimer, this.Runtime.checkInterval)
             if !this.Runtime.maintenanceCoordinator.StartTimers() {
                 SetTimer(this.MonitorTimer, 0)
@@ -52,6 +55,8 @@ class GuardRuntime {
         this.Stopped := true
         this.Running := false
         try SetTimer(this.MonitorTimer, 0)
+        if this.Runtime.HasOwnProp("targetRelocationService")
+            try this.Runtime.targetRelocationService.Shutdown()
         for _, stateObj in this.Runtime.appStates
             try stateObj.CancelScheduledTasks()
         if this.Runtime.scheduler is WatchdogScheduler
@@ -65,7 +70,8 @@ class GuardRuntime {
         nowTicks := this.Now()
         resumed := false
         for path, stateObj in this.Runtime.appStates {
-            if !stateObj.Enabled || !stateObj.IsSnapshotWaitCurrent()
+            if !stateObj.Enabled || stateObj.RelocationPending
+                || !stateObj.IsSnapshotWaitCurrent()
                 || this.Runtime.maintenanceCoordinator.IsBlocking(stateObj)
                 || snapshotIndex.RequestTicks
                     < stateObj.SnapshotRequestTicks {
@@ -151,6 +157,8 @@ class GuardRuntime {
             }
             if !stateObj.Enabled
                 return ""
+            if stateObj.RelocationPending
+                return ""
             if this.Runtime.maintenanceCoordinator.IsBlocking(stateObj) {
                 stateObj.CancelScheduledTasks()
                 stateObj.Pending := true
@@ -186,6 +194,8 @@ class GuardRuntime {
             }
             if !stateObj.Enabled
                 return ""
+            if stateObj.RelocationPending
+                return ""
             if this.Runtime.maintenanceCoordinator.IsBlocking(stateObj) {
                 stateObj.CancelScheduledTasks()
                 stateObj.Pending := true
@@ -220,6 +230,7 @@ class GuardRuntime {
                     continue
                 stateObj := this.Runtime.appStates[path]
                 if !stateObj.Enabled || stateObj.OneShot
+                    || stateObj.RelocationPending
                     continue
                 this.RecoverOrphanedPending(path, stateObj)
                 if (stateObj.Pending
@@ -272,6 +283,8 @@ class GuardRuntime {
                     continue
                 stateObj := this.Runtime.appStates[path]
                 if !stateObj.Enabled
+                    continue
+                if stateObj.RelocationPending
                     continue
 
                 try {
@@ -334,6 +347,16 @@ class GuardRuntime {
                     continue
                 }
 
+                ; 文件身份与进程是否仍在运行相互独立。目标更名后，旧进程
+                ; 可能继续存活，进程快照也可能暂不可用；因此必须先尝试找回
+                ; 新路径，不能等到“进程已停止”分支才触发确认。
+                if (InStr(path, "\")
+                    && !this.Runtime.maintenanceCoordinator
+                        .TargetSubjectExists(path, stateObj)
+                    && this.TryDetectTargetRelocation(path, stateObj)) {
+                    continue
+                }
+
                 if (InStr(path, "\") && !snapshotReady
                     && !this.Callbacks.StateProcessIdentityIsValid.Call(path,
                         stateObj)) {
@@ -354,6 +377,7 @@ class GuardRuntime {
                 }
                 if this.Runtime.maintenanceCoordinator.TargetSubjectExists(
                     path, stateObj) {
+                    this.ObserveAvailableRelocationTarget(path, stateObj)
                     this.Runtime.maintenanceCoordinator.ClearTargetMissing(
                         path, stateObj)
                 }
@@ -485,7 +509,21 @@ class GuardRuntime {
     CanOperationContinue(path, stateObj, generation) {
         return this.IsSupervisorCurrent(path, stateObj, generation)
             && stateObj.Enabled
+            && !stateObj.RelocationPending
             && !this.Runtime.maintenanceCoordinator.IsBlocking(stateObj)
+    }
+
+    ObserveAvailableRelocationTarget(path, stateObj) {
+        if !this.Runtime.HasOwnProp("targetRelocationService")
+            return false
+        return this.Runtime.targetRelocationService.ObserveAvailable(path,
+            stateObj)
+    }
+
+    TryDetectTargetRelocation(path, stateObj) {
+        if !this.Runtime.HasOwnProp("targetRelocationService")
+            return false
+        return this.Runtime.targetRelocationService.TryDetect(path, stateObj)
     }
 
     BuildNativeFallbackSnapshotIndex(orderedPaths) {

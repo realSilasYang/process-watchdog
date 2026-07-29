@@ -406,6 +406,8 @@ AssertStatusIconResources() {
             {Color: 0xEF4444, File: "file-x-2.svg", Group: "Failure"},
         GuardStatusKind.ScriptMissing,
             {Color: 0xEF4444, File: "file-code-2.svg", Group: "Failure"},
+        GuardStatusKind.RelocationPending,
+            {Color: 0x5DD4E8, File: "repeat-2.svg"},
         GuardStatusKind.SafeStartWait,
             {Color: 0x5F9B0D, File: "shield-ellipsis.svg"},
         GuardStatusKind.LaunchRetry,
