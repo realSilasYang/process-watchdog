@@ -965,8 +965,8 @@ class PortugueseBrazilStrings {
             "暂停守护：{1}",
                 "Pausar monitoramento: {1}")
         catalog.Set(
-            "暂停或恢复选中守护对象，不会退出目标`n支持多选；混合状态时逐项反转",
-                "Pausar ou retomar o monitoramento dos itens selecionados sem fechar os destinos`nPermite seleção múltipla`; quando os status são diferentes, cada um é invertido")
+            "暂停或恢复选中守护对象，不会退出目标`n支持多选；混合状态时逐项反转`n快捷键：Space",
+                "Pausar ou retomar o monitoramento dos itens selecionados sem fechar os destinos`nPermite seleção múltipla`; quando os status são diferentes, cada um é invertido`nAtalho: Espaço")
         catalog.Set(
             "暂时无法查询进程状态，稍后重试手动重启：{1}",
                 "Não é possível consultar o status do processo no momento`; a reinicialização manual será tentada mais tarde: {1}")

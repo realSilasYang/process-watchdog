@@ -303,6 +303,12 @@ if ($mainSource -notmatch
         'themeStatePrefix\s*:=\s*UiThemeService\.GetActualTheme\(\)') {
     $failures.Add('Every main theme refresh must resynchronize theme-aware pause/delete command state')
 }
+if ($mainSource -notmatch
+        'ShouldToggleMainListPause\(wParam, lParam, ctrlDown, shiftDown, altDown\)[\s\S]{0,260}0x40000000' -or
+    $mainSource -notmatch
+        'if \(hwnd == Main\.lv\.Hwnd\)[\s\S]{0,700}wParam == 32[\s\S]{0,260}ToggleItemPause\(\)[\s\S]{0,260}return 0') {
+    $failures.Add('Main ListView Space must toggle selected targets once while preserving modified-space selection behavior')
+}
 if ($settingsWindowSource -notmatch
         'CreateTabButton\(index,[\s\S]{0,500}RegisterHoverButton\(button,') {
     $failures.Add('Settings tabs must pass through the centralized system-font button registration')

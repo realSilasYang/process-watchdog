@@ -338,6 +338,94 @@ AssertMainCommandButtonThemeState() {
     }
 }
 
+AssertMainListSpacePauseShortcut() {
+    firstPath := A_WinDir "\System32\cmd.exe"
+    secondPath := A_WinDir "\System32\where.exe"
+    firstState := TargetSupervisor({
+        Enabled: 1,
+        Scheduler: App.scheduler,
+        MaintenanceConfig: App.maintenanceConfigCodec.CreateDefault(firstPath),
+        DisplayConfig: App.displayConfigCodec.CreateDefault()
+    })
+    secondState := TargetSupervisor({
+        Enabled: 0,
+        Scheduler: App.scheduler,
+        MaintenanceConfig: App.maintenanceConfigCodec.CreateDefault(secondPath),
+        DisplayConfig: App.displayConfigCodec.CreateDefault()
+    })
+    firstState.TransitionTo(GuardPhase.Initializing)
+    secondState.TransitionTo(GuardPhase.Paused)
+    App.appStates[firstPath] := firstState
+    App.appStates[secondPath] := secondState
+    App.appOrder.Push(firstPath)
+    App.appOrder.Push(secondPath)
+    firstRow := Main.lv.Add("", "Command Prompt",
+        FormatMainStatusLabel(GetGuardActivationStatus(true)), firstPath,
+        Main.lv.GetCount() + 1)
+    secondRow := Main.lv.Add("", "Where",
+        FormatMainStatusLabel(GetGuardActivationStatus(false)), secondPath,
+        Main.lv.GetCount() + 1)
+    Main.listProjection.Rebuild(Main.lv)
+
+    try {
+        Main.lv.Modify(0, "-Select -Focus")
+        Main.lv.Modify(firstRow, "Select Focus")
+        result := Global_KeyDown(32, 0, Win32.WM_KEYDOWN, Main.lv.Hwnd)
+        App.guardMutationQueue.Drain()
+        AssertDisplayHotSwitch(result == 0 && !firstState.Enabled,
+            "主列表首次按下空格没有暂停选中的守护对象")
+
+        result := Global_KeyDown(32, 0x40000000, Win32.WM_KEYDOWN,
+            Main.lv.Hwnd)
+        App.guardMutationQueue.Drain()
+        AssertDisplayHotSwitch(result == 0 && !firstState.Enabled
+            && App.guardMutationQueue.Count == 0,
+            "长按空格的自动重复消息再次切换了守护状态")
+
+        Global_KeyDown(32, 0, Win32.WM_KEYDOWN, Main.lv.Hwnd)
+        App.guardMutationQueue.Drain()
+        AssertDisplayHotSwitch(firstState.Enabled,
+            "再次按下空格没有恢复选中的守护对象")
+
+        Main.lv.Modify(0, "-Select -Focus")
+        Global_KeyDown(32, 0, Win32.WM_KEYDOWN, Main.lv.Hwnd)
+        App.guardMutationQueue.Drain()
+        AssertDisplayHotSwitch(firstState.Enabled && !secondState.Enabled
+            && App.guardMutationQueue.Count == 0,
+            "主列表无选择时空格仍提交了暂停命令")
+
+        Main.lv.Modify(firstRow, "Select Focus")
+        Main.lv.Modify(secondRow, "Select")
+        Global_KeyDown(32, 0, Win32.WM_KEYDOWN, Main.lv.Hwnd)
+        App.guardMutationQueue.Drain()
+        AssertDisplayHotSwitch(!firstState.Enabled && secondState.Enabled,
+            "主列表空格没有逐项反转混合选择的守护状态")
+
+        AssertDisplayHotSwitch(
+            !ShouldToggleMainListPause(32, 0, true, false, false)
+            && !ShouldToggleMainListPause(32, 0, false, true, false)
+            && !ShouldToggleMainListPause(32, 0, false, false, true)
+            && !ShouldToggleMainListPause(13, 0, false, false, false),
+            "主列表暂停快捷键错误接管了组合键或非空格按键")
+    } finally {
+        Main.lv.Modify(0, "-Select -Focus")
+        for path, stateObj in Map(firstPath, firstState,
+                secondPath, secondState) {
+            try App.maintenanceCoordinator.CleanupTarget(path, stateObj,
+                false)
+            if App.appStates.Has(path)
+                App.appStates.Delete(path)
+            RemoveAppOrderPath(path)
+        }
+        Loop 2
+            Main.lv.Delete(Main.lv.GetCount())
+        Main.listProjection.Rebuild(Main.lv)
+        Main.listProjection.RefreshSequence(Main.lv)
+        RefreshMainStatusSortKeys()
+        RefreshMainCommandState(true)
+    }
+}
+
 AssertPausedReloadResumeProjection() {
     targetPath := A_WinDir "\System32\cmd.exe"
     pausedStatus := GetGuardActivationStatus(false)
@@ -827,6 +915,7 @@ RunDisplayHotSwitchTests() {
     AssertPausedReloadResumeProjection()
     AssertMainCommandButtonSelectionState()
     AssertMainCommandButtonThemeState()
+    AssertMainListSpacePauseShortcut()
     Main.contextTargetRow := 1
     App.guardRuntime.Running := true
     App.guardRuntime.Stopped := false

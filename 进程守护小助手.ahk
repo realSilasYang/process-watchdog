@@ -1362,6 +1362,13 @@ OnMessage(Win32.WM_DPICHANGED, MainDpiChanged)
 OnMessage(Win32.WM_COPYDATA, ReceiveMaintenanceCopyData)
 OnMessage(Win32.WM_SYSCOMMAND, OnManagedWindowSystemCommand)
 
+ShouldToggleMainListPause(wParam, lParam, ctrlDown, shiftDown, altDown) {
+    ; lParam 第 30 位表示按键在本次消息前已经处于按下状态。长按空格时
+    ; 只接受首次按下，避免一次操作在暂停与恢复之间反复切换。
+    return wParam == 32 && !(lParam & 0x40000000)
+        && !ctrlDown && !shiftDown && !altDown
+}
+
 Global_KeyDown(wParam, lParam, msg, hwnd) {
     controlClass := ""
     try controlClass := WinGetClass("ahk_id " hwnd)
@@ -1416,13 +1423,24 @@ Global_KeyDown(wParam, lParam, msg, hwnd) {
 
     ; 只有列表本身持有焦点时，才把按键解释为列表级选择、删除或关闭操作。
     if (hwnd == Main.lv.Hwnd) {
+        ctrlDown := GetKeyState("Ctrl", "P")
+        shiftDown := GetKeyState("Shift", "P")
+        altDown := GetKeyState("Alt", "P")
+        if (wParam == 32 && !ctrlDown && !shiftDown && !altDown) {
+            if ShouldToggleMainListPause(wParam, lParam, ctrlDown,
+                    shiftDown, altDown) && Main.lv.GetNext(0) > 0
+                ToggleItemPause()
+            ; 普通空格由小助手完整接管，包括长按产生的重复消息；否则
+            ; ListView 还会改变选择状态，使本次命令作用到意外条目。
+            return 0
+        }
         if (wParam == 113) { ; F2 编辑当前守护对象的完整路径。
             row := Main.lv.GetNext(0, "Focused")
             if (row > 0)
                 TriggerEdit(Main.lv, row)
             return
         }
-        if (wParam == 65 && GetKeyState("Ctrl")) { ; Ctrl+A 选择列表中的全部守护对象。
+        if (wParam == 65 && ctrlDown) { ; Ctrl+A 选择列表中的全部守护对象。
             Main.lv.Modify(0, "Select")
             return
         }
