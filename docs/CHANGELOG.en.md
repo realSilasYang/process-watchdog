@@ -19,7 +19,7 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### ✨ Added
 
-- **Renamed and moved target recovery**: A directly added program or script can be recovered by its Windows file identity after it is renamed, its parent directory is renamed, or it is moved within the same volume while the assistant is running. On file systems without stable file IDs, only a complete Windows rename event is accepted as fallback evidence; similar names are never guessed.
+- **Renamed and moved target recovery**: A directly added program or script can be recovered after it is renamed, its parent directory is renamed, or it is moved within the same volume while the assistant is running, when the file system permits reopening files by Windows file ID. When that capability is unavailable, only a complete Windows rename event is accepted as fallback evidence; similar names are never guessed.
 - **Path confirmation and history**: Detection freezes restart work only for the affected item and presents the previous path, new path, and evidence in a localized confirmation window. Confirmation changes only the monitored path, preserves the name, icon, arguments, environment, runtime, and update-protection settings, and supports undo and redo.
 
 ---
