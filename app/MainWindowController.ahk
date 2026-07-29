@@ -119,7 +119,7 @@ GuiResized(GuiObj, MinMax, Width, Height) {
 
     if (clientW > col2W + sequenceW) {
         SendMessage(0x101E, 0, clientW - col2W - sequenceW,
-            Main.lv.Hwnd) ; 自动拉伸应用程序列（内部索引 0）
+            Main.lv.Hwnd) ; 自动拉伸守护对象列（内部索引 0）
     }
     SendMessage(0x101E, 2, 0, Main.lv.Hwnd) ; 隐藏完整路径列（内部索引 2）
     LayoutMainListHeader(Width)
@@ -159,7 +159,7 @@ ShowContextMenu(GuiCtrlObj, Item, IsRightClick, X, Y) {
     batchLogSupported := false
     try batchLogSupported := App.targetSpecsService.Get(path,
         stateObj).Launch.Kind == TargetLaunchKind.Batch
-    ; 每次弹出前在同一菜单句柄上刷新条目，避免保留上一条目的勾选或禁用状态。
+    ; 每次弹出前在同一菜单句柄上刷新条目，避免保留上一个守护对象的勾选或禁用状态。
     ConfigureMainContextMenu(isAdmin, maintenanceEnabled,
         maintenanceSupported, batchLogSupported)
     if Main.HasOwnProp("listSelectionPresenter")
@@ -272,7 +272,7 @@ AddDroppedWatchItems(files) {
             CreateAppHistoryAction("add", addedPaths))
         SaveAppsToIni()
     }
-    LogMsg(Tr("通过拖拽添加了 {1} 个监控项。", addedCount))
+    LogMsg(Tr("通过拖拽添加了 {1} 个守护对象。", addedCount))
 }
 
 ; DPI 切换只重建主列表的小图标集合；旧集合在新集合成功绑定后延迟回收，

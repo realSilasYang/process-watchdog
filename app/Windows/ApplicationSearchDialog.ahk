@@ -331,7 +331,7 @@ class ApplicationSearchDialog extends ManagedWindow {
             row += 1
             if (row != this.hoverRow) {
                 this.hoverRow := row
-                this.tooltip.Show(Tr("项目名称：{1}`n真实路径：{2}",
+                this.tooltip.Show(Tr("名称：{1}`n真实路径：{2}",
                     this.lv.GetText(row, 1), this.lv.GetText(row, 2)))
             }
         } else if (this.hoverRow != 0) {

@@ -49,7 +49,7 @@ class BatchOutputLogNoticeWindow extends ManagedWindow {
                 LocalizationService.GetUiFontName())
             this.gui.Add("Text", "x" textX " y48 w" textWidth
                 " h38 BackgroundTrans", Tr(
-                    "小助手只有在启动 BAT 或 CMD 项目时才会创建此文件。"))
+                    "小助手只有在启动 BAT 或 CMD 守护对象时才会创建此文件。"))
 
             this.gui.SetFont("norm s9 c" UiThemeService.Color("MutedText"),
                 LocalizationService.GetUiFontName())

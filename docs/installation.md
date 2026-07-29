@@ -84,7 +84,7 @@ AutoHotkey 版本和更新检查位于“关于”页。
 
 发行包永远不包含 `watchdog.ini` 和 `watchdog.maintenance.ini`，覆盖程序文件不会
 主动覆盖个人配置或未完成的升级保护会话。当前版本
-只接受 README 所述的九字段监控项格式；无法解析的记录会进入 `[Recovery]`，
+只接受 README 所述的九字段守护对象格式；无法解析的记录会进入 `[Recovery]`，
 不会静默删除。
 
 ## 卸载

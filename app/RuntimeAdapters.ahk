@@ -185,7 +185,7 @@ LoadWatchlistFromConfig() {
     if App.configLoadWarnings.Length {
         LogMsg(BuildConfigLoadDiagnostic(App.configLoadWarnings,
             App.configRepository.Path))
-        try TrayTip(Tr("{1} 条监控配置未载入，相关项目当前不会被守护。点击查看具体位置和原因。",
+        try TrayTip(Tr("{1} 条监控配置未载入，相关守护对象当前不会被守护。点击查看具体位置和原因。",
             App.configLoadWarnings.Length), Tr("监控配置加载异常"), 2)
     }
 }
@@ -201,10 +201,10 @@ BuildConfigLoadDiagnostic(warnings, configPath) {
         diagnostic .= Tr("`r`n      目标：{1}", targetText)
         diagnostic .= Tr("`r`n      问题：{1}：{2}",
             TrDiagnostic(warning.Field), TrDiagnostic(warning.Reason))
-        diagnostic .= Tr("`r`n      影响：该项目本次未加入守护列表。")
+        diagnostic .= Tr("`r`n      影响：该守护对象本次未加入守护列表。")
     }
     diagnostic .= Tr("`r`n  配置文件：{1}", configPath)
-    diagnostic .= Tr("`r`n  处理建议：确认目标路径后，可在主界面重新添加该项目；也可退出小助手后检查上述配置位置。后续保存配置时，损坏记录会转存到 [Recovery]，不会被静默删除。")
+    diagnostic .= Tr("`r`n  处理建议：确认目标路径后，可在主界面重新添加该守护对象；也可退出小助手后检查上述配置位置。后续保存配置时，损坏记录会转存到 [Recovery]，不会被静默删除。")
     return diagnostic
 }
 

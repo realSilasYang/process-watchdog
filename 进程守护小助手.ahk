@@ -260,7 +260,7 @@ ManagedWindow.ConfigureLifecycle(ManagedWindowLifecycle({
 ; 所有短生命周期 GUI 都由模块实例持有，窗口销毁后由类负责清空引用。
 global GuiModules := GuiModuleRegistry(Main.gui)
 
-; 首次运行只创建带就地注释的设置分区，不预设任何守护项。
+; 首次运行只创建带就地注释的设置分区，不预设任何守护对象。
 App.runtimeSettingsService.EnsureExists()
 App.runtimeSettingsService.Apply(App, App.runtimeSettingsService.Load())
 CleanupBatchLogs()
@@ -368,7 +368,7 @@ PositionMainCommandButtons(clientWidth) {
     RedrawMainCommandButtonLayout(oldBounds, GetMainCommandButtonBounds())
 }
 
-; 主界面使用可多选、可拖动排序且支持标签编辑的 ListView 展示守护项。
+; 主界面使用可多选、可拖动排序且支持标签编辑的 ListView 展示守护对象。
 InitializeApplicationWindow(Main.gui)
 
 ; 命令栏保持固定按钮高度；宽度只按文案需要分配，剩余空间留给窗口拖动和缩放。
@@ -420,7 +420,7 @@ Main.lv := Main.gui.Add("ListView", "x10 y88 w" (App.savedWidth - 20)
     " h" (App.savedHeight - 113) " Background"
     UiThemeService.Color("Surface") " c" UiThemeService.Color("Text")
     " Report +LV0x10002 -E0x200 +ReadOnly -HScroll -Hdr",
-    [Tr("应用程序"), Tr("状态"), Tr("完整路径"), Tr("序号"), ""])
+    [Tr("守护对象"), Tr("状态"), Tr("完整路径"), Tr("序号"), ""])
 ; 报表视图从小图标槽读取图像；显式传入槽位 1，避免系统附着到不会显示的大图标槽。
 Main.lv.SetImageList(Main.appIcons, 1)
 Main.lv.IL := Main.appIcons
@@ -441,7 +441,7 @@ Main.listSelectionPresenter := ListViewSelectionPresenter(Main.lv)
 Main.listHeader := ListViewPseudoHeader(Main.gui, Main.lv, [
     {Column: 4, Label: Tr("序号"), Align: "Center", SortOptions: "Integer",
         SkipAscending: true},
-    {Column: 1, Label: Tr("应用程序"), SortOptions: "Logical"},
+    {Column: 1, Label: Tr("守护对象"), SortOptions: "Logical"},
     {Column: 5, Label: Tr("状态"), SortOptions: "Logical"}
 ], {
     BackgroundColor: UiThemeService.Color("Toolbar"),
@@ -472,7 +472,7 @@ RegisterButtonClick(Main.btnDel, DelItem)
     RegisterButtonClick(Main.btnSupport, ShowSupportInfo)
     RegisterButtonClick(Main.btnDonate, ShowDonation)
 
-; 选择变化只刷新命令状态，不重新投影列表或触发守护项初始化。
+; 选择变化只刷新命令状态，不重新投影列表或触发守护对象初始化。
 Main.lv.OnEvent("ItemSelect", OnLVSelectChange)
 Main.lv.OnEvent("ItemFocus", OnLVSelectChange)
 
@@ -527,7 +527,7 @@ RefreshMainCommandState(forceRefresh := false) {
                 Main.btnPause.Text := Tr("▶️ 恢复")
             }
         } else {
-            ; 选中的项目里既有运行中的，也有暂停的，统一显示「反转状态」
+            ; 选中的守护对象里既有运行中的，也有暂停的，统一显示「反转状态」
             Main.btnPause.Text := Tr("🔄 反转状态")
         }
 
@@ -633,7 +633,7 @@ LV_ItemDrag(ctrl, lParam) {
     if (selectedPaths.Length == 0)
         return
 
-    ; 拖回选中项自身时应保持原顺序；否则移除后再插入会把项目意外移到列表顶部。
+    ; 拖回选中对象自身时应保持原顺序；否则移除后再插入会把守护对象意外移到列表顶部。
     if selectedRows.Has(targetRow)
         return
 
@@ -748,7 +748,7 @@ RefreshMainWindowDisplay() {
     Main.lv.SetFont("s12 c" UiThemeService.Color("Text"), fontName)
     RefreshMainStatusIconAlignment()
     if Main.HasOwnProp("listHeader") && IsObject(Main.listHeader)
-        Main.listHeader.SetLabels([Tr("序号"), Tr("应用程序"), Tr("状态")])
+        Main.listHeader.SetLabels([Tr("序号"), Tr("守护对象"), Tr("状态")])
     Main.statsText.SetFont("s10 bold c"
         UiThemeService.Color("MutedText"), systemFontName)
 
@@ -1206,7 +1206,7 @@ PerformManualRestart(path, expectedSupervisor, expectedGeneration,
                 return
             }
             ; 正常关闭和 Ctrl+C 等待可能持续数秒。目标身份和事务代际已经在
-            ; 门内冻结，耗时停止放到门外执行，避免阻塞其它守护项与配置操作。
+            ; 门内冻结，耗时停止放到门外执行，避免阻塞其它守护对象与配置操作。
             App.guardWorkGate.Leave()
             gateHeld := false
             try stopResult := StopTargetProcess(pid, creationIdentity)
@@ -1416,17 +1416,17 @@ Global_KeyDown(wParam, lParam, msg, hwnd) {
 
     ; 只有列表本身持有焦点时，才把按键解释为列表级选择、删除或关闭操作。
     if (hwnd == Main.lv.Hwnd) {
-        if (wParam == 113) { ; F2 编辑当前守护项的完整路径。
+        if (wParam == 113) { ; F2 编辑当前守护对象的完整路径。
             row := Main.lv.GetNext(0, "Focused")
             if (row > 0)
                 TriggerEdit(Main.lv, row)
             return
         }
-        if (wParam == 65 && GetKeyState("Ctrl")) { ; Ctrl+A 选择列表中的全部项目。
+        if (wParam == 65 && GetKeyState("Ctrl")) { ; Ctrl+A 选择列表中的全部守护对象。
             Main.lv.Modify(0, "Select")
             return
         }
-        if (wParam == 46) { ; Delete 删除当前选中的守护项。
+        if (wParam == 46) { ; Delete 删除当前选中的守护对象。
             if (Main.lv.GetNext(0) > 0)
                 DelItem()
             return
@@ -1448,7 +1448,7 @@ Global_KeyDown(wParam, lParam, msg, hwnd) {
     }
 }
 
-; 从 INI 读取监控项及对应的升级保护配置。
+; 从 INI 读取守护对象及对应的升级保护配置。
 LoadWatchlistFromConfig()
 ; 控件从创建起采用不可用配色；列表载入后再按真实选择状态强制同步，
 ; 避免首次启动没有 ItemSelect 事件时仍残留可用色。

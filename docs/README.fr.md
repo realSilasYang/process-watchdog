@@ -38,7 +38,7 @@ Le projet propose une interface claire ou sombre, le rétablissement automatique
   <img src="images/process-watchdog-overview.png" alt="Fenêtre principale de Process Watchdog Assistant" width="100%">
 </p>
 
-La fenêtre principale réunit l’ordre des éléments surveillés, l’icône, le nom, les privilèges requis et l’état courant. La barre de commandes permet d’ajouter, supprimer, suspendre, ouvrir les réglages, consulter l’aide ou faire un don ; l’aide donne ensuite accès au mode d’emploi et au journal d’exécution. La barre inférieure récapitule les cibles actives, en rétablissement, en mise à jour, suspendues ou en échec, tandis que le journal expose les indices à l’origine de chaque état anormal.
+La fenêtre principale réunit l’ordre des cibles surveillées, l’icône, le nom, les privilèges requis et l’état courant. La barre de commandes permet d’ajouter, supprimer, suspendre, ouvrir les réglages, consulter l’aide ou faire un don ; l’aide donne ensuite accès au mode d’emploi et au journal d’exécution. La barre inférieure récapitule les cibles actives, en rétablissement, en mise à jour, suspendues ou en échec, tandis que le journal expose les indices à l’origine de chaque état anormal.
 
 ## Points forts
 
@@ -209,7 +209,7 @@ Le script racine se limite à inclure les modules, assembler les dépendances et
 - L’identité de la cible, le point de lancement et la présentation personnalisée sont indépendants ; la présentation ne doit pas modifier la décision de surveillance.
 - `Running`, `Stopped` et `Unknown` sont des résultats d’observation externe ; le rétablissement ne commence qu’après confirmation de l’arrêt.
 - Chaque minuterie, rappel, observateur, processus de travail, fenêtre et ressource native doit disposer d’un nettoyage idempotent.
-- Les instantanés de configuration, éléments surveillés et réglages de protection sont validés dans la même transaction ; les tests ne doivent jamais lire ni écraser le `watchdog.ini` personnel.
+- Les instantanés de configuration, cibles surveillées et réglages de protection sont validés dans la même transaction ; les tests ne doivent jamais lire ni écraser le `watchdog.ini` personnel.
 - L’ancien défilement fluide par superposition de captures GDI ne doit pas revenir ; ListView et le journal gardent leur défilement natif.
 - Les affirmations sur le DPI, les icônes, le mode sombre, la hiérarchie et l’accessibilité nécessitent des preuves réelles sous Windows ; l’automatisation ne remplace pas une matrice d’écrans physiques.
 

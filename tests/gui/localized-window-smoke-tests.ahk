@@ -1142,7 +1142,7 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         addPointerOnSearchButton := ApplicationWindowPresenter.AutomationHidden
             || WaitForLocalizedPointerButton(addWindow.searchButton.Hwnd)
         WinHide("ahk_id " addWindow.gui.Hwnd)
-        AssertWindowTitle(addWindow.gui, Tr("添加监控项"), language,
+        AssertWindowTitle(addWindow.gui, Tr("添加守护对象"), language,
             "AddItemDialog")
         AssertProductionWindowLayout(addWindow.gui, language,
             "AddItemDialog")

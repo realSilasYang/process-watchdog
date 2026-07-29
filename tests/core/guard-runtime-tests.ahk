@@ -2,7 +2,7 @@
 #Warn All, StdOut
 
 ; 验证守护运行时对探测、重试、暂停、升级保护和界面状态的协调。
-; 重点构造过期控制器、代际和任务槽，证明迟到回调不会修改已经变化的守护项。
+; 重点构造过期控制器、代际和任务槽，证明迟到回调不会修改已经变化的守护对象。
 
 #Include ..\..\src\Core\GuardTypes.ahk
 #Include ..\..\src\Core\GuardStateMachine.ahk

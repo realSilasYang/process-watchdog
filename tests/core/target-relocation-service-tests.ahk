@@ -333,7 +333,7 @@ RunTargetRelocationServiceTests() {
         maintenanceState), "升级保护恢复正常后没有重新评估候选")
 
     ; 暂停期间发生更名时，恢复操作会重置控制器代际并先投影为初始化。
-    ; 没有启用升级保护的条目即使残留目录活动信号，也必须继续识别新路径。
+    ; 没有启用升级保护的守护对象即使残留目录活动信号，也必须继续识别新路径。
     pauseResumeHarness := TargetRelocationTestHarness()
     pausedScriptIdentity := CreateRelocationIdentity(7, 8, 9)
     pausedScriptState := pauseResumeHarness.AddTarget(oldScript,

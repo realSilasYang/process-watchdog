@@ -99,7 +99,7 @@ class TargetIdentityService {
 
         conflictPath := this.FindConflict(freshTarget, path)
         if (conflictPath != "") {
-            this.Log(this.Text("快捷方式真实进程刷新被拒绝，目标已由其它项目守护：{1} -> {2}",
+            this.Log(this.Text("快捷方式真实进程刷新被拒绝，目标已由其它守护对象守护：{1} -> {2}",
                 path, conflictPath))
             return false
         }

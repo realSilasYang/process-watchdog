@@ -34,7 +34,7 @@ class CustomDisplayDialog extends ManagedWindow {
             InitializeApplicationWindow(this.gui)
 
             this.gui.Add("Text", "x20 y14 w" (windowWidth - 40)
-                " h20 BackgroundTrans", Tr("守护目标："))
+                " h20 BackgroundTrans", Tr("守护对象："))
             targetInput := AddCenteredSingleLineEdit(this.gui,
                 20, 38, windowWidth - 40, 26, path, "ReadOnly",
                 UiThemeService.Color("Surface"))
