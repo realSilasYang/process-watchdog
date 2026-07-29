@@ -173,7 +173,8 @@ RegisterPersistedWatchItem(record) {
     return RegisterApp(record.Path, record.Enabled, record.RunAsAdmin,
         record.WorkDir, record.Args, record.EnvVars, record.Maintenance,
         record.ResolvedTarget, record.ResolvedTargetManual,
-        record.ShortcutArgs, record.Display)
+        record.ShortcutArgs, record.Display, record.RuntimePath,
+        record.RuntimeArgs)
 }
 
 LoadWatchlistFromConfig() {

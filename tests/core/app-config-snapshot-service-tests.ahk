@@ -90,6 +90,8 @@ RunAppConfigSnapshotServiceTests() {
         Args: "--user",
         ShortcutArgs: "--embedded",
         EnvVars: "MODE=test",
+        RuntimePath: "C:\Python\python.exe",
+        RuntimeArgs: "-I -u",
         ResolvedTarget: "C:/Apps/Product.exe",
         ResolvedTargetManual: false,
         MaintenanceConfig: CreateAppConfigMaintenance(true, "C:\Apps",
@@ -99,6 +101,8 @@ RunAppConfigSnapshotServiceTests() {
     snapshot := service.CreateSnapshot(shortcutPath, stateObj)
     AssertAppConfigSnapshot(snapshot.Path == shortcutPath
         && snapshot.ResolvedTarget == "C:\Apps\Product.exe"
+        && snapshot.RuntimePath == "C:\Python\python.exe"
+        && snapshot.RuntimeArgs == "-I -u"
         && snapshot.Maintenance.Enabled
         && snapshot.Display.IconPath == "C:\Icons\Product.ico",
         "快捷方式快照没有结合真实目标保留升级保护或规范化路径")
@@ -123,6 +127,10 @@ RunAppConfigSnapshotServiceTests() {
     equivalentSnapshot.Display.Name := "另一个名称"
     AssertAppConfigSnapshot(!service.SnapshotsEqual(snapshot,
         equivalentSnapshot), "展示自定义没有参与快照比较")
+    equivalentSnapshot.Display.Name := snapshot.Display.Name
+    equivalentSnapshot.RuntimeArgs := "-u"
+    AssertAppConfigSnapshot(!service.SnapshotsEqual(snapshot,
+        equivalentSnapshot), "启动程序参数没有参与快照比较")
 
     secondSnapshot := service.CreateSnapshot("D:\Tools\Other.exe", "")
     AssertAppConfigSnapshot(service.StatesEqual([snapshot, secondSnapshot],

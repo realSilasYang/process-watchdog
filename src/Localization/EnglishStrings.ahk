@@ -5,6 +5,7 @@ class EnglishStrings {
     static Create() {
         catalog := Map()
         catalog.CaseSense := "On"
+        catalog.Set("按下", "Press")
         catalog.Set(
             "`n位置：{1}",
                 "`nLocation: {1}")
@@ -1805,6 +1806,62 @@ class EnglishStrings {
         catalog.Set("自定义名称和图标", "Customize name and icon")
         catalog.Set("已撤销：{1}", "Undone: {1}")
         catalog.Set("已重做：{1}", "Redone: {1}")
+        catalog.Set("Everything 搜索暂时不可用，请稍后重试。",
+            "Everything search is temporarily unavailable. Try again shortly.")
+        catalog.Set("Everything 搜索组件缺失或无法加载，请完整解压或重新安装小助手。",
+            "The Everything search component is missing or could not be loaded. Fully extract or reinstall the assistant.")
+        catalog.Set("已找到 Everything，但无法后台启动，请手动启动后重试。",
+            "Everything was found but could not be started in the background. Start it manually and try again.")
+        catalog.Set("后台启动 Everything 失败：{1}",
+            "Failed to start Everything in the background: {1}")
+        catalog.Set("正在后台启动 Everything 并等待搜索服务就绪...",
+            "Starting Everything in the background and waiting for its search service...")
+        catalog.Set("已在后台启动 Everything：{1}",
+            "Started Everything in the background: {1}")
+        catalog.Set("等待 Everything 搜索服务就绪超时：{1}",
+            "Timed out waiting for the Everything search service: {1}")
+        catalog.Set("未找到 Everything，点击前往官网下载最新版：{1}",
+            "Everything was not found. Click to download the latest version from the official site: {1}")
+        catalog.Set("本机未找到 Everything；程序搜索需要 Everything 后台服务。",
+            "Everything was not found on this computer; program search requires the Everything background service.")
+        catalog.Set("• 程序搜索：使用 Everything 服务并显示全部匹配结果；未运行时会尝试在本机查找并后台启动，未找到时提供官网最新版下载地址。",
+            "• Program search: uses the Everything service and displays every match. If Everything is not running, the assistant looks for it on this computer and starts it in the background; if it is not found, an official download link is provided.")
+        catalog.Set("• 小助手随包的 Everything64.dll 只是连接 Everything 后台实例的 SDK 客户端，不负责扫描磁盘或建立索引，不能替代 Everything 本体。",
+            "• The bundled Everything64.dll is only an SDK client that connects to the Everything background instance. It does not scan disks or build an index and cannot replace Everything itself.")
+        catalog.Set("六、进程识别与启动设置",
+            "6. Process Identification and Launch Settings")
+        catalog.Set("• 此设置只作用于当前守护项，并将“用什么启动”和“用什么判断正在运行”分开处理。启动环境只在小助手下次启动目标时生效，不会重启当前进程。",
+            "• These settings apply only to the current watched item and treat what to launch separately from what proves it is running. The launch environment takes effect only the next time the assistant starts the target and does not restart the current process.")
+        catalog.Set("• 直接添加程序或脚本时，启动入口与监控目标相同；EXE 按完整路径识别，脚本按宿主进程命令行中的脚本路径识别。",
+            "• When an application or script is added directly, the launch entry and monitored target are the same. EXE files are identified by full path; scripts are identified by the script path in the host process command line.")
+        catalog.Set("• 添加 LNK 快捷方式时，快捷方式始终作为启动入口；自动识别出的真实程序或脚本只用于判断运行状态。",
+            "• When an LNK shortcut is added, the shortcut always remains the launch entry. The automatically resolved application or script is used only to determine whether the target is running.")
+        catalog.Set("• 自动识别会综合快捷方式目标、参数、Windows Installer 信息、安装目录、文件版本信息和已观察进程；证据不唯一时不会随意绑定。",
+            "• Automatic identification combines the shortcut target and arguments, Windows Installer data, installation directory, file-version information, and observed processes. It does not bind a target when the evidence is ambiguous.")
+        catalog.Set("• 自动结果不正确时改用“用户指定”，选择程序正常运行期间持续存在的主程序或脚本；不要选择启动器、更新器或短暂子进程。",
+            "• If the automatic result is wrong, choose User-specified and select the main application or script that remains present while the application is normally running. Do not select a launcher, updater, or short-lived child process.")
+        catalog.Set("启动程序或解释器：", "Launcher or interpreter:")
+        catalog.Set("留空时按目标类型自动启动；可选择 Python、AutoHotkey、PowerShell、Node.js、Java 等运行时。", "Leave blank to launch according to the target type, or select a runtime such as Python, AutoHotkey, PowerShell, Node.js, or Java.")
+        catalog.Set("启动程序参数：", "Launcher arguments:")
+        catalog.Set("参数顺序为：启动程序参数、目标路径、目标参数；例如 Java 使用 -jar。", "The order is launcher arguments, target path, then target arguments. For example, use -jar with Java.")
+        catalog.Set("目标参数（Args）：", "Target arguments（Args）:")
+        catalog.Set("留空时继承小助手当前环境；值中可用 %变量名% 引用已有环境变量。", "Leave blank to inherit the assistant's current environment. Use %VARIABLE% in a value to reference an existing environment variable.")
+        catalog.Set("选择启动程序或解释器", "Choose a Launcher or Interpreter")
+        catalog.Set("可执行程序", "Executable Programs")
+        catalog.Set("请先选择启动程序或解释器，再填写它的参数。", "Choose a launcher or interpreter before entering its arguments.")
+        catalog.Set("启动程序未设置", "Launcher Not Set")
+        catalog.Set("启动程序或解释器不存在：{1}", "The launcher or interpreter does not exist: {1}")
+        catalog.Set("启动程序无效", "Invalid Launcher")
+        catalog.Set("整条启动配置", "entire launch configuration")
+        catalog.Set("启动程序或解释器", "launcher or interpreter")
+        catalog.Set("解释器参数", "interpreter arguments")
+        catalog.Set("• 直接脚本可指定“启动程序或解释器”，选择实际执行脚本的可执行文件，例如 Python、AutoHotkey、PowerShell、Node.js、Ruby、Perl、PHP、Lua、Java 或 Bash；留空时沿用系统默认启动方式。", "• For a directly added script, Launcher or interpreter lets you select the executable that actually runs it, such as Python, AutoHotkey, PowerShell, Node.js, Ruby, Perl, PHP, Lua, Java, or Bash. Leave it blank to use the system's default launch method.")
+        catalog.Set("• “启动程序参数”位于目标路径之前，“目标参数（Args）”位于目标路径之后。Java 可填写 -jar；PowerShell 可填写 -NoProfile -ExecutionPolicy Bypass -File。", "• Launcher arguments are placed before the target path; Target arguments（Args）are placed after it. For Java, use -jar. For PowerShell, you can use -NoProfile -ExecutionPolicy Bypass -File.")
+        catalog.Set("• Python 虚拟环境请选择该环境的 Scripts\python.exe；其他语言也可选择项目要求的确切运行时版本。进程识别仍以目标脚本路径为准，不会误把解释器本身当成守护目标。", "• For a Python virtual environment, select its Scripts\python.exe. Other languages can likewise use the exact runtime version required by the project. Process identification still uses the target script path, so the interpreter itself is not mistaken for the watched target.")
+        catalog.Set("• 工作目录（CWD）用于解析相对路径；留空时使用快捷方式工作目录或目标所在目录。", "• The working directory（CWD）resolves relative paths. When left blank, the shortcut's working directory or the target's directory is used.")
+        catalog.Set("• 环境变量每行填写一个 KEY=VALUE，只覆盖列出的变量；值中可用 %变量名% 引用已有环境变量。启动完成后小助手会恢复自身环境。", "• Enter one KEY=VALUE environment variable per line. Only the listed variables are overridden, and %VARIABLE% can reference an existing value. The assistant restores its own environment after launching.")
+        catalog.Set("; AppN 与 [Apps] 中同名项目一一对应，依次保存启动程序或解释器路径及其参数。", "; Each AppN entry corresponds to the item with the same name in [Apps] and stores the launcher or interpreter path followed by its arguments.")
+        catalog.Set("; 两个字段均为 <HEX> 编码；留空时由小助手按目标类型使用默认启动方式。", "; Both fields use <HEX> encoding. When empty, the assistant uses the default launch method for the target type.")
         return catalog
     }
 }

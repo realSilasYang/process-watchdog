@@ -62,6 +62,26 @@ RunProcessSnapshotIndexTests() {
         "死亡 PID 不得继续表示运行")
     AssertTrue(index.ObserveCommandTarget("C:\Jobs\worker.py").IsRunning(),
         "绝对脚本路径没有命中")
+    customRuntimeIndex := AlwaysLiveProcessSnapshotIndex([{
+        pid: currentPid, parent: 0, name: "custom-runtime.exe",
+        cmd: '"C:\Tools\custom-runtime.exe" --quiet "C:\Jobs\worker.ts"',
+        exe: "C:\Tools\custom-runtime.exe", creation: "CUSTOM",
+        observedTicks: capturedAt
+    }], capturedAt, true)
+    AssertTrue(customRuntimeIndex.ObserveCommandTarget(
+            "C:\Jobs\worker.ts", "C:\Tools\custom-runtime.exe").IsRunning(),
+        "自定义运行时没有识别任意扩展名目标")
+    AssertTrue(customRuntimeIndex.ObserveCommandTarget(
+            "C:\Jobs\worker.ts", "C:\Tools\other-runtime.exe").IsStopped(),
+        "自定义运行时探活忽略了用户指定的启动器身份")
+    inaccessibleCustomRuntime := AlwaysLiveProcessSnapshotIndex([{
+        pid: currentPid, parent: 0, name: "custom-runtime.exe",
+        cmd: '"C:\Tools\custom-runtime.exe" "C:\Jobs\worker.ts"',
+        exe: "", creation: "CUSTOM", observedTicks: capturedAt
+    }], capturedAt, true)
+    AssertTrue(inaccessibleCustomRuntime.ObserveCommandTarget(
+            "C:\Jobs\worker.ts", "C:\Tools\custom-runtime.exe").IsUnknown(),
+        "无法核对自定义运行时镜像路径时不应误判目标停止")
     relativeObservation := index.ObserveCommandTarget("C:\First\main.py")
     AssertTrue(relativeObservation.IsUnknown()
         && relativeObservation.ReasonCode

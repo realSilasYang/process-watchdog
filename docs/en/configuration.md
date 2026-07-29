@@ -96,12 +96,49 @@ standalone EXE is a bootstrapper, not a configuration root:
 background process after startup. Set it to `0` to disable only the startup
 check; the About page can still check manually.
 
+## Monitored items and launch environments
+
+Each `AppN` under `[Apps]` has nine stable fields:
+
+```text
+Enabled|RunAsAdmin|Path|WorkDir|Args|EnvVars|ResolvedTarget|ResolvedTargetManual|ShortcutArgs
+```
+
+Except for booleans and the target path, text is encoded as `<HEX>`. Do not add
+field separators or edit encoded data by hand. `[Maintenance]`, `[Display]`, and
+`[Launch]` use the matching `AppN` key and are committed atomically with
+`[Apps]`.
+
+`[Launch]` exists for an item only when a custom launcher or runtime is set:
+
+```text
+AppN=<HEX RuntimePath>|<HEX RuntimeArgs>
+```
+
+- `RuntimePath` is the executable path for Python, AutoHotkey, PowerShell,
+  Node.js, Java, Ruby, Perl, PHP, Lua, Bash, or another runtime.
+- `RuntimeArgs` belongs to that runtime. The fixed command order is
+  `"RuntimePath" RuntimeArgs "TargetPath" Args`; use `-jar` here for a JAR.
+- Leaving both fields blank preserves the default launcher for the target type
+  and does not change existing items.
+- A custom runtime applies only to a direct script or document-style target. A
+  shortcut continues to launch through its LNK, while an ordinary EXE launches
+  directly, so the interface hides irrelevant fields for those target types.
+- `EnvVars` uses one `KEY=VALUE` per line. Values may refer to existing variables
+  such as `%PATH%`. Overrides exist only around the assistant's one target-launch
+  call and never permanently modify Windows or the assistant environment.
+
+If `[Launch]` cannot be decoded, its source text is moved to `[Recovery]` with
+the corresponding monitored item rather than registering an incomplete launch
+environment. Undo, redo, path changes, and row ordering also preserve both
+fields as part of the item snapshot.
+
 ## Back up
 
 Exit the assistant, then copy:
 
-- `watchdog.ini`: settings, window layout, monitored items, update protection,
-  and display customization.
+- `watchdog.ini`: settings, window layout, monitored items, launch environments,
+  update protection, and display customization.
 - `watchdog.maintenance.ini`: unfinished update-protection sessions only; it is
   normally empty.
 

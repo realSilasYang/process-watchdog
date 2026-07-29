@@ -199,6 +199,28 @@ class LiveGuardTestContext {
     static Logs := []
     static Invocations := []
     static LastObservations := Map()
+    static VerificationTrace := []
+}
+
+RecordLiveGuardVerificationTrace(label, recoveryTargets, scheduler) {
+    for recoveryTarget in recoveryTargets {
+        stateObj := recoveryTarget.State
+        LiveGuardTestContext.VerificationTrace.Push({
+            Path: CanonicalizeLiveTargetPath(recoveryTarget.Path),
+            Text: label
+                . " 阶段=" stateObj.Phase
+                . "，验证任务=" (stateObj.VerifyTask is TargetScheduledTask)
+                . "，到期=" (stateObj.VerifyTask is TargetScheduledTask
+                    ? stateObj.VerifyTask.DueTicks : 0)
+                . "，当前=" scheduler.Now()
+                . "，等待用途=" (stateObj.SnapshotWaitPurpose != ""
+                    ? stateObj.SnapshotWaitPurpose : "<空>")
+                . "，等待请求=" stateObj.SnapshotRequestTicks
+                . "，就绪用途=" (stateObj.SnapshotReadyPurpose != ""
+                    ? stateObj.SnapshotReadyPurpose : "<空>")
+                . "，就绪=" IsObject(stateObj.SnapshotReadyIndex)
+        })
+    }
 }
 
 LiveGuardNormalize(path) {
@@ -349,8 +371,12 @@ BuildLiveGuardStateDiagnostic(path, stateObj) {
         . "，来源=" observation.Source
         . "，原因码=" (observation.ReasonCode != ""
             ? observation.ReasonCode : "<空>")
-        . "，原因=" (observation.Reason != ""
-            ? observation.Reason : "<空>")
+            . "，原因=" (observation.Reason != ""
+                ? observation.Reason : "<空>")
+    for traceEntry in LiveGuardTestContext.VerificationTrace {
+        if traceEntry.Path == normalizedPath
+            diagnostic .= "`nTRACE: " traceEntry.Text
+    }
     return diagnostic "`n" BuildLiveGuardDiagnostic(observation)
 }
 
@@ -371,6 +397,43 @@ WaitForLiveGuardSpecs(guardSpecs, shouldRun, timeoutMs := 7000) {
             guardSpecs.Probe.TargetPath, shouldRun, timeoutMs)
     return ProcessObservation.Unknown(0, "live-guard",
         "真实恢复测试不支持该探测类型")
+}
+
+ObserveLiveGuardSpecsFromIndex(guardSpecs, snapshotIndex) {
+    probeKind := guardSpecs.Probe.Kind
+    if probeKind == TargetProbeKind.CommandTarget
+        return snapshotIndex.ObserveCommandTarget(guardSpecs.Probe.TargetPath)
+    if probeKind == TargetProbeKind.ImagePath
+        return snapshotIndex.ObserveImagePath(guardSpecs.Probe.TargetPath)
+    return ProcessObservation.Unknown(snapshotIndex.CapturedAtTicks,
+        "live-guard", "真实恢复测试不支持该探测类型")
+}
+
+WaitForLiveGuardTargets(recoveryTargets, shouldRun, timeoutMs := 7000) {
+    deadline := DllCall("kernel32\GetTickCount64", "UInt64") + timeoutMs
+    observations := Map()
+    observations.CaseSense := "Off"
+    Loop {
+        snapshotTicks := DllCall("kernel32\GetTickCount64", "UInt64")
+        snapshotIndex := ProcessSnapshotIndex(CaptureLiveTargetSnapshot(),
+            snapshotTicks, true, CanonicalizeLiveTargetPath)
+        allReachedExpectedState := true
+        for recoveryTarget in recoveryTargets {
+            observation := ObserveLiveGuardSpecsFromIndex(
+                recoveryTarget.Specs, snapshotIndex)
+            observations[CanonicalizeLiveTargetPath(recoveryTarget.Path)] :=
+                observation
+            if shouldRun ? !observation.IsRunning()
+                : !observation.IsStopped() {
+                allReachedExpectedState := false
+            }
+        }
+        if allReachedExpectedState
+            return observations
+        if DllCall("kernel32\GetTickCount64", "UInt64") >= deadline
+            return observations
+        Sleep(100)
+    }
 }
 
 RunLiveGuardRecoveryTests(recoveryTargets, quickExitTarget, tempRoot,
@@ -437,6 +500,7 @@ RunLiveGuardRecoveryTests(recoveryTargets, quickExitTarget, tempRoot,
     LiveGuardTestContext.Logs := []
     LiveGuardTestContext.Invocations := []
     LiveGuardTestContext.LastObservations := Map()
+    LiveGuardTestContext.VerificationTrace := []
 
     try {
         ; 先由正式监控轮次接管现存进程身份，再同时终止所有目标，证明并发
@@ -459,9 +523,10 @@ RunLiveGuardRecoveryTests(recoveryTargets, quickExitTarget, tempRoot,
         ; 刚退出的进程。先等正式探测面确认全部目标停止，再验证守护状态机的
         ; 两次独立停止证据，避免把系统快照传播延迟误报为产品回归。
         confirmedRecoveryTargets := []
+        stoppedObservations := WaitForLiveGuardTargets(recoveryTargets, false)
         for recoveryTarget in recoveryTargets {
-            stoppedObservation := WaitForLiveGuardSpecs(
-                recoveryTarget.Specs, false)
+            stoppedObservation := stoppedObservations[
+                CanonicalizeLiveTargetPath(recoveryTarget.Path)]
             if stoppedObservation.IsStopped() {
                 confirmedRecoveryTargets.Push(recoveryTarget)
                 continue
@@ -507,7 +572,11 @@ RunLiveGuardRecoveryTests(recoveryTargets, quickExitTarget, tempRoot,
         ; 共享快照并等待当前最晚任务，既贴近生产服务的合并采集方式，也用固定
         ; 轮数保证测试不会因错误调度而无限等待。
         Loop 2 {
+            RecordLiveGuardVerificationTrace("第 " A_Index " 轮发布前",
+                recoveryTargets, scheduler)
             snapshots.PublishFresh(guardEngine)
+            RecordLiveGuardVerificationTrace("第 " A_Index " 轮发布后",
+                recoveryTargets, scheduler)
             latestVerificationDue := 0
             for recoveryTarget in recoveryTargets {
                 if recoveryTarget.State.VerifyTask is TargetScheduledTask {
@@ -521,6 +590,8 @@ RunLiveGuardRecoveryTests(recoveryTargets, quickExitTarget, tempRoot,
                 latestVerificationDue - scheduler.Now() + 50)
             Sleep(verificationWaitMs)
             scheduler.RunDue()
+            RecordLiveGuardVerificationTrace("第 " A_Index " 轮执行后",
+                recoveryTargets, scheduler)
         }
         for recoveryTarget in recoveryTargets {
             AssertLiveTarget(recoveryTarget.State.Phase == GuardPhase.Running

@@ -7,8 +7,13 @@ class ListViewSelectionPresenter {
     static VerticalInsetDip := 2
     static RadiusDip := 7
 
-    __New(listView) {
+    __New(listView, radiusDip := "") {
         this.listView := listView
+        try this.radiusDip := radiusDip == ""
+            ? ListViewSelectionPresenter.RadiusDip
+            : Max(2, Integer(radiusDip))
+        catch
+            this.radiusDip := ListViewSelectionPresenter.RadiusDip
         this.notifyCallback := ObjBindMethod(this, "HandleCustomDraw")
         this.nativeRefreshCallback := ObjBindMethod(this,
             "RefreshNativeSurface")
@@ -107,7 +112,7 @@ class ListViewSelectionPresenter {
         verticalInset := Max(1,
             Round(ListViewSelectionPresenter.VerticalInsetDip
                 * windowDpi / 96))
-        radius := Max(3, Round(ListViewSelectionPresenter.RadiusDip
+        radius := Max(3, Round(this.radiusDip
             * windowDpi / 96))
         ; 原生绘制完成后只擦除圆角外侧区域：图标、管理员叠层、状态图标、
         ; 文字、拖拽插入标记和系统选中配色均保持公共控件的原始实现。

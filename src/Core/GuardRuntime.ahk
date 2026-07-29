@@ -68,8 +68,7 @@ class GuardRuntime {
             if !stateObj.Enabled || !stateObj.IsSnapshotWaitCurrent()
                 || this.Runtime.maintenanceCoordinator.IsBlocking(stateObj)
                 || snapshotIndex.RequestTicks
-                    < stateObj.SnapshotRequestTicks
-                || nowTicks > stateObj.SnapshotWaitDeadlineTicks {
+                    < stateObj.SnapshotRequestTicks {
                 continue
             }
             purpose := stateObj.SnapshotWaitPurpose

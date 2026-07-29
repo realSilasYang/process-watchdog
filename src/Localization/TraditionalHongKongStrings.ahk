@@ -5,6 +5,7 @@ class TraditionalHongKongStrings {
     static Create() {
         catalog := Map()
         catalog.CaseSense := "On"
+        catalog.Set("按下", "按下")
         catalog.Set(
             "`n位置：{1}",
                 "`n位置：{1}")
@@ -1786,6 +1787,62 @@ class TraditionalHongKongStrings {
         catalog.Set("自定义名称和图标", "自訂名稱和圖示")
         catalog.Set("已撤销：{1}", "已復原：{1}")
         catalog.Set("已重做：{1}", "已重做：{1}")
+        catalog.Set("Everything 搜索暂时不可用，请稍后重试。",
+            "Everything 搜尋暫時無法使用，請稍後再試。")
+        catalog.Set("Everything 搜索组件缺失或无法加载，请完整解压或重新安装小助手。",
+            "Everything 搜尋元件遺失或無法載入，請完整解壓縮或重新安裝小助手。")
+        catalog.Set("已找到 Everything，但无法后台启动，请手动启动后重试。",
+            "已找到 Everything，但無法在背景啟動，請手動啟動後再試。")
+        catalog.Set("后台启动 Everything 失败：{1}",
+            "在背景啟動 Everything 失敗：{1}")
+        catalog.Set("正在后台启动 Everything 并等待搜索服务就绪...",
+            "正在背景啟動 Everything，並等待搜尋服務就緒...")
+        catalog.Set("已在后台启动 Everything：{1}",
+            "已在背景啟動 Everything：{1}")
+        catalog.Set("等待 Everything 搜索服务就绪超时：{1}",
+            "等待 Everything 搜尋服務就緒逾時：{1}")
+        catalog.Set("未找到 Everything，点击前往官网下载最新版：{1}",
+            "找不到 Everything，按一下前往官方網站下載最新版本：{1}")
+        catalog.Set("本机未找到 Everything；程序搜索需要 Everything 后台服务。",
+            "本機找不到 Everything；程式搜尋需要 Everything 背景服務。")
+        catalog.Set("• 程序搜索：使用 Everything 服务并显示全部匹配结果；未运行时会尝试在本机查找并后台启动，未找到时提供官网最新版下载地址。",
+            "• 程式搜尋：使用 Everything 服務並顯示所有相符結果；未執行時會嘗試在本機尋找並於背景啟動，找不到時會提供官方網站的最新版本下載地址。")
+        catalog.Set("• 小助手随包的 Everything64.dll 只是连接 Everything 后台实例的 SDK 客户端，不负责扫描磁盘或建立索引，不能替代 Everything 本体。",
+            "• 小助手隨附的 Everything64.dll 只是連接 Everything 背景執行個體的 SDK 用戶端，不會掃描磁碟或建立索引，亦不能取代 Everything 本體。")
+        catalog.Set("六、进程识别与启动设置",
+            "六、程序識別與啟動設定")
+        catalog.Set("• 此设置只作用于当前守护项，并将“用什么启动”和“用什么判断正在运行”分开处理。启动环境只在小助手下次启动目标时生效，不会重启当前进程。",
+            "• 此設定只套用於目前的守護項目，並分開處理「用甚麼啟動」和「用甚麼判斷正在執行」。啟動環境只會在小助手下次啟動目標時生效，不會重新啟動目前的程序。")
+        catalog.Set("• 直接添加程序或脚本时，启动入口与监控目标相同；EXE 按完整路径识别，脚本按宿主进程命令行中的脚本路径识别。",
+            "• 直接加入程式或腳本時，啟動入口與監控目標相同；EXE 會按完整路徑識別，腳本則按主控程序命令列中的腳本路徑識別。")
+        catalog.Set("• 添加 LNK 快捷方式时，快捷方式始终作为启动入口；自动识别出的真实程序或脚本只用于判断运行状态。",
+            "• 加入 LNK 捷徑時，捷徑會一直作為啟動入口；自動識別出的實際程式或腳本只用於判斷執行狀態。")
+        catalog.Set("• 自动识别会综合快捷方式目标、参数、Windows Installer 信息、安装目录、文件版本信息和已观察进程；证据不唯一时不会随意绑定。",
+            "• 自動識別會綜合捷徑目標、參數、Windows Installer 資料、安裝目錄、檔案版本資料和已觀察程序；證據不唯一時不會隨意綁定。")
+        catalog.Set("• 自动结果不正确时改用“用户指定”，选择程序正常运行期间持续存在的主程序或脚本；不要选择启动器、更新器或短暂子进程。",
+            "• 自動結果不正確時，請改用「用戶指定」，並選擇程式正常執行期間一直存在的主程式或腳本；不要選擇啟動器、更新程式或短暫子程序。")
+        catalog.Set("启动程序或解释器：", "啟動程式或直譯器：")
+        catalog.Set("留空时按目标类型自动启动；可选择 Python、AutoHotkey、PowerShell、Node.js、Java 等运行时。", "留空時會按目標類型自動啟動；亦可選擇 Python、AutoHotkey、PowerShell、Node.js、Java 等執行環境。")
+        catalog.Set("启动程序参数：", "啟動程式參數：")
+        catalog.Set("参数顺序为：启动程序参数、目标路径、目标参数；例如 Java 使用 -jar。", "參數次序為：啟動程式參數、目標路徑、目標參數；例如 Java 使用 -jar。")
+        catalog.Set("目标参数（Args）：", "目標參數（Args）：")
+        catalog.Set("留空时继承小助手当前环境；值中可用 %变量名% 引用已有环境变量。", "留空時會繼承小助手目前的環境；值內可用 %變數名稱% 引用現有環境變數。")
+        catalog.Set("选择启动程序或解释器", "選擇啟動程式或直譯器")
+        catalog.Set("可执行程序", "可執行程式")
+        catalog.Set("请先选择启动程序或解释器，再填写它的参数。", "請先選擇啟動程式或直譯器，再填寫其參數。")
+        catalog.Set("启动程序未设置", "尚未設定啟動程式")
+        catalog.Set("启动程序或解释器不存在：{1}", "啟動程式或直譯器不存在：{1}")
+        catalog.Set("启动程序无效", "啟動程式無效")
+        catalog.Set("整条启动配置", "整項啟動設定")
+        catalog.Set("启动程序或解释器", "啟動程式或直譯器")
+        catalog.Set("解释器参数", "直譯器參數")
+        catalog.Set("• 直接脚本可指定“启动程序或解释器”，选择实际执行脚本的可执行文件，例如 Python、AutoHotkey、PowerShell、Node.js、Ruby、Perl、PHP、Lua、Java 或 Bash；留空时沿用系统默认启动方式。", "• 直接加入的指令碼可設定「啟動程式或直譯器」，選擇實際執行指令碼的可執行檔，例如 Python、AutoHotkey、PowerShell、Node.js、Ruby、Perl、PHP、Lua、Java 或 Bash；留空則沿用系統預設啟動方式。")
+        catalog.Set("• “启动程序参数”位于目标路径之前，“目标参数（Args）”位于目标路径之后。Java 可填写 -jar；PowerShell 可填写 -NoProfile -ExecutionPolicy Bypass -File。", "• 「啟動程式參數」會放在目標路徑之前，「目標參數（Args）」則放在目標路徑之後。Java 可填寫 -jar；PowerShell 可填寫 -NoProfile -ExecutionPolicy Bypass -File。")
+        catalog.Set("• Python 虚拟环境请选择该环境的 Scripts\python.exe；其他语言也可选择项目要求的确切运行时版本。进程识别仍以目标脚本路径为准，不会误把解释器本身当成守护目标。", "• Python 虛擬環境請選擇該環境的 Scripts\python.exe；其他語言亦可選擇項目指定的執行環境版本。程序識別仍以目標指令碼路徑為準，不會把直譯器本身誤當成守護目標。")
+        catalog.Set("• 工作目录（CWD）用于解析相对路径；留空时使用快捷方式工作目录或目标所在目录。", "• 工作目錄（CWD）用於解析相對路徑；留空時會使用捷徑的工作目錄或目標所在目錄。")
+        catalog.Set("• 环境变量每行填写一个 KEY=VALUE，只覆盖列出的变量；值中可用 %变量名% 引用已有环境变量。启动完成后小助手会恢复自身环境。", "• 環境變數每行填寫一個 KEY=VALUE，只會覆寫列出的變數；值內可用 %變數名稱% 引用現有環境變數。啟動完成後，小助手會還原自身環境。")
+        catalog.Set("; AppN 与 [Apps] 中同名项目一一对应，依次保存启动程序或解释器路径及其参数。", "; 每個 AppN 與 [Apps] 內的同名項目一一對應，依次儲存啟動程式或直譯器路徑及其參數。")
+        catalog.Set("; 两个字段均为 <HEX> 编码；留空时由小助手按目标类型使用默认启动方式。", "; 兩個欄位均採用 <HEX> 編碼；留空時由小助手按目標類型使用預設啟動方式。")
         return catalog
     }
 }

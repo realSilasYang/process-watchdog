@@ -60,6 +60,7 @@
 #Include src\Core\AppConfigHistoryService.ahk
 #Include src\Execution\TargetLauncher.ahk
 #Include src\Execution\TargetStopper.ahk
+#Include src\Execution\EverythingRuntimeService.ahk
 #Include src\Maintenance\MaintenanceActorMatcher.ahk
 #Include src\Maintenance\MaintenanceSessionCodec.ahk
 #Include src\Maintenance\MaintenanceCoordinator.ahk
@@ -76,6 +77,7 @@
 #Include src\UI\IconResourceRegistry.ahk
 #Include src\UI\SvgRenderLibrary.ahk
 #Include src\UI\UiInteractionRegistry.ahk
+#Include src\UI\ControlAccessibilityService.ahk
 #Include src\UI\MainListProjection.ahk
 #Include src\UI\ListViewPseudoHeader.ahk
 #Include src\UI\WindowHierarchy.ahk
@@ -1366,7 +1368,14 @@ Global_KeyDown(wParam, lParam, msg, hwnd) {
         && App.uiInteractions.HasButton(hwnd)) {
         buttonState := App.uiInteractions.GetButton(hwnd)
         if IsHoverButtonAvailable(buttonState) {
-            try ControlClick(, "ahk_id " hwnd)
+            ; 自绘 Text 按钮不会可靠地产生原生 BN_CLICKED／AHK Click 事件；键盘
+            ; 激活直接进入与鼠标抬起相同的已注册回调，避免屏幕阅读器用户按
+            ; Enter 或 Space 后只看到焦点变化而实际功能没有执行。
+            if buttonState.HasOwnProp("clickCallback") {
+                try buttonState.clickCallback.Call(buttonState.ctrl)
+            } else {
+                try ControlClick(, "ahk_id " hwnd)
+            }
             return 0
         }
     }

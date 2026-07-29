@@ -10,7 +10,7 @@ GetGuardActivationStatusKind(enabled) {
     return enabled ? GuardStatusKind.Initializing : GuardStatusKind.Paused
 }
 
-RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", arguments := "", environment := "", maintenanceConfig := "", storedResolvedTarget := "", resolvedTargetManual := false, shortcutArguments := "", displayConfig := "") {
+RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", arguments := "", environment := "", maintenanceConfig := "", storedResolvedTarget := "", resolvedTargetManual := false, shortcutArguments := "", displayConfig := "", runtimePath := "", runtimeArguments := "") {
     path := NormalizeTargetPath(path)
     if (path == "")
         return false
@@ -64,6 +64,7 @@ RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", argumen
         Enabled: enabled ? 1 : 0,
         TargetStartTicks: 0, RunAsAdmin: runAsAdmin ? 1 : 0, WorkDir: workingDirectory,
         Args: arguments, ShortcutArgs: shortcutArguments, EnvVars: environment,
+        RuntimePath: runtimePath, RuntimeArgs: runtimeArguments,
         PID: 0, LastKnownPID: 0, PIDCreationIdentity: "", PIDImagePath: "",
         PIDElevationState: -1, PIDElevationChecked: false,
         LastKnownPIDCreationIdentity: "",
@@ -364,6 +365,10 @@ ProcessEditFinishCore(GuiCtrlObj, Item, sessionId := 0) {
                     targetItem.ResolvedTarget := prospectiveResolvedTarget
                     targetItem.ResolvedTargetManual := false
                     targetItem.ShortcutArgs := prospectiveShortcutArgs
+                    if !TargetSpecFactory.SupportsCustomRuntime(newPath) {
+                        targetItem.RuntimePath := ""
+                        targetItem.RuntimeArgs := ""
+                    }
                     if (prospectiveWorkingDirectory != "")
                         targetItem.WorkDir := prospectiveWorkingDirectory
                     targetItem.Maintenance := App.maintenanceConfigCodec
@@ -751,7 +756,8 @@ ApplyAppConfigTransition(path, stateObj, sourceItem, targetItem) {
     if (!!sourceItem.RunAsAdmin != !!targetItem.RunAsAdmin
         && !!stateObj.RunAsAdmin == !!sourceItem.RunAsAdmin)
         stateObj.RunAsAdmin := targetItem.RunAsAdmin
-    for propertyName in ["WorkDir", "Args", "ShortcutArgs", "EnvVars"] {
+    for propertyName in ["WorkDir", "Args", "ShortcutArgs", "EnvVars",
+        "RuntimePath", "RuntimeArgs"] {
         if (sourceItem.%propertyName% != targetItem.%propertyName%
             && stateObj.%propertyName% == sourceItem.%propertyName%)
             stateObj.%propertyName% := targetItem.%propertyName%
@@ -933,7 +939,8 @@ ApplyState(stateArr, sourceStateArr := "", rollbackOnFailure := true) {
             if shouldAdd {
                 if !RegisterApp(item.Path, item.Enabled, item.RunAsAdmin, item.WorkDir, item.Args,
                     item.EnvVars, item.Maintenance, item.ResolvedTarget,
-                    item.ResolvedTargetManual, item.ShortcutArgs, item.Display) {
+                    item.ResolvedTargetManual, item.ShortcutArgs, item.Display,
+                    item.RuntimePath, item.RuntimeArgs) {
                     throw Error(Tr("监控项路径无效：{1}", item.Path))
                 }
             }

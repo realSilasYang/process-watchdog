@@ -95,6 +95,36 @@ RunExecutionTests() {
         'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Jobs\deploy.ps1" -Mode Safe',
         powershellInvocation.Command, "PowerShell 启动命令错误")
 
+    pythonRuntime := "C:\Python\python.exe"
+    pythonSpec := LaunchSpec(TargetLaunchKind.Direct,
+        "C:\Jobs\worker.py", "--port 8080", "", "", false, true,
+        false, "", pythonRuntime, "-I -u")
+    pythonInvocation := launcher.BuildInvocation(pythonSpec)
+    AssertExecutionEqual(
+        '"C:\Python\python.exe" -I -u "C:\Jobs\worker.py" --port 8080',
+        pythonInvocation.Command,
+        "自定义运行时、运行时参数、目标和目标参数的顺序错误")
+
+    javaSpec := LaunchSpec(TargetLaunchKind.Direct,
+        "C:\Jobs\service.jar", "--spring.profiles.active=prod", "", "",
+        false, true, false, "", "C:\Java\bin\java.exe", "-jar")
+    AssertExecutionEqual(
+        '"C:\Java\bin\java.exe" -jar "C:\Jobs\service.jar" --spring.profiles.active=prod',
+        launcher.BuildInvocation(javaSpec).Command,
+        "JAR 没有按通用运行时链构造")
+
+    customBatchSpec := LaunchSpec(TargetLaunchKind.Batch,
+        "C:\Jobs\daily backup.cmd", "--quiet", "", "", false, true,
+        false, "", "C:\Tools\wrapper.exe", "--capture")
+    customBatchInvocation := launcher.BuildInvocation(customBatchSpec, "",
+        false, "C:\Logs\custom batch.log")
+    AssertExecution(customBatchInvocation.Options == "Hide"
+        && InStr(customBatchInvocation.Command,
+            'cmd /d /c ""C:\Tools\wrapper.exe" --capture "C:\Jobs\daily backup.cmd" --quiet')
+        && InStr(customBatchInvocation.Command,
+            '>> "C:\Logs\custom batch.log" 2>&1"'),
+        "自定义运行时破坏了批处理输出捕获")
+
     elevatedSpec := LaunchSpec(TargetLaunchKind.Direct,
         "C:\Apps\Tool.exe", "--quiet", "", "", true)
     elevatedInvocation := launcher.BuildInvocation(elevatedSpec)
@@ -170,6 +200,12 @@ RunExecutionTests() {
         "WATCHDOG_TEST_MISSING_" A_TickCount)
     AssertExecution(!missingVariableState.Exists,
         "启动器把不存在的环境变量误判为已有空值")
+    expandedEnvironment := launcher.ExpandEnvironmentValue(
+        "ROOT=%SystemRoot%;LITERAL=%WATCHDOG_VARIABLE_THAT_DOES_NOT_EXIST%")
+    AssertExecution(InStr(expandedEnvironment, "ROOT=" A_WinDir)
+        && InStr(expandedEnvironment,
+            "%WATCHDOG_VARIABLE_THAT_DOES_NOT_EXIST%"),
+        "环境变量值没有按 Windows 语义展开已有变量并保留未知引用")
 
     unavailableSpec := LaunchSpec(TargetLaunchKind.Direct, "", "", "",
         "", false, false, false, "测试目标不可用")

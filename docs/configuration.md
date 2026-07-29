@@ -68,11 +68,43 @@ UI 字体粗体，也不会为此加载随包字体。配置中填写了无效�
 `CheckUpdatesOnStartup=1` 表示启动完成后在独立后台进程中检查小助手新版；设为
 `0` 只关闭启动检查，仍可从“关于”页手动检查。
 
+## 监控项与启动环境
+
+`[Apps]` 中每个 `AppN` 保存九个稳定字段：
+
+```text
+Enabled|RunAsAdmin|Path|WorkDir|Args|EnvVars|ResolvedTarget|ResolvedTargetManual|ShortcutArgs
+```
+
+其中除布尔值和目标路径外的文本由小助手以 `<HEX>` 编码。不要手工插入竖线或改写
+编码内容。`[Maintenance]`、`[Display]` 和 `[Launch]` 使用相同的 `AppN` 与监控项
+对应，并与 `[Apps]` 在同一个原子事务中保存。
+
+`[Launch]` 只在项目指定了自定义启动程序或解释器时保存：
+
+```text
+AppN=<HEX RuntimePath>|<HEX RuntimeArgs>
+```
+
+- `RuntimePath` 是 Python、AutoHotkey、PowerShell、Node.js、Java、Ruby、Perl、
+  PHP、Lua、Bash 或其他运行时的可执行文件路径。
+- `RuntimeArgs` 是运行时自身参数。实际顺序固定为
+  `"RuntimePath" RuntimeArgs "TargetPath" Args`；例如运行 JAR 时填写 `-jar`。
+- 两项均留空时，小助手按目标类型沿用默认启动方式；不会改变旧项目的行为。
+- 自定义运行时只适用于直接脚本或文档型目标。快捷方式继续从 LNK 启动，普通 EXE
+  直接启动，因此对应界面不会显示无关字段。
+- `EnvVars` 每行使用 `KEY=VALUE`。值可以引用 `%PATH%` 等现有变量；这些覆盖只在
+  小助手启动目标的一次调用期间生效，不会永久修改系统或小助手环境。
+
+无法解析的 `[Launch]` 内容会与对应监控项原文一起进入 `[Recovery]`，不会带着
+不完整的启动环境注册。撤销、重做、路径修改和条目排序也会把这两个字段作为项目
+快照的一部分处理。
+
 ## 备份
 
 退出小助手后复制以下文件：
 
-- `watchdog.ini`：设置、窗口布局、守护项、升级保护和显示自定义。
+- `watchdog.ini`：设置、窗口布局、守护项、启动环境、升级保护和显示自定义。
 - `watchdog.maintenance.ini`：仅包含尚未结束的升级保护会话；正常情况下可以为空。
 
 配置写入失败时，正式文件保持原样并进行低频退避重试。无法解析的监控记录会

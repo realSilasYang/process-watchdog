@@ -57,6 +57,8 @@ class WatchlistPersistenceSnapshotService {
             WorkDir: stateObj.WorkDir,
             Args: stateObj.Args,
             EnvVars: stateObj.EnvVars,
+            RuntimePath: stateObj.RuntimePath,
+            RuntimeArgs: stateObj.RuntimeArgs,
             ResolvedTarget: stateObj.ResolvedTarget,
             ResolvedTargetManual: stateObj.ResolvedTargetManual,
             ShortcutArgs: stateObj.ShortcutArgs,
@@ -83,6 +85,8 @@ CreateWatchlistPersistenceState(path, name := "") {
         WorkDir: "C:\工作目录",
         Args: "--标签=测试",
         EnvVars: "LANG=zh_CN",
+        RuntimePath: A_AhkPath,
+        RuntimeArgs: "/ErrorStdOut",
         ResolvedTarget: path,
         ResolvedTargetManual: false,
         ShortcutArgs: "--shortcut",
@@ -120,6 +124,10 @@ RunWatchlistPersistenceServiceTests() {
             {Name: "Display", Entries: [
                 {Key: "App1", Value: IniFieldCodec.Encode("自定义") "|"}
             ]},
+            {Name: "Launch", Entries: [
+                {Key: "App1", Value: IniFieldCodec.Encode(A_AhkPath)
+                    "|" IniFieldCodec.Encode("/ErrorStdOut")}
+            ]},
             {Name: "Recovery", Entries: [
                 {Key: "Entry1", Value: ""},
                 {Key: "Entry2", Value: IniFieldCodec.Encode("old")}
@@ -134,6 +142,8 @@ RunWatchlistPersistenceServiceTests() {
         AssertWatchlistPersistence(loaded.RegisteredCount == 1
             && records[1].Path == "C:\Valid.exe"
             && records[1].Args == "--中文"
+            && records[1].RuntimePath == A_AhkPath
+            && records[1].RuntimeArgs == "/ErrorStdOut"
             && records[1].Display.Name == "自定义"
             && loaded.Warnings.Length == 5
             && loaded.RecoveryEntries.Length == 7
@@ -174,6 +184,7 @@ RunWatchlistPersistenceServiceTests() {
             && StrSplit(appEntries[1].Value, "|").Length == 9
             && repository.ReadSectionEntries("Maintenance").Length == 2
             && repository.ReadSectionEntries("Display").Length == 1
+            && repository.ReadSectionEntries("Launch").Length == 2
             && repository.ReadSectionEntries("Recovery").Length == 7
             && repository.Read("Recovery", "Entry1", "missing") == "",
             "监控项顺序、当前九字段格式或恢复记录没有原子保存")

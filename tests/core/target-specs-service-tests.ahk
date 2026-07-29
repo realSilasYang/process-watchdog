@@ -60,6 +60,8 @@ RunTargetSpecsServiceTests() {
             Args: "--user",
             ShortcutArgs: "",
             EnvVars: "LANG=zh_CN",
+            RuntimePath: "",
+            RuntimeArgs: "",
             RunAsAdmin: true,
             ShortcutResolveCheckedTicks: 1,
             OneShot: false
@@ -87,8 +89,15 @@ RunTargetSpecsServiceTests() {
         AssertTargetSpecsService(ObjPtr(changedSpecs) != ObjPtr(firstSpecs)
             && changedSpecs.Launch.Arguments == "--changed",
             "启动参数变化没有使目标规格缓存失效")
+        stateObj.RuntimePath := A_AhkPath
+        runtimeChangedSpecs := service.Get(shortcutPath, stateObj)
+        AssertTargetSpecsService(ObjPtr(runtimeChangedSpecs)
+                != ObjPtr(changedSpecs)
+            && runtimeChangedSpecs.Launch.RuntimePath == "",
+            "运行时设置变化没有使规格缓存失效，或错误覆盖了快捷方式入口")
         forcedSpecs := service.Get(shortcutPath, stateObj, true)
-        AssertTargetSpecsService(ObjPtr(forcedSpecs) != ObjPtr(changedSpecs),
+        AssertTargetSpecsService(ObjPtr(forcedSpecs)
+                != ObjPtr(runtimeChangedSpecs),
             "显式刷新没有重建目标规格")
 
         try FileDelete(shortcutPath)
@@ -100,6 +109,7 @@ RunTargetSpecsServiceTests() {
             Args: "--outer",
             WorkDir: A_Temp,
             EnvVars: "",
+            RuntimePath: "", RuntimeArgs: "",
             RunAsAdmin: false,
             OneShot: false
         }
@@ -116,7 +126,8 @@ RunTargetSpecsServiceTests() {
         resolver.ResolvedTarget := ""
         oneShotState := {
             ResolvedTarget: "", ShortcutArgs: "", Args: "", WorkDir: "",
-            EnvVars: "", RunAsAdmin: false, OneShot: false
+            EnvVars: "", RunAsAdmin: false, OneShot: false,
+            RuntimePath: "", RuntimeArgs: ""
         }
         oneShotSpecs := service.Get(shortcutPath, oneShotState, true)
         AssertTargetSpecsService(oneShotSpecs.IsOneShot

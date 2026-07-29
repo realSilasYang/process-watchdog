@@ -44,6 +44,8 @@ class TargetSupervisor {
         this.Args := ""
         this.ShortcutArgs := ""
         this.EnvVars := ""
+        this.RuntimePath := ""
+        this.RuntimeArgs := ""
         this.PID := 0
         this.LastKnownPID := 0
         this.PIDCreationIdentity := ""

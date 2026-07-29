@@ -45,12 +45,14 @@ class ProcessSnapshotIndex {
         return observation
     }
 
-    ObserveCommandTarget(targetPath) {
+    ObserveCommandTarget(targetPath, launcherPath := "") {
         if !this.SupportsCommandLine {
             return ProcessObservation.Unknown(this.CapturedAtTicks,
                 "process-command", "快照不包含命令行信息",
                 ProcessObservationReason.CommandLineUnavailable)
         }
+        if launcherPath != ""
+            return this.ObserveCustomRuntimeTarget(targetPath, launcherPath)
         key := this.Canonical(targetPath)
         observation := this.ObserveEntries(this.ByCommandTarget, key,
             "process-command")
@@ -69,6 +71,84 @@ class ProcessSnapshotIndex {
                 ProcessObservationReason.CommandLineUnavailable)
         }
         return observation
+    }
+
+    ObserveCustomRuntimeTarget(targetPath, launcherPath) {
+        matching := []
+        identityUnavailable := false
+        commandLineUnavailable := false
+        launcherIdentityUnavailable := false
+        for processInfo in this.Processes {
+            liveStatus := this.GetLiveStatus(processInfo)
+            if liveStatus == 0
+                continue
+            launcherStatus := this.GetLauncherMatchStatus(processInfo,
+                launcherPath)
+            if launcherStatus == 0
+                continue
+            if launcherStatus < 0 {
+                launcherIdentityUnavailable := true
+                continue
+            }
+            if !processInfo.HasOwnProp("cmd") || processInfo.cmd == "" {
+                commandLineUnavailable := true
+                continue
+            }
+            if !this.CommandLineContainsTarget(processInfo.cmd, targetPath)
+                continue
+            if liveStatus > 0
+                matching.Push(processInfo)
+            else
+                identityUnavailable := true
+        }
+        if matching.Length {
+            return this.RunningObservation(this.SelectOldestCandidate(matching),
+                "process-command")
+        }
+        if identityUnavailable {
+            return ProcessObservation.Unknown(this.CapturedAtTicks,
+                "process-command", "候选进程的创建身份无法核对",
+                ProcessObservationReason.ProcessIdentityUnavailable)
+        }
+        if commandLineUnavailable {
+            return ProcessObservation.Unknown(this.CapturedAtTicks,
+                "process-command", "候选运行时的命令行不可用",
+                ProcessObservationReason.CommandLineUnavailable)
+        }
+        if launcherIdentityUnavailable {
+            return ProcessObservation.Unknown(this.CapturedAtTicks,
+                "process-command", "候选运行时的镜像路径不可用",
+                ProcessObservationReason.InaccessibleImagePath)
+        }
+        return ProcessObservation.Stopped(this.CapturedAtTicks,
+            "process-command")
+    }
+
+    GetLauncherMatchStatus(processInfo, launcherPath) {
+        wantedLauncher := this.Canonical(launcherPath)
+        if wantedLauncher == ""
+            return 0
+        if processInfo.HasOwnProp("exe") && processInfo.exe != ""
+            return this.Canonical(processInfo.exe) == wantedLauncher ? 1 : 0
+        SplitPath(launcherPath, &wantedName)
+        processName := processInfo.HasOwnProp("name")
+            ? processInfo.name : ""
+        return wantedName != ""
+            && StrLower(processName) == StrLower(wantedName) ? -1 : 0
+    }
+
+    CommandLineContainsTarget(commandLine, targetPath) {
+        wantedTarget := this.Canonical(targetPath)
+        if wantedTarget == ""
+            return false
+        arguments := ProcessSnapshotIndex.ParseCommandLine(commandLine)
+        if arguments.Length < 2
+            return false
+        for index, argument in arguments {
+            if index > 1 && this.Canonical(argument) == wantedTarget
+                return true
+        }
+        return false
     }
 
     ObserveExecutableInRoot(rootPath, preferredName := "") {

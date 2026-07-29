@@ -21,7 +21,8 @@ class TargetProbeKind {
 class LaunchSpec {
     __New(kind, targetPath := "", arguments := "", workingDirectory := "",
         environment := "", runAsAdmin := false, available := true,
-        usesShortcutEntry := false, unavailableReason := "") {
+        usesShortcutEntry := false, unavailableReason := "",
+        runtimePath := "", runtimeArguments := "") {
         this.Kind := kind
         this.TargetPath := targetPath
         this.Arguments := arguments
@@ -31,18 +32,22 @@ class LaunchSpec {
         this.Available := !!available
         this.UsesShortcutEntry := !!usesShortcutEntry
         this.UnavailableReason := unavailableReason
+        this.RuntimePath := runtimePath
+        this.RuntimeArguments := runtimeArguments
     }
 }
 
 class ProbeSpec {
     __New(kind, targetPath := "", workingDirectory := "",
-        preferredName := "", precise := true, reason := "") {
+        preferredName := "", precise := true, reason := "",
+        launcherPath := "") {
         this.Kind := kind
         this.TargetPath := targetPath
         this.WorkingDirectory := workingDirectory
         this.PreferredName := preferredName
         this.Precise := !!precise
         this.Reason := reason
+        this.LauncherPath := launcherPath
     }
 }
 
@@ -74,6 +79,10 @@ class TargetSpecFactory {
         shortcutWorkingDirectory := this.NormalizePath(this.Option(options,
             "ShortcutWorkingDirectory", ""))
         environment := String(this.Option(options, "Environment", ""))
+        runtimePath := this.NormalizePath(this.Option(options,
+            "RuntimePath", ""))
+        runtimeArguments := Trim(String(this.Option(options,
+            "RuntimeArguments", "")))
         runAsAdmin := !!this.Option(options, "RunAsAdmin", false)
         entryExists := !!this.Option(options, "EntryExists", true)
         resolvedTargetExists := !!this.Option(options, "ResolvedTargetExists",
@@ -82,7 +91,8 @@ class TargetSpecFactory {
         if !InStr(configuredPath, "\") {
             launch := LaunchSpec(TargetLaunchKind.Direct, configuredPath,
                 configuredArguments, workingDirectory, environment, runAsAdmin,
-                configuredPath != "")
+                configuredPath != "", false, "", runtimePath,
+                runtimeArguments)
             probe := ProbeSpec(TargetProbeKind.ProcessName, configuredPath)
             return TargetSpecs(configuredPath, launch, probe)
         }
@@ -136,11 +146,16 @@ class TargetSpecFactory {
             || configuredExtension == "appref-ms"
         launch := LaunchSpec(this.ResolveLaunchKind(configuredPath), configuredPath,
             configuredArguments, workingDirectory, environment, runAsAdmin,
-            entryExists, false, entryExists ? "" : "启动目标不存在")
+            entryExists, false, entryExists ? "" : "启动目标不存在",
+            runtimePath, runtimeArguments)
         probe := isOneShot
             ? ProbeSpec(TargetProbeKind.None, "", "", "", true,
                 "非驻留目标不执行持续探活")
-            : this.CreatePathProbe(configuredPath)
+            : (runtimePath != ""
+                ? ProbeSpec(TargetProbeKind.CommandTarget, configuredPath,
+                    "", "", true, "自定义运行时按运行时和目标路径探活",
+                    runtimePath)
+                : this.CreatePathProbe(configuredPath))
         return TargetSpecs(configuredPath, launch, probe, isOneShot)
     }
 
@@ -170,6 +185,17 @@ class TargetSpecFactory {
         probe := this.CreatePathProbe(targetPath)
         return probe.Kind == TargetProbeKind.ImagePath
             || probe.Kind == TargetProbeKind.CommandTarget
+    }
+
+    static SupportsCustomRuntime(targetPath) {
+        targetPath := this.NormalizePath(targetPath)
+        if (targetPath == "" || !InStr(targetPath, "\"))
+            return false
+        SplitPath(targetPath, , , &extension)
+        extension := StrLower(extension)
+        return extension != "lnk" && extension != "exe"
+            && extension != "com" && extension != "url"
+            && extension != "appref-ms"
     }
 
     static ResolveLaunchKind(targetPath) {
