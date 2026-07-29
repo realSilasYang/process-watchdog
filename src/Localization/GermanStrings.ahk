@@ -965,8 +965,8 @@ class GermanStrings {
             "暂停守护：{1}",
                 "Überwachung pausieren: {1}")
         catalog.Set(
-            "暂停或恢复选中守护对象，不会退出目标`n支持多选；混合状态时逐项反转",
-                "Überwachung der ausgewählten Einträge pausieren oder fortsetzen, ohne die Ziele zu beenden`nMehrfachauswahl unterstützt`; bei gemischten Zuständen wird jeder einzeln umgekehrt")
+            "暂停或恢复选中守护对象，不会退出目标`n支持多选；混合状态时逐项反转`n快捷键：Space",
+                "Überwachung der ausgewählten Einträge pausieren oder fortsetzen, ohne die Ziele zu beenden`nMehrfachauswahl unterstützt`; bei gemischten Zuständen wird jeder einzeln umgekehrt`nTastenkürzel: Leertaste")
         catalog.Set(
             "暂时无法查询进程状态，稍后重试手动重启：{1}",
                 "Der Prozessstatus kann vorübergehend nicht abgefragt werden`; der manuelle Neustart wird später erneut versucht: {1}")

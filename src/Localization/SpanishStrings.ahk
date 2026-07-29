@@ -965,8 +965,8 @@ class SpanishStrings {
             "暂停守护：{1}",
                 "Pausar la supervisión: {1}")
         catalog.Set(
-            "暂停或恢复选中守护对象，不会退出目标`n支持多选；混合状态时逐项反转",
-                "Pausar o reanudar la supervisión de los elementos seleccionados sin cerrar los destinos`nAdmite selección múltiple`; si los estados están mezclados, se invierte cada uno")
+            "暂停或恢复选中守护对象，不会退出目标`n支持多选；混合状态时逐项反转`n快捷键：Space",
+                "Pausar o reanudar la supervisión de los elementos seleccionados sin cerrar los destinos`nAdmite selección múltiple`; si los estados están mezclados, se invierte cada uno`nAtajo: Espacio")
         catalog.Set(
             "暂时无法查询进程状态，稍后重试手动重启：{1}",
                 "No se puede consultar temporalmente el estado del proceso`; el reinicio manual se reintentará más tarde: {1}")

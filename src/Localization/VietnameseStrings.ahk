@@ -965,8 +965,8 @@ class VietnameseStrings {
             "暂停守护：{1}",
                 "Đã tạm dừng giám sát: {1}")
         catalog.Set(
-            "暂停或恢复选中守护对象，不会退出目标`n支持多选；混合状态时逐项反转",
-                "Tạm dừng hoặc tiếp tục giám sát các mục đã chọn mà không thoát đích`nHỗ trợ chọn nhiều`; trạng thái hỗn hợp được chuyển đổi riêng từng mục")
+            "暂停或恢复选中守护对象，不会退出目标`n支持多选；混合状态时逐项反转`n快捷键：Space",
+                "Tạm dừng hoặc tiếp tục giám sát các mục đã chọn mà không thoát đích`nHỗ trợ chọn nhiều`; trạng thái hỗn hợp được chuyển đổi riêng từng mục`nPhím tắt: Space")
         catalog.Set(
             "暂时无法查询进程状态，稍后重试手动重启：{1}",
                 "Tạm thời không thể truy vấn trạng thái tiến trình`; sẽ thử lại thao tác khởi động lại thủ công sau: {1}")

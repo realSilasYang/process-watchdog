@@ -965,8 +965,8 @@ class EnglishStrings {
             "暂停守护：{1}",
                 "Monitoring paused: {1}")
         catalog.Set(
-            "暂停或恢复选中守护对象，不会退出目标`n支持多选；混合状态时逐项反转",
-                "Pause or resume monitoring for the selected items without closing their targets`nSupports multiple selection`; mixed states are toggled individually")
+            "暂停或恢复选中守护对象，不会退出目标`n支持多选；混合状态时逐项反转`n快捷键：Space",
+                "Pause or resume monitoring for the selected items without closing their targets`nSupports multiple selection`; mixed states are toggled individually`nShortcut: Space")
         catalog.Set(
             "暂时无法查询进程状态，稍后重试手动重启：{1}",
                 "Process status is temporarily unavailable. Manual restart will be retried later: {1}")

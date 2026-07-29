@@ -965,8 +965,8 @@ class FrenchStrings {
             "暂停守护：{1}",
                 "Suspendre la surveillance : {1}")
         catalog.Set(
-            "暂停或恢复选中守护对象，不会退出目标`n支持多选；混合状态时逐项反转",
-                "Suspendre ou reprendre la surveillance des éléments sélectionnés sans fermer les cibles`nSélection multiple prise en charge `; si les états sont différents, chacun est inversé")
+            "暂停或恢复选中守护对象，不会退出目标`n支持多选；混合状态时逐项反转`n快捷键：Space",
+                "Suspendre ou reprendre la surveillance des éléments sélectionnés sans fermer les cibles`nSélection multiple prise en charge `; si les états sont différents, chacun est inversé`nRaccourci : Espace")
         catalog.Set(
             "暂时无法查询进程状态，稍后重试手动重启：{1}",
                 "Impossible de consulter temporairement l'état du processus `; le redémarrage manuel sera retenté plus tard : {1}")
