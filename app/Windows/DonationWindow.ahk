@@ -35,7 +35,7 @@ class DonationWindow extends ManagedWindow {
                 " y22 w" (windowWidth - contentMargin * 2)
                 " Center BackgroundTrans c"
                 UiThemeService.Color("Text"),
-                Tr("如果小助手为您节省了排查问题和恢复程序的时间，欢迎通过下方二维码打赏作者！`n进程守护小助手持续保持开源，项目的长期维护有赖于您的支持和鼓励~"))
+                Tr("如果小助手为您节省了排查问题和恢复程序的时间，欢迎通过下方二维码打赏作者！`n请选择扶贫方式："))
             this.messageText.GetPos(, &messageY, , &messageHeight)
             dividerY := messageY + messageHeight + 17
             this.gui.Add("Text", "x" contentMargin " y" dividerY

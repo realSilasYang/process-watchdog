@@ -76,7 +76,7 @@ A complete GUI automation run is recorded on real Windows 11 at 200% DPI, with r
 
 # Support the project
 
-Process Watchdog Assistant will remain open source. Long-term maintenance depends on the community's support and encouragement. If the assistant has saved you time diagnosing failures or recovering applications, you can make a voluntary donation using either QR code below. Donations support maintenance, compatibility testing, and future releases.
+If the assistant has saved you time diagnosing failures or recovering applications, you can support the author using either QR code below. Choose how you'd like to help:
 
 <p align="center">
   <img src="../assets/donate/微信个人收款码.png" width="220" alt="WeChat Pay donation QR code">

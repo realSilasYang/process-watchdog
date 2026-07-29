@@ -75,7 +75,7 @@ Ein vollständiger GUI-Automatisierungslauf ist unter Windows 11 mit echten 200 
 
 # Projekt unterstützen
 
-Der Prozessüberwachungs-Assistent bleibt Open Source. Seine langfristige Pflege hängt von Unterstützung und Zuspruch aus der Gemeinschaft ab. Wenn er Zeit bei Fehlersuche oder Wiederherstellung gespart hat, ist über einen der folgenden QR-Codes eine freiwillige Spende möglich. Beiträge finanzieren Wartung, Kompatibilitätsprüfungen und kommende Versionen.
+Wenn Ihnen der Assistent Zeit bei der Fehlersuche oder Wiederherstellung von Anwendungen erspart hat, können Sie den Autor über einen der folgenden QR-Codes unterstützen. Wählen Sie aus, wie Sie helfen möchten:
 
 <p align="center">
   <img src="../assets/donate/微信个人收款码.png" width="220" alt="QR-Code für eine Spende über WeChat Pay">

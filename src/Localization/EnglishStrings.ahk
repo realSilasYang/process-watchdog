@@ -1733,11 +1733,11 @@ class EnglishStrings {
             "• 界面语言、内容字体和主题保存后会立即更新主窗口、菜单和托盘，无需重新启动。",
                 "• Saving the interface language, content font, or theme immediately updates the main window, menus, and tray without restarting.")
         catalog.Set("打开帮助信息`n可选择查看使用说明、运行日志或提交反馈", "Open Help`nChoose the user guide, runtime log, or feedback page")
-        catalog.Set("支持开源项目`n可使用微信支付或支付宝扫码捐赠", "Support the open-source project`nDonate via WeChat Pay or Alipay")
+        catalog.Set("快揭不开锅了（≥Д≤）", "The budget's almost gone（≥Д≤）")
         catalog.Set("帮助信息", "Help")
         catalog.Set("提交反馈", "Submit Feedback")
         catalog.Set("支持开源项目", "Support the Open-Source Project")
-        catalog.Set("如果小助手为您节省了排查问题和恢复程序的时间，欢迎通过下方二维码打赏作者！`n进程守护小助手持续保持开源，项目的长期维护有赖于您的支持和鼓励~", "If the assistant has saved you time diagnosing problems and getting programs running again, please consider supporting the author through one of the QR codes below!`nProcess Watchdog will remain open source, and its long-term maintenance depends on your support and encouragement.")
+        catalog.Set("如果小助手为您节省了排查问题和恢复程序的时间，欢迎通过下方二维码打赏作者！`n请选择扶贫方式：", "If the assistant has saved you time diagnosing problems and getting programs running again, please consider supporting the author through one of the QR codes below!`nChoose how you'd like to help:")
         catalog.Set("微信支付", "WeChat Pay")
         catalog.Set("支付宝", "Alipay")
         catalog.Set("二维码图片未找到", "QR code image not found")
