@@ -108,6 +108,8 @@ foreach ($forbidden in @('softprops/action-gh-release@',
 
 $release = Get-WorkflowText 'release.yml'
 $versionExpression = '${{ steps.release_meta.outputs.version }}'
+$commitExpression = '${{ github.sha }}'
+$repositoryExpression = '${{ github.repository }}'
 $userAssets = @(
     "dist/process-watchdog-$versionExpression-windows-x64.exe"
     "dist/process-watchdog-$versionExpression-windows-x64.zip"
@@ -125,6 +127,10 @@ Assert-WorkflowContains 'release.yml' $release @(
     '.\tools\verify-release-draft.ps1'
     '--draft=false'
     '.\tools\verify-published-release.ps1'
+    '.\tools\verify-downloaded-release.ps1'
+    "-Version '$versionExpression'"
+    "-CommitSha '$commitExpression'"
+    "-Repository '$repositoryExpression'"
     '-SecondPowerShellPath powershell.exe'
     'include-hidden-files: true'
     'fetch-depth: 0'

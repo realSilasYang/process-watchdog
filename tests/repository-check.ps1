@@ -98,6 +98,7 @@ $requiredFiles = @(
     'tools\verify-github-release.ps1',
     'tools\verify-release-draft.ps1',
     'tools\verify-published-release.ps1',
+    'tools\verify-downloaded-release.ps1',
     'tools\resolve-toolchain.ps1',
     'tools\generate-sbom.ps1',
     'tools\verify-release.ps1',

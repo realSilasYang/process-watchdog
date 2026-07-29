@@ -112,3 +112,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: .\tools\verify-published-release.ps1
+
+      - name: Download and audit the public packages
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          .\tools\verify-downloaded-release.ps1
+          -Version '${{ steps.release_meta.outputs.version }}'
+          -CommitSha '${{ github.sha }}'
+          -Repository '${{ github.repository }}'

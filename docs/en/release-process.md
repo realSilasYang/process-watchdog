@@ -74,8 +74,12 @@ after fixing that failure, rerun the same command.
     source ZIP to a draft. The SBOM, `SHA256SUMS.txt`, and remaining `dist` stay in
     the complete Actions artifact, with hidden directories explicitly included.
     The draft body, commit, allowlist, sizes, and
-    GitHub SHA-256 digests must match the local build before publication, followed
-    by a second audit of the public Release and remote tag.
+    GitHub SHA-256 digests must match the local build before publication. After
+    publication, the workflow audits the public Release and remote tag, downloads
+    all three hosted editions, checks their digests again, extracts both ZIPs,
+    and reruns the complete package verifier against the toolchain snapshot
+    embedded by the formal build. The ordinary CI snapshot is never substituted
+    for that release-specific record.
 
 The tag must be in `main` history and is created by the manually dispatched
 Release workflow only after every gate passes. Code pushes, tag pushes, schedules,
