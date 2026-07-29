@@ -41,6 +41,7 @@ $requiredFiles = @(
     'VERSION',
     'config\watchdog.example.ini',
     'assets\app\watchdog.ico',
+    'assets\app\watchdog-logo.png',
     'assets\donate\微信个人收款码.png',
     'assets\donate\微信个人收款码-界面.png',
     'assets\donate\支付宝个人收款码.png',
@@ -519,10 +520,18 @@ $readmeRequiredTopics = @(
 foreach ($readmeDefinition in $localizedReadmes) {
     $readmePath = Join-Path $projectRoot $readmeDefinition.Path
     $readme = Get-Content -LiteralPath $readmePath -Raw -Encoding UTF8
+    $expectedLogoHref = if ($readmeDefinition.Path -eq 'README.md') {
+        './assets/app/watchdog-logo.png'
+    } else {
+        '../assets/app/watchdog-logo.png'
+    }
+    $logoPattern = '(?s)<div align="center">\s*<img src="' +
+        [regex]::Escape($expectedLogoHref) +
+        '" width="112" height="112" alt="[^"]+">\s*<p>(.*?)</p>'
     $languageBarMatch = [regex]::Match($readme,
-        '(?s)<div align="center">\s*<p>(.*?)</p>')
+        $logoPattern)
     if (-not $languageBarMatch.Success) {
-        throw "Localized README has no language switcher: $($readmeDefinition.Path)"
+        throw "Localized README has no canonical logo and language switcher: $($readmeDefinition.Path)"
     }
 
     $expectedEntries = @()

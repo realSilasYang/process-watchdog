@@ -1,4 +1,6 @@
 <div align="center">
+  <img src="./assets/app/watchdog-logo.png" width="112" height="112" alt="进程守护小助手 Logo">
+
   <p><strong>简体中文</strong> · <a href="./docs/README.zh-HK.md">繁體中文（香港）</a> · <a href="./docs/README.zh-TW.md">繁體中文（台灣）</a> · <a href="./docs/README.en.md">English</a> · <a href="./docs/README.ja.md">日本語</a> · <a href="./docs/README.vi.md">Tiếng Việt</a> · <a href="./docs/README.ko.md">한국어</a> · <a href="./docs/README.es.md">Español</a> · <a href="./docs/README.fr.md">Français</a> · <a href="./docs/README.pt-BR.md">Português</a> · <a href="./docs/README.ru.md">Русский</a> · <a href="./docs/README.de.md">Deutsch</a> · <a href="./docs/README.it.md">Italiano</a></p>
 
   <h1>进程守护小助手</h1>
@@ -43,7 +45,7 @@
 - 守护 EXE、AHK、Python、JavaScript、PowerShell、BAT、CMD 和 LNK。
 - 使用 `Running`、`Stopped`、`Unknown` 三态探活；未知状态不会触发盲目重启。
 - 每个目标拥有独立控制器、代际和任务令牌，暂停、删除或改路径后旧回调立即失效。
-- 直接文件被更名或在同一卷（通常是同一盘符）内移动时，以 Windows 文件 ID 找回新路径并由用户确认；不会按目录中的相似文件猜测目标。
+- 直接文件被更名或在同一卷（通常是同一盘符）内移动时，在文件系统允许按 Windows 文件 ID 回开时找回新路径并由用户确认；该能力不可用时仅接受完整的重命名事件，不按目录中的相似文件猜测目标。
 - 支持管理员权限要求；已运行实例权限不符时提示，手动重新启动时按配置提权。
 - 软件升级保护默认关闭；启用后结合更新进程、父子关系、安装目录和文件稳定性暂停守护，并在升级结束后恢复。
 - 配置采用原子替换；无法解析的监控记录进入 `[Recovery]`，不会静默丢弃。

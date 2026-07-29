@@ -57,6 +57,7 @@ $requiredPaths = @(
     '.github\SUPPORT.en.md',
     'config\watchdog.example.ini',
     'assets\app\watchdog.ico',
+    'assets\app\watchdog-logo.png',
     'assets\donate\微信个人收款码.png',
     'assets\donate\微信个人收款码-界面.png',
     'assets\donate\支付宝个人收款码.png',
