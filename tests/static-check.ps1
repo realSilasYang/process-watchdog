@@ -2185,6 +2185,7 @@ if ($windowHierarchySource -notmatch 'MinimizeChildIndependently\(childHwnd\)[\s
     $windowHierarchySource -notmatch 'PrepareChildRestore\(childHwnd\)[\s\S]*?UnregisterTaskbarTab\(childHwnd\)[\s\S]*?RestoreTaskbarStyle\(childHwnd,[\s\S]*?SetNativeOwner\(childHwnd, ownerHwnd\)[\s\S]*?SuspendedChildren\.Delete\(childHwnd\)' -or
     $windowHierarchySource -notmatch 'PromoteToTaskbar\(childHwnd\)[\s\S]*?WS_EX_APPWINDOW[\s\S]*?WS_EX_TOOLWINDOW[\s\S]*?RefreshWindowFrame\(childHwnd\)' -or
     $windowHierarchySource -notmatch 'RegisterTaskbarTab\(childHwnd\)[\s\S]*?ComCall\(4,[\s\S]*?UnregisterTaskbarTab\(childHwnd\)[\s\S]*?ComCall\(5,' -or
+    $windowHierarchySource -notmatch 'IsTaskbarShellAvailable\(timeoutMs := 250\)[\s\S]*?FindWindowW[\s\S]*?SendMessageTimeoutW[\s\S]*?SMTO_ABORTIFHUNG[\s\S]*?GetTaskbarList\(\)[\s\S]*?IsTaskbarShellAvailable\(\)[\s\S]*?ComObject' -or
     $windowHierarchySource -notmatch 'MinimizeWindow\(hwnd\)[\s\S]*?SW_HIDE[\s\S]*?SW_SHOWMINNOACTIVE') {
     $failures.Add('Owned child minimization must detach its owner, enter the taskbar, and restore both styles and modal ownership')
 }

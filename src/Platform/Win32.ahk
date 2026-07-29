@@ -3,6 +3,7 @@
 ; 本文件不封装状态，也不拥有任何句柄或内存资源。
 
 class Win32 {
+    static WM_NULL := 0x0000
     static AHK_NOTIFYICON := 0x0404
     static NIN_BALLOONUSERCLICK := 0x0405
     static WM_MOVE := 0x0003
@@ -117,6 +118,7 @@ class Win32 {
     static SW_HIDE := 0
     static SW_MINIMIZE := 6
     static SW_SHOWMINNOACTIVE := 7
+    static SMTO_ABORTIFHUNG := 0x0002
     static IDC_ARROW := 32512
     static IDC_IBEAM := 32513
     static HTHSCROLL := 6

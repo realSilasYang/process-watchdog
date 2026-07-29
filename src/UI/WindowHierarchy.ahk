@@ -102,7 +102,27 @@ class WindowHierarchyPlatform {
         return false
     }
 
+    IsTaskbarShellAvailable(timeoutMs := 250) {
+        ; Windows Runner、Explorer 尚未启动或 Explorer 重启期间可能没有可用
+        ; 任务栏。先做有界响应探针，避免在 GUI 线程中创建 ITaskbarList 时
+        ; 无限等待一个不存在或失去响应的 Shell。
+        taskbarHwnd := DllCall("user32\FindWindowW", "Str", "Shell_TrayWnd",
+            "Ptr", 0, "Ptr")
+        if !taskbarHwnd
+            return false
+        messageResult := 0
+        return !!DllCall("user32\SendMessageTimeoutW", "Ptr", taskbarHwnd,
+            "UInt", Win32.WM_NULL, "UPtr", 0, "Ptr", 0,
+            "UInt", Win32.SMTO_ABORTIFHUNG,
+            "UInt", Max(1, Integer(timeoutMs)),
+            "UPtr*", &messageResult, "Ptr")
+    }
+
     GetTaskbarList() {
+        if !this.IsTaskbarShellAvailable() {
+            this.TaskbarList := ""
+            return ""
+        }
         if IsObject(this.TaskbarList)
             return this.TaskbarList
         try taskbarList := ComObject(

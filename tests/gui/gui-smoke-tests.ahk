@@ -626,6 +626,9 @@ try {
     child.Show("w260 h140")
 
     hierarchy := WindowHierarchyManager(WindowHierarchyPlatform())
+    taskbarShellAvailable := hierarchy.Platform.IsTaskbarShellAvailable()
+    FileAppend("GUI_SMOKE|STAGE|window-hierarchy|taskbar="
+        (taskbarShellAvailable ? "available" : "unavailable") "`n", "*")
     lease := hierarchy.Acquire(owner, child.Hwnd)
     childExtendedStyle := DllCall("user32\GetWindowLongPtrW", "Ptr",
         child.Hwnd, "Int", Win32.GWL_EXSTYLE, "Ptr")
@@ -651,8 +654,11 @@ try {
         "Minimized child did not receive a taskbar entry style")
     suspendedChildState := hierarchy.OwnerLocks[owner.Hwnd]
         .SuspendedChildren[child.Hwnd]
-    AssertGuiSmoke(suspendedChildState.TaskbarRegistered,
-        "Minimized child was not registered in the assistant taskbar group")
+    AssertGuiSmoke(suspendedChildState.TaskbarRegistered
+            == taskbarShellAvailable,
+        taskbarShellAvailable
+            ? "Minimized child was not registered in the assistant taskbar group"
+            : "Minimized child attempted taskbar registration without a responsive Shell")
 
     AssertGuiSmoke(hierarchy.PrepareChildRestore(child.Hwnd),
         "Owned child hierarchy was not prepared for restore")
