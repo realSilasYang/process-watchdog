@@ -119,22 +119,38 @@ RunTargetFileInspectorTests() {
         ; 某些受限临时卷允许读取文件 ID，却不允许用 OpenFileById 回开卷句柄。
         ; 先在原路径仍存在时探测这一卷能力：支持时必须验证跨路径找回；不支持时
         ; 只允许安全返回空结果，完整的目录重命名事件回退由服务测试单独覆盖。
-        canResolveByIdentity := TargetFileTestCanonical(
-            inspector.ResolveCurrentPath(scriptPath, originalIdentity))
-                == TargetFileTestCanonical(scriptPath)
+        initialResolvedPath := inspector.ResolveCurrentPath(scriptPath,
+            originalIdentity)
+        canResolveByIdentity := initialResolvedPath != ""
+        if canResolveByIdentity {
+            initialResolvedIdentity := inspector.GetIdentity(
+                initialResolvedPath)
+            AssertTargetFileInspector(initialResolvedIdentity.Available
+                    && initialResolvedIdentity.VolumeSerial
+                        == originalIdentity.VolumeSerial
+                    && initialResolvedIdentity.FileIndexHigh
+                        == originalIdentity.FileIndexHigh
+                    && initialResolvedIdentity.FileIndexLow
+                        == originalIdentity.FileIndexLow,
+                "文件 ID 预检返回的路径没有指向原文件")
+        }
         FileMove(scriptPath, renamedScriptPath)
         resolvedRenamedPath := inspector.ResolveCurrentPath(scriptPath,
             originalIdentity)
         if canResolveByIdentity {
-            AssertTargetFileInspector(
-                TargetFileTestCanonical(resolvedRenamedPath)
-                    == TargetFileTestCanonical(renamedScriptPath),
+            AssertTargetFileInspector(resolvedRenamedPath != "",
                 "支持按文件 ID 回开的卷未能在更名后找回当前路径")
-        } else {
-            AssertTargetFileInspector(resolvedRenamedPath == ""
-                    || TargetFileTestCanonical(resolvedRenamedPath)
-                        == TargetFileTestCanonical(renamedScriptPath),
-                "首次文件 ID 回开失败后返回了未经核验的候选路径")
+        }
+        if resolvedRenamedPath != "" {
+            resolvedIdentity := inspector.GetIdentity(resolvedRenamedPath)
+            AssertTargetFileInspector(resolvedIdentity.Available
+                    && resolvedIdentity.VolumeSerial
+                        == originalIdentity.VolumeSerial
+                    && resolvedIdentity.FileIndexHigh
+                        == originalIdentity.FileIndexHigh
+                    && resolvedIdentity.FileIndexLow
+                        == originalIdentity.FileIndexLow,
+                "文件 ID 回开结果没有指向更名前的同一文件")
         }
         FileMove(renamedScriptPath, scriptPath)
     } finally {
