@@ -119,6 +119,12 @@ class FakeWindowHierarchyPlatform {
     }
 }
 
+class UnavailableTaskbarWindowHierarchyPlatform extends WindowHierarchyPlatform {
+    IsTaskbarShellAvailable(*) {
+        return false
+    }
+}
+
 AssertWindowHierarchy(value, message) {
     if !value
         throw Error(message)
@@ -130,6 +136,11 @@ AssertWindowHierarchyEqual(expected, actual, message) {
 }
 
 RunWindowHierarchyTests() {
+    unavailableTaskbarPlatform := UnavailableTaskbarWindowHierarchyPlatform()
+    AssertWindowHierarchy(unavailableTaskbarPlatform.GetTaskbarList() == ""
+        && unavailableTaskbarPlatform.TaskbarList == "",
+        "任务栏 Shell 不可用时仍尝试创建或保留 COM 对象")
+
     platform := FakeWindowHierarchyPlatform()
     manager := WindowHierarchyManager(platform)
     owner := platform.AddWindow(101)
