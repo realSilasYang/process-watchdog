@@ -9,7 +9,7 @@
 | Operating system | Windows 10 x64 and Windows 11 x64 |
 | Source runtime | AutoHotkey v2 x64; the latest upstream stable release is recommended |
 | Release build | Each manual release uses the then-current latest stable AutoHotkey and latest published Ahk2Exe, and records the actual versions in the package |
-| Display scaling | Target physical matrix at 100%, 125%, 150%, 175%, and 200% |
+| Display scaling | Target physical matrix at 100%, 150%, 200%, and 300%; recorded real-hardware automation evidence is in `tests/gui/VALIDATION-EVIDENCE.en.md` |
 | File system | Local NTFS; the program directory must permit configuration and session writes |
 
 CI runs startup, core, real-GUI, and compiled-build validation on Windows Server

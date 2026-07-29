@@ -613,16 +613,51 @@ try {
     historyToast := ""
     WinHide("ahk_id " owner.Hwnd)
 
+    owner.Show("w430 h270")
     child := Gui("+Owner" owner.Hwnd " +Resize", "GUI smoke child")
     child.BackColor := "1E1E1E"
     child.Add("Text", "x12 y12 w180 cFFFFFF BackgroundTrans", "Child window")
-    child.Show("Hide w260 h140")
+    child.Show("w260 h140")
 
     hierarchy := WindowHierarchyManager(WindowHierarchyPlatform())
     lease := hierarchy.Acquire(owner, child.Hwnd)
+    childExtendedStyle := DllCall("user32\GetWindowLongPtrW", "Ptr",
+        child.Hwnd, "Int", Win32.GWL_EXSTYLE, "Ptr")
     AssertGuiSmoke(IsObject(lease), "Owner lease was not acquired")
     AssertGuiSmoke(!DllCall("user32\IsWindowEnabled", "Ptr", owner.Hwnd, "Int"),
         "Owner GUI was not disabled while child lease was active")
+    AssertGuiSmoke(hierarchy.MinimizeChildIndependently(child.Hwnd),
+        "Owned child could not be minimized independently")
+    Sleep(30)
+    AssertGuiSmoke(DllCall("user32\IsIconic", "Ptr", child.Hwnd, "Int")
+        && !DllCall("user32\IsIconic", "Ptr", owner.Hwnd, "Int"),
+        "Minimizing an owned child also minimized its owner")
+    AssertGuiSmoke(DllCall("user32\IsWindowEnabled", "Ptr", owner.Hwnd, "Int")
+        && DllCall("user32\GetActiveWindow", "Ptr") == owner.Hwnd,
+        "Minimizing an owned child did not focus its direct owner")
+    AssertGuiSmoke(DllCall("user32\GetWindow", "Ptr", child.Hwnd,
+            "UInt", 4, "Ptr") == 0,
+        "Minimized child retained its native owner")
+    minimizedExtendedStyle := DllCall("user32\GetWindowLongPtrW", "Ptr",
+        child.Hwnd, "Int", Win32.GWL_EXSTYLE, "Ptr")
+    AssertGuiSmoke((minimizedExtendedStyle & Win32.WS_EX_APPWINDOW) != 0
+        && (minimizedExtendedStyle & Win32.WS_EX_TOOLWINDOW) == 0,
+        "Minimized child did not receive a taskbar entry style")
+    suspendedChildState := hierarchy.OwnerLocks[owner.Hwnd]
+        .SuspendedChildren[child.Hwnd]
+    AssertGuiSmoke(suspendedChildState.TaskbarRegistered,
+        "Minimized child was not registered in the assistant taskbar group")
+
+    AssertGuiSmoke(hierarchy.PrepareChildRestore(child.Hwnd),
+        "Owned child hierarchy was not prepared for restore")
+    child.Show()
+    Sleep(30)
+    AssertGuiSmoke(DllCall("user32\GetWindow", "Ptr", child.Hwnd,
+            "UInt", 4, "Ptr") == owner.Hwnd
+        && DllCall("user32\GetWindowLongPtrW", "Ptr", child.Hwnd,
+            "Int", Win32.GWL_EXSTYLE, "Ptr") == childExtendedStyle
+        && !DllCall("user32\IsWindowEnabled", "Ptr", owner.Hwnd, "Int"),
+        "Restoring an owned child did not rebuild its modal hierarchy")
     releasedContext := hierarchy.Release(lease)
     hierarchy.CompleteClose(releasedContext)
     AssertGuiSmoke(DllCall("user32\IsWindowEnabled", "Ptr", owner.Hwnd, "Int"),

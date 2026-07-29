@@ -112,6 +112,7 @@ class ManagedWindow {
         if !this.IsOpen()
             return false
         lifecycle := this.GetLifecycle()
+        lifecycle.Hierarchy.PrepareChildRestore(this.gui.Hwnd)
         if lifecycle.Hierarchy.IsOwnerLocked(this.gui) {
             lifecycle.Hierarchy.ActivateTopOwned(this.gui)
             return true

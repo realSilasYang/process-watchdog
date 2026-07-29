@@ -107,8 +107,16 @@ class Win32 {
     static EVENT_OBJECT_SHOW := 0x8002
     static CTRL_C_EVENT := 0
     static SC_MINIMIZE := 0xF020
+    static SC_MAXIMIZE := 0xF030
+    static SC_RESTORE := 0xF120
     static GWLP_HWNDPARENT := -8
+    static GWL_STYLE := -16
+    static GWL_EXSTYLE := -20
+    static WS_EX_TOOLWINDOW := 0x80
+    static WS_EX_APPWINDOW := 0x40000
+    static SW_HIDE := 0
     static SW_MINIMIZE := 6
+    static SW_SHOWMINNOACTIVE := 7
     static IDC_ARROW := 32512
     static IDC_IBEAM := 32513
     static HTHSCROLL := 6

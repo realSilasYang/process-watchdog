@@ -61,7 +61,7 @@ A janela principal reúne a ordem dos itens monitorados, o ícone do aplicativo,
 - Sistemas de tempo real rígido, clusters de alta disponibilidade ou orquestração de processos que exija isolamento de segurança.
 - Políticas agressivas que forcem qualquer estado desconhecido a significar “parado”.
 
-A matriz física de escala de exibição atualmente testada cobre 100% a 200%. Outros fatores e alterações contínuas de DPI entre monitores não podem ser considerados verificados apenas pelo código. Consulte [Compatibilidade e limitações conhecidas](en/compatibility.md).
+Há uma execução completa de automação da GUI documentada no Windows 11 com DPI real de 200%, e os cálculos de renderização em 100% e 300% são cobertos por regressão. As revisões visuais manuais em cada escala, as transições contínuas de DPI entre monitores e o alto contraste ainda não foram verificados e não devem ser inferidos apenas pelo código. Consulte o [registro de validação da GUI](../tests/gui/VALIDATION-EVIDENCE.en.md) e [Compatibilidade e limitações conhecidas](en/compatibility.md).
 
 ---
 

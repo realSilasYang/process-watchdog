@@ -334,6 +334,10 @@ Copy-Item -LiteralPath (Join-Path $projectRoot `
     'tests\gui\MANUAL-REGRESSION.md') -Destination $manualRegressionDirectory
 Copy-Item -LiteralPath (Join-Path $projectRoot `
     'tests\gui\MANUAL-REGRESSION.en.md') -Destination $manualRegressionDirectory
+Copy-Item -LiteralPath (Join-Path $projectRoot `
+    'tests\gui\VALIDATION-EVIDENCE.md') -Destination $manualRegressionDirectory
+Copy-Item -LiteralPath (Join-Path $projectRoot `
+    'tests\gui\VALIDATION-EVIDENCE.en.md') -Destination $manualRegressionDirectory
 
 $buildManifest = [ordered]@{
     schemaVersion = 4

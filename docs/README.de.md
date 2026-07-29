@@ -61,7 +61,7 @@ Geeignet sind gewöhnliche Anwendungen, Skripte und Verknüpfungen, die in der a
 - Harte Echtzeitsysteme, Hochverfügbarkeitscluster oder sicherheitsisolierte Prozessorchestrierung.
 - Aggressive Strategien, die jeden unbekannten Prozesszustand zwangsweise als gestoppt behandeln.
 
-Die derzeit auf realer Hardware geprüfte Skalierung reicht von 100 % bis 200 %. Andere Faktoren und fortlaufende DPI-Wechsel zwischen Monitoren können nicht allein anhand des Codes als geprüft gelten. Siehe [Kompatibilität und bekannte Einschränkungen](en/compatibility.md).
+Ein vollständiger GUI-Automatisierungslauf ist unter Windows 11 mit echten 200 % DPI dokumentiert; die Renderberechnungen werden per Regression bei 100 % und 300 % geprüft. Manuelle Sichtprüfungen aller Skalierungen, fortlaufende DPI-Wechsel zwischen Monitoren und hoher Kontrast sind noch nicht verifiziert und dürfen nicht allein aus dem Code abgeleitet werden. Siehe den [GUI-Validierungsnachweis](../tests/gui/VALIDATION-EVIDENCE.en.md) und [Kompatibilität und bekannte Einschränkungen](en/compatibility.md).
 
 ---
 

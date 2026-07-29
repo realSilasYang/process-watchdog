@@ -20,6 +20,7 @@
 #Include ..\..\src\Localization\LocalizationService.ahk
 #Include ..\..\src\UI\UiThemeService.ahk
 #Include ..\..\src\UI\UiInteractionRegistry.ahk
+#Include ..\..\src\UI\ControlAccessibilityService.ahk
 #Include ..\..\src\UI\WindowHierarchy.ahk
 #Include ..\..\app\UI\InteractionPresenter.ahk
 

@@ -150,6 +150,8 @@ $requiredPaths = @(
     'docs\publication-checklist.md',
     'tests\gui\MANUAL-REGRESSION.md'
     'tests\gui\MANUAL-REGRESSION.en.md'
+    'tests\gui\VALIDATION-EVIDENCE.md'
+    'tests\gui\VALIDATION-EVIDENCE.en.md'
 )
 foreach ($relativePath in $requiredPaths) {
     if (-not (Test-Path -LiteralPath (Join-Path $packageRoot $relativePath))) {

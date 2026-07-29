@@ -61,7 +61,7 @@ L’assistant convient aux applications, scripts et raccourcis ordinaires qui do
 - Les systèmes temps réel stricts, grappes à haute disponibilité ou orchestrations nécessitant une isolation de sécurité.
 - Une politique agressive qui assimile de force tout état de processus inconnu à un arrêt.
 
-La matrice physique de mise à l’échelle actuellement vérifiée couvre 100 % à 200 %. Les autres facteurs et les changements continus de DPI entre écrans ne peuvent pas être tenus pour vérifiés par le seul code. Consultez [Compatibilité et limites connues](en/compatibility.md).
+Une exécution complète de l’automatisation GUI est documentée sous Windows 11 à 200 % de DPI réels, et les calculs de rendu sont couverts par régression à 100 % et 300 %. Les vérifications visuelles manuelles à chaque échelle, les changements continus de DPI entre écrans et le contraste élevé restent non vérifiés et ne doivent pas être déduits du seul code. Consultez les [preuves de validation GUI](../tests/gui/VALIDATION-EVIDENCE.en.md) et [Compatibilité et limites connues](en/compatibility.md).
 
 ---
 

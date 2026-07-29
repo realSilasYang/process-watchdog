@@ -61,7 +61,7 @@ La finestra principale riunisce l’ordine degli elementi sorvegliati, l’icona
 - Sistemi hard real-time, cluster ad alta disponibilità o orchestrazione dei processi che richieda isolamento di sicurezza.
 - Politiche aggressive che forzino qualsiasi stato sconosciuto a significare «arrestato».
 
-La matrice fisica di ridimensionamento attualmente verificata copre dal 100% al 200%. Altri fattori e i cambi continui di DPI tra monitor non possono essere considerati verificati solo dal codice. Consulta [Compatibilità e limitazioni note](en/compatibility.md).
+Un ciclo completo di automazione GUI è documentato su Windows 11 con DPI reale al 200%; i test di regressione coprono inoltre i calcoli di rendering al 100% e al 300%. I controlli visivi manuali a ogni scala, le transizioni DPI continue tra monitor e il contrasto elevato restano non verificati e non devono essere dedotti dal solo codice. Consulta le [prove di validazione GUI](../tests/gui/VALIDATION-EVIDENCE.en.md) e [Compatibilità e limitazioni note](en/compatibility.md).
 
 ---
 

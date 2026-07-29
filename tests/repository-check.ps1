@@ -70,9 +70,12 @@ $requiredFiles = @(
     'app\UI\MainVisualPipeline.ahk',
     'src\Update\ApplicationUpdateService.ahk',
     'src\Update\ApplicationVersionInfo.ahk',
+    'src\UI\ControlAccessibilityService.ahk',
+    'src\Execution\EverythingRuntimeService.ahk',
     'runtime\application-update.ps1',
     'runtime\application-update.strings.json',
     'tests\application-update-helper-tests.ps1',
+    'tests\core\everything-runtime-service-tests.ahk',
     'tests\ci-impact-tests.ps1',
     'tests\verify-fast.ps1',
     'tests\verify-windows-integration.ps1',
@@ -116,8 +119,9 @@ foreach ($relativePath in $requiredFiles) {
     }
 }
 
-# 本地开发应允许在暂存前验证新增文件；CI 的检出目录天然只包含已提交内容，
-# 因而“是否已跟踪”检查既不增加发布保障，反而迫使贡献者提前污染暂存区。
+# 发行构建会递归读取以下项目输入目录；任何未受 Git 跟踪的源文件都可能造成
+# “本机验证通过、CI 或源码包缺文件”。新增项目输入应先纳入版本控制，再进入
+# 完整门禁；临时探针应放在系统临时目录，不得混入发行输入目录。
 $trackedFiles = @(git -c core.quotePath=false -C $projectRoot ls-files)
 if ($LASTEXITCODE -ne 0) {
     throw 'Unable to inspect tracked repository files.'
@@ -153,7 +157,6 @@ foreach ($prefix in @('src\', 'app\', 'tests\core\', 'assets\', 'config\',
         }
     }
 }
-
 # 随包字体中存在超过 GitHub 普通对象单文件限制的完整 CJK 集合。字体必须统一
 # 通过 Git LFS 追踪，三个会读取或打包字体的工作流也必须显式还原 LFS 对象；否则
 # 本地测试看到的是完整字体，CI 和 Release 却只会得到一百多字节的指针文件。

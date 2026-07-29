@@ -20,6 +20,11 @@ class FakeWindowHierarchyPlatform {
         this.MinimizeCalls := []
         this.OwnedActivations := []
         this.OwnerActivations := []
+        this.ExtendedStyles := Map()
+        this.TaskbarPromotions := []
+        this.TaskbarRestorations := []
+        this.TaskbarRegistrations := []
+        this.TaskbarUnregistrations := []
     }
 
     AddWindow(hwnd, enabled := true, visible := true, minimized := false) {
@@ -27,6 +32,7 @@ class FakeWindowHierarchyPlatform {
         this.Enabled[hwnd] := enabled
         this.Visible[hwnd] := visible
         this.Minimized[hwnd] := minimized
+        this.ExtendedStyles[hwnd] := 0x80
         return {Hwnd: hwnd}
     }
 
@@ -67,6 +73,28 @@ class FakeWindowHierarchyPlatform {
     SetNativeOwner(childHwnd, ownerHwnd) {
         this.NativeOwners[childHwnd] := ownerHwnd
         this.NativeOwnerChanges.Push({Child: childHwnd, Owner: ownerHwnd})
+    }
+
+    PromoteToTaskbar(childHwnd) {
+        originalStyle := this.ExtendedStyles.Get(childHwnd, 0)
+        this.ExtendedStyles[childHwnd] := (originalStyle | 0x40000) & ~0x80
+        this.TaskbarPromotions.Push(childHwnd)
+        return originalStyle
+    }
+
+    RestoreTaskbarStyle(childHwnd, originalStyle) {
+        this.ExtendedStyles[childHwnd] := originalStyle
+        this.TaskbarRestorations.Push(childHwnd)
+    }
+
+    RegisterTaskbarTab(childHwnd) {
+        this.TaskbarRegistrations.Push(childHwnd)
+        return true
+    }
+
+    UnregisterTaskbarTab(childHwnd) {
+        this.TaskbarUnregistrations.Push(childHwnd)
+        return true
     }
 
     MinimizeWindow(hwnd) {
@@ -176,17 +204,42 @@ RunWindowHierarchyTests() {
     minimizeOwner := platform.AddWindow(105)
     minimizeChild := platform.AddWindow(206)
     platform.NativeOwners[206] := 105
-    manager.Acquire(minimizeOwner, minimizeChild.Hwnd)
+    minimizeLease := manager.Acquire(minimizeOwner, minimizeChild.Hwnd)
     AssertWindowHierarchy(manager.MinimizeChildIndependently(206),
         "有效子窗口无法独立最小化")
     AssertWindowHierarchy(platform.Minimized[206]
         && !platform.Minimized[105],
         "独立最小化错误影响了所有者")
-    changeCount := platform.NativeOwnerChanges.Length
-    AssertWindowHierarchy(changeCount >= 2
-        && platform.NativeOwnerChanges[changeCount - 1].Owner == 0
-        && platform.NativeOwnerChanges[changeCount].Owner == 105,
-        "独立最小化没有临时解除并恢复原生 Owner")
+    AssertWindowHierarchy(platform.NativeOwners[206] == 0,
+        "最小化期间仍保留原生 Owner，可能再次触发窗口组联动")
+    AssertWindowHierarchy((platform.ExtendedStyles[206] & 0x40000) != 0
+        && (platform.ExtendedStyles[206] & 0x80) == 0,
+        "独立最小化的子窗口没有获得任务栏入口样式")
+    AssertWindowHierarchy(platform.TaskbarRegistrations[-1] == 206,
+        "独立最小化的子窗口没有显式注册任务栏入口")
+    AssertWindowHierarchy(platform.Enabled[105]
+        && platform.OwnerActivations[-1] == 105,
+        "最小化子窗口后没有启用并激活直接上级")
+    AssertWindowHierarchy(!manager.IsOwnerLocked(minimizeOwner),
+        "只有最小化子窗口时仍把直接上级报告为模态锁定")
+
+    AssertWindowHierarchy(manager.PrepareChildRestore(206),
+        "无法在恢复子窗口前重建层级")
+    platform.Minimized[206] := false
+    AssertWindowHierarchy(platform.NativeOwners[206] == 105
+        && platform.ExtendedStyles[206] == 0x80
+        && platform.TaskbarUnregistrations[-1] == 206
+        && !platform.Enabled[105]
+        && manager.IsOwnerLocked(minimizeOwner),
+        "恢复子窗口时没有重建 Owner 和模态状态")
+
+    AssertWindowHierarchy(manager.MinimizeChildIndependently(206),
+        "恢复后的子窗口无法再次独立最小化")
+    minimizedClose := manager.Release(minimizeLease)
+    manager.CompleteClose(minimizedClose)
+    AssertWindowHierarchy(platform.Enabled[105]
+        && platform.OwnerActivations[-1] == 105,
+        "关闭已最小化子窗口后没有保持并激活直接上级")
     AssertWindowHierarchy(!manager.MinimizeChildIndependently(999),
         "未登记窗口被错误当作下级窗口最小化")
 
