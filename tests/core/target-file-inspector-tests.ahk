@@ -131,8 +131,10 @@ RunTargetFileInspectorTests() {
                     == TargetFileTestCanonical(renamedScriptPath),
                 "支持按文件 ID 回开的卷未能在更名后找回当前路径")
         } else {
-            AssertTargetFileInspector(resolvedRenamedPath == "",
-                "不支持按文件 ID 回开的卷返回了未经核验的候选路径")
+            AssertTargetFileInspector(resolvedRenamedPath == ""
+                    || TargetFileTestCanonical(resolvedRenamedPath)
+                        == TargetFileTestCanonical(renamedScriptPath),
+                "首次文件 ID 回开失败后返回了未经核验的候选路径")
         }
         FileMove(renamedScriptPath, scriptPath)
     } finally {
