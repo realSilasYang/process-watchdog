@@ -69,6 +69,15 @@ Assert-WorkflowContains 'ci.yml' $ci @(
     'fetch-depth: 0'
     'lfs: false'
     'lfs: true'
+    '  verify:'
+    '    name: verify'
+    '    if: always()'
+    "needs['windows-integration'].result"
+    "needs['release-package'].result"
+    'INTEGRATION_REQUIRED:'
+    'RELEASE_REQUIRED:'
+    'require_result "windows-integration"'
+    'require_result "release-package"'
 )
 if ($ci.Contains('.\tools\invoke-release-validation.ps1')) {
     throw 'CI 分层后不得在每个提交上重复执行完整发布门禁。'

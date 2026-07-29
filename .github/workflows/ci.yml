@@ -177,3 +177,51 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
+
+  # 分支保护只依赖这个稳定检查名。验证层可以继续拆分、按变更范围跳过，
+  # 但汇总门禁必须确认所有本轮应执行的作业确实成功。
+  verify:
+    name: verify
+    if: always()
+    needs:
+      - changes
+      - fast
+      - windows-integration
+      - release-package
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Enforce selected validation layers
+        shell: bash
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          FAST_RESULT: ${{ needs.fast.result }}
+          WINDOWS_RESULT: ${{ needs['windows-integration'].result }}
+          RELEASE_RESULT: ${{ needs['release-package'].result }}
+          INTEGRATION_REQUIRED: ${{ needs.changes.outputs.integration }}
+          RELEASE_REQUIRED: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.release == 'true' || (github.event_name == 'push' && needs.changes.outputs.integration == 'true') }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$CHANGES_RESULT" != "success" || "$FAST_RESULT" != "success" ]]; then
+            echo "::error::changes and fast validation must both succeed"
+            exit 1
+          fi
+
+          require_result() {
+            local name="$1"
+            local actual="$2"
+            local required="$3"
+            if [[ "$required" == "true" ]]; then
+              if [[ "$actual" != "success" ]]; then
+                echo "::error::$name was required but finished as $actual"
+                exit 1
+              fi
+            elif [[ "$actual" != "success" && "$actual" != "skipped" ]]; then
+              echo "::error::$name was optional but finished as $actual"
+              exit 1
+            fi
+          }
+
+          require_result "windows-integration" "$WINDOWS_RESULT" "$INTEGRATION_REQUIRED"
+          require_result "release-package" "$RELEASE_RESULT" "$RELEASE_REQUIRED"
