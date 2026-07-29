@@ -2,6 +2,13 @@
 
 [简体中文](../release-process.md) | **English**
 
+Before a local release, run `powershell -ExecutionPolicy Bypass -File
+tools\invoke-local-release-preflight.ps1`. This single entry point prepares a
+portable PowerShell 7 from its official checksums, refreshes the upstream build
+tools for the release, and runs the required tests, 300-second Windows/GUI soak,
+and cross-host reproducible build described below. It stops on the first failure;
+after fixing that failure, rerun the same command.
+
 1. Prepare user-facing entries with the [changelog template](changelog-template.md)
    and create `docs/release-notes/v<version>.md`, then update `VERSION`,
    `CHANGELOG.md`, and `docs/CHANGELOG.en.md`. The build

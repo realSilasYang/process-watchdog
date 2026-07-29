@@ -7,6 +7,35 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.0.4] - 2026-07-30
+
+### 📦 Release Assets
+
+- **`process-watchdog-2.0.4-windows-x64.exe` (standalone executable):** Requires no AutoHotkey installation and runs immediately after download; intended for a quick trial or users who need a single program file.
+- **`process-watchdog-2.0.4-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, fonts, and runtime resources; intended for long-term use after full extraction or for manual deployment.
+- **`process-watchdog-2.0.4-source.zip` (complete source package):** Includes the AHK source, modules, tests, documentation, and fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+
+---
+
+### ✨ Added
+
+- **Main-list keyboard control:** When the main list has focus, Space pauses or resumes monitoring for the selected targets. Multiple selections and mixed states are toggled item by item, while key-repeat messages are suppressed to prevent rapid state reversal.
+
+---
+
+### 🚀 Improvements
+
+- **Watched-target terminology:** The interface, logs, configuration comments, and all thirteen README languages now use terminology that consistently identifies a watched target, instead of switching among application, monitored item, and project in the same context.
+- **Branding and interface overview:** Refreshed the high-resolution transparent logo and application icon used by the README, application windows, tray, taskbar, and release packages. The README overview now also shows the current main window.
+- **Release-note structure:** Existing and future release notes keep automated validation inventories out of the user-facing change summary, preserving clear sections for version changes and the three downloads while detailed evidence remains in project records and Actions logs.
+- **Release-preflight reliability:** Added a single local preflight entry point that prepares a checksum-verified portable PowerShell 7, refreshes the build tools, and runs the complete release gates in sequence. Packaged-font validation now reads OpenType metadata directly instead of depending on localized family names returned by a particular PowerShell, .NET, or Windows display language.
+
+---
+
+### 🐛 Fixed
+
+- **Log-path action alignment:** Aligned the Browse button on the Log settings page with the left edge of its path field so the action remains visually connected to the setting it changes.
+
 ## 🎉 Version [2.0.3] - 2026-07-29
 
 ### 📦 Release Assets
@@ -285,7 +314,8 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.3...HEAD
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.4...HEAD
+[2.0.4]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.3...v2.0.4
 [2.0.3]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.2...v2.0.3
 [2.0.2]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.0...v2.0.1
