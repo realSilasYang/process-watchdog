@@ -116,12 +116,24 @@ RunTargetFileInspectorTests() {
         AssertTargetFileInspector(originalIdentity.Available
             && originalIdentity.NativeIdentityAvailable,
             "测试文件没有取得可用于更名恢复的 Windows 文件身份")
+        ; 某些受限临时卷允许读取文件 ID，却不允许用 OpenFileById 回开卷句柄。
+        ; 先在原路径仍存在时探测这一卷能力：支持时必须验证跨路径找回；不支持时
+        ; 只允许安全返回空结果，完整的目录重命名事件回退由服务测试单独覆盖。
+        canResolveByIdentity := TargetFileTestCanonical(
+            inspector.ResolveCurrentPath(scriptPath, originalIdentity))
+                == TargetFileTestCanonical(scriptPath)
         FileMove(scriptPath, renamedScriptPath)
         resolvedRenamedPath := inspector.ResolveCurrentPath(scriptPath,
             originalIdentity)
-        AssertTargetFileInspector(TargetFileTestCanonical(resolvedRenamedPath)
-            == TargetFileTestCanonical(renamedScriptPath),
-            "同一文件更名后没有通过文件 ID 找回当前路径")
+        if canResolveByIdentity {
+            AssertTargetFileInspector(
+                TargetFileTestCanonical(resolvedRenamedPath)
+                    == TargetFileTestCanonical(renamedScriptPath),
+                "支持按文件 ID 回开的卷未能在更名后找回当前路径")
+        } else {
+            AssertTargetFileInspector(resolvedRenamedPath == "",
+                "不支持按文件 ID 回开的卷返回了未经核验的候选路径")
+        }
         FileMove(renamedScriptPath, scriptPath)
     } finally {
         for path in [scriptPath, sameSizePath, emptyPath, damagedExePath,
