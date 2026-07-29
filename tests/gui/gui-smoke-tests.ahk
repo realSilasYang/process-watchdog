@@ -388,8 +388,10 @@ try {
         "Owner GUI handle was not created")
     dpi := DllCall("user32\GetDpiForWindow", "Ptr", owner.Hwnd, "UInt")
     AssertGuiSmoke(dpi >= 96, "GUI DPI was not available")
+    ReportGuiSmokeStage("surface-before-redraw")
     DllCall("user32\RedrawWindow", "Ptr", owner.Hwnd, "Ptr", 0,
         "Ptr", 0, "UInt", Win32.RDW_LAYOUT_REFRESH, "Int")
+    ReportGuiSmokeStage("surface-after-redraw")
     ownerDc := DllCall("user32\GetDC", "Ptr", owner.Hwnd, "Ptr")
     actionDc := DllCall("user32\GetDC", "Ptr", actionButton.Hwnd, "Ptr")
     AssertGuiSmoke(ownerDc && actionDc,
@@ -407,6 +409,7 @@ try {
             "Ptr", actionDc)
         DllCall("user32\ReleaseDC", "Ptr", owner.Hwnd, "Ptr", ownerDc)
     }
+    ReportGuiSmokeStage("surface-pixels")
     sequenceWidth := SendMessage(Win32.LVM_GETCOLUMNWIDTH, 3, 0, list.Hwnd)
     AssertGuiSmoke(Abs(sequenceWidth - Round(48 * dpi / 96)) <= 1,
         "Main ListView sequence width did not follow the window DPI")
@@ -423,7 +426,9 @@ try {
     list.Modify(2, "Col2", "Updated")
     AssertGuiSmoke(listSelectionPresenter.ScheduleNativeSurfaceRefresh(1),
         "Native ListView surface refresh was not scheduled")
+    ReportGuiSmokeStage("divider-refresh-scheduled")
     Sleep(30)
+    ReportGuiSmokeStage("divider-refresh-ready")
     firstDividerItemRect := Buffer(16, 0)
     secondDividerItemRect := Buffer(16, 0)
     NumPut("Int", 0, firstDividerItemRect, 0)
@@ -468,6 +473,7 @@ try {
             "Native ListView column divider was interrupted after an item update")
     } finally DllCall("user32\ReleaseDC", "Ptr", list.Hwnd,
         "Ptr", dividerDc)
+    ReportGuiSmokeStage("divider-pixels")
     list.Modify(1, "Select Focus")
     ; 右键菜单接管焦点时，自绘通知可能不再携带 CDIS_SELECTED；真实行状态
     ; 仍须触发后绘制，确保圆角选中态不会退回原生矩形。
@@ -481,8 +487,10 @@ try {
         && listSelectionPresenter.HandleCustomDraw(list,
             selectionNotification.Ptr) == Win32.CDRF_NOTIFYPOSTPAINT,
         "ListView lost rounded selection when focus moved to a context menu")
+    ReportGuiSmokeStage("selection-before-redraw")
     DllCall("user32\RedrawWindow", "Ptr", list.Hwnd, "Ptr", 0,
         "Ptr", 0, "UInt", Win32.RDW_LAYOUT_REFRESH, "Int")
+    ReportGuiSmokeStage("selection-after-redraw")
     itemRect := Buffer(16, 0)
     NumPut("Int", 0, itemRect, 0) ; LVIR_BOUNDS：读取整行边界
     AssertGuiSmoke(SendMessage(0x100E, 0, itemRect.Ptr, list.Hwnd),
@@ -505,6 +513,7 @@ try {
                 Format("0x{:06X}", selectedColor))
     } finally DllCall("user32\ReleaseDC", "Ptr", list.Hwnd,
         "Ptr", listDc)
+    ReportGuiSmokeStage("active-selection-pixels")
     DllCall("user32\SetFocus", "Ptr", ownerEdit.Hwnd, "Ptr")
     AssertGuiSmoke(listSelectionPresenter.RefreshItem(1),
         "Selected ListView item could not be redrawn after losing focus")
