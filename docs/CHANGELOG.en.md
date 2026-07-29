@@ -7,6 +7,37 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.0.2] - 2026-07-29
+
+### 📦 Release Assets
+
+- **`process-watchdog-2.0.2-windows-x64.exe` (standalone executable):** Requires no AutoHotkey installation and runs immediately after download; intended for a quick trial or users who need a single program file.
+- **`process-watchdog-2.0.2-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, fonts, and runtime resources; intended for long-term use after full extraction or for manual deployment.
+- **`process-watchdog-2.0.2-source.zip` (complete source package):** Includes the AHK source, modules, tests, documentation, and fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+
+---
+
+### ✨ Added
+
+- **Runtime and search discovery**: Added general runtime, interpreter, argument, and environment configuration for script monitoring. When Everything is not running, the assistant can discover and start a local instance silently, or provide the official download entry when it is not installed.
+- **GUI accessibility semantics**: Added the Windows button role, localized default action, and keyboard activation to owner-drawn buttons, with symmetric lifecycle cleanup.
+
+---
+
+### 🚀 Improvements
+
+- **Window hierarchy and taskbar behavior**: Minimizing a child no longer minimizes its owner. Restoring it rebuilds ownership, modal state, taskbar grouping, and focus on the direct owner.
+- **Release and validation evidence**: Added offline GUI validation records to the portable package; release gates now cover 13 languages, theme hot switching, window resource soaking, and packaged Markdown links.
+- **Interface overview**: Updated the single README interface preview to the current main-window screenshot and kept all release documentation on the same canonical resource.
+
+---
+
+### 🐛 Fixed
+
+- **Window-destruction cleanup**: Fixed an isolated GUI test fixture missing the accessibility-service dependency, which caused `#Warn` output and false interaction-registration residue reports.
+- **Packaged documentation links**: Fixed the portable package omitting the GUI validation record, which made the README's offline relative link invalid.
+- **Initial pointer in Add Item**: Confirmed the pointer remains on the Search button after window activation, preventing complex startup timing from restoring its previous position.
+
 ## 🎉 Version [2.0.1] - 2026-07-28
 
 ### 📦 Release Assets
@@ -222,7 +253,8 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.1...HEAD
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.2...HEAD
+[2.0.2]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/realSilasYang/process-watchdog/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/realSilasYang/process-watchdog/releases/tag/v1.0.0

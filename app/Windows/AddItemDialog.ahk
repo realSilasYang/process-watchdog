@@ -40,7 +40,7 @@ class AddItemDialog extends ManagedWindow {
     Show(positionPointer := true, *) {
         if this.ShowExisting() {
             if positionPointer
-                MovePointerToControlCenter(this.searchButton)
+                this.PositionPointerOnSearchButton()
             return
         }
 
@@ -119,7 +119,7 @@ class AddItemDialog extends ManagedWindow {
         ShowApplicationWindow(this.gui,
             "w" windowWidth " h" this.normalWindowHeight)
         if positionPointer
-            MovePointerToControlCenter(this.searchButton)
+            this.PositionPointerOnSearchButton()
         } catch as openErr {
             this.Close()
             throw openErr
@@ -159,6 +159,20 @@ class AddItemDialog extends ManagedWindow {
             prompt := Tr("选择文件夹")
         hwndOwner := this.IsOpen() ? this.gui.Hwnd : 0
         return SelectDirectoryWithModernDialog(hwndOwner, "", prompt)
+    }
+
+    PositionPointerOnSearchButton(*) {
+        if !this.IsOpen() || !this.searchButton
+            return
+        MovePointerToControlCenter(this.searchButton)
+        ; 窗口首次激活时，Windows 可能在 Show 返回后完成最后一次前景切换并恢复
+        ; 原指针位置。延迟确认一次可保证用户最终看到的指针仍落在搜索按钮上。
+        SetTimer(ObjBindMethod(this, "ConfirmPointerOnSearchButton"), -25)
+    }
+
+    ConfirmPointerOnSearchButton(*) {
+        if this.IsOpen() && this.searchButton
+            MovePointerToControlCenter(this.searchButton)
     }
 
     SetBatchUi(active, statusText := "") {
