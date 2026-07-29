@@ -523,7 +523,7 @@ try {
     AssertGuiSmoke(focusBeforeToast == ownerEdit.Hwnd,
         "GUI smoke edit control could not receive focus")
     historyToast := HistoryToastWindow()
-    AssertGuiSmoke(historyToast.Show("已撤销：添加监控项：Smoke target"),
+    AssertGuiSmoke(historyToast.Show("已撤销：添加守护对象：Smoke target"),
         "History toast could not be shown")
     AssertGuiSmoke(historyToast.animationPhase == "show",
         "History toast did not begin its entrance animation")
@@ -548,7 +548,7 @@ try {
     AssertGuiSmoke(DllCall("user32\GetFocus", "Ptr") == focusBeforeToast,
         "History toast stole keyboard focus")
     AssertGuiSmoke(historyToast.textControl.Text
-            == "已撤销：添加监控项：Smoke target",
+            == "已撤销：添加守护对象：Smoke target",
         "History toast did not preserve the concrete action text")
     toastWindowRect := Buffer(16, 0)
     toastTextRect := Buffer(16, 0)
@@ -597,7 +597,7 @@ try {
             historyToast.gui.Hwnd, "Int"),
         "History toast exit animation did not hide the window")
 
-    historyToast.Show("已撤销：添加监控项：Smoke target")
+    historyToast.Show("已撤销：添加守护对象：Smoke target")
     Sleep(220)
     Sleep(1700)
     historyToast.Show("已重做：暂停：Smoke target")

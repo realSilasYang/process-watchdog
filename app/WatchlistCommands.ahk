@@ -119,7 +119,7 @@ RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", argumen
         try Main.listProjection.Rebuild(Main.lv)
         try Main.listProjection.RefreshSequenceFromOrder(Main.lv, App.appOrder)
         try RefreshMainStatusSortKeys()
-        LogMsg(Tr("添加监控项失败，已回滚内存状态：{1}",
+        LogMsg(Tr("添加守护对象失败，已回滚内存状态：{1}",
             TrDiagnostic(projectionErr.Message)))
         return false
     }
@@ -325,11 +325,11 @@ PrepareWatchPathTransitionFromState(previousPath, requestedPath,
     if (newPath == "" || PathsEquivalent(newPath, previousPath))
         return {Changed: false, PreviousPath: previousPath, NewPath: previousPath}
     if DirExist(newPath)
-        throw Error(Tr("监控项不能指向文件夹：{1}", newPath))
+        throw Error(Tr("守护对象不能指向文件夹：{1}", newPath))
     if !App.appStates.Has(previousPath)
-        throw Error(Tr("监控项路径无效：{1}", previousPath))
+        throw Error(Tr("守护对象路径无效：{1}", previousPath))
     if App.appStates.Has(newPath)
-        throw Error(Tr("拒绝将应用路径改为已存在的监控项：{1}", newPath))
+        throw Error(Tr("拒绝更新路径，已存在相同的守护对象：{1}", newPath))
 
     prospectiveResolvedTarget := ""
     prospectiveResolutionSource := ""
@@ -352,12 +352,12 @@ PrepareWatchPathTransitionFromState(previousPath, requestedPath,
     identityConflict := App.targetIdentityService.FindConflict(
         prospectiveIdentity, previousPath)
     if identityConflict != "" {
-        throw Error(Tr("拒绝修改路径，真实进程已由其它项目守护：{1}",
+        throw Error(Tr("拒绝修改路径，真实进程已由其它守护对象守护：{1}",
             identityConflict))
     }
 
     if Type(beforeState) != "Array"
-        throw Error(Tr("监控项路径无效：{1}", previousPath))
+        throw Error(Tr("守护对象路径无效：{1}", previousPath))
     targetState := App.appConfigSnapshotService.PrepareState(beforeState).Items
     pathChanged := false
     for targetItem in targetState {
@@ -380,7 +380,7 @@ PrepareWatchPathTransitionFromState(previousPath, requestedPath,
         break
     }
     if !pathChanged
-        throw Error(Tr("监控项路径无效：{1}", previousPath))
+        throw Error(Tr("守护对象路径无效：{1}", previousPath))
     return {
         Changed: true,
         PreviousPath: previousPath,
@@ -465,7 +465,7 @@ ConfirmTargetRelocationCore(candidate) {
     try {
         if !ApplyWatchPathTransition(candidate.OldPath, candidate.NewPath,
             "relocate-path")
-            throw Error(Tr("监控项路径无效：{1}", candidate.OldPath))
+            throw Error(Tr("守护对象路径无效：{1}", candidate.OldPath))
         App.targetRelocationService.Complete(candidate)
         App.targetRelocationService.SyncTargets()
         LogMsg(Tr("已更新已更名的守护目标：{1} -> {2}",
@@ -511,7 +511,7 @@ ProcessEditFinishCore(GuiCtrlObj, Item, sessionId := 0) {
 
         if (newPath != "" && !PathsEquivalent(newPath, previousPath)) {
             if ApplyWatchPathTransition(previousPath, newPath)
-                LogMsg(Tr("已更新应用程序路径。"))
+                LogMsg(Tr("已更新守护对象路径。"))
         }
 
         realPath := GuiCtrlObj.GetText(Item, 3)
@@ -542,11 +542,11 @@ CaptureAppConfigState() {
             snapshot := App.appConfigSnapshotService.CreateSnapshot(savePath,
                 stateObj)
             if !snapshot
-                throw Error(Tr("监控项路径无效：{1}", savePath))
+                throw Error(Tr("守护对象路径无效：{1}", savePath))
             state.Push(snapshot)
         }
     } catch as snapshotError {
-        LogMsg(Tr("捕获监控项历史失败：{1}",
+        LogMsg(Tr("捕获守护对象历史失败：{1}",
             TrDiagnostic(snapshotError.Message)))
         return ""
     }
@@ -741,7 +741,7 @@ FormatHistoryAction(entry) {
     paths := action.HasOwnProp("Paths") ? action.Paths : []
     targetText := FormatHistoryTargetList(entry, paths)
     switch action.Kind {
-        case "add": label := Tr("添加监控项")
+        case "add": label := Tr("添加守护对象")
         case "delete": label := Tr("删除")
         case "toggle-pause": label := GetHistoryPauseActionLabel(entry, paths)
         case "edit-path": label := Tr("编辑完整路径")
@@ -1069,7 +1069,7 @@ ApplyState(stateArr, sourceStateArr := "", rollbackOnFailure := true) {
                     item.EnvVars, item.Maintenance, item.ResolvedTarget,
                     item.ResolvedTargetManual, item.ShortcutArgs, item.Display,
                     item.RuntimePath, item.RuntimeArgs) {
-                    throw Error(Tr("监控项路径无效：{1}", item.Path))
+                    throw Error(Tr("守护对象路径无效：{1}", item.Path))
                 }
             }
         }

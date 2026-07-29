@@ -19,7 +19,7 @@
 
 - 根入口 `进程守护小助手.ahk` 是组合根，只负责包含模块、装配依赖和启动。
 - `app` 组合应用服务，连接运行时适配器、守护命令、日志、系统集成和具体窗口。
-- `src/Config` 管理运行设置、布局、监控项、展示配置、升级保护配置和历史快照。
+- `src/Config` 管理运行设置、布局、守护对象、展示配置、升级保护配置和历史快照。
 - `src/Update` 协调小助手自身更新的后台进程、原子结果和关闭边界；网络与文件替换
   实现在 `runtime/application-update.ps1`。
 - `src/Core` 管理探活结果、单目标控制器、共享调度器、工作门和重试策略。
@@ -35,7 +35,7 @@
 
 ## 目标身份与探活
 
-`TargetSpecsService` 为每个项目生成分离的 `LaunchSpec` 和 `ProbeSpec`。启动规格
+`TargetSpecsService` 为每个守护对象生成分离的 `LaunchSpec` 和 `ProbeSpec`。启动规格
 只描述如何启动，探活规格只描述如何确认运行；缓存指纹只包含真正影响对应行为的
 输入。
 
@@ -90,7 +90,7 @@ Recovering / TimedOut` 状态机。更新进程必须有完整路径、安装根
 
 ## 配置与历史
 
-`WatchdogConfigRepository` 独占 `watchdog.ini`。设置、布局和监控项更新先写同目录
+`WatchdogConfigRepository` 独占 `watchdog.ini`。设置、布局和守护对象更新先写同目录
 临时副本，恢复分区注释并完成全部修改后，再一次替换正式文件。保存事务从有序运行
 快照生成到替换文件保持同一边界；失败时保留原文件，并使用单个指数退避任务重试。
 

@@ -1545,7 +1545,7 @@ AddMainAdminOverlayIcon(imageList) {
     if !badgeIndex
         return false
     ; 图像列表索引从 0 开始，AHK 的 IL_Add 返回值从 1 开始。overlay 槽 1
-    ; 由每一行的 LVIS_OVERLAYMASK 独立启停，不会污染普通项目图标。
+    ; 由每一行的 LVIS_OVERLAYMASK 独立启停，不会污染普通守护对象图标。
     return DllCall("comctl32\ImageList_SetOverlayImage", "Ptr", imageList,
         "Int", badgeIndex - 1, "Int", 1, "Int") != 0
 }

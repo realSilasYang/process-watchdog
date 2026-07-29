@@ -248,18 +248,18 @@ class WatchdogConfigRepository {
                 this.Text("; 本区保存运行参数；以分号开头的注释不会参与软件读取。"),
                 this.Text("; 布尔值使用 1 表示开启、0 表示关闭，建议优先通过设置界面修改。")]},
             {Name: "Apps", Lines: [
-                this.Text("; 每个 AppN 对应一个监控项，九个字段使用竖线分隔。"),
+                this.Text("; 每个 AppN 对应一个守护对象，九个字段使用竖线分隔。"),
                 this.Text("; 格式：启用状态｜管理员运行｜目标路径｜工作目录｜启动参数｜环境变量｜快捷方式真实目标｜手动目标标记｜快捷方式参数。"),
                 this.Text("; 布尔值使用 1 表示开启、0 表示关闭；<HEX> 内容由软件自动编码和解码。")]},
             {Name: "Maintenance", Lines: [
-                this.Text("; AppN 与 [Apps] 中同名项目一一对应，值为软件升级保护的 <HEX> 编码结构。"),
+                this.Text("; AppN 与 [Apps] 中同名的守护对象一一对应，值为软件升级保护的 <HEX> 编码结构。"),
                 this.Text("; 内部字段包括 Enabled、RootIsCustom、DetectionSeconds、StableSeconds、MaxWaitSeconds、InstallRoot 和 Actor。"),
                 this.Text("; 建议通过“软件升级保护”界面修改，不要直接编辑编码内容。")]},
             {Name: "Display", Lines: [
                 this.Text("; 仅保存主窗口显示名称和图标来源，不参与进程识别、启动或升级保护。"),
-                this.Text("; AppN 与 [Apps] 中同名项目一一对应；留空的项目使用目标自身的名称和图标。")]},
+                this.Text("; AppN 与 [Apps] 中同名的守护对象一一对应；留空时使用目标自身的名称和图标。")]},
             {Name: "Launch", Lines: [
-                this.Text("; AppN 与 [Apps] 中同名项目一一对应，依次保存启动程序或解释器路径及其参数。"),
+                this.Text("; AppN 与 [Apps] 中同名的守护对象一一对应，依次保存启动程序或解释器路径及其参数。"),
                 this.Text("; 两个字段均为 <HEX> 编码；留空时由小助手按目标类型使用默认启动方式。")]},
             {Name: "Recovery", Lines: [
                 this.Text("; 无法安全解析的监控记录会暂存于此，避免静默丢失；正常情况下无需手动修改。")]}

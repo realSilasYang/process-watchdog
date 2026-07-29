@@ -392,9 +392,9 @@ RunMainIntegrationTests() {
             "Restart")
             throw Error("删除后同路径重建错误接纳了旧控制器任务")
         if UpdateState(reusedPath, "旧状态", oldSupervisor) != false
-            throw Error("旧控制器仍能通过主界面状态回调覆盖新条目")
+            throw Error("旧控制器仍能通过主界面状态回调覆盖新守护对象")
         if UpdateRunningState(reusedPath, oldSupervisor) != false
-            throw Error("旧控制器仍能通过运行状态回调覆盖新条目")
+            throw Error("旧控制器仍能通过运行状态回调覆盖新守护对象")
     } finally {
         oldSupervisor.CancelScheduledTasks()
         App.appStates.Delete(reusedPath)
@@ -504,29 +504,29 @@ RunMainIntegrationTests() {
         Critical("On")
         try {
             if !SaveAppsToIni()
-                throw Error("监控项没有通过配置仓储保存")
+                throw Error("守护对象没有通过配置仓储保存")
             if !A_IsCritical
-                throw Error("监控项保存破坏了调用方的临界状态")
+                throw Error("守护对象保存破坏了调用方的临界状态")
         } finally Critical("Off")
         appEntries := App.configRepository.ReadSectionEntries("Apps")
         maintenanceValues := App.configRepository.ReadSectionMap("Maintenance")
         if appEntries.Length != 1 || appEntries[1].Key != "App1"
-            throw Error("监控项保存顺序或键名错误")
+            throw Error("守护对象保存顺序或键名错误")
         savedParts := StrSplit(appEntries[1].Value, "|")
         if savedParts.Length != 9
-            throw Error("当前监控项配置不是九字段格式")
+            throw Error("当前守护对象配置不是九字段格式")
         if IniFieldCodec.Decode(savedParts[5]) != "--标签=测试|值"
-            throw Error("监控项参数没有无损编码")
+            throw Error("守护对象参数没有无损编码")
         if !maintenanceValues.Has("App1")
-            throw Error("监控项缺少对应的升级保护配置")
+            throw Error("守护对象缺少对应的升级保护配置")
         recoveryValues := App.configRepository.ReadSectionMap("Recovery")
         if (recoveryValues.Count != 1
             || !recoveryValues.Has("Entry1")
             || recoveryValues["Entry1"] != preservedRecovery)
             throw Error("再次保存时丢失或改写了已有恢复记录")
         savedText := FileRead(configPath, "UTF-16")
-        if !InStr(savedText, "; 每个 AppN 对应一个监控项")
-            throw Error("监控项分区注释没有随事务写入")
+        if !InStr(savedText, "; 每个 AppN 对应一个守护对象")
+            throw Error("守护对象分区注释没有随事务写入")
 
         ; 第一次提交完成但尚未退出保存函数时模拟用户再次修改。
         ; 最新修订必须由同一保存者继续提交，不能被 isSaving 静默吞掉。
@@ -536,7 +536,7 @@ RunMainIntegrationTests() {
         App.watchlistPersistenceService := reentrantService
         App.appStates[A_AhkPath].Args := "--首次修改"
         if !SaveAppsToIni()
-            throw Error("带重入修改的监控项保存失败")
+            throw Error("带重入修改的守护对象保存失败")
         App.watchlistPersistenceService := basePersistenceService
         reentrantParts := StrSplit(App.configRepository
             .ReadSectionEntries("Apps")[1].Value, "|")

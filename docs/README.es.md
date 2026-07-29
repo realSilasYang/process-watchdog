@@ -38,7 +38,7 @@ Incluye interfaz clara y oscura, recuperación automática, protección durante 
   <img src="images/process-watchdog-overview.png" alt="Ventana principal de Process Watchdog Assistant" width="100%">
 </p>
 
-La ventana principal reúne el orden de los elementos supervisados, el icono, el nombre, los requisitos de privilegios y el estado actual. La barra superior permite añadir, eliminar, pausar, abrir los ajustes, consultar la ayuda o realizar una donación; desde Ayuda se accede al manual y al registro de ejecución. La barra inferior resume los destinos en ejecución, recuperación, actualización, pausa y error, y el registro muestra las pruebas que justifican cada estado anómalo.
+La ventana principal reúne el orden de los objetivos supervisados, el icono, el nombre, los requisitos de privilegios y el estado actual. La barra superior permite añadir, eliminar, pausar, abrir los ajustes, consultar la ayuda o realizar una donación; desde Ayuda se accede al manual y al registro de ejecución. La barra inferior resume los destinos en ejecución, recuperación, actualización, pausa y error, y el registro muestra las pruebas que justifican cada estado anómalo.
 
 ## Funciones principales
 

@@ -2030,7 +2030,7 @@ EndButtonPress() {
 }
 
 CanHoverButton(state) {
-    ; 删除/暂停在没有选中项目时只是灰色提示态，不显示可用按钮的悬浮反馈。
+    ; 删除/暂停在没有选中守护对象时只是灰色提示态，不显示可用按钮的悬浮反馈。
     if IsSet(Main) && (state.ctrl == Main.btnDel || state.ctrl == Main.btnPause)
         return Main.lv.GetNext(0) > 0
     return true

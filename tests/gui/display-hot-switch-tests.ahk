@@ -198,7 +198,7 @@ CreateDisplayHotSwitchMainWindow() {
         "x10 y60 w710 h390 Report +LV0x10002 -Hdr Background"
             UiThemeService.Color("Surface") " c"
             UiThemeService.Color("Text"),
-        [Tr("应用程序"), Tr("状态"), Tr("完整路径"), Tr("序号"), ""])
+        [Tr("守护对象"), Tr("状态"), Tr("完整路径"), Tr("序号"), ""])
     Main.lv.ModifyCol(1, 430)
     Main.lv.ModifyCol(2, 180)
     Main.lv.ModifyCol(3, 0)
@@ -274,7 +274,7 @@ AssertMainCommandButtonSelectionState() {
         && Main.btnPause.Text == Tr("⏸️ 暂停")
         && !deleteState.HasOwnProp("buttonImage")
         && !pauseState.HasOwnProp("buttonImage"),
-        "选中项目后删除／暂停按钮没有恢复可用颜色和交互")
+        "选中守护对象后删除／暂停按钮没有恢复可用颜色和交互")
 
     selectedPath := Main.lv.GetText(1, 3)
     selectedState := App.appStates[selectedPath]
@@ -282,7 +282,7 @@ AssertMainCommandButtonSelectionState() {
     RefreshMainCommandState(true)
     AssertDisplayHotSwitch(Main.btnPause.Text == Tr("▶️ 恢复")
         && !pauseState.HasOwnProp("buttonImage"),
-        "暂停项目的恢复按钮没有切换为原有字符图标")
+        "暂停守护对象的恢复按钮没有切换为原有字符图标")
     mixedPath := A_Temp "\watchdog-mixed-button-state.exe"
     mixedRow := Main.lv.Add("", "Mixed State", Tr("初始化"), mixedPath,
         Main.lv.GetCount() + 1)
@@ -344,7 +344,7 @@ AssertPausedReloadResumeProjection() {
     initializingStatus := GetGuardActivationStatus(true)
     stateObj := TargetSupervisor({
         Enabled: 0,
-        ; 模拟旧版本重载暂停条目时留下的内部／列表分裂状态。
+        ; 模拟旧版本重载暂停守护对象时留下的内部／列表分裂状态。
         State: initializingStatus,
         Scheduler: App.scheduler,
         MaintenanceConfig: App.maintenanceConfigCodec.CreateDefault(targetPath),
@@ -376,7 +376,7 @@ AssertPausedReloadResumeProjection() {
             && stateObj.StatusKind == GuardStatusKind.Initializing
             && Main.lv.GetText(row, 2)
                 == FormatMainStatusLabel(initializingStatus),
-            "重载后的暂停条目恢复时，控制器、阶段和列表状态没有同步初始化")
+            "重载后的暂停守护对象恢复时，控制器、阶段和列表状态没有同步初始化")
         AssertDisplayHotSwitch(!stateObj.Pending
             && stateObj.TargetStartTicks == 0
             && stateObj.FailCount == 0
@@ -627,7 +627,7 @@ AssertContextMenuToggleLayout() {
         && (maintenanceState & 0x0003)
         && DllCall("user32\GetMenuItemCount", "Ptr",
             Main.contextMenu.Handle, "Int") == 7,
-        "非批处理条目仍显示输出日志，或关闭状态菜单没有正确刷新")
+        "非批处理守护对象仍显示输出日志，或关闭状态菜单没有正确刷新")
     ConfigureMainContextMenu(false, false, true, true)
     AssertContextMenuPresentation()
 }
@@ -684,10 +684,10 @@ AssertMainStatusSortKeyDirection(stateObj) {
     descendingSecond := GetMainStatusSortKey(stateObj, 2, true)
     AssertDisplayHotSwitch(DllCall("shlwapi\StrCmpLogicalW", "Str",
             ascendingFirst, "Str", ascendingSecond, "Int") < 0,
-        "状态升序键没有保留同组项目的自定义顺序")
+        "状态升序键没有保留同组守护对象的自定义顺序")
     AssertDisplayHotSwitch(DllCall("shlwapi\StrCmpLogicalW", "Str",
             descendingFirst, "Str", descendingSecond, "Int") > 0,
-        "状态降序键会反转同组项目的自定义顺序")
+        "状态降序键会反转同组守护对象的自定义顺序")
 }
 
 AssertMainStatusResizeRecovery() {

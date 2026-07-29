@@ -38,7 +38,7 @@ Dự án có giao diện sáng và tối, khôi phục tự động, bảo vệ 
   <img src="images/process-watchdog-overview.png" alt="Cửa sổ chính của Process Watchdog Assistant" width="100%">
 </p>
 
-Cửa sổ chính hiển thị thứ tự mục giám sát, biểu tượng ứng dụng, tên, yêu cầu đặc quyền và trạng thái hiện tại. Thanh lệnh có các thao tác Thêm, Xóa, Tạm dừng, Cài đặt, Thông tin trợ giúp và Ủng hộ; từ Thông tin trợ giúp có thể mở hướng dẫn hoặc nhật ký chạy. Thanh dưới cùng tổng hợp số mục đang chạy, đang khôi phục, đang cập nhật, tạm dừng và thất bại; nhật ký giải thích bằng chứng đứng sau từng trạng thái bất thường.
+Cửa sổ chính hiển thị thứ tự đối tượng giám sát, biểu tượng ứng dụng, tên, yêu cầu đặc quyền và trạng thái hiện tại. Thanh lệnh có các thao tác Thêm, Xóa, Tạm dừng, Cài đặt, Thông tin trợ giúp và Ủng hộ; từ Thông tin trợ giúp có thể mở hướng dẫn hoặc nhật ký chạy. Thanh dưới cùng tổng hợp số đối tượng đang chạy, đang khôi phục, đang cập nhật, tạm dừng và thất bại; nhật ký giải thích bằng chứng đứng sau từng trạng thái bất thường.
 
 ## Điểm nổi bật
 
@@ -209,7 +209,7 @@ Tập lệnh gốc chỉ nạp mô-đun, nối phụ thuộc và khởi động 
 - Danh tính đích, tệp khởi chạy và tùy chỉnh hiển thị độc lập; cài đặt hiển thị không được thay đổi quyết định giám sát.
 - `Running`, `Stopped`, `Unknown` là kết quả bằng chứng bên ngoài; chỉ trạng thái dừng đã xác nhận mới được vào quy trình khôi phục.
 - Mọi bộ hẹn giờ, lệnh gọi lại, trình theo dõi tệp, tiến trình làm việc, cửa sổ và tài nguyên gốc đều phải có đường dọn dẹp lặp lại an toàn.
-- Ảnh chụp cấu hình, mục giám sát và cài đặt bảo vệ cập nhật được xác nhận trong cùng một giao dịch; kiểm thử không được đọc hay ghi đè `watchdog.ini` cá nhân.
+- Ảnh chụp cấu hình, đối tượng giám sát và cài đặt bảo vệ cập nhật được xác nhận trong cùng một giao dịch; kiểm thử không được đọc hay ghi đè `watchdog.ini` cá nhân.
 - Không đưa lại cách cuộn mượt bằng ảnh chụp GDI đã bị loại bỏ; ListView và nhật ký giữ cuộn gốc.
 - Tuyên bố về DPI, biểu tượng, chế độ tối, phân cấp cửa sổ và khả năng tiếp cận phải có bằng chứng trên Windows và tỷ lệ thật; tự động hóa không thay thế ma trận màn hình vật lý.
 

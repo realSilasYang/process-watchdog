@@ -10,7 +10,7 @@ class VietnameseStrings {
             "`n位置：{1}",
                 "`nVị trí: {1}")
         catalog.Set(
-            "`r`n      影响：该项目本次未加入守护列表。",
+            "`r`n      影响：该守护对象本次未加入守护列表。",
                 "`r`n      Ảnh hưởng: mục này không được thêm vào danh sách giám sát trong lần chạy này.")
         catalog.Set(
             "`r`n      目标：{1}",
@@ -22,7 +22,7 @@ class VietnameseStrings {
             "`r`n  [{1}] 位置：[{2}] {3}",
                 "`r`n  [{1}] Vị trí: [{2}] {3}")
         catalog.Set(
-            "`r`n  处理建议：确认目标路径后，可在主界面重新添加该项目；也可退出小助手后检查上述配置位置。后续保存配置时，损坏记录会转存到 [Recovery]，不会被静默删除。",
+            "`r`n  处理建议：确认目标路径后，可在主界面重新添加该守护对象；也可退出小助手后检查上述配置位置。后续保存配置时，损坏记录会转存到 [Recovery]，不会被静默删除。",
                 "`r`n  Cách xử lý: xác nhận đường dẫn đích rồi thêm lại mục này từ cửa sổ chính`; hoặc thoát trợ lý và kiểm tra các vị trí cấu hình nêu trên. Ở lần lưu cấu hình tiếp theo, bản ghi bị hỏng sẽ được chuyển vào [Recovery] thay vì bị xóa mà không thông báo.")
         catalog.Set(
             "`r`n  配置文件：{1}",
@@ -37,7 +37,7 @@ class VietnameseStrings {
             "  --maintenance-end `"目标完整路径`"      结束维护",
                 "  --maintenance-end `"đường dẫn đầy đủ của đích`"      Kết thúc bảo trì")
         catalog.Set(
-            " 已保留并保存此前添加的 {1} 个监控项。",
+            " 已保留并保存此前添加的 {1} 个守护对象。",
                 " Đã giữ lại và lưu {1} mục giám sát được thêm trước đó.")
         catalog.Set(
             " 扫描达到时间或数量上限，结果已截断。",
@@ -46,10 +46,10 @@ class VietnameseStrings {
             "`; AllowForceTerminate：正常退出超时后是否允许强制结束进程。",
                 "`; AllowForceTerminate: có cho phép buộc kết thúc tiến trình sau khi hết thời gian chờ thoát bình thường hay không.")
         catalog.Set(
-            "`; AppN 与 [Apps] 中同名项目一一对应，值为软件升级保护的 <HEX> 编码结构。",
+            "`; AppN 与 [Apps] 中同名的守护对象一一对应，值为软件升级保护的 <HEX> 编码结构。",
                 "`; Mỗi mục AppN tương ứng với mục cùng tên trong [Apps]. Giá trị của nó là cấu trúc bảo vệ khi cập nhật được mã hóa theo dạng <HEX>.")
         catalog.Set(
-            "`; AppN 与 [Apps] 中同名项目一一对应；留空的项目使用目标自身的名称和图标。",
+            "`; AppN 与 [Apps] 中同名的守护对象一一对应；留空时使用目标自身的名称和图标。",
                 "`; Mỗi mục AppN tương ứng với mục cùng tên trong [Apps]. Mục để trống sẽ dùng tên và biểu tượng của chính đích.")
         catalog.Set(
             "`; CheckInterval：状态检查间隔，单位为毫秒，范围 500～86400000。",
@@ -127,7 +127,7 @@ class VietnameseStrings {
             "`; 格式：启用状态｜管理员运行｜目标路径｜工作目录｜启动参数｜环境变量｜快捷方式真实目标｜手动目标标记｜快捷方式参数。",
                 "`; Định dạng: trạng thái bật｜chạy với quyền quản trị viên｜đường dẫn đích｜thư mục làm việc｜đối số khởi chạy｜biến môi trường｜đích thực của lối tắt｜cờ đích thủ công｜đối số lối tắt.")
         catalog.Set(
-            "`; 每个 AppN 对应一个监控项，九个字段使用竖线分隔。",
+            "`; 每个 AppN 对应一个守护对象，九个字段使用竖线分隔。",
                 "`; Mỗi AppN tương ứng với một mục giám sát`; chín trường được phân cách bằng dấu gạch đứng.")
         catalog.Set(
             "DPI 变化后刷新图标失败：{1}",
@@ -139,7 +139,7 @@ class VietnameseStrings {
             "DPI 图标重建回调无效",
                 "Hàm gọi lại để dựng lại biểu tượng theo DPI không hợp lệ")
         catalog.Set(
-            "{1} 条监控配置未载入，相关项目当前不会被守护。点击查看具体位置和原因。",
+            "{1} 条监控配置未载入，相关守护对象当前不会被守护。点击查看具体位置和原因。",
                 "Không thể nạp {1} bản ghi cấu hình giám sát nên các mục liên quan hiện không được bảo vệ. Bấm để xem vị trí và nguyên nhân cụ thể.")
         catalog.Set(
             "• Ahk2Exe 只在发布服务器上用于生成 EXE，不随小助手安装，普通用户和源码运行用户都不需要维护它。",
@@ -163,7 +163,7 @@ class VietnameseStrings {
             "• 主界面的“日志”显示本次运行中的监控、重启、升级保护和操作记录，并会自动更新。",
                 "• “Nhật ký” trên cửa sổ chính hiển thị các bản ghi giám sát, khởi động lại, bảo vệ khi cập nhật và thao tác trong phiên chạy hiện tại, đồng thời tự động cập nhật.")
         catalog.Set(
-            "• 也可将文件或文件夹直接拖放到主列表；已经存在的项目不会重复添加。",
+            "• 也可将文件或文件夹直接拖放到主列表；已经存在的守护对象不会重复添加。",
                 "• Bạn cũng có thể kéo thả trực tiếp tệp hoặc thư mục vào danh sách chính`; mục đã tồn tại sẽ không được thêm trùng.")
         catalog.Set(
             "• 停止：设置窗口程序和命令行程序的退出等待，以及是否允许强制终止。",
@@ -175,10 +175,10 @@ class VietnameseStrings {
             "• 升级等待超时或判断不正确时，可选择“结束升级等待并恢复守护”；恢复前仍会检查目标文件是否可以安全启动。",
                 "• Khi thời gian chờ cập nhật hết hoặc bị nhận diện sai, có thể chọn “Kết thúc chờ cập nhật và tiếp tục giám sát”`; trước khi tiếp tục, tệp đích vẫn được kiểm tra để bảo đảm có thể khởi chạy an toàn.")
         catalog.Set(
-            "• 单击选择项目；按住 Ctrl 或 Shift 可多选；拖动列表行可调整守护顺序。",
+            "• 单击选择守护对象；按住 Ctrl 或 Shift 可多选；拖动列表行可调整守护顺序。",
                 "• Bấm để chọn mục`; giữ Ctrl hoặc Shift để chọn nhiều mục`; kéo hàng trong danh sách để thay đổi thứ tự giám sát.")
         catalog.Set(
-            "• 双击项目或按 F2 可编辑完整路径。Delete 删除，Ctrl+Z 撤销，Ctrl+Shift+Z 或 Ctrl+Y 重做。",
+            "• 双击守护对象或按 F2 可编辑完整路径。Delete 删除，Ctrl+Z 撤销，Ctrl+Shift+Z 或 Ctrl+Y 重做。",
                 "• Bấm đúp vào mục hoặc nhấn F2 để sửa đường dẫn đầy đủ. Delete để xóa, Ctrl+Z để hoàn tác, Ctrl+Shift+Z hoặc Ctrl+Y để làm lại.")
         catalog.Set(
             "• 发现新版后会先询问；确认后校验完整发行包，退出当前实例、替换受管文件并自动重启，不会覆盖个人配置和升级保护会话。",
@@ -187,13 +187,13 @@ class VietnameseStrings {
             "• 可控的更新脚本可显式发送维护指令：",
                 "• Tập lệnh cập nhật do bạn kiểm soát có thể gửi lệnh bảo trì tường minh:")
         catalog.Set(
-            "• 右键项目可自定义主窗口名称和图标，也可打开所在位置、重新启动、编辑路径、切换管理员运行、配置高级运行环境与软件升级保护，并查看批处理输出日志。要求管理员运行但当前权限不符时会显示警告；右键重新启动会按该设置提权启动。",
+            "• 右键守护对象可自定义主窗口名称和图标，也可打开所在位置、重新启动、编辑路径、切换管理员运行、配置高级运行环境与软件升级保护，并查看批处理输出日志。要求管理员运行但当前权限不符时会显示警告；右键重新启动会按该设置提权启动。",
                 "• Bấm chuột phải vào mục để tùy chỉnh tên và biểu tượng trên cửa sổ chính, mở vị trí, khởi động lại, sửa đường dẫn, chuyển chế độ chạy với quyền quản trị viên, cấu hình môi trường khởi chạy nâng cao và bảo vệ khi cập nhật, hoặc xem nhật ký đầu ra lô. Nếu mục yêu cầu quyền quản trị viên nhưng tiến trình đang chạy không đủ quyền, cảnh báo sẽ xuất hiện`; khởi động lại từ menu chuột phải sẽ nâng quyền theo cài đặt đó.")
         catalog.Set(
-            "• 在项目右键菜单打开“软件升级保护”，可调整安装足迹目录、退出检测窗口、文件稳定等待和最长升级等待，也可清除已学习的更新程序特征。",
+            "• 在守护对象右键菜单打开“软件升级保护”，可调整安装足迹目录、退出检测窗口、文件稳定等待和最长升级等待，也可清除已学习的更新程序特征。",
                 "• Mở “Bảo vệ khi cập nhật” từ menu chuột phải của mục để điều chỉnh thư mục cài đặt, thời gian phát hiện thoát, thời gian chờ tệp ổn định và thời gian chờ cập nhật tối đa, hoặc xóa dấu hiệu nhận dạng trình cập nhật đã học.")
         catalog.Set(
-            "• 多选项目状态一致时，“暂停”按钮会统一暂停或恢复；状态混合时会逐项反转。",
+            "• 多个守护对象状态一致时，“暂停”按钮会统一暂停或恢复；状态混合时会逐项反转。",
                 "• Khi mọi mục được chọn có cùng trạng thái, nút “Tạm dừng” sẽ tạm dừng hoặc tiếp tục tất cả cùng lúc. Nếu trạng thái khác nhau, từng mục sẽ được chuyển đổi riêng.")
         catalog.Set(
             "• 小助手会核对目标路径或命令行，避免只按进程名称造成误判。",
@@ -208,7 +208,7 @@ class VietnameseStrings {
             "• 日志：设置运行日志内存上限、批处理输出日志的保存目录、保留时间和启动时清理策略。",
                 "• Nhật ký: đặt giới hạn số bản ghi hoạt động trong bộ nhớ, thư mục lưu nhật ký đầu ra lô, thời gian lưu giữ và cách dọn dẹp khi khởi động.")
         catalog.Set(
-            "• 暂停项目会取消该项目的重试和升级检测；恢复后会重新检查目标状态。",
+            "• 暂停守护对象会取消它的重试和升级检测；恢复后会重新检查目标状态。",
                 "• Tạm dừng một mục sẽ hủy lần thử lại và phát hiện cập nhật của mục đó`; khi tiếp tục, trạng thái đích sẽ được kiểm tra lại.")
         catalog.Set(
             "• 检测到目标停止后，会先确认状态，再按“重启等待序列”依次重试；连续失败时采用后续等待时间，避免频繁拉起。",
@@ -241,16 +241,16 @@ class VietnameseStrings {
             "• 脚本：AHK、Python、JavaScript、VBScript、PowerShell、批处理，以及 Ruby、Perl、PHP、Lua、JAR、Shell 等。",
                 "• Tập lệnh: AHK, Python, JavaScript, VBScript, PowerShell, tệp lô, Ruby, Perl, PHP, Lua, JAR, Shell và các loại khác.")
         catalog.Set(
-            "• 软件升级保护默认关闭。需要时在项目右键菜单打开“软件升级保护”，勾选“自动识别升级并保护启动过程”并保存。",
+            "• 软件升级保护默认关闭。需要时在守护对象右键菜单打开“软件升级保护”，勾选“自动识别升级并保护启动过程”并保存。",
                 "• Bảo vệ khi cập nhật mặc định bị tắt. Khi cần, mở “Bảo vệ khi cập nhật” từ menu chuột phải của mục, chọn “Tự động nhận diện cập nhật và bảo vệ quá trình khởi động”, rồi lưu.")
         catalog.Set(
-            "• 选中项目后可暂停、恢复或删除。暂停只停止守护，不会关闭当前正在运行的目标。",
+            "• 选中守护对象后可暂停、恢复或删除。暂停只停止守护，不会关闭当前正在运行的目标。",
                 "• Sau khi chọn mục, bạn có thể tạm dừng, tiếp tục hoặc xóa. Tạm dừng chỉ dừng giám sát, không đóng đích đang chạy.")
         catalog.Set(
             "• 选择文件夹会批量导入其中支持的文件；是否扫描子目录由“设置”中的“监控与启动”控制。",
                 "• Chọn một thư mục sẽ nhập hàng loạt các tệp được hỗ trợ trong đó`; việc có quét thư mục con hay không được điều khiển trong “Giám sát và khởi động” thuộc “Cài đặt”.")
         catalog.Set(
-            "• 项目右键菜单中的“查看运行日志”用于打开 BAT/CMD 目标生成的输出日志；其他类型或尚未生成时会提示文件不存在。",
+            "• 守护对象右键菜单中的“查看运行日志”用于打开 BAT/CMD 目标生成的输出日志；其他类型或尚未生成时会提示文件不存在。",
                 "• “Xem nhật ký hoạt động” trong menu chuột phải của mục dùng để mở nhật ký đầu ra do đích BAT/CMD tạo. Với loại khác hoặc khi nhật ký chưa được tạo, trợ lý sẽ báo không tìm thấy tệp.")
         catalog.Set(
             "⏳ 停止原进程...",
@@ -367,7 +367,7 @@ class VietnameseStrings {
             "不是当前 <HEX> 编码格式",
                 "Không phải định dạng mã hóa <HEX> hiện tại")
         catalog.Set(
-            "与已加载项目重复，或目标格式无效",
+            "与已加载守护对象重复，或目标格式无效",
                 "Trùng với mục đã nạp hoặc định dạng đích không hợp lệ")
         catalog.Set(
             "主进程监控",
@@ -376,7 +376,7 @@ class VietnameseStrings {
             "主进程监控异常：{1}",
                 "Lỗi giám sát tiến trình chính: {1}")
         catalog.Set(
-            "二、支持的目标",
+            "二、支持的守护对象",
                 "2. Đích được hỗ trợ")
         catalog.Set(
             "五、设置",
@@ -445,7 +445,7 @@ class VietnameseStrings {
             "初始化...",
                 "Đang khởi tạo...")
         catalog.Set(
-            "删除选中的守护项目（支持多选，可撤销）`n快捷键：Delete",
+            "删除选中的守护对象（支持多选，可撤销）`n快捷键：Delete",
                 "Xóa các mục giám sát đã chọn（hỗ trợ chọn nhiều và hoàn tác）`nPhím: Delete")
         catalog.Set(
             "刷新主窗口状态失败，已暂停界面倒计时刷新：{1}",
@@ -583,8 +583,8 @@ class VietnameseStrings {
             "守护监控操作必须具备高级别系统读写权限，请以管理员身份运行此程序！",
                 "Giám sát tiến trình cần quyền đọc ghi hệ thống cấp cao. Hãy chạy chương trình này với quyền quản trị viên.")
         catalog.Set(
-            "守护目标：",
-                "Đích được giám sát:")
+            "守护对象：",
+                "Đối tượng giám sát:")
         catalog.Set(
             "安全启动门暂缓启动：{1}（{2}）",
                 "Cổng khởi động an toàn đã hoãn khởi chạy: {1}（{2}）")
@@ -691,13 +691,13 @@ class VietnameseStrings {
             "已更新主窗口显示设置：{1}",
                 "Đã cập nhật cài đặt hiển thị của cửa sổ chính: {1}")
         catalog.Set(
-            "已更新应用程序路径。",
-                "Đã cập nhật đường dẫn ứng dụng.")
+            "已更新守护对象路径。",
+                "Đã cập nhật đường dẫn của đối tượng giám sát.")
         catalog.Set(
             "已更新软件升级保护设置：{1}",
                 "Đã cập nhật cài đặt bảo vệ khi cập nhật: {1}")
         catalog.Set(
-            "已添加 {1} 个监控项。",
+            "已添加 {1} 个守护对象。",
                 "Đã thêm {1} mục giám sát.")
         catalog.Set(
             "已用完快速重试，将每隔 {1} 秒继续尝试启动：{2}",
@@ -733,8 +733,8 @@ class VietnameseStrings {
             "应用更新检查进程未返回 PID",
                 "Tiến trình kiểm tra cập nhật ứng dụng không trả về PID")
         catalog.Set(
-            "应用程序",
-                "Ứng dụng")
+            "守护对象",
+                "Đối tượng giám sát")
         catalog.Set(
             "应用资源",
                 "Tài nguyên ứng dụng")
@@ -787,7 +787,7 @@ class VietnameseStrings {
             "快捷方式真实目标",
                 "Đích thực đã phân giải của lối tắt")
         catalog.Set(
-            "快捷方式真实进程刷新被拒绝，目标已由其它项目守护：{1} -> {2}",
+            "快捷方式真实进程刷新被拒绝，目标已由其它守护对象守护：{1} -> {2}",
                 "Từ chối làm mới tiến trình thực của lối tắt vì đích đã được mục khác giám sát: {1} -> {2}")
         catalog.Set(
             "恢复守护：{1}",
@@ -808,7 +808,7 @@ class VietnameseStrings {
             "所选文件夹内未找到支持的程序、脚本或快捷方式。",
                 "Không tìm thấy ứng dụng, tập lệnh hoặc lối tắt được hỗ trợ trong thư mục đã chọn.")
         catalog.Set(
-            "手动添加监控：{1}",
+            "手动添加守护对象：{1}",
                 "Đã thêm mục giám sát thủ công: {1}")
         catalog.Set(
             "手动触发了重新启动：{1}",
@@ -835,19 +835,19 @@ class VietnameseStrings {
             "批量导入完成",
                 "Nhập hàng loạt hoàn tất")
         catalog.Set(
-            "批量导入已取消，已保留并保存此前添加的 {1} 个监控项。",
+            "批量导入已取消，已保留并保存此前添加的 {1} 个守护对象。",
                 "Đã hủy nhập hàng loạt. {1} mục giám sát được thêm trước đó đã được giữ lại và lưu.")
         catalog.Set(
-            "拒绝修改路径，真实进程已由其它项目守护：{1}",
+            "拒绝修改路径，真实进程已由其它守护对象守护：{1}",
                 "Từ chối sửa đường dẫn vì tiến trình thực đã được mục khác giám sát: {1}")
         catalog.Set(
-            "拒绝将应用路径改为已存在的监控项：{1}",
-                "Từ chối đổi đường dẫn ứng dụng thành một mục giám sát đã tồn tại: {1}")
+            "拒绝更新路径，已存在相同的守护对象：{1}",
+                "Từ chối thay đổi đường dẫn vì đã có một đối tượng giám sát trùng khớp: {1}")
         catalog.Set(
             "按钮绘制器",
                 "Bộ vẽ nút")
         catalog.Set(
-            "捕获监控项历史失败：{1}",
+            "捕获守护对象历史失败：{1}",
                 "Không thể ghi lại lịch sử mục giám sát: {1}")
         catalog.Set(
             "提示",
@@ -928,7 +928,7 @@ class VietnameseStrings {
             "无法清理后台扫描结果文件：{1}",
                 "Không thể dọn tệp kết quả quét nền: {1}")
         catalog.Set(
-            "无法生成监控项快照：{1}",
+            "无法生成守护对象快照：{1}",
                 "Không thể tạo ảnh chụp mục giám sát: {1}")
         catalog.Set(
             "日志",
@@ -939,7 +939,7 @@ class VietnameseStrings {
         catalog.Set("📄 查看批处理输出日志", "📄 Xem nhật ký đầu ra lô")
         catalog.Set("尚未生成批处理输出日志", "Chưa có nhật ký đầu ra lô")
         catalog.Set(
-            "小助手只有在启动 BAT 或 CMD 项目时才会创建此文件。",
+            "小助手只有在启动 BAT 或 CMD 守护对象时才会创建此文件。",
                 "Tệp này chỉ được tạo khi trợ lý khởi chạy một mục BAT hoặc CMD.")
         catalog.Set("日志保存位置：", "Vị trí lưu nhật ký:")
         catalog.Set("确定", "Xác nhận")
@@ -965,7 +965,7 @@ class VietnameseStrings {
             "暂停守护：{1}",
                 "Đã tạm dừng giám sát: {1}")
         catalog.Set(
-            "暂停或恢复选中项目的守护，不会退出目标`n支持多选；混合状态时逐项反转",
+            "暂停或恢复选中守护对象，不会退出目标`n支持多选；混合状态时逐项反转",
                 "Tạm dừng hoặc tiếp tục giám sát các mục đã chọn mà không thoát đích`nHỗ trợ chọn nhiều`; trạng thái hỗn hợp được chuyển đổi riêng từng mục")
         catalog.Set(
             "暂时无法查询进程状态，稍后重试手动重启：{1}",
@@ -1112,10 +1112,10 @@ class VietnameseStrings {
             "添加扫描结果失败",
                 "Không thể thêm kết quả quét")
         catalog.Set(
-            "添加监控项",
+            "添加守护对象",
                 "Thêm mục giám sát")
         catalog.Set(
-            "添加监控项失败，已回滚内存状态：{1}",
+            "添加守护对象失败，已回滚内存状态：{1}",
                 "Không thể thêm mục giám sát`; đã khôi phục trạng thái trong bộ nhớ: {1}")
         catalog.Set(
             "添加程序、脚本或快捷方式`n支持搜索、文件夹批量导入和文件拖放",
@@ -1178,7 +1178,7 @@ class VietnameseStrings {
             "监控与启动",
                 "Giám sát và khởi động")
         catalog.Set(
-            "监控目标重复",
+            "守护对象重复",
                 "Đích giám sát bị trùng")
         catalog.Set(
             "监控配置加载异常",
@@ -1190,13 +1190,13 @@ class VietnameseStrings {
             "监控配置尚未保存，请查看运行日志。",
                 "Cấu hình giám sát chưa được lưu. Hãy xem nhật ký hoạt động.")
         catalog.Set(
-            "监控项保存状态无效",
+            "守护对象保存状态无效",
                 "Trạng thái lưu mục giám sát không hợp lệ")
         catalog.Set(
-            "监控项注册回调无效",
+            "守护对象注册回调无效",
                 "Hàm gọi lại đăng ký mục giám sát không hợp lệ")
         catalog.Set(
-            "监控项路径无效：{1}",
+            "守护对象路径无效：{1}",
                 "Đường dẫn mục giám sát không hợp lệ: {1}")
         catalog.Set(
             "监测到目标文件已不存在，守护进入缺失状态，文件恢复后将自动复核：{1}",
@@ -1346,7 +1346,7 @@ class VietnameseStrings {
             "该目标已存在、无效或指向目录。",
                 "Đích này đã tồn tại, không hợp lệ hoặc trỏ tới một thư mục.")
         catalog.Set(
-            "该真实进程已由其他监控项守护。",
+            "该真实进程已由其他守护对象守护。",
                 "Tiến trình thực này đã được một mục giám sát khác bảo vệ.")
         catalog.Set(
             "该软件正在升级保护中。请等待升级完成，或在“软件升级保护”中结束等待后再重新启动。",
@@ -1469,7 +1469,7 @@ class VietnameseStrings {
             "选择软件安装目录",
                 "Chọn thư mục cài đặt phần mềm")
         catalog.Set(
-            "通过拖拽添加了 {1} 个监控项。",
+            "通过拖拽添加了 {1} 个守护对象。",
                 "Đã thêm {1} mục giám sát bằng cách kéo thả.")
         catalog.Set(
             "配置仓储无效",
@@ -1511,8 +1511,8 @@ class VietnameseStrings {
             "错误",
                 "Lỗi")
         catalog.Set(
-            "项目名称：{1}`n真实路径：{2}",
-                "Tên mục: {1}`nĐường dẫn thực: {2}")
+            "名称：{1}`n真实路径：{2}",
+                "Tên: {1}`nĐường dẫn thực: {2}")
         catalog.Set(
             "🌿 环境变量：{1} 项`n",
                 "🌿 Biến môi trường: {1} mục`n")
@@ -1727,7 +1727,7 @@ class VietnameseStrings {
         catalog.Set("进程识别", "Nhận diện tiến trình")
         catalog.Set("启动环境", "Môi trường khởi chạy")
         catalog.Set("快捷方式仍用于启动；真实进程用于判断程序是否正在运行。", "Lối tắt vẫn được dùng để khởi chạy; tiến trình thực tế được dùng để xác định ứng dụng có đang chạy hay không.")
-        catalog.Set("该项目直接启动并监控同一个目标，无需额外识别真实进程。", "Mục này trực tiếp khởi chạy và giám sát cùng một đích nên không cần nhận diện riêng tiến trình thực tế.")
+        catalog.Set("该守护对象直接启动并监控同一个目标，无需额外识别真实进程。", "Mục này trực tiếp khởi chạy và giám sát cùng một đích nên không cần nhận diện riêng tiến trình thực tế.")
         catalog.Set("用于判断运行状态的真实进程：", "Tiến trình thực tế dùng để xác định trạng thái:")
         catalog.Set("用于判断运行状态的目标：", "Đích dùng để xác định trạng thái:")
         catalog.Set("重新识别", "Nhận diện lại")
@@ -1755,7 +1755,7 @@ class VietnameseStrings {
         catalog.Set("配置暂未写入", "Cấu hình chưa được ghi")
         catalog.Set("已更新进程识别与启动设置：{1}", "Đã cập nhật nhận diện tiến trình và thiết lập khởi chạy: {1}")
         catalog.Set("• 快捷方式：LNK、URL、APPREF-MS，包括可解析真实目标的 MSI 快捷方式。特殊快捷方式可在“进程识别与启动设置”中手动指定真实进程。", "• Lối tắt: LNK, URL và APPREF-MS, bao gồm lối tắt MSI có thể xác định đích thực tế. Với lối tắt đặc biệt, hãy chỉ định thủ công tiến trình thực tế trong mục Nhận diện tiến trình và thiết lập khởi chạy.")
-        catalog.Set("• 右键项目可自定义主窗口名称和图标，也可打开所在位置、重新启动、编辑路径、切换管理员运行、配置进程识别与启动设置及软件升级保护，并查看批处理输出日志。要求管理员运行但当前权限不符时会显示警告；右键重新启动会按该设置提权启动。", "• Nhấp phải một mục để tùy chỉnh tên và biểu tượng trong cửa sổ chính, mở vị trí tệp, khởi động lại, sửa đường dẫn, chuyển chế độ chạy với quyền quản trị, cấu hình nhận diện tiến trình, thiết lập khởi chạy và bảo vệ cập nhật, hoặc xem nhật ký đầu ra của tệp lệnh. Cảnh báo sẽ xuất hiện nếu mục yêu cầu quyền quản trị nhưng tiến trình hiện tại chưa được nâng quyền; khi khởi động lại từ menu chuột phải, chương trình sẽ được chạy nâng quyền theo thiết lập đó.")
+        catalog.Set("• 右键守护对象可自定义主窗口名称和图标，也可打开所在位置、重新启动、编辑路径、切换管理员运行、配置进程识别与启动设置及软件升级保护，并查看批处理输出日志。要求管理员运行但当前权限不符时会显示警告；右键重新启动会按该设置提权启动。", "• Nhấp phải một mục để tùy chỉnh tên và biểu tượng trong cửa sổ chính, mở vị trí tệp, khởi động lại, sửa đường dẫn, chuyển chế độ chạy với quyền quản trị, cấu hình nhận diện tiến trình, thiết lập khởi chạy và bảo vệ cập nhật, hoặc xem nhật ký đầu ra của tệp lệnh. Cảnh báo sẽ xuất hiện nếu mục yêu cầu quyền quản trị nhưng tiến trình hiện tại chưa được nâng quyền; khi khởi động lại từ menu chuột phải, chương trình sẽ được chạy nâng quyền theo thiết lập đó.")
         catalog.Set("添加", "Thêm")
         catalog.Set("暂停", "Tạm dừng")
         catalog.Set("恢复", "Tiếp tục")
@@ -1798,7 +1798,7 @@ class VietnameseStrings {
         catalog.Set("• 程序搜索：使用 Everything 服务并显示全部匹配结果；未运行时会尝试在本机查找并后台启动，未找到时提供官网最新版下载地址。", "• Tìm chương trình: sử dụng dịch vụ Everything và hiển thị mọi kết quả phù hợp. Nếu Everything chưa chạy, trợ lý sẽ tìm trên máy và khởi chạy trong nền; nếu không tìm thấy, trợ lý sẽ cung cấp liên kết tải bản mới nhất từ trang chính thức.")
         catalog.Set("• 小助手随包的 Everything64.dll 只是连接 Everything 后台实例的 SDK 客户端，不负责扫描磁盘或建立索引，不能替代 Everything 本体。", "• Everything64.dll đi kèm trợ lý chỉ là ứng dụng khách SDK dùng để kết nối với phiên Everything chạy nền. Tệp này không quét ổ đĩa, không tạo chỉ mục và không thể thay thế ứng dụng Everything.")
         catalog.Set("六、进程识别与启动设置", "6. Nhận diện tiến trình và thiết lập khởi chạy")
-        catalog.Set("• 此设置只作用于当前守护项，并将“用什么启动”和“用什么判断正在运行”分开处理。启动环境只在小助手下次启动目标时生效，不会重启当前进程。", "• Các thiết lập này chỉ áp dụng cho mục đang được giám sát và tách riêng cách khởi chạy khỏi bằng chứng xác định mục đang chạy. Môi trường khởi chạy chỉ có hiệu lực vào lần tới trợ lý chạy đích và không khởi động lại tiến trình hiện tại.")
+        catalog.Set("• 此设置只作用于当前守护对象，并将“用什么启动”和“用什么判断正在运行”分开处理。启动环境只在小助手下次启动目标时生效，不会重启当前进程。", "• Các thiết lập này chỉ áp dụng cho mục đang được giám sát và tách riêng cách khởi chạy khỏi bằng chứng xác định mục đang chạy. Môi trường khởi chạy chỉ có hiệu lực vào lần tới trợ lý chạy đích và không khởi động lại tiến trình hiện tại.")
         catalog.Set("• 直接添加程序或脚本时，启动入口与监控目标相同；EXE 按完整路径识别，脚本按宿主进程命令行中的脚本路径识别。", "• Khi thêm trực tiếp một chương trình hoặc tập lệnh, điểm khởi chạy cũng là đích giám sát. Tệp EXE được nhận diện theo đường dẫn đầy đủ; tập lệnh được nhận diện theo đường dẫn tập lệnh trong dòng lệnh của tiến trình chủ.")
         catalog.Set("• 添加 LNK 快捷方式时，快捷方式始终作为启动入口；自动识别出的真实程序或脚本只用于判断运行状态。", "• Khi thêm lối tắt LNK, lối tắt luôn được giữ làm điểm khởi chạy. Chương trình hoặc tập lệnh thực tế được nhận diện tự động chỉ dùng để xác định trạng thái chạy.")
         catalog.Set("• 自动识别会综合快捷方式目标、参数、Windows Installer 信息、安装目录、文件版本信息和已观察进程；证据不唯一时不会随意绑定。", "• Nhận diện tự động kết hợp đích và đối số của lối tắt, thông tin Windows Installer, thư mục cài đặt, thông tin phiên bản tệp và các tiến trình đã quan sát. Trợ lý sẽ không tùy tiện liên kết khi bằng chứng còn mơ hồ.")
@@ -1823,9 +1823,9 @@ class VietnameseStrings {
         catalog.Set("• Python 虚拟环境请选择该环境的 Scripts\python.exe；其他语言也可选择项目要求的确切运行时版本。进程识别仍以目标脚本路径为准，不会误把解释器本身当成守护目标。", "• Với môi trường ảo Python, hãy chọn Scripts\python.exe của chính môi trường đó. Các ngôn ngữ khác cũng có thể chọn đúng phiên bản môi trường chạy mà dự án yêu cầu. Tiến trình vẫn được nhận diện theo đường dẫn tập lệnh đích nên trình thông dịch sẽ không bị nhầm là đích giám sát.")
         catalog.Set("• 工作目录（CWD）用于解析相对路径；留空时使用快捷方式工作目录或目标所在目录。", "• Thư mục làm việc（CWD）dùng để phân giải đường dẫn tương đối. Nếu để trống, trợ lý dùng thư mục làm việc của lối tắt hoặc thư mục chứa đích.")
         catalog.Set("• 环境变量每行填写一个 KEY=VALUE，只覆盖列出的变量；值中可用 %变量名% 引用已有环境变量。启动完成后小助手会恢复自身环境。", "• Nhập mỗi biến môi trường trên một dòng theo dạng KEY=VALUE. Chỉ các biến được liệt kê mới bị ghi đè; có thể dùng %TÊN_BIẾN% để tham chiếu giá trị hiện có. Sau khi khởi chạy, trợ lý sẽ khôi phục môi trường của chính mình.")
-        catalog.Set("; AppN 与 [Apps] 中同名项目一一对应，依次保存启动程序或解释器路径及其参数。", "; Mỗi AppN tương ứng với mục cùng tên trong [Apps] và lần lượt lưu đường dẫn của chương trình khởi chạy hoặc trình thông dịch cùng các đối số của nó.")
+        catalog.Set("; AppN 与 [Apps] 中同名的守护对象一一对应，依次保存启动程序或解释器路径及其参数。", "; Mỗi AppN tương ứng với đối tượng giám sát cùng tên trong [Apps] và lần lượt lưu đường dẫn của chương trình khởi chạy hoặc trình thông dịch cùng các đối số của nó.")
         catalog.Set("; 两个字段均为 <HEX> 编码；留空时由小助手按目标类型使用默认启动方式。", "; Cả hai trường đều được mã hóa dạng <HEX>; khi để trống, trợ lý dùng cách khởi chạy mặc định cho loại đích.")
-        catalog.Set("监控项不能指向文件夹：{1}", "Mục giám sát không thể trỏ đến thư mục: {1}")
+        catalog.Set("守护对象不能指向文件夹：{1}", "Mục giám sát không thể trỏ đến thư mục: {1}")
         catalog.Set("自动识别目标新位置", "Tự động nhận diện vị trí mới của đích")
         catalog.Set("检测到的目标新位置已失效，请重新操作。", "Vị trí mới đã phát hiện của đích không còn hợp lệ. Vui lòng thử lại.")
         catalog.Set("已更新已更名的守护目标：{1} -> {2}", "Đã cập nhật đích giám sát được đổi tên: {1} -> {2}")
@@ -1847,7 +1847,7 @@ class VietnameseStrings {
         catalog.Set("忽略", "Bỏ qua")
         catalog.Set("更新已更名的守护目标", "Cập nhật đích giám sát được đổi tên")
         catalog.Set("• 直接添加的程序或脚本在小助手运行期间更名或在同一卷（通常是同一盘符）内移动后，小助手会按 Windows 文件身份找回新路径并请您确认，不会按相似文件名猜测。", "• Nếu chương trình hoặc tập lệnh được thêm trực tiếp bị đổi tên khi trợ lý đang chạy, hoặc được chuyển sang vị trí khác trong cùng một phân vùng, trợ lý sẽ tìm đường dẫn mới bằng mã định danh tệp của Windows và yêu cầu bạn xác nhận. Trợ lý không suy đoán từ tên tệp tương tự.")
-        catalog.Set("• 确认后只更新守护路径，名称、图标和启动设置保持不变；关闭小助手期间发生的更名或跨磁盘移动无法可靠自动识别，请双击项目手动更新完整路径。", "• Sau khi xác nhận, chỉ đường dẫn giám sát được cập nhật. Tên, biểu tượng và thiết lập khởi chạy vẫn được giữ nguyên. Không thể tự động nhận diện một cách đáng tin cậy việc đổi tên khi trợ lý đã đóng hoặc chuyển sang ổ đĩa khác. Khi đó, hãy nhấp đúp vào mục để tự cập nhật đường dẫn đầy đủ.")
+        catalog.Set("• 确认后只更新守护路径，名称、图标和启动设置保持不变；关闭小助手期间发生的更名或跨磁盘移动无法可靠自动识别，请双击守护对象手动更新完整路径。", "• Sau khi xác nhận, chỉ đường dẫn giám sát được cập nhật. Tên, biểu tượng và thiết lập khởi chạy vẫn được giữ nguyên. Không thể tự động nhận diện một cách đáng tin cậy việc đổi tên khi trợ lý đã đóng hoặc chuyển sang ổ đĩa khác. Khi đó, hãy nhấp đúp vào mục để tự cập nhật đường dẫn đầy đủ.")
         return catalog
     }
 }

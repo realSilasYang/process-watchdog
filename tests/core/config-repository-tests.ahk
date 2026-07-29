@@ -106,7 +106,7 @@ RunConfigRepositoryTests() {
         AssertConfigRepository(InStr(iniText,
             "; CheckInterval：状态检查间隔")
             && InStr(iniText, "; GuiH：主窗口高度")
-            && InStr(iniText, "; 每个 AppN 对应一个监控项"),
+            && InStr(iniText, "; 每个 AppN 对应一个守护对象"),
             "配置注释没有恢复到对应分区或键")
         repository.ReplaceSections([{Name: "Display", Entries: [
             {Key: "App1", Value: "name|icon"}]}])
@@ -181,7 +181,7 @@ RunConfigRepositoryTests() {
         chineseText := FileRead(englishConfigPath, "UTF-16")
         AssertConfigRepository(InStr(chineseText,
             "; 本区保存运行参数")
-            && InStr(chineseText, "; 每个 AppN 对应一个监控项"),
+            && InStr(chineseText, "; 每个 AppN 对应一个守护对象"),
             "中文环境没有生成中文配置注释")
 
         LocalizationService.Configure("en-US")

@@ -1,4 +1,4 @@
-; 添加守护项窗口。
+; 添加守护对象窗口。
 ; 支持直接选择目标、批量导入和应用搜索；异步扫描以会话代际隔离，窗口关闭后
 ; 迟到的工作器结果只能被丢弃，不能继续写入控件或重复提交撤销记录。
 
@@ -44,7 +44,7 @@ class AddItemDialog extends ManagedWindow {
             return
         }
 
-        if !this.CreateOwnedGui(this.owner, "-MinimizeBox -MaximizeBox", Tr("添加监控项"))
+        if !this.CreateOwnedGui(this.owner, "-MinimizeBox -MaximizeBox", Tr("添加守护对象"))
             return
         try {
         this.gui.OnEvent("Escape", ObjBindMethod(this, "Close"))
@@ -498,7 +498,7 @@ class AddItemDialog extends ManagedWindow {
                 CreateAppHistoryAction("add", addedPaths))
             SaveAppsToIni()
         }
-        message := Tr("已添加 {1} 个监控项。", addedCount)
+        message := Tr("已添加 {1} 个守护对象。", addedCount)
         if wasTruncated
             message .= Tr(" 扫描达到时间或数量上限，结果已截断。")
         LogMsg(message)
@@ -550,7 +550,7 @@ class AddItemDialog extends ManagedWindow {
         if this.IsBatchSessionCurrent(failureSessionId) {
             message := context Tr("。")
             if addedCount
-                message .= Tr(" 已保留并保存此前添加的 {1} 个监控项。", addedCount)
+                message .= Tr(" 已保留并保存此前添加的 {1} 个守护对象。", addedCount)
             try ShowDarkMsgBox(message, Tr("批量导入中断"), "Error", this.gui)
         }
     }
@@ -591,7 +591,7 @@ class AddItemDialog extends ManagedWindow {
             CommitUndoState(undoState,
                 CreateAppHistoryAction("add", addedPaths))
             SaveAppsToIni()
-            LogMsg(Tr("批量导入已取消，已保留并保存此前添加的 {1} 个监控项。",
+            LogMsg(Tr("批量导入已取消，已保留并保存此前添加的 {1} 个守护对象。",
                 addedCount))
         }
         return cancelledSessionId
@@ -631,14 +631,14 @@ class AddItemDialog extends ManagedWindow {
         undoState := CaptureAppConfigState()
         if !RegisterApp(normalizedPath, 1, 0, resolvedWorkDir, "", "", "",
             "", false, shortcutArgs) {
-            LogMsg(Tr("添加监控项失败，已回滚内存状态：{1}",
+            LogMsg(Tr("添加守护对象失败，已回滚内存状态：{1}",
                 normalizedPath))
             return false
         }
         CommitUndoState(undoState,
             CreateAppHistoryAction("add", normalizedPath))
         SaveAppsToIni()
-        LogMsg(Tr("手动添加监控：{1}", normalizedPath))
+        LogMsg(Tr("手动添加守护对象：{1}", normalizedPath))
         return true
     }
 

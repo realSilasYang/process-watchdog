@@ -622,7 +622,7 @@ AssertAdminOverlayIcon() {
 AssertCompleteMainImageList() {
     global Main
     testGui := Gui()
-    testList := testGui.Add("ListView", "w480 h220 Report", ["应用程序", "状态"])
+    testList := testGui.Add("ListView", "w480 h220 Report", ["守护对象", "状态"])
     imageList := 0
     Main := {
         gui: testGui,

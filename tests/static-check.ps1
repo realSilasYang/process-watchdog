@@ -1056,7 +1056,7 @@ if ($targetSpecsServiceSource -notmatch 'StateValue\(stateObj, "RuntimePath"[\s\
 }
 if ($configRepositorySource -notmatch '\{Name:\s*"Launch",\s*Lines:' -or
     $iniText -notmatch '(?m)^\[Launch\]\r?$' -or
-    $iniText -notmatch 'AppN 与 \[Apps\] 中同名项目一一对应，依次保存启动程序或解释器路径及其参数') {
+    $iniText -notmatch 'AppN 与 \[Apps\] 中同名的守护对象一一对应，依次保存启动程序或解释器路径及其参数') {
     $failures.Add('The repository and UTF-16 example configuration must document the Launch section in place')
 }
 if ($documentationSource.Contains('Python 虚拟环境变量不能可靠替换 .py 文件关联所用的解释器')) {
@@ -2071,7 +2071,7 @@ if ($source -notmatch 'LV_ItemDrag\(ctrl, lParam\)[\s\S]{0,3200}QueueGuardMutati
     $failures.Add('List drag reorder must synchronize and persist the visible order')
 }
 foreach ($mainListColumnCheck in @(
-    @{ Name = 'four localized columns plus hidden semantic key'; Passed = $mainSource -match '\[Tr\("\u5E94\u7528\u7A0B\u5E8F"\),\s*Tr\("\u72B6\u6001"\),\s*Tr\("\u5B8C\u6574\u8DEF\u5F84"\),\s*Tr\("\u5E8F\u53F7"\),\s*""\s*\]' },
+    @{ Name = 'four localized columns plus hidden semantic key'; Passed = $mainSource -match '\[Tr\("\u5B88\u62A4\u5BF9\u8C61"\),\s*Tr\("\u72B6\u6001"\),\s*Tr\("\u5B8C\u6574\u8DEF\u5F84"\),\s*Tr\("\u5E8F\u53F7"\),\s*""\s*\]' },
     @{ Name = 'column-order application'; Passed = $mainSource -match 'Main\.listProjection\.ApplyColumnOrder\(Main\.lv\)' },
     @{ Name = 'sequence-first display order'; Passed = $mainListProjectionSource -match 'displayOrder\s*:=\s*\[3,\s*0,\s*1,\s*2,\s*4\]' },
     @{ Name = 'hidden semantic-key width'; Passed = $mainSource -match 'Main\.lv\.ModifyCol\(5,\s*0\)' },

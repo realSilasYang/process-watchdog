@@ -60,9 +60,9 @@ class DarkTooltipWindow extends ManagedWindow {
                 } else if (control == Main.btnAdd) {
                     text := Tr("添加程序、脚本或快捷方式`n支持搜索、文件夹批量导入和文件拖放")
                 } else if (control == Main.btnDel) {
-                    text := Tr("删除选中的守护项目（支持多选，可撤销）`n快捷键：Delete")
+                    text := Tr("删除选中的守护对象（支持多选，可撤销）`n快捷键：Delete")
                 } else if (control == Main.btnPause) {
-                    text := Tr("暂停或恢复选中项目的守护，不会退出目标`n支持多选；混合状态时逐项反转")
+                    text := Tr("暂停或恢复选中守护对象，不会退出目标`n支持多选；混合状态时逐项反转")
                 } else if (control == Main.btnSet) {
                     text := Tr("配置通用、监控与启动、停止策略、日志`n以及关于选项")
                 } else if (control == Main.btnSupport) {

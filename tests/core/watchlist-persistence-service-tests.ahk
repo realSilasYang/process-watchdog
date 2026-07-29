@@ -2,7 +2,7 @@
 #Warn All, StdOut
 
 ; 验证守护列表顺序、升级配置、展示配置和恢复记录的一致持久化。
-; 损坏项目必须进入恢复区并在后续保存中原样保留，不能静默丢失用户数据。
+; 损坏的守护对象必须进入恢复区并在后续保存中原样保留，不能静默丢失用户数据。
 
 #Include ..\..\src\Config\IniFieldCodec.ahk
 #Include ..\..\src\Config\WatchdogConfigRepository.ahk
@@ -187,7 +187,7 @@ RunWatchlistPersistenceServiceTests() {
             && repository.ReadSectionEntries("Launch").Length == 2
             && repository.ReadSectionEntries("Recovery").Length == 7
             && repository.Read("Recovery", "Entry1", "missing") == "",
-            "监控项顺序、当前九字段格式或恢复记录没有原子保存")
+            "守护对象顺序、当前九字段格式或恢复记录没有原子保存")
 
         reloadedRecords := []
         reloaded := service.Load(

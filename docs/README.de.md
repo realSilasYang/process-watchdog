@@ -38,7 +38,7 @@ Das Projekt bietet eine helle und dunkle Oberfläche, automatische Wiederherstel
   <img src="images/process-watchdog-overview.png" alt="Hauptfenster von Process Watchdog Assistant" width="100%">
 </p>
 
-Das Hauptfenster zeigt Reihenfolge, Anwendungssymbol, Namen, Rechteanforderung und aktuellen Status aller überwachten Einträge. Über die obere Leiste können Einträge hinzugefügt, gelöscht und pausiert sowie Einstellungen, Hilfe und Spenden geöffnet werden; in der Hilfe stehen Handbuch und Laufzeitprotokoll bereit. Die untere Leiste fasst laufende, wiederherzustellende, aktualisierte, pausierte und fehlgeschlagene Ziele zusammen. Das Protokoll erläutert die Belege hinter ungewöhnlichen Zuständen.
+Das Hauptfenster zeigt Reihenfolge, Anwendungssymbol, Namen, Rechteanforderung und aktuellen Status aller überwachten Ziele. Über die obere Leiste können Ziele hinzugefügt, gelöscht und pausiert sowie Einstellungen, Hilfe und Spenden geöffnet werden; in der Hilfe stehen Handbuch und Laufzeitprotokoll bereit. Die untere Leiste fasst laufende, wiederherzustellende, aktualisierte, pausierte und fehlgeschlagene Ziele zusammen. Das Protokoll erläutert die Belege hinter ungewöhnlichen Zuständen.
 
 ## Wichtigste Funktionen
 
@@ -68,7 +68,7 @@ Ein vollständiger GUI-Automatisierungslauf ist unter Windows 11 mit echten 200 
 ---
 
 **[Benutzerhandbuch](#benutzerhandbuch)**<br>
-[Installation](#1-installation-und-erster-start) · [Verwaltung](#2-einträge-hinzufügen-und-verwalten) · [Status](#3-status-und-wiederherstellung) · [Updates](#4-schutz-bei-updates) · [Einstellungen](#5-einstellungen) · [Protokolle](#6-protokolle-diagnose-und-datenschutz)
+[Installation](#1-installation-und-erster-start) · [Verwaltung](#2-ziele-hinzufügen-und-verwalten) · [Status](#3-status-und-wiederherstellung) · [Updates](#4-schutz-bei-updates) · [Einstellungen](#5-einstellungen) · [Protokolle](#6-protokolle-diagnose-und-datenschutz)
 
 **[Entwicklerhandbuch](#entwicklerhandbuch)**<br>
 [Verzeichnisse](#1-verzeichnisse-und-zuständigkeiten) · [Korrektheit](#2-korrektheitsgrenzen) · [Prüfung](#3-prüfbefehle) · [Veröffentlichung](#4-veröffentlichung-und-mitarbeit)
@@ -107,12 +107,12 @@ Für den Start aus dem Quellcode installieren Sie AutoHotkey v2 x64 und führen 
 
 Das Schließen des Hauptfensters blendet es nur im Infobereich aus; die Überwachung läuft weiter. Verwenden Sie „Beenden“ im Infobereichsmenü, um die Anwendung vollständig zu stoppen. Siehe [Installation, Aktualisierung und Entfernung](en/installation.md) für Verknüpfungen, geplanten Start und Updates.
 
-## 2. Einträge hinzufügen und verwalten
+## 2. Ziele hinzufügen und verwalten
 
 | Schaltfläche | Funktion |
 | --- | --- |
 | Hinzufügen | Ziel wählen, installierte Anwendungen suchen oder Ordner importieren; Unterordner sind standardmäßig eingeschlossen |
-| Löschen | Ausgewählte Einträge entfernen; Mehrfachauswahl und Rückgängig werden unterstützt |
+| Löschen | Ausgewählte Ziele entfernen; Mehrfachauswahl und Rückgängig werden unterstützt |
 | Pausieren / Fortsetzen | Nur automatische Überwachung ändern, ohne das laufende Ziel zu schließen; gemischte Auswahl wird einzeln umgeschaltet |
 | Einstellungen | Allgemein, Überwachung und Start, Stopprichtlinie, Protokolle und Info konfigurieren |
 | Hilfe | Eingebautes Handbuch, Laufzeitprotokoll oder GitHub-Feedbackseite auswählen |
@@ -122,7 +122,7 @@ Ein Eintrag kann Einstiegspunkt, Arbeitsordner, Argumente und Administratoranfor
 
 Das Kontextmenü öffnet den Speicherort, startet neu, ändert den Pfad, konfiguriert Prozesserkennung und Starteinstellungen, schaltet die Administratoranforderung um, richtet Updateschutz ein und passt Namen oder Symbol nur im Hauptfenster an. Die Darstellung ändert weder Identität, Start noch Schutz. Sind bereits Standardwerte aktiv, ist das Zurücksetzen deaktiviert.
 
-Nur BAT- und CMD-Einträge zeigen zusätzlich den Befehl „Batch-Ausgabeprotokoll anzeigen“; bei anderen Zieltypen erscheint er nicht. Die eigenständige Protokolldatei wird nur angelegt, wenn der Assistent den Batch-Eintrag tatsächlich startet und dessen Standardausgabe und Fehlerausgabe erfasst. Für einen bereits laufenden Batch-Prozess entsteht sie nicht automatisch.
+Nur BAT- und CMD-Ziele zeigen zusätzlich den Befehl „Batch-Ausgabeprotokoll anzeigen“; bei anderen Zieltypen erscheint er nicht. Die eigenständige Protokolldatei wird nur angelegt, wenn der Assistent das Batch-Ziel tatsächlich startet und dessen Standardausgabe und Fehlerausgabe erfasst. Für einen bereits laufenden Batch-Prozess entsteht sie nicht automatisch.
 
 Ziehen Sie Zeilen zum Sortieren; die Reihenfolge wird gespeichert. `Ctrl+Z`, `Ctrl+Y` und `Ctrl+Shift+Z` machen Hinzufügen, Löschen, Sortieren und Konfigurationsänderungen rückgängig oder wiederholen sie. Die linke Nummer wird aus der sichtbaren Reihenfolge neu gebildet und gehört nicht zu Identität, Start oder Speicherung. Siehe [Typische Szenarien](en/quick-start.md).
 
@@ -209,7 +209,7 @@ Das Stammskript bindet nur Module ein, setzt Abhängigkeiten zusammen und starte
 - Zielidentität, Startpunkt und angepasste Darstellung sind unabhängig; Darstellungseinstellungen dürfen Überwachungsentscheidungen nicht ändern.
 - `Running`, `Stopped` und `Unknown` sind Ergebnisse externer Belege; Wiederherstellung beginnt nur nach bestätigtem Stopp.
 - Timer, Rückrufe, Beobachter, Arbeitsprozesse, Fenster und native Ressourcen benötigen einen idempotenten Bereinigungspfad.
-- Konfigurationsabbild, Einträge und Updateschutz werden in derselben Transaktion bestätigt; Tests dürfen persönliche `watchdog.ini` weder lesen noch überschreiben.
+- Konfigurationsabbild, überwachte Ziele und Updateschutz werden in derselben Transaktion bestätigt; Tests dürfen persönliche `watchdog.ini` weder lesen noch überschreiben.
 - Der verworfene weiche Bildlauf mit GDI-Bildüberlagerung darf nicht zurückkehren; ListView und Protokoll behalten nativen Bildlauf.
 - Aussagen zu DPI, Symbolen, dunklem Modus, Hierarchie und Barrierefreiheit erfordern echte Windows-Prüfungen; Automatisierung ersetzt keine physische Matrix.
 

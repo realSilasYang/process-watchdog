@@ -1,4 +1,4 @@
-; 单个守护项的软件升级保护设置窗口。
+; 单个守护对象的软件升级保护设置窗口。
 ; 用户配置与后台实时学习到的更新程序特征在保存时合并；除非用户明确清空，
 ; 窗口打开期间新发现的证据不会被旧表单覆盖，未变化的设置也不会创建撤销记录。
 
@@ -36,7 +36,7 @@ class MaintenanceSettingsDialog extends ManagedWindow {
             InitializeApplicationWindow(this.gui)
 
             this.gui.Add("Text", "x20 y14 w" contentWidth
-                " h20 BackgroundTrans", Tr("守护目标："))
+                " h20 BackgroundTrans", Tr("守护对象："))
             targetInput := AddCenteredSingleLineEdit(this.gui, 20, 38,
                 contentWidth, 26, path, "ReadOnly",
                 UiThemeService.Color("Surface"))

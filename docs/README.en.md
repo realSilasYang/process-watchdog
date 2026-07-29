@@ -127,7 +127,7 @@ The six main-window buttons have the following roles:
 | Button | Purpose |
 | --- | --- |
 | Add | Select one target, search installed applications, or import a folder; folder import scans subdirectories by default |
-| Delete | Remove selected monitoring items; multiple selections are supported and deletion can be undone |
+| Delete | Remove selected watched targets; multiple selections are supported and deletion can be undone |
 | Pause / Resume | Change automatic monitoring only; the currently running target is not closed, and a mixed selection is toggled item by item |
 | Settings | Configure General, Monitoring & startup, Stop Policy, Logs, and About |
 | Help | Choose the built-in user guide, this session's runtime log, or the GitHub feedback page |
@@ -264,7 +264,7 @@ The root script includes modules, wires dependencies, and starts the application
 - Target identity, launch entry, and custom display are independent. Display settings must never change monitoring decisions.
 - `Running`, `Stopped`, and `Unknown` are evidence results. Recovery begins only after a confirmed stop.
 - Every timer, message callback, file watcher, worker process, window, and native resource needs an idempotent cleanup path.
-- Configuration snapshots, monitoring items, and update-protection settings are committed in one transaction. Tests must not read or overwrite personal `watchdog.ini` files.
+- Configuration snapshots, watched targets, and update-protection settings are committed in one transaction. Tests must not read or overwrite personal `watchdog.ini` files.
 - The abandoned GDI screenshot-overlay smooth-scrolling approach must not return; the ListView and log retain native scrolling.
 - DPI, icon, dark-mode, hierarchy, and accessibility claims must be backed by actual Windows and scaling evidence. Automation does not replace a physical display matrix.
 

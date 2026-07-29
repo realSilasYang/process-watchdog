@@ -1,5 +1,5 @@
 ; 守护列表与升级、展示配置的持久化服务。
-; 加载时保留 INI 中的条目顺序，损坏记录进入恢复区而不是静默丢弃；
+; 加载时保留 INI 中的守护对象顺序，损坏记录进入恢复区而不是静默丢弃；
 ; 保存时把启动、升级和展示配置作为一个一致快照提交，并原样保留仍无法解析的恢复记录。
 
 class WatchlistPersistenceService {
@@ -14,7 +14,7 @@ class WatchlistPersistenceService {
 
     Load(registerCallback) {
         if !IsObject(registerCallback)
-            throw TypeError("监控项注册回调无效")
+            throw TypeError("守护对象注册回调无效")
         result := {
             Warnings: [],
             RecoveryEntries: this.ReadRecoveryEntries(),
@@ -31,7 +31,7 @@ class WatchlistPersistenceService {
                     displayValues, launchValues)
                 if !registerCallback.Call(record)
                     throw this.CreateLoadError("Apps", "目标路径",
-                        "与已加载项目重复，或目标格式无效")
+                        "与已加载守护对象重复，或目标格式无效")
                 result.RegisteredCount++
             } catch as loadError {
                 result.Warnings.Push(this.CreateLoadWarning(appEntry,
@@ -44,7 +44,7 @@ class WatchlistPersistenceService {
 
     Save(appOrder, appStates, recoveryEntries) {
         if Type(appOrder) != "Array" || !IsObject(appStates)
-            throw TypeError("监控项保存状态无效")
+            throw TypeError("守护对象保存状态无效")
         if Type(recoveryEntries) != "Array"
             throw TypeError("恢复记录列表无效")
         orderedPaths := this.BuildOrderedPaths(appOrder, appStates)
@@ -56,7 +56,7 @@ class WatchlistPersistenceService {
             snapshot := this.SnapshotService.CreateSnapshot(savePath,
                 appStates[savePath])
             if !snapshot
-                throw Error("无法生成监控项快照: " savePath)
+                throw Error("无法生成守护对象快照: " savePath)
             value := snapshot.Enabled "|" snapshot.RunAsAdmin "|"
                 . snapshot.Path "|" this.FieldCodec.Encode(snapshot.WorkDir)
             value .= "|" this.FieldCodec.Encode(snapshot.Args)

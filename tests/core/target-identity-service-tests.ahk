@@ -2,7 +2,7 @@
 #Warn All, StdOut
 
 ; 验证目标身份冲突检测和快捷方式身份刷新事务。
-; 刷新期间控制器若被替换或新身份与现有项目冲突，任何候选结果都不能提交。
+; 刷新期间控制器若被替换或新身份与现有守护对象冲突，任何候选结果都不能提交。
 
 #Include ..\..\src\Core\TargetSpecs.ahk
 #Include ..\..\src\Core\TargetIdentityService.ahk
