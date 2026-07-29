@@ -16,7 +16,11 @@ class GuiModuleRegistry {
         this.addItem := AddItemDialog(mainGui)
         this.tooltip := DarkTooltipWindow()
         this.historyToast := HistoryToastWindow()
+        this.targetRelocation := TargetRelocationPrompt(mainGui)
         this.stopped := false
+        if App.HasOwnProp("targetRelocationService")
+            SetTimer(ObjBindMethod(App.targetRelocationService,
+                "RedeliverPending"), -1)
     }
 
     HideTransientWindows() {
@@ -42,6 +46,7 @@ class GuiModuleRegistry {
         try this.maintenance.Close()
         try this.tooltip.Close()
         try this.historyToast.Close()
+        try this.targetRelocation.Shutdown()
     }
 }
 

@@ -43,6 +43,7 @@ The main window keeps each target's order, application icon, display name, privi
 - Monitor EXE, AHK, Python, JavaScript, PowerShell, BAT, CMD, and LNK targets.
 - Use `Running`, `Stopped`, and `Unknown` probe results; an unknown result never triggers a blind restart.
 - Give every target its own controller, generation, and task tokens, so stale callbacks become invalid immediately after pausing, deletion, or path changes.
+- Resolve a directly added file by its Windows file ID after a rename or same-volume move, then ask for confirmation instead of guessing from similar files in the folder.
 - Enforce an administrator requirement when configured; report a privilege mismatch for an existing process and elevate a manual restart.
 - Keep update protection off by default. When enabled, combine updater processes, parent-child relationships, installation-directory activity, and file stability before pausing or resuming monitoring.
 - Replace configuration atomically. Records that cannot be parsed are moved to `[Recovery]` instead of being silently discarded.

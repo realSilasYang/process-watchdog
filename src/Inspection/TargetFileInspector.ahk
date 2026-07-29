@@ -8,20 +8,26 @@ class TargetFileInspector {
     }
 
     GetFingerprint(path) {
+        identity := this.GetIdentity(path)
+        return identity.Available ? identity.Fingerprint : "MISSING"
+    }
+
+    GetIdentity(path) {
         if !this.Callbacks.IsSupportedTarget.Call(path)
-            return "MISSING"
+            return this.MissingIdentity()
         path := this.Callbacks.GetSubjectPath.Call(path)
         if !FileExist(path) || DirExist(path)
-            return "MISSING"
+            return this.MissingIdentity()
         try fileSize := FileGetSize(path)
         catch
-            return "MISSING"
+            return this.MissingIdentity()
         try modifiedTime := FileGetTime(path, "M")
         catch
-            return "MISSING"
+            return this.MissingIdentity()
         volumeSerial := 0
         fileIndexHigh := 0
         fileIndexLow := 0
+        nativeIdentityAvailable := false
         fileHandle := DllCall("kernel32\CreateFileW", "WStr", path,
             "UInt", 0, "UInt", Win32.FILE_SHARE_ALL, "Ptr", 0,
             "UInt", Win32.OPEN_EXISTING, "UInt", Win32.FILE_ATTRIBUTE_NORMAL,
@@ -37,14 +43,105 @@ class TargetFileInspector {
                     volumeSerial := NumGet(fileInfo, 28, "UInt")
                     fileIndexHigh := NumGet(fileInfo, 44, "UInt")
                     fileIndexLow := NumGet(fileInfo, 48, "UInt")
+                    nativeIdentityAvailable := volumeSerial
+                        || fileIndexHigh || fileIndexLow
                 }
             } finally {
                 DllCall("kernel32\CloseHandle", "Ptr", fileHandle)
             }
         }
-        return fileSize "|" modifiedTime "||"
+        fingerprint := fileSize "|" modifiedTime "||"
             . Format("{:08X}{:08X}{:08X}", volumeSerial, fileIndexHigh,
                 fileIndexLow)
+        return {
+            Available: true,
+            NativeIdentityAvailable: !!nativeIdentityAvailable,
+            Path: path,
+            FileSize: fileSize,
+            ModifiedTime: modifiedTime,
+            VolumeSerial: volumeSerial,
+            FileIndexHigh: fileIndexHigh,
+            FileIndexLow: fileIndexLow,
+            Fingerprint: fingerprint
+        }
+    }
+
+    ; 同一卷内的文件在改名或移动后仍保留文件 ID。OpenFileById 可以直接按
+    ; 该身份重新打开文件并取得当前完整路径，不需要枚举目录或扫描整个磁盘。
+    ResolveCurrentPath(originalPath, identity) {
+        if !IsObject(identity) || !identity.HasOwnProp(
+            "NativeIdentityAvailable") || !identity.NativeIdentityAvailable
+            return ""
+        originalPath := String(originalPath)
+        if !RegExMatch(originalPath, "i)^([A-Z]:)\\", &volumeMatch)
+            return ""
+        volumePath := "\\.\" volumeMatch[1]
+        volumeHandle := DllCall("kernel32\CreateFileW", "WStr", volumePath,
+            "UInt", 0x80, "UInt", Win32.FILE_SHARE_ALL, "Ptr", 0,
+            "UInt", Win32.OPEN_EXISTING,
+            "UInt", Win32.FILE_FLAG_BACKUP_SEMANTICS, "Ptr", 0, "Ptr")
+        if (!volumeHandle || volumeHandle == -1)
+            return ""
+        fileHandle := 0
+        try {
+            descriptor := Buffer(24, 0)
+            NumPut("UInt", descriptor.Size, descriptor, 0)
+            NumPut("Int", 0, descriptor, 4) ; FileIdType：使用 64 位文件编号。
+            fileId := (identity.FileIndexHigh << 32)
+                | identity.FileIndexLow
+            NumPut("Int64", fileId, descriptor, 8)
+            fileHandle := DllCall("kernel32\OpenFileById",
+                "Ptr", volumeHandle, "Ptr", descriptor.Ptr,
+                "UInt", 0x80, "UInt", Win32.FILE_SHARE_ALL,
+                "Ptr", 0, "UInt", Win32.FILE_FLAG_BACKUP_SEMANTICS,
+                "Ptr")
+            if (!fileHandle || fileHandle == -1)
+                return ""
+            requiredLength := DllCall("kernel32\GetFinalPathNameByHandleW",
+                "Ptr", fileHandle, "Ptr", 0, "UInt", 0,
+                "UInt", 0, "UInt")
+            if !requiredLength || requiredLength >= 32768
+                return ""
+            pathBuffer := Buffer((requiredLength + 1) * 2, 0)
+            copiedLength := DllCall("kernel32\GetFinalPathNameByHandleW",
+                "Ptr", fileHandle, "Ptr", pathBuffer.Ptr,
+                "UInt", requiredLength + 1, "UInt", 0, "UInt")
+            if !copiedLength || copiedLength > requiredLength
+                return ""
+            currentPath := StrGet(pathBuffer.Ptr, copiedLength, "UTF-16")
+            if SubStr(currentPath, 1, 8) == "\\?\UNC\"
+                currentPath := "\\" SubStr(currentPath, 9)
+            else if SubStr(currentPath, 1, 4) == "\\?\"
+                currentPath := SubStr(currentPath, 5)
+            currentIdentity := this.GetIdentity(currentPath)
+            if !currentIdentity.Available
+                || !currentIdentity.NativeIdentityAvailable
+                || currentIdentity.VolumeSerial != identity.VolumeSerial
+                || currentIdentity.FileIndexHigh != identity.FileIndexHigh
+                || currentIdentity.FileIndexLow != identity.FileIndexLow
+                return ""
+            return currentPath
+        } catch {
+            return ""
+        } finally {
+            if fileHandle && fileHandle != -1
+                DllCall("kernel32\CloseHandle", "Ptr", fileHandle)
+            DllCall("kernel32\CloseHandle", "Ptr", volumeHandle)
+        }
+    }
+
+    MissingIdentity() {
+        return {
+            Available: false,
+            NativeIdentityAvailable: false,
+            Path: "",
+            FileSize: 0,
+            ModifiedTime: "",
+            VolumeSerial: 0,
+            FileIndexHigh: 0,
+            FileIndexLow: 0,
+            Fingerprint: "MISSING"
+        }
     }
 
     IsReady(path) {

@@ -200,7 +200,103 @@ AssertRoundedButtonSvgImage() {
     }
 }
 
-AssertVisualTextCenter(fontName, pointSize, fontWeight, dpi, text) {
+MeasureLeadingCommandSymbolPixels(symbol) {
+    width := 40
+    height := 30
+    screenDc := DllCall("user32\GetDC", "Ptr", 0, "Ptr")
+    targetDc := screenDc ? DllCall("gdi32\CreateCompatibleDC",
+        "Ptr", screenDc, "Ptr") : 0
+    targetBitmap := targetDc ? DllCall("gdi32\CreateCompatibleBitmap",
+        "Ptr", screenDc, "Int", width, "Int", height, "Ptr") : 0
+    previousBitmap := 0
+    backgroundBrush := 0
+    try {
+        AssertRoundedButtonRenderer(screenDc && targetDc && targetBitmap,
+            "无法创建状态按钮符号像素画布")
+        previousBitmap := DllCall("gdi32\SelectObject", "Ptr", targetDc,
+            "Ptr", targetBitmap, "Ptr")
+        backgroundBrush := DllCall("gdi32\CreateSolidBrush", "UInt", 0,
+            "Ptr")
+        canvasRect := Buffer(16, 0)
+        NumPut("Int", width, canvasRect, 8)
+        NumPut("Int", height, canvasRect, 12)
+        DllCall("user32\FillRect", "Ptr", targetDc, "Ptr", canvasRect,
+            "Ptr", backgroundBrush)
+        AssertRoundedButtonRenderer(
+            RoundedButtonRenderer.DrawLeadingCommandSymbol(targetDc, symbol,
+                10, 0, 30, height, "FFFFFF", 10),
+            "无法绘制状态按钮符号：" symbol)
+
+        minimumX := width
+        minimumY := height
+        maximumX := -1
+        maximumY := -1
+        visiblePixels := 0
+        Loop height {
+            y := A_Index - 1
+            Loop width {
+                x := A_Index - 1
+                if DllCall("gdi32\GetPixel", "Ptr", targetDc,
+                        "Int", x, "Int", y, "UInt") == 0
+                    continue
+                minimumX := Min(minimumX, x)
+                minimumY := Min(minimumY, y)
+                maximumX := Max(maximumX, x)
+                maximumY := Max(maximumY, y)
+                visiblePixels++
+            }
+        }
+        AssertRoundedButtonRenderer(visiblePixels > 0,
+            "状态按钮符号没有可见像素：" symbol)
+        return {
+            Left: minimumX,
+            Top: minimumY,
+            Right: maximumX,
+            Bottom: maximumY,
+            Width: maximumX - minimumX + 1,
+            Height: maximumY - minimumY + 1,
+            CenterX: (minimumX + maximumX) / 2,
+            CenterY: (minimumY + maximumY) / 2,
+            PixelCount: visiblePixels
+        }
+    } finally {
+        if backgroundBrush
+            DllCall("gdi32\DeleteObject", "Ptr", backgroundBrush)
+        if previousBitmap
+            DllCall("gdi32\SelectObject", "Ptr", targetDc,
+                "Ptr", previousBitmap)
+        if targetBitmap
+            DllCall("gdi32\DeleteObject", "Ptr", targetBitmap)
+        if targetDc
+            DllCall("gdi32\DeleteDC", "Ptr", targetDc)
+        if screenDc
+            DllCall("user32\ReleaseDC", "Ptr", 0, "Ptr", screenDc)
+    }
+}
+
+AssertLeadingCommandSymbolGeometry() {
+    referenceBounds := MeasureLeadingCommandSymbolPixels("▶")
+    for symbol in ["⏸", "▶"] {
+        bounds := symbol == "▶" ? referenceBounds
+            : MeasureLeadingCommandSymbolPixels(symbol)
+        weightRatio := bounds.PixelCount / referenceBounds.PixelCount
+        AssertRoundedButtonRenderer(
+            Abs(bounds.Width - referenceBounds.Width) <= 1
+                && Abs(bounds.Height - referenceBounds.Height) <= 1,
+            "主命令按钮符号的外接尺寸不一致：" symbol)
+        AssertRoundedButtonRenderer(
+            Abs(bounds.CenterX - referenceBounds.CenterX) <= 0.5
+                && Abs(bounds.CenterY - referenceBounds.CenterY) <= 0.5,
+            "主命令按钮符号的可见中心不一致：" symbol)
+        AssertRoundedButtonRenderer(weightRatio >= 0.7
+                && weightRatio <= 1.4,
+            "主命令按钮符号的视觉重量差异过大：" symbol "／"
+                weightRatio)
+    }
+}
+
+AssertVisualTextCenter(fontName, pointSize, fontWeight, dpi, text,
+    useRasterMeasurement := false) {
     width := Max(160, Round(160 * dpi / 96))
     height := Max(40, Round(40 * dpi / 96))
     pixelHeight := Max(1, Round(pointSize * dpi / 72))
@@ -228,8 +324,11 @@ AssertVisualTextCenter(fontName, pointSize, fontWeight, dpi, text) {
         DllCall("gdi32\SetBkMode", "Ptr", targetDc, "Int", 1)
         DllCall("gdi32\SetTextColor", "Ptr", targetDc,
             "UInt", 0x00FFFFFF)
-        textRect := TextVisualAlignment.CreateCenteredTextRect(targetDc,
-            text, 0, 0, width, height)
+        textRect := useRasterMeasurement
+            ? TextVisualAlignment.CreateRasterCenteredTextRect(targetDc,
+                text, 0, 0, width, height)
+            : TextVisualAlignment.CreateCenteredTextRect(targetDc,
+                text, 0, 0, width, height)
         DllCall("user32\DrawTextW", "Ptr", targetDc, "Str", text,
             "Int", -1, "Ptr", textRect, "UInt", 0x00000825, "Int")
 
@@ -272,10 +371,15 @@ AssertVisualTextCenter(fontName, pointSize, fontWeight, dpi, text) {
 
 AssertTextVisualAlignment() {
     TextVisualAlignment.InkBoundsCache.Clear()
+    TextVisualAlignment.RasterInkBoundsCache.Clear()
     systemFont := LocalizationService.GetLanguageSystemUiFontName()
     AssertVisualTextCenter(systemFont, 10, 700, 96, Tr("帮助信息"))
     AssertVisualTextCenter(systemFont, 10, 700, 288, Tr("帮助信息"))
     AssertVisualTextCenter("Segoe UI", 10, 700, 96, "Settings")
+    AssertVisualTextCenter(systemFont, 10, 700, 96, "➕", true)
+    AssertVisualTextCenter(systemFont, 10, 700, 288, "🗑️", true)
+    rasterCachedCount := TextVisualAlignment.RasterInkBoundsCache.Count
+    AssertVisualTextCenter(systemFont, 10, 700, 288, "🗑️", true)
     cachedCount := TextVisualAlignment.InkBoundsCache.Count
     delta := TextVisualAlignment.MeasureFontInkCenterDelta(
         systemFont, 12, 400, 96,
@@ -285,6 +389,10 @@ AssertTextVisualAlignment() {
     AssertRoundedButtonRenderer(cachedCount > 0
         && TextVisualAlignment.InkBoundsCache.Count >= cachedCount,
         "字形视觉中心缓存没有复用已测量字体与文本")
+    AssertRoundedButtonRenderer(rasterCachedCount >= 2
+        && TextVisualAlignment.RasterInkBoundsCache.Count
+            == rasterCachedCount,
+        "回退字符图标的栅格墨迹缓存没有复用已测量字体与文本")
 }
 
 AssertLucideSvgAssets() {
@@ -468,6 +576,7 @@ RunRoundedButtonRendererTests() {
     AssertRoundedButtonSurfaceColor(UiThemeService.Color("PauseDisabled"))
     AssertRoundedSelectionMask()
     AssertRoundedButtonSvgImage()
+    AssertLeadingCommandSymbolGeometry()
     AssertTextVisualAlignment()
     AssertLucideSvgAssets()
     AssertRoundedButtonAccessibility()

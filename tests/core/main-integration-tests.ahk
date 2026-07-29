@@ -56,11 +56,88 @@ class ReentrantWatchlistPersistenceTestService {
     }
 }
 
+RunWatchPathTransitionSnapshotTests() {
+    global App
+    previousPath := A_Temp "\watchdog-relocation-before.py"
+    requestedPath := A_Temp "\watchdog-relocation-after.py"
+    installRoot := A_Temp "\watchdog-relocation-product"
+    learnedActor := "P:" installRoot "\updater.exe|R:" installRoot
+    maintenanceConfig := App.maintenanceConfigCodec.CreateDefault(previousPath)
+    maintenanceConfig.Enabled := true
+    maintenanceConfig.RootIsCustom := true
+    maintenanceConfig.InstallRoot := installRoot
+    maintenanceConfig.DetectionSeconds := 17
+    maintenanceConfig.StableSeconds := 23
+    maintenanceConfig.MaxWaitSeconds := 2400
+    maintenanceConfig.LearnedActors := [learnedActor]
+    displayConfig := {
+        Name: "迁移测试自定义名称",
+        IconPath: A_AhkPath
+    }
+    stateObj := TargetSupervisor({
+        Enabled: false,
+        RunAsAdmin: true,
+        WorkDir: A_Temp,
+        Args: "--profile relocation",
+        EnvVars: "WATCHDOG_RELOCATION=1",
+        RuntimePath: A_AhkPath,
+        RuntimeArgs: "/ErrorStdOut",
+        ResolvedTarget: "",
+        ResolvedTargetManual: false,
+        ShortcutArgs: "",
+        MaintenanceConfig: maintenanceConfig,
+        DisplayConfig: displayConfig,
+        Scheduler: App.scheduler
+    })
+    App.appStates[previousPath] := stateObj
+    try {
+        beforeState := [App.appConfigSnapshotService.CreateSnapshot(
+            previousPath, stateObj)]
+        transition := PrepareWatchPathTransitionFromState(previousPath,
+            requestedPath, beforeState)
+        if !transition.Changed || transition.TargetState.Length != 1
+            throw Error("路径迁移没有生成唯一目标快照")
+        migrated := transition.TargetState[1]
+        expectedMaintenance := App.maintenanceConfigCodec.NormalizeSnapshot(
+            maintenanceConfig, requestedPath, "")
+        if !PathsEquivalent(migrated.Path, requestedPath)
+            || migrated.Enabled != 0 || migrated.RunAsAdmin != 1
+            || migrated.WorkDir != A_Temp
+            || migrated.Args != "--profile relocation"
+            || migrated.EnvVars != "WATCHDOG_RELOCATION=1"
+            || !PathsEquivalent(migrated.RuntimePath, A_AhkPath)
+            || migrated.RuntimeArgs != "/ErrorStdOut"
+            || !App.displayConfigCodec.Equals(migrated.Display,
+                displayConfig)
+            || !App.maintenanceConfigCodec.Equals(migrated.Maintenance,
+                expectedMaintenance) {
+            throw Error("路径迁移丢失名称、图标、参数、环境、运行时或升级保护配置")
+        }
+
+        history := AppConfigHistoryService(App.appConfigSnapshotService)
+        action := CreateAppHistoryAction("relocate-path",
+            [previousPath, requestedPath])
+        if !history.Commit(transition.BeforeState, transition.TargetState,
+                action)
+            || !history.Undo((*) => true, &undoEntry)
+            || undoEntry.Action.Kind != "relocate-path"
+            || undoEntry.Action.Paths.Length != 2
+            || !history.Redo((*) => true, &redoEntry)
+            || redoEntry != undoEntry {
+            throw Error("路径迁移没有建立可撤销且可重做的独立历史记录")
+        }
+    } finally {
+        if App.appStates.Has(previousPath)
+            App.appStates.Delete(previousPath)
+    }
+}
+
 RunMainIntegrationTests() {
     global App
     ; 本用例校验中文界面的全角标点契约，不依赖执行测试的 Windows 语言。
     LocalizationService.Configure("zh-CN")
     App := ApplicationState()
+    RunWatchPathTransitionSnapshotTests()
     maintenanceSink := SnapshotDeliveryTestSink()
     guardSink := SnapshotDeliveryTestSink()
     originalMaintenanceCoordinator := App.maintenanceCoordinator

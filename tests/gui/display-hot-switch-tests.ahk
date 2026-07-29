@@ -174,14 +174,17 @@ CreateDisplayHotSwitchMainWindow() {
             UiThemeService.Color("ToolbarText"),
         Tr("捐赠"))
     RegisterHoverButton(Main.btnAdd, UiThemeService.Color("Add"))
+    SetButtonLeadingTextSlot(Main.btnAdd, 20, 4)
     RegisterHoverButton(Main.btnPause,
         UiThemeService.Color("PauseDisabled"),
         UiThemeService.Color("PauseDisabled"), "",
         UiThemeService.Color("DisabledButtonText"))
+    SetButtonLeadingTextSlot(Main.btnPause, 20, 4)
     RegisterHoverButton(Main.btnDel,
         UiThemeService.Color("DeleteDisabled"),
         UiThemeService.Color("DeleteDisabled"), "",
         UiThemeService.Color("DisabledButtonText"))
+    SetButtonLeadingTextSlot(Main.btnDel, 20, 4)
     RegisterHoverButton(Main.btnSet, UiThemeService.Color("Toolbar"))
     RegisterHoverButton(Main.btnSupport, UiThemeService.Color("Toolbar"))
     RegisterHoverButton(Main.btnDonate, UiThemeService.Color("Toolbar"))
@@ -240,6 +243,16 @@ AssertMainCommandButtonSelectionState() {
     AssertDisplayHotSwitch(!addState.HasOwnProp("buttonImage")
         && !deleteState.HasOwnProp("buttonImage")
         && !pauseState.HasOwnProp("buttonImage")
+        && addState.HasOwnProp("leadingTextSlotDip")
+        && deleteState.HasOwnProp("leadingTextSlotDip")
+        && pauseState.HasOwnProp("leadingTextSlotDip")
+        && addState.leadingTextSlotDip == 20
+        && deleteState.leadingTextSlotDip == 20
+        && pauseState.leadingTextSlotDip == 20
+        && addState.leadingTextGapDip == 4
+        && deleteState.leadingTextGapDip == 4
+        && pauseState.leadingTextGapDip == 4
+        && pauseState.leadingTextVisualSizeDip == 10
         && Main.btnAdd.Text == Tr("➕ 添加")
         && Main.btnDel.Text == Tr("🗑️ 删除")
         && Main.btnPause.Text == Tr("⏸️ 暂停")

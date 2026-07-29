@@ -13,7 +13,7 @@
 
 ;@Ahk2Exe-SetName 进程守护小助手
 ;@Ahk2Exe-SetDescription 进程、脚本和快捷方式守护工具
-;@Ahk2Exe-SetVersion 2.0.2.0
+;@Ahk2Exe-SetVersion 2.0.3.0
 ;@Ahk2Exe-SetCopyright Copyright (c) 2026 进程守护小助手 contributors
 ;@Ahk2Exe-SetMainIcon assets\app\watchdog.ico
 
@@ -72,6 +72,7 @@
 #Include src\Inspection\ShortcutResolver.ahk
 #Include src\Inspection\ShortcutTargetResolver.ahk
 #Include src\Inspection\DirectoryChangeWatcher.ahk
+#Include src\Core\TargetRelocationService.ahk
 #Include src\Inspection\FileScanService.ahk
 #Include src\Diagnostics\DiagnosticBundleService.ahk
 #Include src\UI\IconResourceRegistry.ahk
@@ -109,6 +110,7 @@
 #Include app\Windows\ApplicationSearchDialog.ahk
 #Include app\Windows\DarkTooltipWindow.ahk
 #Include app\Windows\HistoryToastWindow.ahk
+#Include app\Windows\TargetRelocationPrompt.ahk
 #Include src\Core\GuardRuntime.ahk
 ; 业务运行态只有一个稳定根对象；函数只修改实例属性，不再重新绑定全局变量。
 LocalizationService.Configure(LocalizationService.ReadConfiguredLanguage(
@@ -391,12 +393,15 @@ Main.btnSet  := Main.gui.Add("Text", "x" buttonPositions.Settings " y15 w" Main.
 Main.btnSupport := Main.gui.Add("Text", "x" buttonPositions.Support " y15 w" Main.supportButtonWidth " h30 Center 0x200 Background" UiThemeService.Color("Toolbar") " c" UiThemeService.Color("ToolbarText"), Tr("帮助信息"))
 Main.btnDonate := Main.gui.Add("Text", "x" buttonPositions.Donate " y15 w" Main.donateButtonWidth " h30 Center 0x200 Background" UiThemeService.Color("Toolbar") " c" UiThemeService.Color("ToolbarText"), Tr("捐赠"))
 RegisterHoverButton(Main.btnAdd, UiThemeService.Color("Add"))
+SetButtonLeadingTextSlot(Main.btnAdd, 20, 4)
 RegisterHoverButton(Main.btnPause, UiThemeService.Color("PauseDisabled"),
     UiThemeService.Color("PauseDisabled"), "",
     UiThemeService.Color("DisabledButtonText"))
+SetButtonLeadingTextSlot(Main.btnPause, 20, 4)
 RegisterHoverButton(Main.btnDel, UiThemeService.Color("DeleteDisabled"),
     UiThemeService.Color("DeleteDisabled"), "",
     UiThemeService.Color("DisabledButtonText"))
+SetButtonLeadingTextSlot(Main.btnDel, 20, 4)
 RegisterHoverButton(Main.btnSet, UiThemeService.Color("Toolbar"))
 RegisterHoverButton(Main.btnSupport, UiThemeService.Color("Toolbar"))
 RegisterHoverButton(Main.btnDonate, UiThemeService.Color("Toolbar"))

@@ -94,6 +94,7 @@ class TargetSupervisor {
         this.SafetyStableSince := 0
         this.MaintenanceLearningCandidates := Map()
         this.MissingSinceTicks := 0
+        this.RelocationPending := false
         this.DisplayConfig := ""
         this.TargetSpecs := ""
         this.TargetSpecsFingerprint := ""

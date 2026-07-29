@@ -8,6 +8,8 @@
 class TextVisualAlignment {
     static InkBoundsCache := Map()
     static InkBoundsCacheLimit := 512
+    static RasterInkBoundsCache := Map()
+    static RasterInkBoundsCacheLimit := 128
 
     static MeasureText(hdc, text) {
         if !hdc || text == ""
@@ -114,6 +116,128 @@ class TextVisualAlignment {
 
     static CreateCenteredTextRect(hdc, text, left, top, right, bottom) {
         offset := this.GetTextCenterOffset(hdc, text, bottom - top)
+        rect := Buffer(16, 0)
+        NumPut("Int", left, "Int", top + offset,
+            "Int", right, "Int", bottom + offset, rect)
+        return rect
+    }
+
+    ; GDI 的字体链接会在主字体缺少 Emoji 时静默换用回退字体，但
+    ; GetGlyphOutline 仍可能返回主字体的缺字符框，导致测得的重心与实际画面
+    ; 不一致。固定槽字符图标首次出现时画入一个很小的内存 DIB，读取真实墨迹
+    ; 上下边界并缓存；悬浮、按下和后续重绘不再重复分配或扫描像素。
+    static MeasureRasterInkBounds(hdc, text) {
+        if !hdc || text == ""
+            return false
+        textMetrics := Buffer(64, 0)
+        if !DllCall("gdi32\GetTextMetricsW", "Ptr", hdc,
+                "Ptr", textMetrics, "Int")
+            return false
+        extent := this.MeasureText(hdc, text)
+        lineHeight := extent.Height > 0 ? extent.Height
+            : NumGet(textMetrics, 0, "Int")
+        if lineHeight <= 0
+            return false
+        cacheKey := this.GetFontCacheKey(hdc, textMetrics)
+            . Chr(30) . "raster" Chr(30) . text
+        if this.RasterInkBoundsCache.Has(cacheKey)
+            return this.RasterInkBoundsCache[cacheKey]
+
+        margin := Max(4, Ceil(lineHeight / 2))
+        canvasWidth := Max(1, extent.Width + margin * 2)
+        canvasHeight := Max(1, lineHeight + margin * 2)
+        measureDc := DllCall("gdi32\CreateCompatibleDC", "Ptr", hdc,
+            "Ptr")
+        sourceFont := DllCall("gdi32\GetCurrentObject", "Ptr", hdc,
+            "UInt", 6, "Ptr") ; OBJ_FONT：复制当前控件实际使用的字体。
+        bitmapInfo := Buffer(40, 0)
+        NumPut("UInt", 40, bitmapInfo, 0)
+        NumPut("Int", canvasWidth, bitmapInfo, 4)
+        NumPut("Int", -canvasHeight, bitmapInfo, 8)
+        NumPut("UShort", 1, bitmapInfo, 12)
+        NumPut("UShort", 32, bitmapInfo, 14)
+        pixelAddress := 0
+        bitmap := measureDc ? DllCall("gdi32\CreateDIBSection",
+            "Ptr", measureDc, "Ptr", bitmapInfo, "UInt", 0,
+            "Ptr*", &pixelAddress, "Ptr", 0, "UInt", 0, "Ptr") : 0
+        previousBitmap := 0
+        previousFont := 0
+        try {
+            if !measureDc || !sourceFont || !bitmap || !pixelAddress
+                return false
+            previousBitmap := DllCall("gdi32\SelectObject", "Ptr",
+                measureDc, "Ptr", bitmap, "Ptr")
+            previousFont := DllCall("gdi32\SelectObject", "Ptr",
+                measureDc, "Ptr", sourceFont, "Ptr")
+            DllCall("gdi32\PatBlt", "Ptr", measureDc,
+                "Int", 0, "Int", 0, "Int", canvasWidth,
+                "Int", canvasHeight, "UInt", 0x00000042, "Int") ; 黑色填充。
+            DllCall("gdi32\SetBkMode", "Ptr", measureDc, "Int", 1)
+            DllCall("gdi32\SetTextColor", "Ptr", measureDc,
+                "UInt", 0x00FFFFFF)
+            drawRect := Buffer(16, 0)
+            NumPut("Int", margin, "Int", margin,
+                "Int", margin + Max(1, extent.Width),
+                "Int", margin + lineHeight, drawRect)
+            ; DT_SINGLELINE／DT_NOCLIP／DT_NOPREFIX：让字体链接后的字形完整落在
+            ; 外围留白中，避免测量画布本身裁掉左右悬伸。
+            DllCall("user32\DrawTextW", "Ptr", measureDc,
+                "Str", text, "Int", -1, "Ptr", drawRect,
+                "UInt", 0x00000920, "Int")
+
+            minimumY := canvasHeight
+            maximumY := -1
+            Loop canvasHeight {
+                y := A_Index - 1
+                rowOffset := y * canvasWidth * 4
+                Loop canvasWidth {
+                    x := A_Index - 1
+                    pixel := NumGet(pixelAddress,
+                        rowOffset + x * 4, "UInt") & 0x00FFFFFF
+                    if !pixel
+                        continue
+                    minimumY := Min(minimumY, y)
+                    maximumY := Max(maximumY, y)
+                }
+            }
+            if maximumY < minimumY
+                return false
+            result := {
+                Top: minimumY - margin,
+                Bottom: maximumY - margin + 1,
+                LineHeight: lineHeight
+            }
+            if this.RasterInkBoundsCache.Count
+                    >= this.RasterInkBoundsCacheLimit
+                this.RasterInkBoundsCache.Clear()
+            this.RasterInkBoundsCache[cacheKey] := result
+            return result
+        } finally {
+            if previousFont
+                DllCall("gdi32\SelectObject", "Ptr", measureDc,
+                    "Ptr", previousFont, "Ptr")
+            if previousBitmap
+                DllCall("gdi32\SelectObject", "Ptr", measureDc,
+                    "Ptr", previousBitmap, "Ptr")
+            if bitmap
+                DllCall("gdi32\DeleteObject", "Ptr", bitmap)
+            if measureDc
+                DllCall("gdi32\DeleteDC", "Ptr", measureDc)
+        }
+    }
+
+    static GetRasterTextCenterOffset(hdc, text, containerHeight) {
+        bounds := this.MeasureRasterInkBounds(hdc, text)
+        if !bounds || containerHeight <= 0
+            return 0
+        lineTop := Floor((containerHeight - bounds.LineHeight) / 2)
+        currentInkCenter := lineTop + (bounds.Top + bounds.Bottom) / 2
+        return Round(containerHeight / 2 - currentInkCenter)
+    }
+
+    static CreateRasterCenteredTextRect(hdc, text, left, top, right,
+        bottom) {
+        offset := this.GetRasterTextCenterOffset(hdc, text, bottom - top)
         rect := Buffer(16, 0)
         NumPut("Int", left, "Int", top + offset,
             "Int", right, "Int", bottom + offset, rect)
@@ -236,6 +360,89 @@ class RoundedButtonRenderer {
             "Int", 400, "UInt", 0, "UInt", 0, "UInt", 0,
             "UInt", 1, "UInt", 0, "UInt", 0, "UInt", 5,
             "UInt", 0, "Str", icon.fontName, "Ptr")
+    }
+
+    ; 暂停和恢复不能直接依赖字体字形：同一字号下双竖线的墨迹宽度远小于
+    ; 播放三角形。这里把两者绘制在同一个正方形画布内；添加、删除等已经确认
+    ; 的字符图标保留原造型，只复用外层的固定图标槽、中心和图文间距。
+    static DrawLeadingCommandSymbol(hdc, symbol, left, top, right, bottom,
+        color, visualSize) {
+        normalizedSymbol := StrReplace(symbol, Chr(0xFE0F))
+        if normalizedSymbol != "⏸" && normalizedSymbol != "▶"
+            return false
+        availableWidth := right - left
+        availableHeight := bottom - top
+        if !hdc || availableWidth <= 0 || availableHeight <= 0
+            return false
+        try visualSize := Max(6.0, Min(visualSize + 0,
+            availableWidth, availableHeight))
+        catch
+            return false
+        if !this.EnsureStarted()
+            return false
+
+        graphics := 0
+        brush := 0
+        path := 0
+        try {
+            if DllCall("gdiplus\GdipCreateFromHDC", "Ptr", hdc,
+                    "Ptr*", &graphics, "UInt") || !graphics
+                return false
+            if DllCall("gdiplus\GdipCreateSolidFill", "UInt",
+                    this.ColorToArgb(color), "Ptr*", &brush, "UInt") || !brush
+                return false
+            DllCall("gdiplus\GdipSetSmoothingMode", "Ptr", graphics,
+                "Int", 4)
+            DllCall("gdiplus\GdipSetPixelOffsetMode", "Ptr", graphics,
+                "Int", 4)
+
+            visualLeft := (left + right - visualSize) / 2.0
+            visualTop := (top + bottom - visualSize) / 2.0
+            if normalizedSymbol == "⏸" {
+                ; 两条竖线占据与三角形相同的完整外接宽度；约 56% 的填充面积
+                ; 与三角形的 50% 接近，切换时不会产生明显的大小和轻重变化。
+                barWidth := visualSize * 0.28
+                firstStatus := DllCall("gdiplus\GdipFillRectangle",
+                    "Ptr", graphics, "Ptr", brush,
+                    "Float", visualLeft, "Float", visualTop,
+                    "Float", barWidth, "Float", visualSize, "UInt")
+                secondStatus := DllCall("gdiplus\GdipFillRectangle",
+                    "Ptr", graphics, "Ptr", brush,
+                    "Float", visualLeft + visualSize - barWidth,
+                    "Float", visualTop, "Float", barWidth,
+                    "Float", visualSize, "UInt")
+                return firstStatus == 0 && secondStatus == 0
+            }
+
+            if DllCall("gdiplus\GdipCreatePath", "Int", 0,
+                    "Ptr*", &path, "UInt") || !path
+                return false
+            visualRight := visualLeft + visualSize
+            visualBottom := visualTop + visualSize
+            visualCenterY := visualTop + visualSize / 2.0
+            if DllCall("gdiplus\GdipAddPathLine", "Ptr", path,
+                    "Float", visualLeft, "Float", visualTop,
+                    "Float", visualRight, "Float", visualCenterY,
+                    "UInt")
+                || DllCall("gdiplus\GdipAddPathLine", "Ptr", path,
+                    "Float", visualRight, "Float", visualCenterY,
+                    "Float", visualLeft, "Float", visualBottom,
+                    "UInt")
+                || DllCall("gdiplus\GdipClosePathFigure", "Ptr", path,
+                    "UInt")
+                return false
+            return DllCall("gdiplus\GdipFillPath", "Ptr", graphics,
+                "Ptr", brush, "Ptr", path, "UInt") == 0
+        } catch {
+            return false
+        } finally {
+            if path
+                DllCall("gdiplus\GdipDeletePath", "Ptr", path)
+            if brush
+                DllCall("gdiplus\GdipDeleteBrush", "Ptr", brush)
+            if graphics
+                DllCall("gdiplus\GdipDeleteGraphics", "Ptr", graphics)
+        }
     }
 
     static DrawPixelImage(hdc, image, x, y, width, height) {
@@ -411,6 +618,49 @@ class RoundedButtonRenderer {
                 textFlags |= 0x00000002
             else if textAlign != "left"
                 textFlags |= 0x00000001
+            ; 状态按钮可能复用宽度不同的字符图标。视觉层去掉 Emoji 变体标记，
+            ; 再以固定符号字体和固定槽位绘制：暂停显示无框双竖线，且切换到播放
+            ; 三角形或反转符号时正文起点与整组内容重心都保持稳定。
+            if state.HasOwnProp("leadingTextSlotDip")
+                && RegExMatch(text, "^(\S+)\s+(.+)$", &leadingMatch) {
+                leadingText := leadingMatch[1]
+                bodyText := leadingMatch[2]
+                availableWidth := Max(1, width - horizontalInset * 2)
+                slotWidth := Min(availableWidth, Max(1, Round(
+                    state.leadingTextSlotDip * dpi / 96)))
+                gap := Min(Max(0, availableWidth - slotWidth), Max(0,
+                    Round(state.leadingTextGapDip * dpi / 96)))
+                bodyExtent := this.MeasureText(hdc, bodyText)
+                contentWidth := Min(availableWidth,
+                    slotWidth + gap + bodyExtent.Width)
+                if textAlign == "left"
+                    contentX := horizontalInset
+                else if textAlign == "right"
+                    contentX := width - horizontalInset - contentWidth
+                else
+                    contentX := Floor((width - contentWidth) / 2)
+
+                visualSize := Max(1, Round(
+                    state.leadingTextVisualSizeDip * dpi / 96))
+                if !this.DrawLeadingCommandSymbol(hdc, leadingText,
+                        contentX, 0, contentX + slotWidth, height,
+                        textColor, visualSize) {
+                    leadingRect := TextVisualAlignment
+                        .CreateRasterCenteredTextRect(
+                        hdc, leadingText, contentX, 0,
+                        contentX + slotWidth, height)
+                    DllCall("user32\DrawTextW", "Ptr", hdc,
+                        "Str", leadingText, "Int", -1,
+                        "Ptr", leadingRect, "UInt", 0x00000825,
+                        "Int")
+                }
+                bodyLeft := contentX + slotWidth + gap
+                bodyRect := TextVisualAlignment.CreateCenteredTextRect(hdc,
+                    bodyText, bodyLeft, 0, contentX + contentWidth, height)
+                DllCall("user32\DrawTextW", "Ptr", hdc, "Str", bodyText,
+                    "Int", -1, "Ptr", bodyRect, "UInt", 0x00008824, "Int")
+                return
+            }
             if state.HasOwnProp("buttonImage") {
                 image := state.buttonImage
                 if !IsObject(image) || !image.HasOwnProp("Width")
@@ -1271,6 +1521,32 @@ RegisterHoverButton(ctrl, normalColor := "333333", hoverColor := "", pressedColo
     state.roundedOwnerDraw := EnableRoundedButtonRendering(ctrl)
     if state.roundedOwnerDraw
         RedrawRoundedButton(hWnd)
+}
+
+; 为“字符图标 + 文案”按钮锁定图标槽宽。控件文本和无障碍名称仍保留完整
+; 字符串，只有圆角按钮的绘制布局被拆开，因此不会改变本地化或键盘交互。
+SetButtonLeadingTextSlot(ctrl, slotDip := 20, gapDip := 4,
+    visualSizeDip := 10) {
+    try hWnd := ctrl.Hwnd
+    catch
+        return false
+    if !App.uiInteractions.HasButton(hWnd)
+        return false
+    state := App.uiInteractions.GetButton(hWnd)
+    if !state.HasOwnProp("roundedOwnerDraw") || !state.roundedOwnerDraw
+        return false
+    try {
+        slotDip := Max(1, slotDip + 0)
+        gapDip := Max(0, gapDip + 0)
+        visualSizeDip := Max(6, visualSizeDip + 0)
+    } catch {
+        return false
+    }
+    state.leadingTextSlotDip := slotDip
+    state.leadingTextGapDip := gapDip
+    state.leadingTextVisualSizeDip := visualSizeDip
+    RedrawRoundedButton(hWnd)
+    return true
 }
 
 ; 图标与正文分别使用符号字体和当前语言的系统 UI 字体，避免 Emoji 字体回退
