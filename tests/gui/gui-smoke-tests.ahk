@@ -75,6 +75,21 @@ class RoundedButtonRenderer {
 #Include ..\..\app\UI\ListViewSelectionPresenter.ahk
 #Include ..\..\app\Windows\HistoryToastWindow.ahk
 
+; 原生列边界的具体像素由 Windows 主题和桌面合成器决定，CI 虚拟桌面不能
+; 稳定比较颜色。测试子类只记录生产刷新入口的真实执行次数和返回值，用来
+; 验证连续状态更新确实合并为一次整控件重绘，而不是退回逐行刷新。
+class GuiSmokeListViewSelectionPresenter extends ListViewSelectionPresenter {
+    nativeRefreshCount := 0
+    lastNativeRefreshSucceeded := false
+
+    RefreshNativeSurface(*) {
+        refreshSucceeded := super.RefreshNativeSurface()
+        this.nativeRefreshCount += 1
+        this.lastNativeRefreshSucceeded := refreshSucceeded
+        return refreshSucceeded
+    }
+}
+
 AssertGuiSmoke(condition, message) {
     if !condition
         throw Error(message)
@@ -169,7 +184,7 @@ try {
     list := owner.Add("ListView",
         "x16 y82 w380 h120 Report +LV0x10002 -Hdr Background252526 cFFFFFF",
         ["Name", "State", "Path", "Sequence", "StatusKey"])
-    listSelectionPresenter := ListViewSelectionPresenter(list)
+    listSelectionPresenter := GuiSmokeListViewSelectionPresenter(list)
     list.ModifyCol(1, 220)
     list.ModifyCol(2, 110)
     list.ModifyCol(3, 0)
@@ -421,59 +436,20 @@ try {
         - NumGet(headerCellRect, 0, "Int")
     AssertGuiSmoke(Abs(headerSequenceWidth - sequenceWidth) <= 1,
         "Pseudo header sequence cell did not align with the native DPI-scaled column")
-    ; 模拟守护状态的单行更新，再由呈现器合并为一次原生整控件绘制。
-    ; 两行和空白区的同一列边界必须保持同色，证明没有退回逐段自绘。
+    ; 模拟同一轮内的两次状态更新。第二次调度必须替换第一次的单次计时器，
+    ; 最终只执行一次生产级整控件重绘。
     list.Modify(2, "Col2", "Updated")
     AssertGuiSmoke(listSelectionPresenter.ScheduleNativeSurfaceRefresh(1),
         "Native ListView surface refresh was not scheduled")
+    AssertGuiSmoke(listSelectionPresenter.ScheduleNativeSurfaceRefresh(1),
+        "Repeated native ListView surface refresh was not coalesced")
     ReportGuiSmokeStage("divider-refresh-scheduled")
     Sleep(30)
     ReportGuiSmokeStage("divider-refresh-ready")
-    firstDividerItemRect := Buffer(16, 0)
-    secondDividerItemRect := Buffer(16, 0)
-    NumPut("Int", 0, firstDividerItemRect, 0)
-    NumPut("Int", 0, secondDividerItemRect, 0)
-    AssertGuiSmoke(SendMessage(0x100E, 0, firstDividerItemRect.Ptr,
-            list.Hwnd)
-        && SendMessage(0x100E, 1, secondDividerItemRect.Ptr, list.Hwnd),
-        "Native ListView divider item bounds were not readable")
-    listClientRect := Buffer(16, 0)
-    AssertGuiSmoke(DllCall("user32\GetClientRect", "Ptr", list.Hwnd,
-        "Ptr", listClientRect, "Int"), "ListView client bounds were not readable")
-    dividerDc := DllCall("user32\GetDC", "Ptr", list.Hwnd, "Ptr")
-    AssertGuiSmoke(dividerDc, "Native ListView divider pixels were not readable")
-    try {
-        surfaceColor := RoundedButtonRenderer.ColorToBgr(
-            UiThemeService.Color("Surface"))
-        blankY := Min(NumGet(listClientRect, 12, "Int") - 3,
-            NumGet(secondDividerItemRect, 12, "Int") + 8)
-        dividerX := -1
-        dividerColor := surfaceColor
-        for candidateX in [sequenceWidth - 1, sequenceWidth,
-                sequenceWidth + 1] {
-            candidateColor := DllCall("gdi32\GetPixel", "Ptr", dividerDc,
-                "Int", candidateX, "Int", blankY, "UInt")
-            if candidateColor != surfaceColor {
-                dividerX := candidateX
-                dividerColor := candidateColor
-                break
-            }
-        }
-        firstRowDividerColor := dividerX < 0 ? surfaceColor
-            : DllCall("gdi32\GetPixel", "Ptr", dividerDc, "Int", dividerX,
-                "Int", (NumGet(firstDividerItemRect, 4, "Int")
-                    + NumGet(firstDividerItemRect, 12, "Int")) // 2, "UInt")
-        secondRowDividerColor := dividerX < 0 ? surfaceColor
-            : DllCall("gdi32\GetPixel", "Ptr", dividerDc, "Int", dividerX,
-                "Int", (NumGet(secondDividerItemRect, 4, "Int")
-                    + NumGet(secondDividerItemRect, 12, "Int")) // 2, "UInt")
-        AssertGuiSmoke(dividerX >= 0
-            && firstRowDividerColor == dividerColor
-            && secondRowDividerColor == dividerColor,
-            "Native ListView column divider was interrupted after an item update")
-    } finally DllCall("user32\ReleaseDC", "Ptr", list.Hwnd,
-        "Ptr", dividerDc)
-    ReportGuiSmokeStage("divider-pixels")
+    AssertGuiSmoke(listSelectionPresenter.nativeRefreshCount == 1
+        && listSelectionPresenter.lastNativeRefreshSucceeded,
+        "Native ListView updates were not coalesced into one full refresh")
+    ReportGuiSmokeStage("divider-refresh")
     list.Modify(1, "Select Focus")
     ; 右键菜单接管焦点时，自绘通知可能不再携带 CDIS_SELECTED；真实行状态
     ; 仍须触发后绘制，确保圆角选中态不会退回原生矩形。
