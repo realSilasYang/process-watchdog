@@ -700,11 +700,11 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             settingsDialog.gui.Hwnd)
         logRowGap := Max(8, Round(8 * windowDpi / 96))
         AssertLocalizedWindow(logPathRect.Width > retryRect.Width
-            && Abs(logBrowseRect.Right - logPathRect.Right)
+            && Abs(logBrowseRect.Left - logPathRect.Left)
                 <= centerTolerance
             && logBrowseRect.Top >= logPathRect.Bottom + logRowGap
             && clearLogsRect.Top >= logBrowseRect.Bottom + logRowGap,
-            language " 日志路径输入框未延长，或浏览按钮没有独占下一行")
+            language " 日志路径输入框未延长，或浏览按钮未在下一行左对齐")
 
         alignedInputs := [
             {Label: Tr("进程状态检查间隔（毫秒）："),
