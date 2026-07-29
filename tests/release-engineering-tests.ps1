@@ -133,6 +133,20 @@ try {
     Set-Content -LiteralPath $bodyPath -Encoding UTF8 `
         -Value $validBody
     Assert-ReleaseNotesContent -Version '2.0.0' -BodyPath $bodyPath
+    $validationScopeBody = $validBody -replace '## 📦 发布物说明', @"
+## ✅ 验证范围
+
+- 通过核心测试、GUI 冒烟和可复现构建。
+
+---
+
+## 📦 发布物说明
+"@
+    Set-Content -LiteralPath $bodyPath -Encoding UTF8 `
+        -Value $validationScopeBody
+    Assert-ReleaseFailure {
+        Assert-ReleaseNotesContent -Version '2.0.0' -BodyPath $bodyPath
+    } '发行说明中的验证范围章节未被拒绝。'
     $validWarningBody = $validBody -replace '## ✨ 新增', @"
 ## ⚠️ 重要说明
 

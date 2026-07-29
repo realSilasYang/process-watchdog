@@ -16,6 +16,9 @@
    `📦 Release Assets` and names all three files with their edition role, included
    content, AutoHotkey requirement, and intended use. This is always the final
    Release-notes section so readers can choose a download after reviewing changes.
+   Neither changelogs nor Release notes may add a `✅ Validation Scope` section;
+   test counts, soak results, build hashes, and incomplete manual matrices belong
+   only in validation evidence and Actions logs.
 2. Confirm the repository is not shallow and contains every branch and tag. Run
    `tests/verify.ps1`. It scans the complete history with pinned Gitleaks and
    rejects committed personal configuration, probes, credentials, or local paths
@@ -41,9 +44,10 @@
    `toolchain.resolved.json`. Confirm that the package contains the AutoHotkey
    license, corresponding source archive, resolved snapshot, and an SBOM
    consistent with the actual archive hashes.
-7. Test affected Windows and DPI combinations in the manual GUI matrix. List
-   incomplete physical combinations in the Release notes; automation does not
-   replace them.
+7. Test affected Windows and DPI combinations in the manual GUI matrix. Record
+   completed and missing combinations in the GUI validation evidence and manual
+   regression matrix; automation does not replace them, and these records do not
+   belong in changelogs or Release notes.
 8. Verify both README languages and the matching compatibility, installation,
    and troubleshooting documents against actual behavior. Each changelog item
    describes observable behavior, not a commit title or internal class.
@@ -71,8 +75,9 @@ Release workflow only after every gate passes. Code pushes, tag pushes, schedule
 and ordinary CI never publish. Never rewrite a published tag; release a patch
 version for corrections.
 Release text uses the corresponding `docs/release-notes/v<version>.md` and the
-matching changelog entry as its source of truth, explaining each asset,
-verification method, and uncompleted physical GUI check.
+matching changelog entry as its source of truth, explaining each asset, runtime
+requirement, and intended use. Test and manual-acceptance evidence remains in
+dedicated validation records.
 Each Release contains only three downloads: the standalone EXE, the complete
 portable ZIP, and the complete source ZIP. The SBOM, `SHA256SUMS.txt`, and extracted
 package directories remain available only in the complete Actions build artifact.

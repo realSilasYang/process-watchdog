@@ -215,6 +215,8 @@ Assert-ReleaseNotesContent -Version $version -BodyPath $releaseNotesPath
 $allReleaseNotes = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot `
     'docs\release-notes') -File -Filter 'v*.md')
 foreach ($releaseNotesFile in $allReleaseNotes) {
+    Assert-ReleaseNotesNoValidationSection `
+        -BodyPath $releaseNotesFile.FullName
     Assert-ReleaseNotesImportantSection -BodyPath $releaseNotesFile.FullName
 }
 $legacyReleaseNotesRelativePath = 'docs/release-notes/v1.0.0.md'
@@ -234,8 +236,7 @@ foreach ($marker in @(
         '无需另行安装 AutoHotkey',
         '它不是可运行程序',
         '必须先退出旧实例',
-        '## ⚠️ 重要说明',
-        '## ✅ 验证范围')) {
+        '## ⚠️ 重要说明')) {
     if (-not $legacyReleaseNotes.Contains($marker)) {
         throw "Historical v1.0.0 release notes are missing required marker: $marker"
     }
@@ -283,6 +284,10 @@ foreach ($contract in $changelogContracts) {
     if ($changelogText -match '(?m)^## \[(?:\d|未发布|Unreleased)') {
         throw "Legacy changelog headings must not return: $($contract.Path)"
     }
+    if ($changelogText -match
+        '(?mi)^#{2,3}\s+(?:✅\s*)?(?:验证范围|驗證範圍|测试范围|測試範圍|Validation\s+Scope|Verification\s+Scope|Test\s+Coverage)\s*\r?$') {
+        throw "Changelog must not contain a validation-scope section: $($contract.Path)"
+    }
 }
 
 $templateContracts = @(
@@ -290,14 +295,16 @@ $templateContracts = @(
         Path = 'docs\changelog-template.md'
         Markers = @('# 📝 中文更新日志模板',
             '## 🎉 版本 [X.Y.Z] - YYYY-MM-DD', '### 📦 发布物说明',
-            '模板默认不生成“重要说明”', '没有合格事项时连标题一起删除')
+            '模板默认不生成“重要说明”', '没有合格事项时连标题一起删除',
+            '更新日志和 Release Notes 均不得包含“✅ 验证范围”章节')
     }
     @{
         Path = 'docs\en\changelog-template.md'
         Markers = @('# 📝 English Changelog Template',
             '## 🎉 Version [X.Y.Z] - YYYY-MM-DD', '### 📦 Release Assets',
             'does not generate Important Notes by default',
-            'Remove the heading when no item qualifies')
+            'Remove the heading when no item qualifies',
+            'Neither changelogs nor Release notes may contain a `✅ Validation Scope` section')
     }
 )
 foreach ($contract in $templateContracts) {
