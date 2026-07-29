@@ -80,6 +80,11 @@ AssertGuiSmoke(condition, message) {
         throw Error(message)
 }
 
+ReportGuiSmokeStage(name, details := "") {
+    FileAppend("GUI_SMOKE|STAGE|" name
+        (details == "" ? "" : "|" details) "`n", "*")
+}
+
 GetGuiSmokePathOrder(listView) {
     order := ""
     Loop listView.GetCount()
@@ -199,6 +204,7 @@ try {
             headerCell.Text),
             "Unchanged pseudo header text still requested a redraw")
     }
+    ReportGuiSmokeStage("header-structure")
     list.Add("", "Smoke target B", "Paused", "C:\SmokeB.exe", "1", "20")
     list.Add("", "Smoke target A", "Running", "C:\SmokeA.exe", "2", "10")
     customPathOrder := "C:\SmokeB.exe|C:\SmokeA.exe"
@@ -349,6 +355,7 @@ try {
         && list.GetText(1, 4) == "1",
         "Main ListView sequence did not refresh after deletion")
     list.Add("", "Smoke target C", "Paused", "C:\SmokeC.exe", "2", "20")
+    ReportGuiSmokeStage("sorting")
     actionButton := owner.Add("Text",
         "x16 y216 w88 h30 Center 0x200 Background333333 cFFFFFF",
         "Action")
@@ -375,6 +382,7 @@ try {
         AssertGuiSmoke(DllCall("user32\GetFocus", "Ptr") == list.Hwnd,
             "Pseudo header field retained focus instead of rejecting selection")
     }
+    ReportGuiSmokeStage("visible-header-focus")
 
     AssertGuiSmoke(DllCall("user32\IsWindow", "Ptr", owner.Hwnd, "Int"),
         "Owner GUI handle was not created")
@@ -518,6 +526,7 @@ try {
             "ListView selection reverted to a rectangle after losing focus")
     } finally DllCall("user32\ReleaseDC", "Ptr", list.Hwnd,
         "Ptr", inactiveListDc)
+    ReportGuiSmokeStage("list-rendering")
     try DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", owner.Hwnd,
         "Int", 20, "Int*", 1, "Int", 4)
     try DllCall("uxtheme\SetWindowTheme", "Ptr", list.Hwnd,
@@ -617,6 +626,7 @@ try {
         "History toast remained visible after three seconds")
     historyToast.Close()
     historyToast := ""
+    ReportGuiSmokeStage("history-toast")
     WinHide("ahk_id " owner.Hwnd)
 
     owner.Show("w430 h270")
@@ -627,8 +637,8 @@ try {
 
     hierarchy := WindowHierarchyManager(WindowHierarchyPlatform())
     taskbarShellAvailable := hierarchy.Platform.IsTaskbarShellAvailable()
-    FileAppend("GUI_SMOKE|STAGE|window-hierarchy|taskbar="
-        (taskbarShellAvailable ? "available" : "unavailable") "`n", "*")
+    ReportGuiSmokeStage("window-hierarchy", "taskbar="
+        (taskbarShellAvailable ? "available" : "unavailable"))
     lease := hierarchy.Acquire(owner, child.Hwnd)
     childExtendedStyle := DllCall("user32\GetWindowLongPtrW", "Ptr",
         child.Hwnd, "Int", Win32.GWL_EXSTYLE, "Ptr")
