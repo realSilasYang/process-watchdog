@@ -4,6 +4,167 @@
 
 Set-StrictMode -Version Latest
 
+if (-not ('ProcessWatchdog.Release.OpenTypeFamilyReader' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+
+namespace ProcessWatchdog.Release
+{
+    public static class OpenTypeFamilyReader
+    {
+        public static string[] Read(string path)
+        {
+            string fullPath = Path.GetFullPath(path);
+            byte[] data = File.ReadAllBytes(fullPath);
+            if (data.Length < 12)
+                throw new InvalidDataException("OpenType font file is truncated: " + fullPath);
+
+            List<int> fontOffsets = new List<int>();
+            if (ReadTag(data, 0) == "ttcf")
+            {
+                uint fontCount = ReadUInt32(data, 8);
+                if (fontCount == 0 || fontCount > 4096 ||
+                    12L + (4L * fontCount) > data.Length)
+                    throw new InvalidDataException(
+                        "OpenType collection has an invalid font directory: " + fullPath);
+                for (uint index = 0; index < fontCount; index++)
+                {
+                    uint value = ReadUInt32(data, checked(12 + (int)(4 * index)));
+                    if (value > Int32.MaxValue || (long)value + 12 > data.Length)
+                        throw new InvalidDataException(
+                            "OpenType collection contains an invalid font offset: " + fullPath);
+                    fontOffsets.Add((int)value);
+                }
+            }
+            else
+            {
+                fontOffsets.Add(0);
+            }
+
+            HashSet<string> families = new HashSet<string>(
+                StringComparer.OrdinalIgnoreCase);
+            foreach (int fontOffset in fontOffsets)
+            {
+                string signature = ReadTag(data, fontOffset);
+                bool trueType = data[fontOffset] == 0 &&
+                    data[fontOffset + 1] == 1 &&
+                    data[fontOffset + 2] == 0 &&
+                    data[fontOffset + 3] == 0;
+                if (!trueType && signature != "OTTO" &&
+                    signature != "true" && signature != "typ1")
+                    throw new InvalidDataException(
+                        "OpenType collection contains an unsupported font face: " + fullPath);
+
+                int tableCount = ReadUInt16(data, fontOffset + 4);
+                if (tableCount == 0 ||
+                    (long)fontOffset + 12L + (16L * tableCount) > data.Length)
+                    throw new InvalidDataException(
+                        "OpenType font has an invalid table directory: " + fullPath);
+
+                int nameTableOffset = -1;
+                int nameTableLength = 0;
+                for (int tableIndex = 0; tableIndex < tableCount; tableIndex++)
+                {
+                    int recordOffset = checked(fontOffset + 12 + (16 * tableIndex));
+                    if (ReadTag(data, recordOffset) != "name")
+                        continue;
+                    uint offsetValue = ReadUInt32(data, recordOffset + 8);
+                    uint lengthValue = ReadUInt32(data, recordOffset + 12);
+                    if (offsetValue > Int32.MaxValue || lengthValue > Int32.MaxValue ||
+                        (long)offsetValue + lengthValue > data.Length || lengthValue < 6)
+                        throw new InvalidDataException(
+                            "OpenType font has an invalid name table: " + fullPath);
+                    nameTableOffset = (int)offsetValue;
+                    nameTableLength = (int)lengthValue;
+                    break;
+                }
+                if (nameTableOffset < 0)
+                    throw new InvalidDataException(
+                        "OpenType font has no name table: " + fullPath);
+
+                int nameCount = ReadUInt16(data, nameTableOffset + 2);
+                int stringStorageOffset = ReadUInt16(data, nameTableOffset + 4);
+                if (6L + (12L * nameCount) > nameTableLength ||
+                    stringStorageOffset < 6 + (12 * nameCount) ||
+                    stringStorageOffset > nameTableLength)
+                    throw new InvalidDataException(
+                        "OpenType font has invalid name records: " + fullPath);
+
+                for (int nameIndex = 0; nameIndex < nameCount; nameIndex++)
+                {
+                    int recordOffset = checked(nameTableOffset + 6 + (12 * nameIndex));
+                    int platformId = ReadUInt16(data, recordOffset);
+                    int nameId = ReadUInt16(data, recordOffset + 6);
+                    if ((nameId != 1 && nameId != 16 && nameId != 21) ||
+                        (platformId != 0 && platformId != 3))
+                        continue;
+                    int stringLength = ReadUInt16(data, recordOffset + 8);
+                    int stringOffset = ReadUInt16(data, recordOffset + 10);
+                    if (stringLength == 0)
+                        continue;
+                    long stringStart = (long)nameTableOffset +
+                        stringStorageOffset + stringOffset;
+                    long stringEnd = stringStart + stringLength;
+                    if ((stringLength % 2) != 0 || stringStart < nameTableOffset ||
+                        stringEnd > (long)nameTableOffset + nameTableLength)
+                        throw new InvalidDataException(
+                            "OpenType font has an invalid family-name record: " + fullPath);
+                    string family = Encoding.BigEndianUnicode.GetString(
+                        data, checked((int)stringStart), stringLength).Trim('\0').Trim();
+                    if (family.Length != 0)
+                        families.Add(family);
+                }
+            }
+
+            if (families.Count == 0)
+                throw new InvalidDataException(
+                    "OpenType font exposes no Unicode family names: " + fullPath);
+            return families.OrderBy(value => value, StringComparer.Ordinal).ToArray();
+        }
+
+        private static ushort ReadUInt16(byte[] data, int offset)
+        {
+            EnsureRange(data, offset, 2);
+            return (ushort)((data[offset] << 8) | data[offset + 1]);
+        }
+
+        private static uint ReadUInt32(byte[] data, int offset)
+        {
+            EnsureRange(data, offset, 4);
+            return ((uint)data[offset] << 24) |
+                ((uint)data[offset + 1] << 16) |
+                ((uint)data[offset + 2] << 8) |
+                data[offset + 3];
+        }
+
+        private static string ReadTag(byte[] data, int offset)
+        {
+            EnsureRange(data, offset, 4);
+            return Encoding.ASCII.GetString(data, offset, 4);
+        }
+
+        private static void EnsureRange(byte[] data, long offset, long length)
+        {
+            if (offset < 0 || length < 0 || offset + length > data.Length)
+                throw new InvalidDataException(
+                    "OpenType record points outside the font file.");
+        }
+    }
+}
+'@
+}
+
+function Get-OpenTypeFamilyNames {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$FontPath)
+
+    return @([ProcessWatchdog.Release.OpenTypeFamilyReader]::Read($FontPath))
+}
+
 function Test-CanonicalReleaseVersion {
     [CmdletBinding()]
     param([AllowEmptyString()][string]$Version)
@@ -409,6 +570,7 @@ function Assert-ReleaseRecord {
 }
 
 Export-ModuleMember -Function @(
+    'Get-OpenTypeFamilyNames'
     'Test-CanonicalReleaseVersion'
     'Get-ReleaseArtifactNames'
     'Assert-ReleaseArtifactInventory'

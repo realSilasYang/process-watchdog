@@ -2,6 +2,11 @@
 
 **简体中文** | [English](en/release-process.md)
 
+本机发布前统一运行 `powershell -ExecutionPolicy Bypass -File
+tools\invoke-local-release-preflight.ps1`。该入口会按官方摘要准备便携 PowerShell 7、
+刷新本次上游构建工具，并一次完成下列必需测试、300 秒 Windows／GUI 长测和双宿主
+可复现构建；任何一步失败都会停止，修复后从同一入口重跑。
+
 1. 按[更新日志模板](changelog-template.md)整理面向用户的版本条目，并创建对应的
    `docs/release-notes/v<版本>.md` 发行说明，再同步更新 `VERSION`、`CHANGELOG.md`
    和英文更新日志。编译文件版本由构建脚本从 `VERSION`

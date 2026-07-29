@@ -36,12 +36,126 @@ function New-TestRelease {
     }
 }
 
+function Add-TestUInt16BigEndian {
+    param(
+        [System.Collections.Generic.List[byte]]$Bytes,
+        [int]$Value
+    )
+    $Bytes.Add([byte](($Value -shr 8) -band 0xFF))
+    $Bytes.Add([byte]($Value -band 0xFF))
+}
+
+function Add-TestUInt32BigEndian {
+    param(
+        [System.Collections.Generic.List[byte]]$Bytes,
+        [uint32]$Value
+    )
+    $Bytes.Add([byte](($Value -shr 24) -band 0xFF))
+    $Bytes.Add([byte](($Value -shr 16) -band 0xFF))
+    $Bytes.Add([byte](($Value -shr 8) -band 0xFF))
+    $Bytes.Add([byte]($Value -band 0xFF))
+}
+
+function Add-TestBytes {
+    param(
+        [System.Collections.Generic.List[byte]]$Bytes,
+        [byte[]]$Value
+    )
+    foreach ($byteValue in $Value) { $Bytes.Add($byteValue) }
+}
+
+function New-TestNameTable {
+    param([string[]]$Families)
+
+    $encodedFamilies = @($Families | ForEach-Object {
+        ,([System.Text.Encoding]::BigEndianUnicode.GetBytes($_))
+    })
+    $bytes = [System.Collections.Generic.List[byte]]::new()
+    Add-TestUInt16BigEndian $bytes 0
+    Add-TestUInt16BigEndian $bytes $encodedFamilies.Count
+    Add-TestUInt16BigEndian $bytes (6 + (12 * $encodedFamilies.Count))
+    $stringOffset = 0
+    foreach ($encodedFamily in $encodedFamilies) {
+        Add-TestUInt16BigEndian $bytes 3
+        Add-TestUInt16BigEndian $bytes 1
+        Add-TestUInt16BigEndian $bytes 0x0409
+        Add-TestUInt16BigEndian $bytes 1
+        Add-TestUInt16BigEndian $bytes $encodedFamily.Length
+        Add-TestUInt16BigEndian $bytes $stringOffset
+        $stringOffset += $encodedFamily.Length
+    }
+    foreach ($encodedFamily in $encodedFamilies) {
+        Add-TestBytes $bytes $encodedFamily
+    }
+    return $bytes.ToArray()
+}
+
+function Add-TestFontDirectory {
+    param(
+        [System.Collections.Generic.List[byte]]$Bytes,
+        [int]$NameTableOffset,
+        [int]$NameTableLength
+    )
+    Add-TestBytes $Bytes ([byte[]](0, 1, 0, 0))
+    Add-TestUInt16BigEndian $Bytes 1
+    Add-TestUInt16BigEndian $Bytes 0
+    Add-TestUInt16BigEndian $Bytes 0
+    Add-TestUInt16BigEndian $Bytes 0
+    Add-TestBytes $Bytes ([System.Text.Encoding]::ASCII.GetBytes('name'))
+    Add-TestUInt32BigEndian $Bytes 0
+    Add-TestUInt32BigEndian $Bytes $NameTableOffset
+    Add-TestUInt32BigEndian $Bytes $NameTableLength
+}
+
+function New-TestOpenTypeCollection {
+    $firstNameTable = New-TestNameTable @('Primary Family', '稳定字体')
+    $secondNameTable = New-TestNameTable @('Second Family')
+    $firstFontOffset = 20
+    $secondFontOffset = $firstFontOffset + 28
+    $firstNameOffset = $secondFontOffset + 28
+    $secondNameOffset = $firstNameOffset + $firstNameTable.Length
+    $bytes = [System.Collections.Generic.List[byte]]::new()
+    Add-TestBytes $bytes ([System.Text.Encoding]::ASCII.GetBytes('ttcf'))
+    Add-TestUInt32BigEndian $bytes 0x00010000
+    Add-TestUInt32BigEndian $bytes 2
+    Add-TestUInt32BigEndian $bytes $firstFontOffset
+    Add-TestUInt32BigEndian $bytes $secondFontOffset
+    Add-TestFontDirectory $bytes $firstNameOffset $firstNameTable.Length
+    Add-TestFontDirectory $bytes $secondNameOffset $secondNameTable.Length
+    Add-TestBytes $bytes $firstNameTable
+    Add-TestBytes $bytes $secondNameTable
+    return $bytes.ToArray()
+}
+
 $commit = '1' * 40
 $otherCommit = '2' * 40
 Assert-ReleaseTest (Test-CanonicalReleaseVersion '2.0.0') `
     '规范版本被错误拒绝。'
 Assert-ReleaseTest (-not (Test-CanonicalReleaseVersion '02.0.0')) `
     '带前导零的版本被错误接受。'
+
+$fontFixtureRoot = Join-Path $env:TEMP `
+    ('ProcessWatchdogOpenTypeTest-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $fontFixtureRoot | Out-Null
+try {
+    $collectionPath = Join-Path $fontFixtureRoot 'families.ttc'
+    [System.IO.File]::WriteAllBytes($collectionPath,
+        (New-TestOpenTypeCollection))
+    $familyNames = @(Get-OpenTypeFamilyNames -FontPath $collectionPath)
+    Assert-ReleaseTest ($familyNames.Count -eq 3 -and
+        $familyNames -contains 'Primary Family' -and
+        $familyNames -contains 'Second Family' -and
+        $familyNames -contains '稳定字体') `
+        'OpenType 集合未稳定解析所有语言的字体族名。'
+    $invalidPath = Join-Path $fontFixtureRoot 'invalid.ttf'
+    [System.IO.File]::WriteAllBytes($invalidPath, [byte[]](0, 1, 2, 3))
+    Assert-ReleaseFailure {
+        Get-OpenTypeFamilyNames -FontPath $invalidPath
+    } '截断的 OpenType 字体未被拒绝。'
+} finally {
+    Remove-Item -LiteralPath $fontFixtureRoot -Recurse -Force `
+        -ErrorAction SilentlyContinue
+}
 
 $state = Resolve-ReleaseState '2.0.0' $commit
 Assert-ReleaseTest ($state.State -ceq 'new') '全新发布状态判断错误。'

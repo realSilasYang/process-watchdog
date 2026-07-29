@@ -15,6 +15,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
+Import-Module (Join-Path $PSScriptRoot 'ReleaseEngineering.psm1') -Force
 $packageRoot = [System.IO.Path]::GetFullPath($PackageDirectory)
 if (-not (Test-Path -LiteralPath $packageRoot -PathType Container)) {
     throw "Release package directory does not exist: $packageRoot"
@@ -172,22 +173,6 @@ foreach ($obsoletePath in @(
     }
 }
 
-function Get-FontFileFamilyNames {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$FontPath
-    )
-
-    Add-Type -AssemblyName System.Drawing
-    $collection = [System.Drawing.Text.PrivateFontCollection]::new()
-    try {
-        $collection.AddFontFile($FontPath)
-        return @($collection.Families | ForEach-Object Name | Sort-Object -Unique)
-    } finally {
-        $collection.Dispose()
-    }
-}
-
 function Test-FontMetadataFamilies {
     param(
         [Parameter(Mandatory = $true)]
@@ -203,7 +188,7 @@ function Test-FontMetadataFamilies {
     }
     $actualFamilies = [System.Collections.Generic.HashSet[string]]::new(
         [System.StringComparer]::OrdinalIgnoreCase)
-    foreach ($familyName in (Get-FontFileFamilyNames -FontPath $fontPath)) {
+    foreach ($familyName in (Get-OpenTypeFamilyNames -FontPath $fontPath)) {
         [void]$actualFamilies.Add([string]$familyName)
     }
     foreach ($declaredFamily in $declaredFamilies) {
