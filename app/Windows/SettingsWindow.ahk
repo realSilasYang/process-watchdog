@@ -475,7 +475,7 @@ class SettingsWindow extends ManagedWindow {
         this.logDirEdit := this.AddSettingsEdit(4, layout.InputX, 132,
             layout.ContentRight - layout.InputX, App.logDirectory)
         this.logBrowseButton := this.AddTabControl(4,
-            this.gui.Add("Text", "x" layout.ActionX
+            this.gui.Add("Text", "x" layout.InputX
                 " y168 w72 h26 Center 0x200 Background"
                     UiThemeService.Color("Toolbar") " c"
                     UiThemeService.Color("ToolbarText"), Tr("浏览")))
