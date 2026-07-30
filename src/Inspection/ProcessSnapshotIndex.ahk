@@ -347,10 +347,6 @@ class ProcessSnapshotIndex {
             this.CapturedAtTicks, source)
     }
 
-    IsAlive(processInfo) {
-        return this.GetLiveStatus(processInfo) > 0
-    }
-
     GetLiveStatus(processInfo) {
         if !IsObject(processInfo) || !processInfo.HasOwnProp("pid")
             || !processInfo.pid || !ProcessExist(processInfo.pid) {

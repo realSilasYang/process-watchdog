@@ -26,8 +26,4 @@ class GuardStateMachine {
         this.Phase := nextPhase
         return nextPhase
     }
-
-    Is(phase) {
-        return this.Phase == phase
-    }
 }

@@ -1174,16 +1174,6 @@ SaveAppsToIni(markChanged := true) {
     }
 }
 
-SyncAppOrderFromListView() {
-    newOrder := []
-    Loop Main.lv.GetCount() {
-        path := Main.lv.GetText(A_Index, 3)
-        if App.appStates.Has(path)
-            newOrder.Push(path)
-    }
-    App.appOrder := newOrder
-}
-
 ApplyMainListReorder(selectedPaths, anchorCandidates, appendToEnd := false) {
     if Type(selectedPaths) != "Array" || !selectedPaths.Length
         return false
@@ -1278,15 +1268,5 @@ RemoveAppOrderPath(path) {
             return true
         }
     }
-    return false
-}
-ReplaceAppOrderPath(previousPath, newPath) {
-    for index, existingPath in App.appOrder {
-        if PathsEquivalent(existingPath, previousPath) {
-            App.appOrder[index] := newPath
-            return true
-        }
-    }
-    App.appOrder.Push(newPath)
     return false
 }

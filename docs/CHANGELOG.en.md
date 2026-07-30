@@ -7,6 +7,20 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.0.5] - 2026-07-30
+
+### 📦 Release Assets
+
+- **`process-watchdog-2.0.5-windows-x64.exe` (standalone executable):** Requires no AutoHotkey installation and runs immediately after download; intended for a quick trial or users who need a single program file.
+- **`process-watchdog-2.0.5-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, fonts, and runtime resources; intended for long-term use after full extraction or for manual deployment.
+- **`process-watchdog-2.0.5-source.zip` (complete source package):** Includes the AHK source, modules, tests, documentation, and fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+
+---
+
+### 🚀 Improvements
+
+- **Downloaded-release final audit:** After the formal workflow matches the local build against GitHub metadata and publishes the Release, it downloads the hosted standalone EXE, portable ZIP, and source ZIP, checks their digests again, extracts both archives, and reruns the complete package verifier. The dynamic formal-release toolchain snapshot remains distinct from the pinned ordinary-CI snapshot so the audit cannot use the wrong reference.
+
 ## 🎉 Version [2.0.4] - 2026-07-30
 
 ### 📦 Release Assets
@@ -314,7 +328,8 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.4...HEAD
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.5...HEAD
+[2.0.5]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.4...v2.0.5
 [2.0.4]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.3...v2.0.4
 [2.0.3]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.2...v2.0.3
 [2.0.2]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.1...v2.0.2

@@ -212,10 +212,6 @@ StopTargetProcess(pid, expectedCreationIdentity := "") {
     return result
 }
 
-GracefulStop(pid, expectedCreationIdentity := "") {
-    return StopTargetProcess(pid, expectedCreationIdentity).Stopped
-}
-
 ElevatedKillProcess(pid, expectedCreationIdentity := "") {
     errorMessage := ""
     return App.targetStopper.TerminateVerifiedProcess(pid,

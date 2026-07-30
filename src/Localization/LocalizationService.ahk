@@ -780,10 +780,6 @@ class LocalizationService {
         return this.GetCatalog(language).Has(String(chineseTemplate))
     }
 
-    static HasEnglish(chineseTemplate) {
-        return this.HasTranslation(chineseTemplate, "en-US")
-    }
-
     static GetEnglishCatalog() {
         return this.GetCatalog("en-US")
     }

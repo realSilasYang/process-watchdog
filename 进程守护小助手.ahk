@@ -13,7 +13,7 @@
 
 ;@Ahk2Exe-SetName 进程守护小助手
 ;@Ahk2Exe-SetDescription 进程、脚本和快捷方式守护工具
-;@Ahk2Exe-SetVersion 2.0.4.0
+;@Ahk2Exe-SetVersion 2.0.5.0
 ;@Ahk2Exe-SetCopyright Copyright (c) 2026 进程守护小助手 contributors
 ;@Ahk2Exe-SetMainIcon assets\app\watchdog.ico
 
