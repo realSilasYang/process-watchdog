@@ -7,6 +7,20 @@
 
 ## 🚧 [未发布]
 
+## 🎉 版本 [2.0.5] - 2026-07-30
+
+### 📦 发布物说明
+
+- **`process-watchdog-2.0.5-windows-x64.exe`（独立可执行版）**：无需安装 AutoHotkey，下载后即可运行，适合快速体验或只需要单个程序文件的用户。
+- **`process-watchdog-2.0.5-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证、字体及运行所需资源，适合完整解压后长期使用或手动部署。
+- **`process-watchdog-2.0.5-source.zip`（完整源码版）**：包含 AHK 源码、模块、测试、文档和字体资源，适合审阅、开发或从源码运行；本机需要 AutoHotkey v2 x64。
+
+---
+
+### 🚀 优化
+
+- **公开发行物终验**：正式发布在核对本地构建与 GitHub 元数据并公开后，会重新下载实际托管的独立 EXE、便携 ZIP 和源码 ZIP，再次核对摘要、解压并复用完整发行包校验；发布专用动态工具链快照与普通 CI 固定快照严格分离，避免审计基准混用。
+
 ## 🎉 版本 [2.0.4] - 2026-07-30
 
 ### 📦 发布物说明
@@ -262,7 +276,8 @@
 - 后台文件扫描使用 `DirExist` 明确区分目录边界，临时文件遇到瞬时占用时执行
   短时有界重试；测试分别报告结果协议、实际文件集合和清理失败。
 
-[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.4...HEAD
+[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.5...HEAD
+[2.0.5]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.4...v2.0.5
 [2.0.4]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.3...v2.0.4
 [2.0.3]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.2...v2.0.3
 [2.0.2]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.1...v2.0.2

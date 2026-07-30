@@ -45,10 +45,6 @@ class MainListProjection {
         return nextIndex.Count
     }
 
-    Reset() {
-        this.RowByPath := this.CreateIndex()
-    }
-
     ApplyColumnOrder(listView) {
         if !IsObject(listView)
             || !DllCall("user32\IsWindow", "Ptr", listView.Hwnd, "Int")

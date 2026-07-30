@@ -262,11 +262,6 @@ HandleApplicationUpdateCheckResult(result, interactive := false,
 
 
 ; 计划任务使用 COM 接口读取和写入，操作前先确认同名任务确实属于当前脚本。
-CheckTaskExists() {
-    task := GetWatchdogTask()
-    return task && IsOwnedWatchdogTask(task)
-}
-
 GetWatchdogTask() {
     try {
         service := ComObject("Schedule.Service")

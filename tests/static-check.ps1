@@ -1653,9 +1653,8 @@ else {
         $failures.Add('Target launch must validate controller generation immediately before and after execution')
     }
 }
-if ($source -notmatch 'StopTargetProcess\(pid, expectedCreationIdentity := ""\)[\s\S]{0,500}App\.targetStopper\.Stop\(' -or
-    $source -notmatch 'GracefulStop\(pid, expectedCreationIdentity := ""\)[\s\S]{0,160}StopTargetProcess\(pid, expectedCreationIdentity\)') {
-    $failures.Add('GracefulStop must delegate process termination to TargetStopper')
+if ($source -notmatch 'StopTargetProcess\(pid, expectedCreationIdentity := ""\)[\s\S]{0,500}App\.targetStopper\.Stop\(') {
+    $failures.Add('Process termination must delegate to TargetStopper')
 }
 $removedExecutionModule = Join-Path $projectRoot `
     ('src\Execution\Service' + 'Controller.ahk')
@@ -2028,7 +2027,7 @@ if (-not $runningStateMatch.Success -or
     $runningStateMatch.Value -notmatch 'IsRunAsAdminMismatch\(stateObj\)') {
     $failures.Add('Running-state projection must report a confirmed elevation mismatch')
 }
-elseif ($runningStateMatch.Value -match 'ScheduleRestart|ProcessClose|GracefulStop|DoRestart') {
+elseif ($runningStateMatch.Value -match 'ScheduleRestart|ProcessClose|StopTargetProcess|DoRestart') {
     $failures.Add('An elevation mismatch must not stop or restart a running target automatically')
 }
 if ($source -notmatch 'ToggleRunAsAdmin\(\*\)[\s\S]{0,2200}UpdateRunningState\(path, stateObj,[\s\S]{0,80}stateObj\.Generation\)') {
