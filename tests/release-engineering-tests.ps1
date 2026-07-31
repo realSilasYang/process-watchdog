@@ -341,14 +341,22 @@ try {
     Assert-ReleaseFailure {
         Assert-ReleaseNotesContent -Version '2.0.0' -BodyPath $bodyPath
     } '完整便携版缺少 AutoHotkey 要求时未被拒绝。'
-    $fontAssetLine = [regex]::Match($validBody,
-        '(?m)^- [^\r\n]*fonts\.zip[^\r\n]*$').Value
-    $portableAssetLine = [regex]::Match($validBody,
-        '(?m)^- [^\r\n]*process-watchdog-2\.0\.0-windows-x64\.zip[^\r\n]*$').Value
-    $misorderedAssetsBody = $validBody.Replace($fontAssetLine,
-        '__WATCHDOG_PORTABLE_ASSET__').Replace($portableAssetLine,
-        $fontAssetLine).Replace('__WATCHDOG_PORTABLE_ASSET__',
-        $portableAssetLine)
+    $misorderedAssetsBody = @"
+# 🎉 进程守护小助手 v2.0.0
+
+## ✨ 新增
+
+- 测试正文
+
+---
+
+## 📦 发布物说明
+
+- **`process-watchdog-2.0.0-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证和运行所需资源，不含字体；无需安装 AutoHotkey，适合完整解压后长期使用。
+- **`process-watchdog-2.0.0-source.zip`（完整源码版）**：包含 AHK 源码、模块、测试和文档，不含字体，适合审阅、开发或从源码运行；本机需要 AutoHotkey v2 x64。
+- **``fonts.zip``（可选字体包）**：提供首选字体和回退字体，需先安装到 Windows；它不是程序运行必需。
+- **Everything（[官方最新版](https://www.voidtools.com/downloads/)）**：为程序搜索提供索引和后台服务；随包 `Everything64.dll` 只是 IPC 客户端，不能替代 Everything 本体。
+"@
     Set-Content -LiteralPath $bodyPath -Encoding UTF8 -Value $misorderedAssetsBody
     Assert-ReleaseFailure {
         Assert-ReleaseNotesContent -Version '2.0.0' -BodyPath $bodyPath
