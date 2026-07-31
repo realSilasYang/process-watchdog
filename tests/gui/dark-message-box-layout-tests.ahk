@@ -104,9 +104,15 @@ ReadDarkMessageControlText(controlHwnd) {
 }
 
 InspectDarkMessageBox(title, message, mode, &inspectionError) {
+    dialogHwnd := WinExist(title " ahk_class AutoHotkeyGUI")
+    if !dialogHwnd {
+        ; CI 冷启动时首次定时器可能先于窗口创建触发；返回并重排检查，
+        ; 让被中断的弹窗创建线程继续，避免之后无人关闭弹窗而永久等待。
+        SetTimer(InspectDarkMessageBox.Bind(title, message, mode,
+            &inspectionError), -50)
+        return
+    }
     try {
-        dialogHwnd := WinExist(title " ahk_class AutoHotkeyGUI")
-        AssertDarkMessageBox(dialogHwnd, "弹窗未创建：" title)
         clientRect := Buffer(16, 0)
         DllCall("user32\GetClientRect", "Ptr", dialogHwnd,
             "Ptr", clientRect)
