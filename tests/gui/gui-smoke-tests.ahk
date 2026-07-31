@@ -387,11 +387,21 @@ try {
     }
     ReportGuiSmokeStage("visible-header-focus")
 
-    ; 主窗口、状态栏和 ListView 自身的空白区域都应交还焦点，同时保留选择。
+    ; 非客户区消息必须原样交还给 Windows，否则标题栏最小化、关闭和拖动
+    ; 都会失效。客户区的主窗口、状态栏和 ListView 空白区域才交还焦点。
     list.Modify(1, "Select Focus")
     DllCall("user32\SetFocus", "Ptr", list.Hwnd, "Ptr")
+    nonClientResult := ListViewFocusService.HandleBlankPointerDown(list,
+        owner.Hwnd, owner.Hwnd, 0, Win32.WM_NCLBUTTONDOWN,
+        [passiveStatus.Hwnd])
+    AssertGuiSmoke(nonClientResult == ListViewFocusService.NoAction
+        && DllCall("user32\GetFocus", "Ptr") == list.Hwnd
+        && list.GetNext(0, "Focused") == 1 && list.GetNext(0) == 1,
+        "Non-client pointer down was swallowed by ListView blur routing")
+
     rootBlurResult := ListViewFocusService.HandleBlankPointerDown(list,
-        owner.Hwnd, owner.Hwnd, 0, [passiveStatus.Hwnd])
+        owner.Hwnd, owner.Hwnd, 0, Win32.WM_LBUTTONDOWN,
+        [passiveStatus.Hwnd])
     rootFocusHwnd := DllCall("user32\GetFocus", "Ptr")
     rootFocusedRow := list.GetNext(0, "Focused")
     rootSelectedRow := list.GetNext(0)
@@ -405,7 +415,8 @@ try {
     list.Modify(1, "Focus")
     DllCall("user32\SetFocus", "Ptr", list.Hwnd, "Ptr")
     statusBlurResult := ListViewFocusService.HandleBlankPointerDown(list,
-        owner.Hwnd, passiveStatus.Hwnd, 0, [passiveStatus.Hwnd])
+        owner.Hwnd, passiveStatus.Hwnd, 0, Win32.WM_LBUTTONDOWN,
+        [passiveStatus.Hwnd])
     AssertGuiSmoke(statusBlurResult == ListViewFocusService.Handled
         && DllCall("user32\GetFocus", "Ptr") == passiveStatus.Hwnd
         && list.GetNext(0, "Focused") == 0 && list.GetNext(0) == 1,
@@ -415,7 +426,8 @@ try {
     DllCall("user32\SetFocus", "Ptr", list.Hwnd, "Ptr")
     blankListPoint := (100 << 16) | 8
     listBlurResult := ListViewFocusService.HandleBlankPointerDown(list,
-        owner.Hwnd, list.Hwnd, blankListPoint, [passiveStatus.Hwnd])
+        owner.Hwnd, list.Hwnd, blankListPoint, Win32.WM_LBUTTONDOWN,
+        [passiveStatus.Hwnd])
     AssertGuiSmoke(listBlurResult == ListViewFocusService.SuppressDefault
         && DllCall("user32\GetFocus", "Ptr") == passiveStatus.Hwnd
         && list.GetNext(0, "Focused") == 0 && list.GetNext(0) == 1,
@@ -425,7 +437,8 @@ try {
     DllCall("user32\SetFocus", "Ptr", list.Hwnd, "Ptr")
     rowListPoint := (10 << 16) | 8
     rowHitResult := ListViewFocusService.HandleBlankPointerDown(list,
-        owner.Hwnd, list.Hwnd, rowListPoint, [passiveStatus.Hwnd])
+        owner.Hwnd, list.Hwnd, rowListPoint, Win32.WM_LBUTTONDOWN,
+        [passiveStatus.Hwnd])
     AssertGuiSmoke(rowHitResult == ListViewFocusService.NoAction
         && DllCall("user32\GetFocus", "Ptr") == list.Hwnd
         && list.GetNext(0, "Focused") == 1,

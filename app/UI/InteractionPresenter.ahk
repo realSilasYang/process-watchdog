@@ -998,7 +998,7 @@ OnGlobalPointerDown(wParam, lParam, msg, hwnd) {
         if Main.HasOwnProp("statsText") && IsObject(Main.statsText)
             passiveSurfaces.Push(Main.statsText.Hwnd)
         blankResult := ListViewFocusService.HandleBlankPointerDown(
-            Main.lv, Main.gui.Hwnd, hwnd, lParam, passiveSurfaces)
+            Main.lv, Main.gui.Hwnd, hwnd, lParam, msg, passiveSurfaces)
         if blankResult != ListViewFocusService.NoAction
             return 0
     }

@@ -37,6 +37,7 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### 🐛 Fixed
 
 - **Main-list focus clearing:** Clicking an empty main-window surface or empty ListView area now clears both ListView focus and its focused item, preventing a selected target from retaining keyboard-operation focus.
+- **Main-window title-bar actions:** Focus-clearing routing no longer intercepts non-client mouse messages, restoring native Windows behavior for minimizing, closing, dragging, and resizing the main window.
 
 ## 🎉 Version [2.0.5] - 2026-07-31
 

@@ -84,6 +84,9 @@ $svgRenderLibrarySource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\
 $uiInteractionRegistrySource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\UI\UiInteractionRegistry.ahk') -Raw -Encoding UTF8
 $controlAccessibilitySource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\UI\ControlAccessibilityService.ahk') -Raw -Encoding UTF8
 $mainListProjectionSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\UI\MainListProjection.ahk') -Raw -Encoding UTF8
+$listViewFocusServiceSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'src\UI\ListViewFocusService.ahk') `
+    -Raw -Encoding UTF8
 $listViewPseudoHeaderSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'src\UI\ListViewPseudoHeader.ahk') -Raw -Encoding UTF8
 $windowHierarchySource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\UI\WindowHierarchy.ahk') -Raw -Encoding UTF8
@@ -887,6 +890,12 @@ if ($source -notmatch 'OnMouseMove_Tooltip\([^)]*\)\s*\{\s*if\s+!IsRoundedButton
 }
 if ($source -notmatch 'OnGlobalPointerDown\([^)]*\)\s*\{\s*if\s+App\.uiInteractions\.HasButton\(hwnd\)\s*&&\s*!IsRoundedButtonInputRouted\(hwnd\)') {
     $failures.Add('Global pointer-down routing must skip subclassed rounded buttons')
+}
+if ($interactionPresenterSource -notmatch
+    'HandleBlankPointerDown\(\s*Main\.lv,\s*Main\.gui\.Hwnd,\s*hwnd,\s*lParam,\s*msg,\s*passiveSurfaces\)' -or
+    $listViewFocusServiceSource -notmatch
+    'HandleBlankPointerDown\([^)]*pointerMessage[^)]*\)[\s\S]{0,500}if\s+pointerMessage\s*!=\s*Win32\.WM_LBUTTONDOWN\s*\r?\n\s*return\s+this\.NoAction') {
+    $failures.Add('ListView blur routing must reject non-client pointer messages before handling the root window')
 }
 if ($source -notmatch 'OnGlobalPointerUp\([^)]*\)\s*\{\s*if\s+!IsRoundedButtonInputRouted\(hwnd\)') {
     $failures.Add('Global pointer-up routing must skip subclassed rounded buttons')

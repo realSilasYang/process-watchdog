@@ -7,7 +7,12 @@ class ListViewFocusService {
     static SuppressDefault := 2
 
     static HandleBlankPointerDown(listView, rootHwnd, pointerHwnd, lParam,
-        passiveSurfaceHwnds := "") {
+        pointerMessage, passiveSurfaceHwnds := "") {
+        ; 标题栏按钮、标题栏拖动和窗口边框都使用非客户区鼠标消息。
+        ; OnMessage 回调返回非空值会吞掉 Windows 默认处理，因此这里必须在
+        ; 查看窗口句柄前就明确拒绝 WM_NCLBUTTONDOWN 等非客户区消息。
+        if pointerMessage != Win32.WM_LBUTTONDOWN
+            return this.NoAction
         if !IsObject(listView) || !listView.Hwnd || !rootHwnd
             return this.NoAction
 
