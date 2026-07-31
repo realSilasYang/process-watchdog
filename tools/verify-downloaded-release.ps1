@@ -1,6 +1,6 @@
 ﻿# 公开发行物的下载后验收入口。
-# 从 GitHub 实际下载三个用户版本，核对远端摘要，再解压并复用完整发行包校验，
-# 防止只验证上传前的本地 dist 而漏过托管、传输或压缩包内容问题。
+# 从 GitHub 实际下载两个程序版本和可选字体包，核对远端摘要，再解压并复用完整
+# 发行包校验，防止只验证上传前的本地 dist 而漏过托管、传输或压缩包内容问题。
 
 [CmdletBinding()]
 param(
@@ -67,15 +67,18 @@ try {
         -BodyPath $BodyPath
 
     $artifactNames = @(Get-ReleaseArtifactNames $Version)
-    $standalonePath = Join-Path $fullAuditRoot $artifactNames[0]
-    $portableArchivePath = Join-Path $fullAuditRoot $artifactNames[1]
-    $sourceArchivePath = Join-Path $fullAuditRoot $artifactNames[2]
+    $portableArchivePath = Join-Path $fullAuditRoot $artifactNames[0]
+    $sourceArchivePath = Join-Path $fullAuditRoot $artifactNames[1]
+    $fontArchivePath = Join-Path $fullAuditRoot $artifactNames[2]
     $portableRoot = Join-Path $fullAuditRoot 'portable'
     $sourceRoot = Join-Path $fullAuditRoot 'source'
+    $fontRoot = Join-Path $fullAuditRoot 'fonts'
     Expand-Archive -LiteralPath $portableArchivePath `
         -DestinationPath $portableRoot
     Expand-Archive -LiteralPath $sourceArchivePath `
         -DestinationPath $sourceRoot
+    Expand-Archive -LiteralPath $fontArchivePath `
+        -DestinationPath $fontRoot
 
     # 正式发布动态解析上游最新版；包内快照才是本次构建实际使用的事实源。
     # 仓库的 ci-toolchain.resolved.json 只服务普通 CI，不能替代这里的快照。
@@ -83,11 +86,11 @@ try {
         'build-metadata\toolchain.resolved.json'
     & (Join-Path $PSScriptRoot 'verify-release.ps1') `
         -PackageDirectory $portableRoot `
-        -StandaloneExecutablePath $standalonePath `
         -SourcePackageDirectory $sourceRoot `
+        -FontPackageDirectory $fontRoot `
         -ResolvedToolchainPath $resolvedToolchainPath
 
-    Write-Host "GitHub 实际托管的 v$Version 三个发行物已通过下载后验收。"
+    Write-Host "GitHub 实际托管的 v$Version 两个程序版本和可选字体包已通过下载后验收。"
 } finally {
     if (Test-Path -LiteralPath $fullAuditRoot) {
         Remove-Item -LiteralPath $fullAuditRoot -Recurse -Force

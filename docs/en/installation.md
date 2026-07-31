@@ -4,44 +4,40 @@
 
 ## Release package
 
-Each Release offers only three downloads: a standalone EXE, a complete portable
-ZIP, and a complete source ZIP.
+Each Release offers only two program editions: a complete portable ZIP and a
+complete source ZIP.
 
-- The standalone EXE embeds the complete portable package. On first run it verifies
-  the embedded SHA-256, version, and update manifest, then performs a rollback-safe
-  installation under `%LOCALAPPDATA%\ProcessWatchdog\Standalone`. Running the
-  launcher from any location starts that stable installation, and an older launcher
-  never downgrades an installation that has already updated itself.
 - The complete portable ZIP is for users who want explicit control over installation,
   backup, and migration. Fully extract it and keep the EXE, `assets/`, and
   `third_party/` at their relative paths; do not copy only the inner EXE.
 - The complete source ZIP is for review, development, and source execution and
   requires local AutoHotkey v2 x64.
 
-Both compiled editions support long-term use. The standalone EXE keeps managed
-program files in a stable local-app-data directory, while the portable ZIP keeps
-program files and personal configuration in the directory selected by the user.
+The separately published `process-watchdog-X.Y.Z-fonts.zip` is an optional resource
+package, not a third program edition. It supplies preferred and Noto fallback UI
+fonts, which must be installed into Windows first. The program does not require it
+and never loads fonts privately from the ZIP or application directory.
 
 `v1.0.0` predates self-update and contains no update helper, so it cannot initiate
 its own upgrade. Move to `v2.0.0` by downloading and fully replacing the package
 manually. Releases after that bootstrap step can use Check for Updates in Settings.
 
-The standalone EXE and portable ZIP include the required AutoHotkey runtime. AutoHotkey v2 x64 is
+The portable ZIP includes the required AutoHotkey runtime. AutoHotkey v2 x64 is
 needed only when running from source. `licenses/sources/` also contains the full
 AutoHotkey source archive for the exact embedded runtime. Its version, commit,
 and hashes are recorded in `build-metadata/toolchain.resolved.json`. This is the
 actual toolchain snapshot resolved and frozen at the start of that release, not
 a repository-pinned AutoHotkey or Ahk2Exe version.
 
-A Git source clone also requires Git LFS. Run `git lfs pull` after the initial
-clone and after updates. Complete bundled fonts are LFS objects, including a CJK
-collection larger than GitHub's ordinary per-object limit. The interface may
-fall back to system fonts when only pointer files are present, but builds and
-release verification intentionally fail. A Release source ZIP already contains
-the complete fonts and does not require Git LFS.
+A Git source clone requires Git LFS only when building the optional font package.
+Run `git lfs pull` after the initial clone and updates. Its CJK collection is
+larger than GitHub's ordinary per-object limit; font-package builds and release
+verification intentionally fail when only pointer files are present. Neither the
+portable ZIP nor source ZIP contains fonts.
 
-Search for applications requires Everything to be installed and running. The
-Everything SDK DLL included in the package only connects to that service; the
+Search for applications requires the [latest official Everything release](https://www.voidtools.com/downloads/) to be installed and running. The bundled
+`Everything64.dll` is only an IPC client for its index and background service and
+cannot replace Everything itself; the
 assistant does not fall back to a local full-disk scan when it is unavailable.
 Monitoring, manual file selection, and batch import of a selected folder do not
 depend on Everything.
@@ -89,9 +85,6 @@ files are never replaced silently. After confirmation:
 - Official compiled edition: downloads the complete Windows x64 ZIP, verifies it
   against the SHA-256 digest supplied by the GitHub Release API, exits the main
   process, replaces managed files in the actual runtime directory, and restarts.
-  A standalone installation updates the inner program under
-  `%LOCALAPPDATA%\ProcessWatchdog\Standalone`; the originally downloaded launcher
-  remains unchanged and continues to start the newer installed version.
 - Git source: requires every tracked file to be clean, allows only a fast-forward
   to the official release tag, and restarts through the original AutoHotkey
   interpreter. Local changes or divergent history are never overwritten.
@@ -118,7 +111,7 @@ moved to `[Recovery]` instead of being silently deleted.
 ## Remove
 
 Disable automatic startup from General and exit the application. Delete the selected
-directory for portable or source installations. For a standalone installation,
-delete both the downloaded launcher and `%LOCALAPPDATA%\ProcessWatchdog\Standalone`.
+portable or source directory. Remove optional fonts through Windows Settings →
+Personalization → Fonts when they are no longer needed.
 Desktop and Start menu shortcuts can be deleted normally. The monitoring list is
 not stored in the registry.

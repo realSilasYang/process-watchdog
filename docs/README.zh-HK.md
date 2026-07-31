@@ -87,8 +87,8 @@
 
 ## 1. 安裝與首次執行
 
-1. 從 [Releases](https://github.com/realSilasYang/process-watchdog/releases) 選擇獨立 EXE、完整可攜式 ZIP 或完整原始碼 ZIP 其中一種版本。
-2. 獨立 EXE 無需安裝 AutoHotkey，首次執行會把已驗證內容安裝至 `%LOCALAPPDATA%\ProcessWatchdog\Standalone`；可攜式 ZIP 在完整解壓的目錄執行；原始碼 ZIP 需要 AutoHotkey v2 x64。
+1. 從 [Releases](https://github.com/realSilasYang/process-watchdog/releases) 選擇完整可攜式 ZIP 或完整原始碼 ZIP；可選字型包不是第三個程式版本。
+2. 可攜式 ZIP 在完整解壓的目錄執行且無需另裝 AutoHotkey；原始碼 ZIP 需要 AutoHotkey v2 x64。字型包需安裝到 Windows 且不是執行必需；程式搜尋另需 [Everything 官方最新版](https://www.voidtools.com/downloads/)。
 3. 執行 `进程守护小助手.exe`。程式會要求系統管理員權限，並按設定顯示主視窗或靜默留在系統匣。
 4. 選擇「加入」以選取目標，亦可把支援的檔案拖入主視窗。
 5. 開啟「記錄」，查看小助手實際採用的身分證據、狀態檢查、恢復嘗試及更新訊號。
@@ -173,7 +173,7 @@
 
 難以定位的問題可從記錄視窗匯出本機診斷套件。當中包括應用程式、Windows、AutoHotkey、DPI、資源控制代碼、守護階段、設定警告及目前記錄摘要，但不會自動上載。
 
-個人設定儲存在實際執行目錄的 `watchdog.ini`，未完成的軟件更新工作階段儲存在同一目錄的 `watchdog.maintenance.ini`。可攜式與原始碼版本使用各自入口目錄；獨立 EXE 固定使用 `%LOCALAPPDATA%\ProcessWatchdog\Standalone`。兩個檔案均由 Git 忽略，發行套件不會攜帶或覆寫。
+個人設定儲存在實際執行目錄的 `watchdog.ini`，未完成的軟件更新工作階段儲存在同一目錄的 `watchdog.maintenance.ini`。可攜式與原始碼版本使用各自入口目錄。兩個檔案均由 Git 忽略，發行套件不會攜帶或覆寫。
 
 可攜式 EXE 與原始碼入口只有放在同一目錄時才共用狀態；獨立 EXE 不會讀取下載啟動檔旁的設定。全域單一實例鎖會阻止多種形態同時執行，捷徑和排程工作會指向最後整合的實際執行形態。詳情請參閱[設定、備份與恢復](en/configuration.md)和[安裝、升級與移除](en/installation.md)。
 

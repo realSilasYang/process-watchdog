@@ -1023,19 +1023,44 @@ RunDisplayHotSwitchTests() {
                 language " 热切换后的标题、字体或动态状态不正确")
             }
         }
-        ; 真实控件再走一次随包内容字体路径：ListView 必须应用 Noto，按钮和状态栏
-        ; 则继续使用当前语言的系统 UI 字体粗体。
-        ApplyDisplaySettingsHot("ja-JP", "Noto Sans CJK JP")
+        ; 真实控件再走一次“已安装内容字体”路径。v2.0.6 不再私有加载随包字体，
+        ; 因此测试必须从当前 Windows 选择确实可用、且不同于日语系统 UI 字体的
+        ; 字体；ListView 使用该内容字体，按钮和状态栏继续使用系统 UI 字体粗体。
+        japaneseSystemFont := LocalizationService
+            .GetLanguageSystemUiFontName("ja-JP")
+        explicitContentFont := ""
+        for candidateFont in ["Segoe UI", "Arial", "Consolas"] {
+            installedCandidate := LocalizationService
+                .FindInstalledUiFontName(candidateFont)
+            if installedCandidate != ""
+                && StrLower(installedCandidate) != StrLower(japaneseSystemFont) {
+                explicitContentFont := installedCandidate
+                break
+            }
+        }
+        if explicitContentFont == "" {
+            for installedCandidate in LocalizationService
+                .GetInstalledUiFontNames() {
+                if StrLower(installedCandidate)
+                    != StrLower(japaneseSystemFont) {
+                    explicitContentFont := installedCandidate
+                    break
+                }
+            }
+        }
+        AssertDisplayHotSwitch(explicitContentFont != "",
+            "当前 Windows 没有可用于区分内容字体与系统 UI 字体的第二种字体")
+        ApplyDisplaySettingsHot("ja-JP", explicitContentFont)
         AssertDisplayHotSwitch(LocalizationService.GetRequestedUiFont()
-            == "Noto Sans CJK JP"
+            == explicitContentFont
             && GetDisplayHotSwitchFontFace(Main.btnSet.Hwnd)
-                == LocalizationService.GetLanguageSystemUiFontName()
+                == japaneseSystemFont
             && GetDisplayHotSwitchFontWeight(Main.btnSet.Hwnd) >= 700
             && GetDisplayHotSwitchFontFace(Main.statsText.Hwnd)
-                == LocalizationService.GetLanguageSystemUiFontName()
+                == japaneseSystemFont
             && GetDisplayHotSwitchFontWeight(Main.statsText.Hwnd) >= 700
             && GetDisplayHotSwitchFontFace(Main.lv.Hwnd)
-                == "Noto Sans CJK JP",
+                == explicitContentFont,
             "内容字体和系统强调字体没有保持独立")
         ApplyDisplaySettingsHot("ja-JP", "auto")
         ; 注入注册表关闭异常，验证已经改写的语言、字体和状态会完整回滚。

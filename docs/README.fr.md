@@ -87,8 +87,8 @@ Si l’assistant vous a fait gagner du temps lors d’un diagnostic ou du rétab
 
 ## 1. Installation et premier démarrage
 
-1. Choisissez dans les [Releases](https://github.com/realSilasYang/process-watchdog/releases) l’une des trois éditions : EXE autonome, ZIP portable complet ou ZIP complet du code source.
-2. L’EXE autonome ne nécessite pas AutoHotkey et installe au premier lancement sa charge vérifiée dans `%LOCALAPPDATA%\ProcessWatchdog\Standalone` ; le ZIP portable reste dans le dossier où il est entièrement extrait ; le ZIP du code source exige AutoHotkey v2 x64.
+1. Choisissez dans les [Releases](https://github.com/realSilasYang/process-watchdog/releases) le ZIP portable complet ou le ZIP complet du code source. Le paquet de polices facultatif n’est pas une troisième édition du programme.
+2. Le ZIP portable s’exécute après extraction complète sans installation séparée d’AutoHotkey ; le ZIP du code source exige AutoHotkey v2 x64. Les polices doivent être installées dans Windows mais ne sont pas requises pour exécuter le programme ; la recherche d’applications nécessite aussi la [dernière version officielle d’Everything](https://www.voidtools.com/downloads/).
 3. Lancez `进程守护小助手.exe`. L’application demande les droits administrateur, puis affiche la fenêtre principale ou reste dans la zone de notification selon les réglages.
 4. Choisissez Ajouter pour sélectionner une cible, ou faites glisser un fichier compatible dans la fenêtre principale.
 5. Ouvrez le journal pour voir les indices d’identité, contrôles d’état, tentatives de rétablissement et signaux de mise à jour effectivement utilisés.
@@ -173,7 +173,7 @@ Le journal d’exécution permet la sélection et la copie du texte, l’agrandi
 
 Pour un problème difficile, exportez un paquet de diagnostic local depuis le journal. Il contient des résumés de l’application, Windows, AutoHotkey, du DPI, des handles de ressources, de la phase de surveillance, des avertissements de configuration et du journal courant, sans aucun envoi automatique.
 
-La configuration personnelle se trouve dans `watchdog.ini` sous le dossier d’exécution réel et les sessions inachevées dans `watchdog.maintenance.ini`. Les éditions portable et source utilisent leur dossier d’entrée ; l’EXE autonome utilise toujours `%LOCALAPPDATA%\ProcessWatchdog\Standalone`. Git ignore ces deux fichiers, qui ne sont ni distribués ni écrasés.
+La configuration personnelle se trouve dans `watchdog.ini` sous le dossier d’exécution réel et les sessions inachevées dans `watchdog.maintenance.ini`. Les éditions portable et source utilisent leur propre dossier d’entrée. Git ignore ces deux fichiers, qui ne sont ni distribués ni écrasés.
 
 Un EXE portable et une entrée source ne partagent leur état que dans le même dossier ; l’EXE autonome ne partage rien avec les fichiers placés près du lanceur téléchargé. Le verrou global empêche l’exécution simultanée des formes. Les raccourcis et la tâche planifiée ciblent la dernière forme réellement intégrée. Consultez [Configuration, sauvegarde et récupération](en/configuration.md) et [Installation, mise à niveau et suppression](en/installation.md).
 

@@ -111,9 +111,9 @@ $versionExpression = '${{ steps.release_meta.outputs.version }}'
 $commitExpression = '${{ github.sha }}'
 $repositoryExpression = '${{ github.repository }}'
 $userAssets = @(
-    "dist/process-watchdog-$versionExpression-windows-x64.exe"
     "dist/process-watchdog-$versionExpression-windows-x64.zip"
     "dist/process-watchdog-$versionExpression-source.zip"
+    "dist/process-watchdog-$versionExpression-fonts.zip"
 )
 Assert-WorkflowContains 'release.yml' $release @(
     'workflow_dispatch:'
@@ -142,7 +142,7 @@ foreach ($asset in $userAssets) {
 }
 if ($release.Contains('dist/*.spdx.json') -or
     $release.Contains('dist/SHA256SUMS.txt')) {
-    throw 'GitHub Release 只能上传独立 EXE、便携 ZIP 和源码 ZIP。'
+    throw 'GitHub Release 只能上传便携 ZIP、源码 ZIP 和可选字体 ZIP。'
 }
 if ($release -match '(?m)^\s*push:\s*$' -or
     $release -match '(?m)^\s*schedule:\s*$') {

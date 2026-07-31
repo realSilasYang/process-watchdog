@@ -39,8 +39,8 @@ after fixing that failure, rerun the same command.
 5. Run `tests/reproducible-build.ps1` and preserve the final SHA-256 output.
    Non-documentation `main` CI, release-engineering pull requests, dry runs, and
    formal releases build once with PowerShell 7 and once with
-   Windows PowerShell 5.1. Do not release if the standalone EXE, EXE ZIP, source
-   ZIP, or standalone SBOM differs between the two hosts, or if
+   Windows PowerShell 5.1. Do not release if the portable ZIP, source ZIP, optional
+   font ZIP, or separate SBOM differs between the two hosts, or if
    `SHA256SUMS.txt` does not match.
 6. Ordinary CI uses the hash-pinned repository snapshot at
    `tools/ci-toolchain.resolved.json` and classifies changed paths first.
@@ -74,8 +74,8 @@ after fixing that failure, rerun the same command.
     draft or recover an orphaned same-commit tag; duplicates and inconsistent state
     fail explicitly.
 12. The formal workflow resolves upstream tools and runs every gate again. It then
-    attests and uploads only the standalone EXE, complete portable ZIP, and complete
-    source ZIP to a draft. The SBOM, `SHA256SUMS.txt`, and remaining `dist` stay in
+    attests and uploads only the complete portable ZIP, complete source ZIP, and
+    optional font ZIP to a draft. The SBOM, `SHA256SUMS.txt`, and remaining `dist` stay in
     the complete Actions artifact, with hidden directories explicitly included.
     The draft body, commit, allowlist, sizes, and
     GitHub SHA-256 digests must match the local build before publication. After
@@ -93,8 +93,12 @@ Release text uses the corresponding `docs/release-notes/v<version>.md` and the
 matching changelog entry as its source of truth, explaining each asset, runtime
 requirement, and intended use. Test and manual-acceptance evidence remains in
 dedicated validation records.
-Each Release contains only three downloads: the standalone EXE, the complete
-portable ZIP, and the complete source ZIP. The SBOM, `SHA256SUMS.txt`, and extracted
+Each Release contains two program editions (the complete portable ZIP and complete
+source ZIP) plus an optional font ZIP. The font package supplies preferred and fallback
+UI fonts for installation into Windows and is not required to run the program. Release
+notes also link the [latest official Everything release](https://www.voidtools.com/downloads/), explain that it supplies the index and
+background service for application search, and state that `Everything64.dll` is only
+an IPC client and cannot replace Everything itself. The SBOM, `SHA256SUMS.txt`, and extracted
 package directories remain available only in the complete Actions build artifact.
 If the final post-publication audit fails, do not delete or overwrite the public
 version. Preserve the evidence, diagnose the cause, and issue a new patch release.

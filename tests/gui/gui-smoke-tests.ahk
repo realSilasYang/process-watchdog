@@ -7,6 +7,7 @@
 
 #Include ..\..\src\Platform\Win32.ahk
 #Include ..\..\src\UI\MainListProjection.ahk
+#Include ..\..\src\UI\ListViewFocusService.ahk
 #Include ..\..\src\UI\ListViewPseudoHeader.ahk
 #Include ..\..\src\UI\WindowHierarchy.ahk
 
@@ -361,6 +362,8 @@ try {
     actionButton := owner.Add("Text",
         "x16 y216 w88 h30 Center 0x200 Background333333 cFFFFFF",
         "Action")
+    passiveStatus := owner.Add("Text",
+        "x114 y216 w282 h30 Background1E1E1E cAAAAAA 0x200", "Status")
     ; 这组测试必须可见才能验证焦点、气泡动画和真实像素；因此显示前就把
     ; 标题栏与原生输入／列表控件设为同一深色主题，禁止测试夹具自身混搭。
     if VerCompare(A_OSVersion, "10.0.17763") >= 0 {
@@ -383,6 +386,64 @@ try {
             "Pseudo header field retained focus instead of rejecting selection")
     }
     ReportGuiSmokeStage("visible-header-focus")
+
+    ; 非客户区消息必须原样交还给 Windows，否则标题栏最小化、关闭和拖动
+    ; 都会失效。客户区的主窗口、状态栏和 ListView 空白区域才交还焦点。
+    list.Modify(1, "Select Focus")
+    DllCall("user32\SetFocus", "Ptr", list.Hwnd, "Ptr")
+    nonClientResult := ListViewFocusService.HandleBlankPointerDown(list,
+        owner.Hwnd, owner.Hwnd, 0, Win32.WM_NCLBUTTONDOWN,
+        [passiveStatus.Hwnd])
+    AssertGuiSmoke(nonClientResult == ListViewFocusService.NoAction
+        && DllCall("user32\GetFocus", "Ptr") == list.Hwnd
+        && list.GetNext(0, "Focused") == 1 && list.GetNext(0) == 1,
+        "Non-client pointer down was swallowed by ListView blur routing")
+
+    rootBlurResult := ListViewFocusService.HandleBlankPointerDown(list,
+        owner.Hwnd, owner.Hwnd, 0, Win32.WM_LBUTTONDOWN,
+        [passiveStatus.Hwnd])
+    rootFocusHwnd := DllCall("user32\GetFocus", "Ptr")
+    rootFocusedRow := list.GetNext(0, "Focused")
+    rootSelectedRow := list.GetNext(0)
+    AssertGuiSmoke(rootBlurResult == ListViewFocusService.Handled
+        && rootFocusHwnd == passiveStatus.Hwnd
+        && rootFocusedRow == 0 && rootSelectedRow == 1,
+        "Clicking the main-window blank surface did not fully blur ListView: result="
+            rootBlurResult " focus=" rootFocusHwnd " sink=" passiveStatus.Hwnd
+            " focusedRow=" rootFocusedRow " selectedRow=" rootSelectedRow)
+
+    list.Modify(1, "Focus")
+    DllCall("user32\SetFocus", "Ptr", list.Hwnd, "Ptr")
+    statusBlurResult := ListViewFocusService.HandleBlankPointerDown(list,
+        owner.Hwnd, passiveStatus.Hwnd, 0, Win32.WM_LBUTTONDOWN,
+        [passiveStatus.Hwnd])
+    AssertGuiSmoke(statusBlurResult == ListViewFocusService.Handled
+        && DllCall("user32\GetFocus", "Ptr") == passiveStatus.Hwnd
+        && list.GetNext(0, "Focused") == 0 && list.GetNext(0) == 1,
+        "Clicking the passive status surface did not blur ListView")
+
+    list.Modify(1, "Focus")
+    DllCall("user32\SetFocus", "Ptr", list.Hwnd, "Ptr")
+    blankListPoint := (100 << 16) | 8
+    listBlurResult := ListViewFocusService.HandleBlankPointerDown(list,
+        owner.Hwnd, list.Hwnd, blankListPoint, Win32.WM_LBUTTONDOWN,
+        [passiveStatus.Hwnd])
+    AssertGuiSmoke(listBlurResult == ListViewFocusService.SuppressDefault
+        && DllCall("user32\GetFocus", "Ptr") == passiveStatus.Hwnd
+        && list.GetNext(0, "Focused") == 0 && list.GetNext(0) == 1,
+        "Clicking the ListView blank surface did not suppress refocus")
+
+    list.Modify(1, "Focus")
+    DllCall("user32\SetFocus", "Ptr", list.Hwnd, "Ptr")
+    rowListPoint := (10 << 16) | 8
+    rowHitResult := ListViewFocusService.HandleBlankPointerDown(list,
+        owner.Hwnd, list.Hwnd, rowListPoint, Win32.WM_LBUTTONDOWN,
+        [passiveStatus.Hwnd])
+    AssertGuiSmoke(rowHitResult == ListViewFocusService.NoAction
+        && DllCall("user32\GetFocus", "Ptr") == list.Hwnd
+        && list.GetNext(0, "Focused") == 1,
+        "Clicking a ListView item was mistaken for a blank surface")
+    ReportGuiSmokeStage("main-list-blank-focus")
 
     AssertGuiSmoke(DllCall("user32\IsWindow", "Ptr", owner.Hwnd, "Int"),
         "Owner GUI handle was not created")
@@ -558,8 +619,8 @@ try {
 } catch as testError {
     ; GUI 测试运行在无人值守的 CI 桌面上，异常必须进入标准错误并退出；
     ; 让 AHK 显示模态错误框会把真实断言伪装成外层超时。
-    testFailure := testError.File " (" testError.Line "): "
-        testError.Message "`n" testError.Stack
+    testFailure := testError.File . " (" . testError.Line . "): "
+        . testError.Message . "`n" . testError.Stack
 } finally {
     if listSelectionPresenter
         try listSelectionPresenter.Dispose()

@@ -51,7 +51,7 @@ The main window keeps each target's order, application icon, display name, privi
 - Replace configuration atomically. Records that cannot be parsed are moved to `[Recovery]` instead of being silently discarded.
 - Use the Everything service exclusively for application search, without a local full-disk fallback or an application-imposed result limit. Large result sets are appended in short batches so icon extraction does not monopolize the UI.
 - Support Simplified Chinese, Traditional Chinese (Hong Kong), Traditional Chinese (Taiwan), English, Japanese, Vietnamese, Korean, Spanish, French, Brazilian Portuguese, Russian, German, and Italian. The interface follows the Windows UI language by default, falls back to English for unsupported languages, and can be selected manually under General. Language and content-font changes take effect immediately in the current process without stopping or reinitializing guard tasks.
-- In language-default mode, prefer PingFang, SF Pro Text, Harano Aji Gothic, or Apple SD Gothic Neo. When absent from the device, privately load the packaged commercially licensed or OFL resource, with the matching Noto family as the next fallback. The content font controls body text, inputs, lists, and About information; buttons, Settings tabs, and the main-window footer always use the current language's Windows UI font in bold.
+- In language-default mode, use only Windows-installed fonts: try PingFang, SF Pro Text, Harano Aji Gothic, or Apple SD Gothic Neo first, then the matching Noto family, then a Windows system font. Optional fonts must be installed into Windows first; the assistant never loads fonts privately from its own directory. The content font controls body text, inputs, lists, and About information; buttons, Settings tabs, and the main-window footer always use the current language's Windows UI font in bold.
 - Provide light and dark GUIs with independently minimizable child windows, DPI-aware icon rebuilding, rounded buttons, and custom icons.
 - Generate diagnostics locally without automatic upload, and make official artifacts independently verifiable.
 
@@ -88,12 +88,11 @@ If the assistant has saved you time diagnosing failures or recovering applicatio
 
 ## 1. Installation and first run
 
-1. Choose the standalone EXE, complete portable ZIP, or complete source ZIP from [Releases](https://github.com/realSilasYang/process-watchdog/releases).
-2. The downloads have different storage and runtime models:
+1. Choose the complete portable ZIP or complete source ZIP from [Releases](https://github.com/realSilasYang/process-watchdog/releases). The optional font package is a separate resource, not a third program edition.
+2. The two program editions have different storage and runtime models:
 
 | Download | Best for | Runtime and configuration location |
 | --- | --- | --- |
-| Standalone EXE | One-file download with no AutoHotkey installation | On first run, verifies its embedded payload and installs it under `%LOCALAPPDATA%\ProcessWatchdog\Standalone`; the application, configuration, and later self-updates remain in that stable directory |
 | Complete portable ZIP | Visible, backup-friendly long-term or manual deployment | Run after fully extracting it; resources and `watchdog.ini` remain in the extracted directory, so the inner EXE cannot be copied out alone |
 | Complete source ZIP | Review, development, or source execution | Fully extract it and run the root AHK with local AutoHotkey v2 x64; configuration remains in the source directory |
 
@@ -102,15 +101,16 @@ If the assistant has saved you time diagnosing failures or recovering applicatio
 5. Open Logs to see which identity evidence, state checks, recovery attempts, and update signals the assistant actually used.
 
 To run from source, install AutoHotkey v2 x64 and execute `进程守护小助手.ahk`.
-A Git clone also requires Git LFS and `git lfs pull` so the bundled font files
-are materialized instead of remaining pointer files. The source ZIP attached to
-a Release already contains those assets and does not require Git LFS. The standalone
-EXE and portable ZIP embed the AutoHotkey runtime that passed the complete release test suite,
-so ordinary users do not need a separate AutoHotkey installation.
+A Git clone also requires Git LFS and `git lfs pull` to materialize the build
+resources for the separate font package. Neither the source ZIP nor portable ZIP
+contains fonts. The portable ZIP embeds the AutoHotkey runtime that passed the
+complete release test suite, so ordinary users do not need a separate installation.
+
+The optional `process-watchdog-X.Y.Z-fonts.zip` supplies preferred and Noto fallback UI fonts. Install the desired fonts into Windows before use; they are not required to run the assistant. Application search separately requires the [latest official Everything release](https://www.voidtools.com/downloads/). The bundled `Everything64.dll` is only an IPC client for its index and background service and cannot replace Everything itself.
 
 ### Versions and runtime forms
 
-| Version | Compiled editions (standalone EXE / portable ZIP) | Source edition |
+| Version | Compiled edition (portable ZIP) | Source edition |
 | --- | --- | --- |
 | Assistant | Read from EXE file metadata; a complete release package replaces it during updates | Read from `VERSION` beside the entry; updated by a safe Git fast-forward or source package |
 | AutoHotkey | Embedded and updated with a later assistant release package | Uses the local interpreter; assistant updates do not upgrade AutoHotkey for the user |
@@ -208,9 +208,9 @@ do not automatically receive a separate output file.
 
 For difficult problems, export a local diagnostics bundle from the log window. It includes application, Windows, AutoHotkey, DPI, resource-handle, monitoring phase, configuration-warning, and current-log summaries. Nothing is uploaded automatically.
 
-Personal configuration is stored in `watchdog.ini` under the actual runtime directory; unfinished update sessions use `watchdog.maintenance.ini` there. Portable and source editions use their entry directory. The standalone EXE always uses `%LOCALAPPDATA%\ProcessWatchdog\Standalone`. Both files are ignored by Git and never shipped in a release. `config/watchdog.example.ini` only documents current defaults and fields.
+Personal configuration is stored in `watchdog.ini` under the actual runtime directory; unfinished update sessions use `watchdog.maintenance.ini` there. Portable and source editions use their entry directory. Both files are ignored by Git and never shipped in a release. `config/watchdog.example.ini` only documents current defaults and fields.
 
-A portable EXE and source entry in one directory share personal state; separate directories remain independent. The standalone EXE does not share configuration with files beside the downloaded launcher. A machine-wide single-instance lock prevents forms from running concurrently. Shortcuts and the scheduled task point to whichever actual runtime form most recently created or switched the integration, so choose one everyday entry per installation. See [Configuration, backup, and recovery](en/configuration.md) and [Installation, upgrades, and removal](en/installation.md).
+A portable EXE and source entry in one directory share personal state; separate directories remain independent. A machine-wide single-instance lock prevents forms from running concurrently. Shortcuts and the scheduled task point to whichever actual runtime form most recently created or switched the integration, so choose one everyday entry per installation. See [Configuration, backup, and recovery](en/configuration.md) and [Installation, upgrades, and removal](en/installation.md).
 
 Logs and diagnostics may contain target paths, launch arguments, or environment variables. Review and redact them before posting publicly. Use the [structured issue forms](https://github.com/realSilasYang/process-watchdog/issues/new/choose) for ordinary reports, and private vulnerability reporting for unresolved security issues. See [Local diagnostics](en/diagnostics.md), [Troubleshooting](en/troubleshooting.md), and [Support](../.github/SUPPORT.en.md).
 
@@ -234,7 +234,7 @@ process-watchdog/
 │  └─ Windows/               settings, logs, help, and child dialogs
 ├─ assets/
 │  ├─ app/                   application icon
-│  ├─ fonts/                 process-private preferred/fallback fonts, authorization, and provenance
+│  ├─ fonts/                 optional font-package resources, authorization, and provenance
 │  └─ ui-icons/              SVG icons for buttons, list states, and the statistics bar
 ├─ config/                   current configuration example with inline comments
 ├─ docs/                     user, architecture, multilingual overview, image, and governance docs
@@ -283,7 +283,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\reproducible-build.p
 - `verify-fast.ps1` avoids LFS font downloads and GUI startup while checking dependencies, static boundaries, update/install transactions, repository policy, leak history, and workflows.
 - `verify.ps1` adds all 39 AHK core and integration tests to the fast gate.
 - `verify-windows-integration.ps1` verifies complete font hashes and creates real Windows controls across 13 languages, three window levels, and GDI/USER handle reclamation.
-- `reproducible-build.ps1` builds the standalone EXE, portable ZIP, source ZIP, and SBOM twice, compares every SHA-256, and performs a two-pass empty-directory standalone launch.
+- `reproducible-build.ps1` builds the portable ZIP, source ZIP, optional font ZIP, and SBOM twice, compares every SHA-256, and verifies all three extracted package directories.
 
 GitHub Actions classifies changed paths first. Documentation-only changes run only the fast gate; runtime changes add Windows/GUI integration; non-documentation pushes to `main` and release-engineering pull requests add reproducible packaging. A formal release still reruns every layer.
 

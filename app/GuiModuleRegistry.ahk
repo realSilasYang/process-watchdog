@@ -181,7 +181,6 @@ ShutdownApplicationResources(*) {
     try App.ClearPendingProcessSnapshot()
     try App.applicationUpdateService.Shutdown()
     try App.svgRenderer.Shutdown()
-    try LocalizationService.ShutdownUiFonts()
     ReleaseApplicationMutex()
     try ReleaseWindowIcons(A_ScriptHwnd)
 }

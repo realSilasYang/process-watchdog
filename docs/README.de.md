@@ -87,8 +87,8 @@ Wenn Ihnen der Assistent Zeit bei der Fehlersuche oder Wiederherstellung von Anw
 
 ## 1. Installation und erster Start
 
-1. Wählen Sie unter [Releases](https://github.com/realSilasYang/process-watchdog/releases) eine der drei Ausgaben: eigenständige EXE, vollständiges portables ZIP oder vollständiges Quellcode-ZIP.
-2. Die eigenständige EXE benötigt kein AutoHotkey und installiert beim ersten Start ihr geprüftes Paket unter `%LOCALAPPDATA%\ProcessWatchdog\Standalone`; das portable ZIP bleibt nach vollständigem Entpacken im gewählten Ordner; für das Quellcode-ZIP muss AutoHotkey v2 x64 installiert sein.
+1. Wählen Sie unter [Releases](https://github.com/realSilasYang/process-watchdog/releases) das vollständige portable ZIP oder das vollständige Quellcode-ZIP. Das optionale Schriftpaket ist keine dritte Programmausgabe.
+2. Das portable ZIP läuft vollständig entpackt ohne separate AutoHotkey-Installation; das Quellcode-ZIP benötigt AutoHotkey v2 x64. Schriften müssen in Windows installiert werden, sind aber nicht zum Ausführen erforderlich; die Programmsuche benötigt zusätzlich die [neueste offizielle Everything-Version](https://www.voidtools.com/downloads/).
 3. Starten Sie `进程守护小助手.exe`. Die Anwendung fordert Administratorrechte an und zeigt je nach Einstellung das Hauptfenster oder bleibt im Infobereich.
 4. Wählen Sie „Hinzufügen“ oder ziehen Sie unterstützte Dateien in das Hauptfenster.
 5. Öffnen Sie das Protokoll, um die tatsächlich verwendeten Identitätsbelege, Statusprüfungen, Wiederherstellungsversuche und Updatesignale zu sehen.
@@ -173,7 +173,7 @@ Im Laufzeitprotokoll können Text markiert und kopiert, das Fenster maximiert un
 
 Bei schwierigen Problemen lässt sich aus dem Protokollfenster ein lokales Diagnosepaket exportieren. Es enthält Zusammenfassungen zu Anwendung, Windows, AutoHotkey, DPI, Ressourcenhandles, Überwachungsphase, Konfigurationswarnungen und aktuellem Protokoll, wird aber nie automatisch hochgeladen.
 
-Persönliche Einstellungen liegen im tatsächlichen Laufzeitordner in `watchdog.ini`, unvollständige Updatesitzungen in `watchdog.maintenance.ini`. Portable und Quellversion nutzen ihren Einstiegsordner; die eigenständige EXE nutzt immer `%LOCALAPPDATA%\ProcessWatchdog\Standalone`. Git ignoriert beide Dateien; Releases liefern oder überschreiben sie nicht.
+Persönliche Einstellungen liegen im tatsächlichen Laufzeitordner in `watchdog.ini`, unvollständige Updatesitzungen in `watchdog.maintenance.ini`. Portable und Quellversion nutzen ihren jeweiligen Einstiegsordner. Git ignoriert beide Dateien; Releases liefern oder überschreiben sie nicht.
 
 Portable EXE und Quellversion teilen den Zustand nur im selben Ordner; die eigenständige EXE teilt keine Konfiguration mit Dateien neben dem heruntergeladenen Starter. Eine systemweite Einzelinstanzsperre verhindert parallele Ausführung. Verknüpfungen und geplante Aufgabe zeigen auf die zuletzt integrierte tatsächliche Laufzeitform. Siehe [Konfiguration, Sicherung und Wiederherstellung](en/configuration.md) und [Installation, Aktualisierung und Entfernung](en/installation.md).
 

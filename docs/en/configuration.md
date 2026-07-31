@@ -29,14 +29,13 @@ and update checks use the new language, while existing log entries keep the text
 originally recorded. Guard tasks, target controllers, PID identity, scheduled
 work, the main window, and the ListView handle are not rebuilt.
 
-`UiFont=auto` resolves the content font for the active language through the table below. A preferred
-font must be installed and must produce the requested face through Windows GDI.
-Otherwise, the assistant privately loads the matching Noto family from
-`assets/fonts`. Private fonts are visible only to the current process and are
-never installed into Windows. The final Windows font is used only if the packaged
-resource is missing or cannot be loaded.
+`UiFont=auto` resolves the content font for the active language through the
+table below. Every family must already be installed into Windows and produce the
+requested face through GDI; the assistant never loads fonts privately from its own
+directory or a font ZIP. It tries the preferred family, an installed Noto fallback,
+then the final Windows family.
 
-| Interface language | Preferred family | Packaged Noto fallback | Final Windows fallback |
+| Interface language | Preferred family | Installed Noto fallback | Final Windows fallback |
 | --- | --- | --- | --- |
 | Simplified Chinese | PingFang SC | Noto Sans CJK SC | Microsoft YaHei UI |
 | Traditional Chinese（Hong Kong） | PingFang HK | Noto Sans CJK HK | Microsoft JhengHei UI |
@@ -45,38 +44,26 @@ resource is missing or cannot be loaded.
 | Korean | AppleSDGothicNeoR00 | Noto Sans CJK KR | Malgun Gothic |
 | English, Vietnamese, Spanish, French, Portuguese（Brazil）, Russian, German, and Italian | SF Pro Text | Noto Sans | Segoe UI |
 
-Preferred families were selected from the actual files and internal family names
-in the user-specified Apple font directory. That directory contains no Hiragino
-Japanese font, so Japanese uses the complete UI-suitable, OFL-licensed
-`Harano Aji Gothic` family found there. Its regular face is packaged as a
-private resource. The original PingFang collection, SF Pro Text regular and
-bold faces, and Apple SD Gothic Neo regular face are packaged under the project
-owner's commercial redistribution authorization. Auto mode still prefers an
-installed copy and loads these external resources only when the family is absent.
-Second-level fallbacks come from the user-selected Google
-`NoTofu` collection: the Latin resource retains its variable weight and width
-axes, while the original CJK collection retains all 45 faces and regional
-families. Fonts ship as external `assets/fonts` resources in the complete
-package rather than being embedded in the EXE. The font directory records the
-separate OFL and commercial authorization boundaries.
+The optional font package supplies the preferred and Noto fallback families in the
+table and must be installed into Windows first. It is absent from both program
+editions and is not required to run the assistant. Its Google `NoTofu` Latin
+resource retains variable weight and width axes, while the CJK collection retains
+all 45 faces and regional families. The font package records the separate OFL and
+commercial authorization boundaries.
 
 The General page can also select any font installed on the current computer.
 Saving applies the font immediately in the same process along with the language.
 This setting affects body text, inputs, lists, the About title and metadata, and
 other content controls. Buttons, Settings tabs, and the main-window footer ignore
 `UiFont`; they always use the Windows UI font in the table's final column at bold
-weight and never load a packaged font for that purpose. An invalid or uninstalled
+weight. An invalid or uninstalled
 configured font falls back to `auto` instead of being passed through to the
 interface.
 
 ## EXE and source configuration relationship
 
-The real runtime entry determines the configuration location. The downloaded
-standalone EXE is a bootstrapper, not a configuration root:
+The directory containing the real runtime entry determines the configuration location:
 
-- The standalone EXE installs the complete application under
-  `%LOCALAPPDATA%\ProcessWatchdog\Standalone` and reads both personal-state files
-  there. Files beside the downloaded bootstrapper do not participate.
 - A portable `进程守护小助手.exe` and `进程守护小助手.ahk` in the same directory share
   `watchdog.ini` and `watchdog.maintenance.ini`.
 - In different directories, each form reads and writes its own local files;
@@ -84,8 +71,7 @@ standalone EXE is a bootstrapper, not a configuration root:
 - Both forms use exactly the same format. A machine-wide single-instance lock
   prevents them from running concurrently.
 - Exit the active instance before switching forms. Copy both state files to the
-  new actual runtime directory when settings should follow. For the standalone
-  EXE that destination is the `LOCALAPPDATA` path above.
+  new actual runtime directory when settings should follow.
 - Same-directory coexistence is recommended only for temporary switching tests.
   EXE and source packages share release directories and one
   `update-manifest.json`, so they are not two independently auto-updatable

@@ -23,6 +23,7 @@
 #Include ..\..\src\UI\UiInteractionRegistry.ahk
 #Include ..\..\src\UI\ControlAccessibilityService.ahk
 #Include ..\..\src\UI\WindowHierarchy.ahk
+#Include ..\..\src\UI\ListViewFocusService.ahk
 #Include ..\..\app\UI\InteractionPresenter.ahk
 
 UiThemeService.Configure("dark")

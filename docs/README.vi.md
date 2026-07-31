@@ -87,8 +87,8 @@ Nếu trợ lý đã giúp bạn tiết kiệm thời gian tìm lỗi hoặc kh�
 
 ## 1. Cài đặt và lần chạy đầu
 
-1. Trong [Releases](https://github.com/realSilasYang/process-watchdog/releases), hãy chọn một trong ba bản: EXE độc lập, ZIP di động đầy đủ hoặc ZIP mã nguồn đầy đủ.
-2. EXE độc lập không cần AutoHotkey và ở lần chạy đầu sẽ cài phần tải đã xác minh vào `%LOCALAPPDATA%\ProcessWatchdog\Standalone`; ZIP di động chạy trong thư mục được giải nén đầy đủ; ZIP mã nguồn cần AutoHotkey v2 x64.
+1. Trong [Releases](https://github.com/realSilasYang/process-watchdog/releases), hãy chọn ZIP di động đầy đủ hoặc ZIP mã nguồn đầy đủ. Gói phông chữ tùy chọn không phải là phiên bản chương trình thứ ba.
+2. ZIP di động chạy sau khi giải nén đầy đủ và không cần cài AutoHotkey riêng; ZIP mã nguồn cần AutoHotkey v2 x64. Phông chữ phải được cài vào Windows nhưng không bắt buộc để chạy chương trình; tìm kiếm ứng dụng cũng cần [Everything chính thức mới nhất](https://www.voidtools.com/downloads/).
 3. Chạy `进程守护小助手.exe`. Ứng dụng yêu cầu quyền quản trị, sau đó hiển thị cửa sổ chính hoặc nằm trong khay hệ thống tùy cài đặt.
 4. Chọn Thêm để chọn đích, hoặc kéo tệp được hỗ trợ vào cửa sổ chính.
 5. Mở Nhật ký để xem bằng chứng danh tính, kiểm tra trạng thái, lần thử khôi phục và tín hiệu cập nhật thực tế.
@@ -173,7 +173,7 @@ Nhật ký chạy cho phép chọn và sao chép văn bản, phóng to và đổ
 
 Với lỗi khó xác định, có thể xuất gói chẩn đoán cục bộ từ cửa sổ nhật ký. Gói này có thông tin ứng dụng, Windows, AutoHotkey, DPI, handle tài nguyên, giai đoạn giám sát, cảnh báo cấu hình và tóm tắt nhật ký hiện tại, nhưng không tự tải lên.
 
-Cấu hình cá nhân nằm trong `watchdog.ini` ở thư mục chạy thực tế; phiên cập nhật chưa hoàn tất nằm trong `watchdog.maintenance.ini` cùng nơi. Bản di động và mã nguồn dùng thư mục tệp vào của chúng; EXE độc lập luôn dùng `%LOCALAPPDATA%\ProcessWatchdog\Standalone`. Cả hai tệp bị Git bỏ qua và không có trong bản phát hành.
+Cấu hình cá nhân nằm trong `watchdog.ini` ở thư mục chạy thực tế; phiên cập nhật chưa hoàn tất nằm trong `watchdog.maintenance.ini` cùng nơi. Bản di động và mã nguồn dùng thư mục tệp vào của chúng. Cả hai tệp bị Git bỏ qua và không có trong bản phát hành.
 
 EXE di động và tệp vào mã nguồn chỉ dùng chung trạng thái khi ở cùng thư mục; EXE độc lập không dùng cấu hình cạnh tệp khởi động đã tải xuống. Khóa toàn máy ngăn nhiều hình thức chạy cùng lúc; lối tắt và tác vụ theo lịch trỏ tới hình thức chạy thực tế được tích hợp gần nhất. Xem [Cấu hình, sao lưu và khôi phục](en/configuration.md) và [Cài đặt, nâng cấp và gỡ bỏ](en/installation.md).
 

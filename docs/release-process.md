@@ -30,8 +30,8 @@ tools\invoke-local-release-preflight.ps1`。该入口会按官方摘要准备便
    仍覆盖 `assets/fonts/metadata.json` 所列精确文件、Windows、公开仓库和 Release
    分发；未确认时不得触发正式发布。
 5. 运行 `tests/reproducible-build.ps1`，保存脚本输出的最终 SHA-256；主分支非文档 CI、
-   发行工程 Pull Request、演练和正式发布会分别以 PowerShell 7 与 Windows PowerShell 5.1 构建并比较。两次 EXE、
-   EXE ZIP、源码 ZIP 或独立 SBOM 哈希不同，或 `SHA256SUMS.txt` 不匹配时不得发布。
+   发行工程 Pull Request、演练和正式发布会分别以 PowerShell 7 与 Windows PowerShell 5.1 构建并比较。两次便携 ZIP、
+   源码 ZIP、可选字体 ZIP 或独立 SBOM 哈希不同，或 `SHA256SUMS.txt` 不匹配时不得发布。
 6. 普通 CI 使用仓库内经哈希固定的 `tools/ci-toolchain.resolved.json` 和缓存，先按
    路径分类：纯文档只运行不需要 LFS 的快速门禁；运行时变更增加真实 Windows／GUI；
    主分支非文档变更和发行工程 Pull Request 再增加可复现打包，避免上游变化和大型
@@ -54,11 +54,11 @@ tools\invoke-local-release-preflight.ps1`。该入口会按官方摘要准备便
 11. 演练通过后，从同一 `main` 提交人工运行 Release。不要预先推送版本标签；工作流
     会拒绝其他提交的标签或草稿，以及任何已公开版本。同一提交的草稿或孤立标签可
     安全续传，重复记录和不一致状态会明确失败。
-12. 正式工作流再次动态解析上游工具链并执行全部门禁。通过后只为独立 EXE、完整
-    便携 ZIP 和完整源码 ZIP 生成溯源证明并上传到草稿；SBOM、`SHA256SUMS.txt` 和其余
+12. 正式工作流再次动态解析上游工具链并执行全部门禁。通过后只为完整便携 ZIP、完整
+    源码 ZIP 和可选字体 ZIP 生成溯源证明并上传到草稿；SBOM、`SHA256SUMS.txt` 和其余
     `dist` 只保存在完整 Actions 构建产物中；上传时必须显式包含隐藏目录。草稿正文、提交、附件白名单、大小和
     GitHub SHA-256 摘要与本地构建完全一致后才公开。公开后不仅再次审计远程标签和
-    Release，还会从 GitHub 下载三个实际托管的用户版本，重新核对摘要、解压 ZIP，
+    Release，还会从 GitHub 下载两个程序版本和可选字体包，重新核对摘要、解压 ZIP，
     并以包内正式工具链快照复用完整发行包校验；仓库的普通 CI 快照不会混入该步骤。
 
 标签必须属于 `main` 历史，并由人工 Release 工作流在全部门禁通过后创建。推送代码、
@@ -66,7 +66,10 @@ tools\invoke-local-release-preflight.ps1`。该入口会按官方摘要准备便
 发布后发现需要修正的代码或文档时，应增加补丁版本。Release 正文使用对应的
 `docs/release-notes/v<版本>.md`，并以 CHANGELOG 条目为事实源，同时列出附件用途、
 运行要求和适用场景；测试与人工验收证据留在专门的验证记录中。
-Release 只保留三种下载：独立 EXE、完整便携 ZIP 和完整源码 ZIP。SBOM、
+Release 只保留两个程序版本（完整便携 ZIP、完整源码 ZIP）和可选字体 ZIP。字体包提供
+首选和回退界面字体，需安装到 Windows，不是程序运行必需。发布说明同时链接
+[Everything 官方最新版](https://www.voidtools.com/downloads/)，说明它为程序搜索提供索引和后台服务，且
+`Everything64.dll` 只是 IPC 客户端、不能替代 Everything 本体。SBOM、
 `SHA256SUMS.txt` 及解压后的发行目录只保存在 Actions 完整构建产物中。
 若公开后的最终审计失败，禁止删除或覆盖已公开版本；应保留现场、定位原因并发布新的
 补丁版本。正式发布状态判断和两次审计都由 `tools/ReleaseEngineering.psm1` 的同一

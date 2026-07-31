@@ -63,12 +63,14 @@ class Win32 {
     static LVM_GETHEADER := 0x101F
     static LVM_GETIMAGELIST := 0x1002
     static LVM_HITTEST := 0x1012
+    static LVM_SETITEMSTATE := 0x102B
     static LVM_GETITEMSTATE := 0x102C
     static LVM_SETCOLUMNORDERARRAY := 0x103A
     static LVM_GETCOLUMNORDERARRAY := 0x103B
     static LVM_SETITEMW := 0x104C
     static LVIF_STATE := 0x00000008
     static LVIF_IMAGE := 0x00000002
+    static LVIS_FOCUSED := 0x00000001
     static LVIS_SELECTED := 0x00000002
     static LVIS_OVERLAYMASK := 0x00000F00
     static ICON_SMALL := 0

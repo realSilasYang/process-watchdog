@@ -51,7 +51,7 @@
 - 配置采用原子替换；无法解析的监控记录进入 `[Recovery]`，不会静默丢弃。
 - 程序搜索仅使用 Everything 服务，不启用本地全盘扫描，也不限制匹配结果数量；大量结果会分批加入列表，避免图标提取长时间阻塞界面。
 - 支持简体中文、繁体中文（香港）、繁体中文（台湾）、英语、日语、越南语、韩语、西班牙语、法语、葡萄牙语（巴西）、俄语、德语和意大利语；默认跟随 Windows 界面语言，不受支持的系统语言回退英语，也可在“通用”中手动切换。语言和内容字体保存后在当前进程内立即生效，不会停止或重新初始化守护任务。
-- “跟随语言默认”优先使用苹方、SF Pro Text、Harano Aji Gothic 或 Apple SD Gothic Neo；设备未安装时从随包商业授权或 OFL 资源私有加载，仍不可用时再加载对应 Noto 字体。内容字体控制正文、输入框、列表以及“关于”页的信息；按钮、设置切换标签与主窗口底部状态栏始终使用当前语言对应的 Windows 系统 UI 字体粗体。
+- “跟随语言默认”只使用 Windows 已安装字体，依次尝试苹方、SF Pro Text、Harano Aji Gothic 或 Apple SD Gothic Neo，对应 Noto 字体，以及 Windows 系统字体。可选字体包需由用户先安装到 Windows，程序不会从自身目录私有加载字体。内容字体控制正文、输入框、列表以及“关于”页的信息；按钮、设置切换标签与主窗口底部状态栏始终使用当前语言对应的 Windows 系统 UI 字体粗体。
 - 浅色与深色 GUI 支持多级窗口独立最小化、DPI 图标重建、圆角按钮和自定义图标。
 - 诊断包只在本机生成且不会自动上传；正式发行物可独立核验来源和完整性。
 
@@ -88,12 +88,11 @@
 
 ## 1. 安装与首次运行
 
-1. 从 [Releases](https://github.com/realSilasYang/process-watchdog/releases) 选择独立 EXE、完整便携 ZIP 或完整源码 ZIP。
-2. 三种下载的运行和存储方式不同：
+1. 从 [Releases](https://github.com/realSilasYang/process-watchdog/releases) 选择完整便携 ZIP 或完整源码 ZIP。可选字体包是单独资源，不是第三个程序版本。
+2. 两个程序版本的运行和存储方式不同：
 
 | 下载 | 适用场景 | 实际运行与配置位置 |
 | --- | --- | --- |
-| 独立 EXE | 单文件下载、无需安装 AutoHotkey | 首次运行校验内嵌载荷并安装到 `%LOCALAPPDATA%\ProcessWatchdog\Standalone`；程序、配置和后续自动更新都在该稳定目录中，移动或删除下载的引导 EXE 不会迁移配置 |
 | 完整便携 ZIP | 可见、可备份、可手动部署的长期安装 | 完整解压后运行；程序资源与 `watchdog.ini` 保存在解压目录，不可只取出其中的 EXE |
 | 完整源码 ZIP | 审阅、开发或源码运行 | 完整解压后用本机 AutoHotkey v2 x64 运行根 AHK；配置保存在源码目录 |
 
@@ -102,13 +101,15 @@
 5. 从“帮助信息 → 运行日志”查看目标识别、状态检查、恢复重试和升级保护实际采用的证据。
 
 也可以从源码运行：安装 AutoHotkey v2 x64 后执行 `进程守护小助手.ahk`。通过 Git
-克隆仓库时还需安装 Git LFS 并执行 `git lfs pull`，以取得随包字体的完整二进制文件；
-Release 提供的源码 ZIP 已包含这些资源，不需要 Git LFS。独立 EXE 与便携 ZIP 中的
-编译版已经内嵌发布时通过完整测试的 AutoHotkey 运行时，普通用户无需另行安装。
+克隆仓库时仍需安装 Git LFS 并执行 `git lfs pull`，以取得独立字体下载包的构建资源；
+源码 ZIP 和便携 ZIP 均不包含字体。便携 ZIP 中的编译版已经内嵌发布时通过完整测试的
+AutoHotkey 运行时，普通用户无需另行安装。
+
+可选的 `process-watchdog-X.Y.Z-fonts.zip` 提供首选和 Noto 回退界面字体；按需将其字体安装到 Windows 后，小助手会沿用原有优先级自动选择。字体不是程序运行必需。程序搜索另需安装并运行 [Everything 官方最新版](https://www.voidtools.com/downloads/)；随包 `Everything64.dll` 只是连接索引和后台服务的 IPC 客户端，不能替代 Everything 本体。
 
 ### 版本与运行方式
 
-| 版本 | 编译版（独立 EXE／便携 ZIP） | 源码版 |
+| 版本 | 编译版（便携 ZIP） | 源码版 |
 | --- | --- | --- |
 | 小助手版本 | 来自 EXE 文件版本，更新时替换完整发行包 | 来自入口目录的 `VERSION`，通过 Git 快速前进或源码包更新 |
 | AutoHotkey 版本 | 已内嵌；随下一版小助手发行包一起更新 | 使用本机解释器；小助手更新不会替用户升级 AutoHotkey |
@@ -133,7 +134,7 @@ Release 提供的源码 ZIP 已包含这些资源，不需要 Git LFS。独立 E
 
 添加守护对象时可以配置启动入口、工作目录、参数、环境变量和是否要求管理员权限。直接脚本还可以在“进程识别与启动设置”中指定 Python 虚拟环境、AutoHotkey、PowerShell、Node.js、Java 等任意运行时及其参数；实际顺序固定为“运行时参数、目标路径、目标参数”，留空则沿用默认启动方式。LNK 始终保留为启动入口，真实程序路径单独用于进程识别，因此安装器生成的间接快捷方式也不需要手工改成某个容易变化的内部 EXE。
 
-程序搜索依赖正在运行的 Everything 后台实例；随包 `Everything64.dll` 只是连接该实例的 SDK 客户端，不包含索引器。后台未运行时，小助手会从有界的本机安装线索中查找并静默启动 Everything；未安装时则在搜索窗口提供官方最新版下载地址。详细示例见[常见使用场景](docs/quick-start.md)。
+程序搜索依赖正在运行的 Everything 后台实例；随包 `Everything64.dll` 只是连接该实例的 SDK IPC 客户端，不包含索引器和后台服务，不能替代 Everything 本体。后台未运行时，小助手会从有界的本机安装线索中查找并静默启动 Everything；未安装时则在搜索窗口提供 [Everything 官方最新版](https://www.voidtools.com/downloads/)。详细示例见[常见使用场景](docs/quick-start.md)。
 
 在主列表中右键守护对象可以：
 
@@ -205,9 +206,9 @@ PowerShell、快捷方式以及启动前已经运行的批处理不会因此自�
 
 难以定位的问题可以在日志窗口导出本地诊断包。诊断包包含应用、Windows、AutoHotkey、DPI、资源句柄、守护阶段、配置警告和当前日志摘要，但不会自动上传。
 
-个人配置保存在实际运行目录的 `watchdog.ini`，未完成的软件升级会话保存在同目录的 `watchdog.maintenance.ini`。便携版和源码版以各自入口目录为实际运行目录；独立 EXE 则固定使用 `%LOCALAPPDATA%\ProcessWatchdog\Standalone`。这两个个人文件均被 Git 忽略，发行包不会携带或覆盖；仓库中的 `config/watchdog.example.ini` 只用于说明当前默认值和字段。
+个人配置保存在实际运行目录的 `watchdog.ini`，未完成的软件升级会话保存在同目录的 `watchdog.maintenance.ini`。便携版和源码版都以各自入口目录为实际运行目录。这两个个人文件均被 Git 忽略，发行包不会携带或覆盖；仓库中的 `config/watchdog.example.ini` 只用于说明当前默认值和字段。
 
-便携 EXE 与源码入口放在同一目录时共用个人状态，放在不同目录时彼此独立；独立 EXE 不与下载位置旁的文件共享配置。全局单实例锁会阻止不同形态同时运行。快捷方式和计划任务始终指向最后执行创建／切换操作的实际运行形态，因此每套安装只应选定一个日常入口。详细规则见[配置、备份与恢复](docs/configuration.md)和[安装、升级与卸载](docs/installation.md)。
+便携 EXE 与源码入口放在同一目录时共用个人状态，放在不同目录时彼此独立。全局单实例锁会阻止不同形态同时运行。快捷方式和计划任务始终指向最后执行创建／切换操作的实际运行形态，因此每套安装只应选定一个日常入口。详细规则见[配置、备份与恢复](docs/configuration.md)和[安装、升级与卸载](docs/installation.md)。
 
 日志和诊断包可能包含目标路径、启动参数或环境变量。公开提交前应自行检查和脱敏。提交问题时请使用[结构化 Issue 模板](https://github.com/realSilasYang/process-watchdog/issues/new/choose)；尚未修复的安全问题必须使用私密漏洞报告入口。详细说明见[本地诊断包](docs/diagnostics.md)、[故障排查](docs/troubleshooting.md)和[获取帮助](.github/SUPPORT.md)。
 
@@ -231,7 +232,7 @@ process-watchdog/
 │  └─ Windows/               设置、日志、帮助及各级对话框
 ├─ assets/
 │  ├─ app/                   应用图标
-│  ├─ fonts/                 进程私有首选／回退字体、授权声明与来源
+│  ├─ fonts/                 可选字体包的字体、授权声明与来源
 │  └─ ui-icons/              按钮、主列表状态与底部统计栏 SVG 图标
 ├─ config/                   带就地注释的最新配置格式示例
 ├─ docs/                     使用、架构、多语言总览、截图及项目治理文档
@@ -280,7 +281,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\reproducible-build.p
 - `verify-fast.ps1`：不拉取 LFS 大字体、不打开 GUI，检查依赖、静态边界、更新与安装事务、仓库、泄漏和工作流，供每个提交快速反馈。
 - `verify.ps1`：在快速门禁之上运行 39 个 AHK 核心和集成测试。
 - `verify-windows-integration.ps1`：校验完整字体哈希，创建真实 Windows 控件，覆盖 13 种语言、三级窗口和 GDI／USER 句柄回收。
-- `reproducible-build.ps1`：连续构建两次独立 EXE、便携 ZIP、源码 ZIP 和 SBOM，比较逐项 SHA-256，并对单文件版执行空目录双启动。
+- `reproducible-build.ps1`：连续构建两次便携 ZIP、源码 ZIP、可选字体 ZIP 和 SBOM，比较逐项 SHA-256，并验收三个解压目录。
 
 GitHub Actions 先按变更路径分类：纯文档只运行快速门禁；运行时代码增加 Windows／GUI 集成；主分支非文档变更和发行工程相关 Pull Request 才执行完整可复现打包。正式发布仍会重新执行全部三层，不以较快的普通 CI 代替发布验收。
 

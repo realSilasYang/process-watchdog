@@ -12,8 +12,8 @@ actions on GitHub after repository creation and cannot be replaced by local test
 - `tests/verify-windows-integration.ps1 -SoakSeconds 300` passes with all core
   tests, complete font hashes, and zero unexpected GDI or USER growth.
 - The release EXE hash matches the EXE used for the long GUI soak; otherwise rerun the soak.
-- `tests/reproducible-build.ps1` produces identical standalone EXE, EXE ZIP,
-  source ZIP, and SBOM hashes twice.
+- `tests/reproducible-build.ps1` produces identical portable ZIP, source ZIP,
+  optional font ZIP, and SBOM hashes twice.
 - `git log --all --name-only` contains no personal configuration, maintenance sessions, or probes.
 - `watchdog.ini` and `watchdog.maintenance.ini` remain ignored and unchanged by hash.
 - `VERSION` agrees with both changelogs, and the target version tag does not exist.
@@ -23,8 +23,9 @@ actions on GitHub after repository creation and cannot be replaced by local test
   environment, privilege, or default changes, or mandatory upgrade actions. It
   is omitted rather than filled with unchanged compatibility or download advice.
 - The changelog and Release notes retain their required emoji headings, and
-  `📦 Release Assets` lists all three exact file names, edition roles, included
-  content, AutoHotkey requirements, and intended uses as the final Release-notes
+  `📦 Release Assets` lists all three exact asset names, both program-edition
+  roles, the font-package purpose, official Everything link, AutoHotkey requirements,
+  and intended uses as the final Release-notes
   section.
 - Neither changelogs nor Release notes contain a `✅ Validation Scope` section.
   Test counts, soak results, build hashes, and incomplete physical matrices stay
@@ -60,7 +61,7 @@ actions on GitHub after repository creation and cannot be replaced by local test
   published release. Tests, both builds, and the SBOM share one resolved snapshot.
 - The release workflow reruns full-history scanning, core tests, real-GUI smoke,
   and two reproducible builds.
-- The Release contains only the standalone EXE, Windows x64 ZIP, and source ZIP.
+- The Release contains only the Windows x64 ZIP, source ZIP, and optional font ZIP.
   The standalone SPDX SBOM, `SHA256SUMS.txt`, extracted directories, and other
   build outputs remain available only in the complete Actions artifact.
 - The Release remains a draft during upload and becomes public only after its
@@ -68,7 +69,7 @@ actions on GitHub after repository creation and cannot be replaced by local test
   the draft from the same commit and never overwrite a published release.
 - After publication, audit the remote tag, commit, title, body, and GitHub SHA-256
   for all three assets. Then let `tools/verify-downloaded-release.ps1` download
-  the three hosted editions, extract both ZIPs, and rerun the complete structural
+  both hosted program editions and the optional font package, extract all three ZIPs, and rerun the complete structural
   verifier against the formal build snapshot embedded in the package. Confirm
   that personal configuration is absent. Preserve a failed public audit and
   issue a patch; never delete or overwrite it.
