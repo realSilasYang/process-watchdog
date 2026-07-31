@@ -13,7 +13,7 @@ complete source ZIP.
 - The complete source ZIP is for review, development, and source execution and
   requires local AutoHotkey v2 x64.
 
-The separately published `process-watchdog-X.Y.Z-fonts.zip` is an optional resource
+The separately published `fonts.zip` is an optional resource
 package, not a third program edition. It supplies preferred and Noto fallback UI
 fonts, which must be installed into Windows first. The program does not require it
 and never loads fonts privately from the ZIP or application directory.

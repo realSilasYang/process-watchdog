@@ -10,7 +10,7 @@ Release 只提供完整便携 ZIP 和完整源码 ZIP 两个程序版本：
   `assets/` 和 `third_party/` 要保持相对位置，不能只复制其中的 EXE。
 - 完整源码 ZIP 用于审阅、开发和源码方式运行，要求本机 AutoHotkey v2 x64。
 
-另行提供的 `process-watchdog-X.Y.Z-fonts.zip` 是可选字体资源包，不是第三个程序
+另行提供的 `fonts.zip` 是可选字体资源包，不是第三个程序
 版本。它提供首选和 Noto 回退界面字体；需要时先安装到 Windows。程序本身不依赖该包，
 也不会从 ZIP 或程序目录私有加载字体。
 

@@ -37,4 +37,4 @@ under the project owner's commercial redistribution authorization, whose public
 boundary is documented in `COMMERCIAL-LICENSE-NOTICE.en.md`. `metadata.json`
 records the source collection, original names, families, versions, and SHA-256
 values for every resource. Fonts ship only in
-`process-watchdog-X.Y.Z-fonts.zip` and are absent from both program editions.
+`fonts.zip` and are absent from both program editions.

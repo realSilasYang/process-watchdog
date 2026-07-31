@@ -28,4 +28,4 @@ Harano Aji Gothic 与两个 Noto 文件采用 SIL Open Font License 1.1，完整
 `OFL-1.1.txt`。其余四个文件依据项目所有者持有的商业分发授权提供，边界见
 `COMMERCIAL-LICENSE-NOTICE.md`。全部资源的来源集合、原始文件名、家族、版本和
 SHA-256 均记录在 `metadata.json`。字体只进入独立的
-`process-watchdog-X.Y.Z-fonts.zip`，不进入两个程序版本。
+`fonts.zip`，不进入两个程序版本。

@@ -194,6 +194,9 @@ Assert-ReleaseFailure {
 
 $expectedNames = @(Get-ReleaseArtifactNames '2.0.0')
 Assert-ReleaseTest ($expectedNames.Count -eq 3) '发行附件白名单数量错误。'
+Assert-ReleaseTest (($expectedNames -join '|') -ceq
+    'fonts.zip|process-watchdog-2.0.0-source.zip|process-watchdog-2.0.0-windows-x64.zip') `
+    '发行附件名称或 GitHub 固定展示顺序错误。'
 Assert-ReleaseFailure {
     Assert-ReleaseArtifactInventory -Version '2.0.0' `
         -Assets @($expectedNames[0], $expectedNames[1])
@@ -240,10 +243,10 @@ try {
 
 ## 📦 发布物说明
 
-- **`process-watchdog-2.0.0-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证和运行所需资源，不含字体；无需安装 AutoHotkey，适合完整解压后长期使用。
+- **``fonts.zip``（可选字体包）**：提供首选字体和回退字体，需先安装到 Windows；它不是程序运行必需。
 - **`process-watchdog-2.0.0-source.zip`（完整源码版）**：包含 AHK 源码、模块、测试和文档，不含字体，适合审阅、开发或从源码运行；本机需要 AutoHotkey v2 x64。
-- **`process-watchdog-2.0.0-fonts.zip`（可选字体包）**：提供首选字体和回退字体，需先安装到 Windows；它不是程序运行必需。
-- **Everything（官方最新版：https://www.voidtools.com/downloads/）**：为程序搜索提供索引和后台服务；随包 `Everything64.dll` 只是 IPC 客户端，不能替代 Everything 本体。
+- **`process-watchdog-2.0.0-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证和运行所需资源，不含字体；无需安装 AutoHotkey，适合完整解压后长期使用。
+- **Everything（[官方最新版](https://www.voidtools.com/downloads/)）**：为程序搜索提供索引和后台服务；随包 `Everything64.dll` 只是 IPC 客户端，不能替代 Everything 本体。
 "@
     Set-Content -LiteralPath $bodyPath -Encoding UTF8 `
         -Value $validBody
@@ -338,6 +341,33 @@ try {
     Assert-ReleaseFailure {
         Assert-ReleaseNotesContent -Version '2.0.0' -BodyPath $bodyPath
     } '完整便携版缺少 AutoHotkey 要求时未被拒绝。'
+    $misorderedAssetsBody = @"
+# 🎉 进程守护小助手 v2.0.0
+
+## ✨ 新增
+
+- 测试正文
+
+---
+
+## 📦 发布物说明
+
+- **`process-watchdog-2.0.0-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证和运行所需资源，不含字体；无需安装 AutoHotkey，适合完整解压后长期使用。
+- **`process-watchdog-2.0.0-source.zip`（完整源码版）**：包含 AHK 源码、模块、测试和文档，不含字体，适合审阅、开发或从源码运行；本机需要 AutoHotkey v2 x64。
+- **``fonts.zip``（可选字体包）**：提供首选字体和回退字体，需先安装到 Windows；它不是程序运行必需。
+- **Everything（[官方最新版](https://www.voidtools.com/downloads/)）**：为程序搜索提供索引和后台服务；随包 `Everything64.dll` 只是 IPC 客户端，不能替代 Everything 本体。
+"@
+    Set-Content -LiteralPath $bodyPath -Encoding UTF8 -Value $misorderedAssetsBody
+    Assert-ReleaseFailure {
+        Assert-ReleaseNotesContent -Version '2.0.0' -BodyPath $bodyPath
+    } '未按 GitHub 固定顺序排列的发布物说明未被拒绝。'
+    $malformedEverythingBody = $validBody -replace
+        '\[官方最新版\]\(https://www\.voidtools\.com/downloads/\)',
+        '官方最新版：https://www.voidtools.com/downloads/'
+    Set-Content -LiteralPath $bodyPath -Encoding UTF8 -Value $malformedEverythingBody
+    Assert-ReleaseFailure {
+        Assert-ReleaseNotesContent -Version '2.0.0' -BodyPath $bodyPath
+    } '会把加粗标记吞进链接的 Everything 裸 URL 未被拒绝。'
     Set-Content -LiteralPath $bodyPath -Encoding UTF8 `
         -Value ($validBody + "`r`n`r`n## 🐛 修复`r`n`r`n- 错误顺序")
     Assert-ReleaseFailure {

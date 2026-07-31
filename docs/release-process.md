@@ -66,8 +66,11 @@ tools\invoke-local-release-preflight.ps1`。该入口会按官方摘要准备便
 发布后发现需要修正的代码或文档时，应增加补丁版本。Release 正文使用对应的
 `docs/release-notes/v<版本>.md`，并以 CHANGELOG 条目为事实源，同时列出附件用途、
 运行要求和适用场景；测试与人工验收证据留在专门的验证记录中。
-Release 只保留两个程序版本（完整便携 ZIP、完整源码 ZIP）和可选字体 ZIP。字体包提供
-首选和回退界面字体，需安装到 Windows，不是程序运行必需。发布说明同时链接
+Release 只保留两个程序版本（完整便携 ZIP、完整源码 ZIP）和固定名称 `fonts.zip` 的
+可选字体包。发布物说明必须按 GitHub Assets 的固定文件名顺序列出 `fonts.zip`、完整源码
+ZIP、完整便携 ZIP，随后再列 Everything；Everything 官方地址必须使用显式 Markdown
+链接，不能把裸 URL 放进加粗文本。字体包提供首选和回退界面字体，需安装到 Windows，
+不是程序运行必需。发布说明同时链接
 [Everything 官方最新版](https://www.voidtools.com/downloads/)，说明它为程序搜索提供索引和后台服务，且
 `Everything64.dll` 只是 IPC 客户端、不能替代 Everything 本体。SBOM、
 `SHA256SUMS.txt` 及解压后的发行目录只保存在 Actions 完整构建产物中。

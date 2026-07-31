@@ -105,7 +105,7 @@
 源码 ZIP 和便携 ZIP 均不包含字体。便携 ZIP 中的编译版已经内嵌发布时通过完整测试的
 AutoHotkey 运行时，普通用户无需另行安装。
 
-可选的 `process-watchdog-X.Y.Z-fonts.zip` 提供首选和 Noto 回退界面字体；按需将其字体安装到 Windows 后，小助手会沿用原有优先级自动选择。字体不是程序运行必需。程序搜索另需安装并运行 [Everything 官方最新版](https://www.voidtools.com/downloads/)；随包 `Everything64.dll` 只是连接索引和后台服务的 IPC 客户端，不能替代 Everything 本体。
+可选的 `fonts.zip` 提供首选和 Noto 回退界面字体；按需将其字体安装到 Windows 后，小助手会沿用原有优先级自动选择。字体不是程序运行必需。程序搜索另需安装并运行 [Everything 官方最新版](https://www.voidtools.com/downloads/)；随包 `Everything64.dll` 只是连接索引和后台服务的 IPC 客户端，不能替代 Everything 本体。
 
 ### 版本与运行方式
 

@@ -111,9 +111,9 @@ $versionExpression = '${{ steps.release_meta.outputs.version }}'
 $commitExpression = '${{ github.sha }}'
 $repositoryExpression = '${{ github.repository }}'
 $userAssets = @(
-    "dist/process-watchdog-$versionExpression-windows-x64.zip"
+    'dist/fonts.zip'
     "dist/process-watchdog-$versionExpression-source.zip"
-    "dist/process-watchdog-$versionExpression-fonts.zip"
+    "dist/process-watchdog-$versionExpression-windows-x64.zip"
 )
 Assert-WorkflowContains 'release.yml' $release @(
     'workflow_dispatch:'
