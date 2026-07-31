@@ -19,12 +19,11 @@
 诊断与更新检查也使用新语言。既有日志保留写入时的原文，核心守护、目标控制器、PID、
 调度任务、主窗口和列表句柄均不会重建。
 
-`UiFont=auto` 按下表解析当前界面语言的内容字体。首选字体必须已经安装且能由
-Windows GDI 实际创建；否则小助手从 `assets/fonts` 私有加载对应 Noto 字体。
-私有字体只对当前进程可见，不会安装到系统或修改 Windows 字体设置。若字体资源
-缺失或加载失败，才使用最后一列的 Windows 自带字体。
+`UiFont=auto` 按下表解析当前界面语言的内容字体。每一级字体都必须已经安装到
+Windows 并能由 GDI 实际创建；程序不会从自身目录或字体 ZIP 私有加载字体。首选字体
+不可用时依次尝试已安装的 Noto 字体和最后一列 Windows 系统字体。
 
-| 界面语言 | 首选字体 | 随包 Noto 回退 | Windows 最终兜底 |
+| 界面语言 | 首选字体 | 已安装 Noto 回退 | Windows 最终兜底 |
 | --- | --- | --- | --- |
 | 简体中文 | PingFang SC | Noto Sans CJK SC | Microsoft YaHei UI |
 | 繁體中文（香港） | PingFang HK | Noto Sans CJK HK | Microsoft JhengHei UI |
@@ -33,34 +32,27 @@ Windows GDI 实际创建；否则小助手从 `assets/fonts` 私有加载对应 
 | 한국어 | AppleSDGothicNeoR00 | Noto Sans CJK KR | Malgun Gothic |
 | English、Tiếng Việt、Español、Français、Português（Brasil）、Русский、Deutsch、Italiano | SF Pro Text | Noto Sans | Segoe UI |
 
-首选字体根据用户指定的 Apple 字体目录中的实际文件与内部家族名确定。该目录没有
-Hiragino 日文字体，因此日语选择同目录中字符覆盖完整、适合界面且采用 OFL 1.1 的
-`Harano Aji Gothic`，并将常规字重作为 OFL 私有资源随包提供。PingFang 原始集合、
-SF Pro Text 常规与粗体以及 Apple SD Gothic Neo 常规字体依据项目所有者持有的商业
-分发授权随包提供。自动模式仍先使用设备已安装的对应家族；缺失时才加载这些外置资源。
-第二级回退资源取自用户指定的 Google `NoTofu` 字体集：拉丁
-字体保留可变字重与字宽，CJK 字体保留原始 45 字体面集合及各地区家族。字体作为
-`assets/fonts` 外置资源随完整发行包分发，不嵌入单个 EXE。OFL 与商业字体的授权
-边界分别记录在字体目录的许可证和商业授权声明中。
+可选字体包提供表中的首选字体和 Noto 回退字体，需由用户先安装到 Windows；它不包含在
+便携版或源码版中，也不是程序运行必需。第二级回退取自 Google `NoTofu` 字体集：
+拉丁字体保留可变字重与字宽，CJK 字体保留原始 45 字体面集合及各地区家族。OFL 与商业
+字体的授权边界分别记录在字体包的许可证和商业授权声明中。
 
 也可在“通用”页从本机已安装字体中选择；保存后会与语言一起在当前进程内立即应用。
 该设置控制正文、输入框、列表以及“关于”页标题和信息等内容控件。按钮、设置切换
 标签和主窗口底部状态栏不跟随 `UiFont`，始终使用表中最后一列对应的 Windows 系统
-UI 字体粗体，也不会为此加载随包字体。配置中填写了无效或已卸载字体时，程序会回退
+UI 字体粗体。配置中填写了无效或已卸载字体时，程序会回退
 到 `auto`，不会把任意字体名传给界面。
 
 ## EXE 与源码的配置关系
 
-配置位置由实际运行的正式入口决定。独立 EXE 的下载文件只是引导器，不是配置根：
+配置位置由实际运行入口所在目录决定：
 
-- 独立 EXE 固定把完整程序安装到 `%LOCALAPPDATA%\ProcessWatchdog\Standalone`，并在
-  该目录读写 `watchdog.ini` 和 `watchdog.maintenance.ini`；下载文件旁的配置不参与运行。
 - 便携 `进程守护小助手.exe` 与 `进程守护小助手.ahk` 位于同一目录时，共用
   `watchdog.ini` 和 `watchdog.maintenance.ini`。
 - 两者位于不同目录时，各自读写所在目录内的配置，彼此不会自动同步。
 - 两种形态使用完全相同的配置格式；全局单实例锁会阻止它们同时运行。
 - 若要从一种形态切换到另一种形态，应先退出当前实例。需要沿用设置时，把两份
-  配置文件复制到新的实际运行目录；独立 EXE 的目标目录是上述 `LOCALAPPDATA` 路径。
+  配置文件复制到新的实际运行目录。
 - 同目录共存只建议用于临时切换验证。EXE 包与源码包共用部分发行目录和一份
   `update-manifest.json`，不能把它们当作两套可分别自动更新的安装；需要长期保留
   两套形态时请使用不同的实际运行目录，并在完全退出后按需复制两份配置。

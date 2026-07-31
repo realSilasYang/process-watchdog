@@ -642,8 +642,6 @@ class SettingsWindow extends ManagedWindow {
             LocalizationService.RefreshInstalledUiFontNames()
             defaultFontName := LocalizationService
                 .GetLanguageDefaultUiFontName()
-            ; 解析默认字体时可能刚好加载随包私有字体并再次清空缓存；重新读取
-            ; 一次可复用未变化的缓存，也能把新加载的字体立即纳入本次菜单。
             refreshedFonts := LocalizationService.GetInstalledUiFontNames()
             fontLabels := [Tr("跟随语言默认（{1}）", defaultFontName)]
             refreshedValues := ["auto"]

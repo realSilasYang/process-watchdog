@@ -292,16 +292,16 @@ if ($localizationServiceSource -notmatch
 foreach ($fontLifecycleHook in @(
         'GetLanguageUiFontSpec(language := "")',
         'GetLanguageSystemUiFontName(language := "")',
-        'AddFontResourceExW',
-        'RemoveFontResourceExW',
-        'GetUiFontAssetDirectory()',
-        'GetLoadedPrivateUiFontResourceCount()')) {
+        'GetInstalledUiFontNames()',
+        'RefreshInstalledUiFontNames()',
+        'FindInstalledUiFontName(fontName)')) {
     if (-not $localizationServiceSource.Contains($fontLifecycleHook)) {
-        $failures.Add("Missing language-default font lifecycle hook: $fontLifecycleHook")
+        $failures.Add("Missing installed-font resolution hook: $fontLifecycleHook")
     }
 }
-if (-not $source.Contains('LocalizationService.ShutdownUiFonts()')) {
-    $failures.Add('Application shutdown must release process-private UI fonts')
+if ($localizationServiceSource -match 'AddFontResourceExW|RemoveFontResourceExW|FR_PRIVATE|GetUiFontAssetDirectory|GetLoadedPrivateUiFontResourceCount' -or
+    $source -match 'LocalizationService.ShutdownUiFonts()') {
+    $failures.Add('Runtime UI fonts must come only from Windows-installed families; private font loading and cleanup must not return')
 }
 
 # 用户选择的内容字体不得重新覆盖界面骨架。所有交互按钮都从统一注册入口取得
@@ -561,8 +561,8 @@ try {
 } catch {
     $failures.Add("Third-party dependency lock is unreadable: $($_.Exception.Message)")
 }
-# 随包字体属于输入资源而不是本机安装前提；仓库门禁必须验证固定数量、哈希和 OFL，
-# 这样源码运行、编译包及自动更新使用的是同一组可追溯文件。
+# 独立可选字体包属于发行输入资源，而不是程序运行前提；仓库门禁仍必须验证固定
+# 数量、哈希和授权，确保用户安装到 Windows 的资源可追溯且未被替换。
 $fontMetadataPath = Join-Path $projectRoot 'assets\fonts\metadata.json'
 try {
     $fontMetadata = Get-Content -LiteralPath $fontMetadataPath -Raw `

@@ -87,8 +87,8 @@ Si el asistente te ha ahorrado tiempo al diagnosticar fallos o recuperar aplicac
 
 ## 1. Instalación y primer inicio
 
-1. Elige en [Releases](https://github.com/realSilasYang/process-watchdog/releases) una de las tres ediciones: EXE independiente, ZIP portátil completo o ZIP completo del código fuente.
-2. El EXE independiente no necesita AutoHotkey y, en el primer inicio, instala su carga verificada en `%LOCALAPPDATA%\ProcessWatchdog\Standalone`; el ZIP portátil permanece en la carpeta donde se extraiga por completo; el ZIP del código fuente requiere AutoHotkey v2 x64.
+1. Elige en [Releases](https://github.com/realSilasYang/process-watchdog/releases) el ZIP portátil completo o el ZIP completo del código fuente. El paquete opcional de fuentes no es una tercera edición del programa.
+2. El ZIP portátil se ejecuta tras extraerlo por completo y no requiere instalar AutoHotkey; el ZIP del código fuente requiere AutoHotkey v2 x64. Las fuentes deben instalarse en Windows, pero no son necesarias para ejecutar el programa; la búsqueda de aplicaciones también requiere la [última versión oficial de Everything](https://www.voidtools.com/downloads/).
 3. Ejecuta `进程守护小助手.exe`. La aplicación solicitará privilegios de administrador y mostrará la ventana principal o permanecerá en la bandeja del sistema según los ajustes.
 4. Pulsa Añadir para elegir un destino o arrastra archivos compatibles a la ventana principal.
 5. Abre el Registro para consultar las pruebas de identidad, comprobaciones de estado, intentos de recuperación y señales de actualización utilizadas.
@@ -173,7 +173,7 @@ El Registro de ejecución permite seleccionar y copiar texto, maximizar y cambia
 
 Para problemas difíciles puede exportarse un paquete de diagnóstico local. Contiene resúmenes de la aplicación, Windows, AutoHotkey, DPI, identificadores de recursos, fase de supervisión, avisos de configuración y registro actual, pero nunca se sube automáticamente.
 
-La configuración personal se guarda en `watchdog.ini` dentro del directorio de ejecución real y las sesiones incompletas en `watchdog.maintenance.ini`. Las ediciones portátil y de código fuente usan su carpeta de entrada; el EXE independiente siempre usa `%LOCALAPPDATA%\ProcessWatchdog\Standalone`. Git ignora ambos archivos y ninguna versión los incluye ni sobrescribe.
+La configuración personal se guarda en `watchdog.ini` dentro del directorio de ejecución real y las sesiones incompletas en `watchdog.maintenance.ini`. Las ediciones portátil y de código fuente usan su propia carpeta de entrada. Git ignora ambos archivos y ninguna versión los incluye ni sobrescribe.
 
 Un EXE portátil y una entrada de código fuente solo comparten estado cuando están en la misma carpeta; el EXE independiente no comparte configuración con archivos situados junto al lanzador descargado. El bloqueo global impide ejecutar varias formas a la vez. Los accesos directos y la tarea programada apuntan a la última forma de ejecución integrada. Consulta [Configuración, copia de seguridad y recuperación](en/configuration.md) e [Instalación, actualización y eliminación](en/installation.md).
 

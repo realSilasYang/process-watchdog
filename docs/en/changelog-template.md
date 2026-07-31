@@ -13,9 +13,10 @@ breaking changes or mandatory upgrade actions.
 
 ### 📦 Release Assets
 
-- **`process-watchdog-X.Y.Z-windows-x64.exe` (standalone executable):** Requires no AutoHotkey installation and runs immediately after download; intended for a quick trial or users who need a single program file.
-- **`process-watchdog-X.Y.Z-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, fonts, and runtime resources; intended for long-term use after full extraction or for manual deployment.
-- **`process-watchdog-X.Y.Z-source.zip` (complete source package):** Includes the AHK source, modules, tests, documentation, and fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+- **`process-watchdog-X.Y.Z-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, and runtime resources but no fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **`process-watchdog-X.Y.Z-source.zip` (complete source package):** Includes AHK source, modules, tests, and documentation but no fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64.
+- **`process-watchdog-X.Y.Z-fonts.zip` (optional font package):** Supplies preferred and fallback UI fonts for installation into Windows; it is not required to run the program.
+- **Everything (latest official release: https://www.voidtools.com/downloads/):** Supplies the index and background service for application search. The bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
 
 ---
 
@@ -93,9 +94,10 @@ breaking changes or mandatory upgrade actions.
 
 ### 📦 Release Assets
 
-- **`process-watchdog-1.0.1-windows-x64.exe` (standalone executable):** Requires no AutoHotkey installation and runs immediately after download; intended for a quick trial or users who need a single program file.
-- **`process-watchdog-1.0.1-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, fonts, and runtime resources; intended for long-term use after full extraction or for manual deployment.
-- **`process-watchdog-1.0.1-source.zip` (complete source package):** Includes the AHK source, modules, tests, documentation, and fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+- **`process-watchdog-1.0.1-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, and runtime resources but no fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **`process-watchdog-1.0.1-source.zip` (complete source package):** Includes AHK source, modules, tests, and documentation but no fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64.
+- **`process-watchdog-1.0.1-fonts.zip` (optional font package):** Supplies preferred and fallback UI fonts for installation into Windows; it is not required to run the program.
+- **Everything (latest official release: https://www.voidtools.com/downloads/):** Supplies the index and background service for application search. The bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
 
 ---
 

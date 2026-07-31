@@ -4,35 +4,32 @@
 
 ## 发行包
 
-Release 只提供独立 EXE、完整便携 ZIP 和完整源码 ZIP 三种下载：
+Release 只提供完整便携 ZIP 和完整源码 ZIP 两个程序版本：
 
-- 独立 EXE 内嵌完整便携包。首次运行先核对内嵌 SHA-256、版本和更新清单，再以可
-  回滚事务安装到 `%LOCALAPPDATA%\ProcessWatchdog\Standalone`。以后从任意位置运行
-  该引导 EXE 都会启动稳定目录中的程序；旧引导 EXE 不会把已经更新的新版本降级。
 - 完整便携 ZIP 适合希望明确控制安装、备份和迁移目录的用户。必须完整解压，EXE、
   `assets/` 和 `third_party/` 要保持相对位置，不能只复制其中的 EXE。
 - 完整源码 ZIP 用于审阅、开发和源码方式运行，要求本机 AutoHotkey v2 x64。
 
-独立 EXE 与便携 ZIP 都可长期使用，差别是前者把受管程序隐藏在稳定的本机应用数据
-目录中，后者让所有程序文件和个人配置留在用户选择的解压目录。
+另行提供的 `process-watchdog-X.Y.Z-fonts.zip` 是可选字体资源包，不是第三个程序
+版本。它提供首选和 Noto 回退界面字体；需要时先安装到 Windows。程序本身不依赖该包，
+也不会从 ZIP 或程序目录私有加载字体。
 
 `v1.0.0` 是自动更新功能加入前的首个公开版本，本身没有更新助手，也不能自行发起
 升级。仍在使用 `v1.0.0` 时，需要手动下载并完整替换为 `v2.0.0`；从该版本起，
 后续正式版本才可使用设置中的检查更新流程。
 
-独立 EXE 与便携 ZIP 已经包含运行所需的 AutoHotkey 运行时，不要求用户安装 AutoHotkey。
+完整便携 ZIP 已经包含运行所需的 AutoHotkey 运行时，不要求用户安装 AutoHotkey。
 从源码运行才需要 AutoHotkey v2 x64。发行包的 `licenses/sources/` 同时附带与内嵌
 运行时精确对应的 AutoHotkey 完整源码归档；版本、提交和哈希记录在
 `build-metadata/toolchain.resolved.json`。该文件是本次发布开始时解析并冻结的实际
 工具链快照，不是仓库预先指定的 AutoHotkey 或 Ahk2Exe 版本。
 
-通过 Git 克隆源码时还必须安装 Git LFS，并在首次运行或更新后执行 `git lfs pull`。
-项目用 LFS 保存完整的随包字体，其中 CJK 集合超过 GitHub 普通 Git 对象的单文件
-限制；如果工作区中只剩 LFS 指针文件，界面仍可能回退系统字体，但构建和发行校验会
-明确失败。Release 的源码 ZIP 已包含完整字体，不需要安装 Git LFS。
+通过 Git 克隆源码并需要构建可选字体包时，还必须安装 Git LFS，并在首次克隆或更新后
+执行 `git lfs pull`。CJK 字体集合超过 GitHub 普通 Git 对象的单文件限制；如果工作
+区中只剩 LFS 指针文件，字体包构建和发行校验会明确失败。便携 ZIP 和源码 ZIP 均不含字体。
 
-“搜索程序”功能要求本机安装并运行 Everything。发行包附带的 Everything SDK DLL
-只负责连接 Everything 服务；小助手不会在服务不可用时改为本地全盘扫描。守护、手动
+“搜索程序”功能要求本机安装并运行 [Everything 官方最新版](https://www.voidtools.com/downloads/)。发行包附带的 `Everything64.dll`
+只是连接索引和后台服务的 IPC 客户端，不能替代 Everything 本体；小助手不会在服务不可用时改为本地全盘扫描。守护、手动
 选择文件和批量导入指定文件夹不依赖 Everything。
 
 小助手、AutoHotkey 和 Ahk2Exe 使用独立版本号。EXE 版更新完整发行包时会一同更新
@@ -67,8 +64,6 @@ AutoHotkey 版本和更新检查位于“关于”页。
 
 - 正式编译版：下载完整 Windows x64 ZIP，使用 GitHub Release API 提供的 SHA-256
   摘要校验后退出主程序，再由临时更新助手替换实际运行目录中的受管文件并重启。
-  独立 EXE 更新的是 `%LOCALAPPDATA%\ProcessWatchdog\Standalone` 中的内层程序；最初
-  下载的引导 EXE 无需改写，并会继续启动已经更新的版本。
 - Git 源码：确认所有受 Git 跟踪的文件没有本地修改，只允许快速前进到正式发布
   标签，然后使用原 AutoHotkey 解释器重启。有本地修改或历史分叉时拒绝覆盖。
 - 非 Git 源码包：下载项目生成的独立源码 ZIP，核对 GitHub 提供的 SHA-256 摘要后
@@ -89,6 +84,6 @@ AutoHotkey 版本和更新检查位于“关于”页。
 
 ## 卸载
 
-先在“通用”页取消开机自启，再退出程序。便携版和源码版删除各自目录；独立 EXE
-还要删除下载的引导文件和 `%LOCALAPPDATA%\ProcessWatchdog\Standalone`。桌面和开始
-菜单中由用户创建的快捷方式可直接删除；程序不在注册表保存守护列表。
+先在“通用”页取消开机自启，再退出程序，然后删除便携版或源码版目录。桌面和开始
+菜单中由用户创建的快捷方式可直接删除；程序不在注册表保存守护列表。已安装到 Windows
+的可选字体属于系统字体，应在 Windows“设置 → 个性化 → 字体”中按需单独卸载。

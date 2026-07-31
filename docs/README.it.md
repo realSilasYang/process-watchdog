@@ -87,8 +87,8 @@ Se l’assistente ti ha fatto risparmiare tempo nella diagnosi o nel ripristino 
 
 ## 1. Installazione e primo avvio
 
-1. Scegli in [Releases](https://github.com/realSilasYang/process-watchdog/releases) una delle tre edizioni: EXE autonomo, ZIP portatile completo o ZIP completo del codice sorgente.
-2. L’EXE autonomo non richiede AutoHotkey e al primo avvio installa il carico verificato in `%LOCALAPPDATA%\ProcessWatchdog\Standalone`; lo ZIP portatile resta nella cartella in cui viene estratto per intero; lo ZIP del codice sorgente richiede AutoHotkey v2 x64.
+1. Scegli in [Releases](https://github.com/realSilasYang/process-watchdog/releases) lo ZIP portatile completo o lo ZIP completo del codice sorgente. Il pacchetto di font opzionale non è una terza edizione del programma.
+2. Lo ZIP portatile funziona dopo l’estrazione completa e non richiede AutoHotkey separato; lo ZIP del codice sorgente richiede AutoHotkey v2 x64. I font vanno installati in Windows ma non sono necessari per eseguire il programma; la ricerca delle applicazioni richiede anche l’[ultima versione ufficiale di Everything](https://www.voidtools.com/downloads/).
 3. Avvia `进程守护小助手.exe`. L’app richiede i privilegi di amministratore e, secondo le impostazioni, mostra la finestra principale oppure resta nell’area di notifica.
 4. Seleziona Aggiungi per scegliere una destinazione oppure trascina un file supportato nella finestra principale.
 5. Apri il Registro per vedere le prove di identità, i controlli di stato, i tentativi di ripristino e i segnali di aggiornamento effettivamente usati.
@@ -173,7 +173,7 @@ Il Registro di esecuzione consente di selezionare e copiare testo, massimizzare 
 
 Per un problema difficile, esporta un pacchetto diagnostico locale dal registro. Contiene riepiloghi di app, Windows, AutoHotkey, DPI, handle delle risorse, fase di sorveglianza, avvisi di configurazione e registro corrente, senza caricamento automatico.
 
-La configurazione personale è in `watchdog.ini` nella directory di esecuzione reale e le sessioni non concluse in `watchdog.maintenance.ini`. Le edizioni portatile e sorgente usano la propria cartella di ingresso; l’EXE autonomo usa sempre `%LOCALAPPDATA%\ProcessWatchdog\Standalone`. Git ignora entrambi i file e nessuna release li include o sovrascrive.
+La configurazione personale è in `watchdog.ini` nella directory di esecuzione reale e le sessioni non concluse in `watchdog.maintenance.ini`. Le edizioni portatile e sorgente usano la propria cartella di ingresso. Git ignora entrambi i file e nessuna release li include o sovrascrive.
 
 Un EXE portatile e un ingresso sorgente condividono lo stato solo nella stessa cartella; l’EXE autonomo non condivide la configurazione con i file accanto al launcher scaricato. Il blocco globale impedisce l’esecuzione simultanea. Collegamenti e attività pianificata puntano all’ultima forma di esecuzione integrata. Consulta [Configurazione, backup e ripristino](en/configuration.md) e [Installazione, aggiornamento e rimozione](en/installation.md).
 

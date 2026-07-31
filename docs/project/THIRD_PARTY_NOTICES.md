@@ -11,12 +11,12 @@
 | --- | --- | --- |
 | AutoHotkey | 编译版内嵌的 x64 运行时及 PCRE | GPL-2.0-only 及 BSD-3-Clause |
 | resvg | SVG 内存栅格化 | MIT 或 Apache License 2.0 |
-| Everything SDK DLL | 程序搜索接口 | MIT |
-| PingFang | 简体、港繁和台繁界面的进程私有首选字体 | 商业分发授权 |
-| SF Pro Text | 拉丁、越南语和西里尔语言界面的进程私有首选字体 | 商业分发授权 |
-| Apple SD Gothic Neo | 韩文界面的进程私有首选字体 | 商业分发授权 |
-| Harano Aji Gothic | 日文界面的进程私有首选字体 | SIL Open Font License 1.1 |
-| Noto Sans 及 Noto Sans CJK | 首选字体缺失时的进程私有界面字体 | SIL Open Font License 1.1 |
+| Everything SDK DLL | 连接 Everything 索引和后台服务的程序搜索 IPC 客户端 | MIT |
+| PingFang | 可选字体包中的简体、港繁和台繁界面首选字体 | 商业分发授权 |
+| SF Pro Text | 可选字体包中的拉丁、越南语和西里尔语言界面首选字体 | 商业分发授权 |
+| Apple SD Gothic Neo | 可选字体包中的韩文界面首选字体 | 商业分发授权 |
+| Harano Aji Gothic | 可选字体包中的日文界面首选字体 | SIL Open Font License 1.1 |
+| Noto Sans 及 Noto Sans CJK | 可选字体包中的界面回退字体 | SIL Open Font License 1.1 |
 | Lucide Icons 1.27.0 | 按钮、主列表状态与底部统计栏 SVG 图标 | ISC；部分 Feather 派生图标为 MIT |
 
 Lucide 选用图标的版本、来源和完整许可文本保存在
@@ -31,9 +31,11 @@ WTFPL。actionlint
 和 Gitleaks 仅用于验证 GitHub Actions 工作流及公开历史，不进入发行包，采用
 MIT 许可证。
 
-随包字体的家族、版本、来源和 SHA-256 位于
-[`assets/fonts/metadata.json`](../../assets/fonts/metadata.json)，完整 OFL 文本位于
-[`assets/fonts/OFL-1.1.txt`](../../assets/fonts/OFL-1.1.txt)。PingFang、SF Pro Text
-与 Apple SD Gothic Neo 依据项目所有者确认持有的商业分发授权随包提供，公开授权边界
-见[`商业字体授权说明`](../../assets/fonts/COMMERCIAL-LICENSE-NOTICE.md)；这些字体
-不适用本项目的开源许可证。Harano Aji Gothic 与 Noto 继续采用 OFL 1.1。
+可选字体包中字体的家族、版本、来源和 SHA-256 位于
+[`assets/fonts/metadata.json`](https://github.com/realSilasYang/process-watchdog/blob/main/assets/fonts/metadata.json)，完整 OFL 文本位于
+[`assets/fonts/OFL-1.1.txt`](https://github.com/realSilasYang/process-watchdog/blob/main/assets/fonts/OFL-1.1.txt)。PingFang、SF Pro Text
+与 Apple SD Gothic Neo 依据项目所有者确认持有的商业分发授权在独立字体包中提供，公开授权边界
+见[`商业字体授权说明`](https://github.com/realSilasYang/process-watchdog/blob/main/assets/fonts/COMMERCIAL-LICENSE-NOTICE.md)；这些字体
+不适用本项目的开源许可证。Harano Aji Gothic 与 Noto 继续采用 OFL 1.1。两个程序
+版本均不包含字体，运行时也不私有加载字体。Everything 本体不随项目分发；请从
+[官方网站](https://www.voidtools.com/downloads/)获取最新版，`Everything64.dll` 不能替代它。

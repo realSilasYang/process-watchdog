@@ -990,6 +990,19 @@ OnGlobalPointerDown(wParam, lParam, msg, hwnd) {
     if App.uiInteractions.HasButton(hwnd) && !IsRoundedButtonInputRouted(hwnd)
         BeginButtonPress(hwnd)
 
+    ; 主窗口空白表面和列表自身的空白区都应让 ListView 完全失焦。
+    ; 这里保留选中行，仅移除键盘焦点和焦点行；列表空白区还要阻止原生
+    ; ListView 在本次按下消息结束时再次抢回焦点。
+    if IsSet(Main) && IsObject(Main.lv) && Main.lv.Hwnd {
+        passiveSurfaces := []
+        if Main.HasOwnProp("statsText") && IsObject(Main.statsText)
+            passiveSurfaces.Push(Main.statsText.Hwnd)
+        blankResult := ListViewFocusService.HandleBlankPointerDown(
+            Main.lv, Main.gui.Hwnd, hwnd, lParam, passiveSurfaces)
+        if blankResult != ListViewFocusService.NoAction
+            return 0
+    }
+
     PruneTextInputCursorStates()
     if App.uiInteractions.HasTextInput(hwnd) {
         clickedTextState := App.uiInteractions.GetTextInput(hwnd)

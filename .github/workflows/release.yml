@@ -59,13 +59,13 @@ jobs:
           -SoakSeconds 15
           -SecondPowerShellPath powershell.exe
 
-      - name: Attest the three user editions
+      - name: Attest the two program editions and optional font package
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4
         with:
           subject-path: |
-            dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.exe
             dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.zip
             dist/process-watchdog-${{ steps.release_meta.outputs.version }}-source.zip
+            dist/process-watchdog-${{ steps.release_meta.outputs.version }}-fonts.zip
 
       - name: Preserve all build outputs
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -76,7 +76,7 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-      - name: Upload only the three user editions to a draft
+      - name: Upload the two program editions and optional font package to a draft
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
           tag_name: ${{ steps.release_meta.outputs.tag }}
@@ -88,9 +88,9 @@ jobs:
           body_path: docs/release-notes/v${{ steps.release_meta.outputs.version }}.md
           fail_on_unmatched_files: true
           files: |
-            dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.exe
             dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.zip
             dist/process-watchdog-${{ steps.release_meta.outputs.version }}-source.zip
+            dist/process-watchdog-${{ steps.release_meta.outputs.version }}-fonts.zip
 
       - name: Audit draft against source and local hashes
         shell: pwsh

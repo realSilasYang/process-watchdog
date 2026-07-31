@@ -7,6 +7,37 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.0.6] - 2026-07-31
+
+### 📦 Release Assets
+
+- **`process-watchdog-2.0.6-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, and runtime resources without fonts; no AutoHotkey installation is required, and it is intended for long-term use after full extraction.
+- **`process-watchdog-2.0.6-source.zip` (complete source package):** Includes the AHK source, modules, tests, and documentation without fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+- **`process-watchdog-2.0.6-fonts.zip` (optional font package):** Provides the preferred and fallback fonts for installation into Windows; it is not required to run the application.
+- **Everything (latest official version: https://www.voidtools.com/downloads/):** Provides the index and background service used by application searches. The bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### ⚠️ Important Notes
+
+- **Release asset change:** Starting with v2.0.6, the standalone EXE is no longer provided. Upgrades must use either the complete portable package or the source package.
+- **Font-loading change:** Application packages no longer include or privately load fonts. To retain the prior preferred-font appearance, the optional font package must be downloaded and installed into Windows.
+
+---
+
+### 🚀 Improvements
+
+- **Simplified program editions:** The release pipeline now builds only the complete portable and source editions. The standalone EXE wrapper, installation script, and corresponding tests have been removed so the same application no longer has three delivery paths.
+- **System fonts and optional font package:** Runtime selection now considers only fonts installed in Windows while preserving the existing priority order. Preferred and fallback fonts are distributed separately and no longer appear in application packages or the SBOM.
+- **Everything acquisition guidance:** Installation, configuration, and release documentation consistently links to the latest official version and explains that Everything itself supplies indexing and the background service while the bundled DLL only provides IPC.
+- **Converged release pipeline:** Builds, reproducibility checks, asset inventories, downloaded-release verification, and the GitHub Release workflow now consistently validate the two application editions and optional font package, with obsolete standalone-EXE branches removed.
+
+---
+
+### 🐛 Fixed
+
+- **Main-list focus clearing:** Clicking an empty main-window surface or empty ListView area now clears both ListView focus and its focused item, preventing a selected target from retaining keyboard-operation focus.
+
 ## 🎉 Version [2.0.5] - 2026-07-31
 
 ### 📦 Release Assets

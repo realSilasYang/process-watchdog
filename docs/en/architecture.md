@@ -131,13 +131,8 @@ through replacement. Failure preserves the old file and schedules one
 exponential-backoff retry.
 
 Portable EXE and source modes use `A_ScriptDir` as the configuration root. Entries
-in one directory share state and separate directories are independent. The standalone
-EXE is an outer bootstrapper: it verifies an embedded portable ZIP, transactionally
-installs it under `%LOCALAPPDATA%\ProcessWatchdog\Standalone` with staged extraction,
-managed-path backup, and rollback, then starts the real EXE there. Its `A_ScriptDir`,
-personal state, and later self-updates therefore remain under that stable root. A
-semantic-version comparison prevents an older bootstrapper from downgrading a newer
-installed payload. The global mutex still permits only one running instance. A separate PowerShell process checks
+in one directory share state and separate directories are independent. The global
+mutex permits only one running instance. A separate PowerShell process checks
 for self-updates, and the main thread only reads one atomic result file every
 250 milliseconds. A process handle, rather than a reusable PID, determines worker
 completion and timeout. Results must belong to the running version, and each EXE,
@@ -231,20 +226,14 @@ no provable source template remains unchanged. Content controls continue using
 the selected content font. Every button obtains the current language's Windows
 UI font at bold weight through the shared interaction-registration path, which
 also covers Settings tabs; the main-window footer applies the same font on
-creation and hot switch. Resolving this system emphasis font never loads a
-packaged font.
+creation and hot switch. Resolving this system emphasis font uses installed fonts only.
 
-For language-default fonts, the service first verifies that Windows GDI can
-create the installed preferred face. When absent, it loads the matching
-packaged preference: the original PingFang collection for Chinese, SF Pro Text
-regular and bold for Latin and Cyrillic languages, Harano Aji Gothic for
-Japanese, or Apple SD Gothic Neo for Korean. The service then privately loads
-the packaged Noto Sans variable font or original Noto Sans CJK collection,
-and uses a native Windows UI font only if loading also fails. Paths resolve from the installation root; successful
-and failed attempts are cached, each resource is loaded only once across hot
-switches, and `RemoveFontResourceExW` releases it during shutdown. OFL and
-commercially licensed fonts have separate SBOM entries, and the project license
-does not relicense the commercial files.
+For language-default fonts, the service asks Windows GDI for the installed preferred
+face, an installed Noto fallback, then a native Windows UI font. The optional font
+package is only installed by the user into Windows; runtime code never resolves font
+asset paths, registers process-private fonts, or releases them at shutdown. The font
+package records separate OFL and commercial authorization boundaries, and the project
+license does not relicense the commercial files.
 
 The transaction does not replace `App`, `GuardRuntime`, the scheduler, target
 controllers, the main window, or the ListView, and target generations do not
@@ -288,9 +277,9 @@ monitors, per-monitor DPI, and high contrast remain manual-matrix responsibiliti
 Public-release validation requires a non-shallow clone, scans every commit with
 the pinned Gitleaks, rejects personal configuration and temporary probes in
 history, and rejects local absolute paths in release text. Builds pin AutoHotkey,
-Ahk2Exe, runtime DLL, and packaged-font hashes, compile through an ASCII-only virtual path, and
-validate the compiled startup. Two builds must produce byte-identical EXE, ZIP,
+Ahk2Exe, runtime DLL, and optional-font-package hashes, compile through an ASCII-only virtual path, and
+validate the compiled startup. Two builds must produce byte-identical portable ZIP, source ZIP, font ZIP,
 and SPDX SBOM files. The portable package includes its SBOM, AutoHotkey license,
 and source archive for the exact embedded runtime. The complete Actions artifact
-retains checksums and the standalone SBOM, while provenance covers the three user
-editions.
+retains checksums and the separate SBOM, while provenance covers the two program
+editions and optional font package.

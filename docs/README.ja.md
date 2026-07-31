@@ -87,8 +87,8 @@ Windows 11 の実機で 200% DPI の完全な GUI 自動テストを記録し、
 
 ## 1. インストールと初回起動
 
-1. [Releases](https://github.com/realSilasYang/process-watchdog/releases) から、単体 EXE、完全なポータブル ZIP、完全なソース ZIP のいずれかを選びます。
-2. 単体 EXE は AutoHotkey 不要で、初回起動時に検証済みの内容を `%LOCALAPPDATA%\ProcessWatchdog\Standalone` へ配置します。ポータブル ZIP は完全に展開した任意のフォルダーで動作し、ソース ZIP は AutoHotkey v2 x64 が必要です。
+1. [Releases](https://github.com/realSilasYang/process-watchdog/releases) から、完全なポータブル ZIP または完全なソース ZIP を選びます。任意のフォントパックは 3 番目のプログラム版ではありません。
+2. ポータブル ZIP は完全に展開したフォルダーで動作し AutoHotkey は不要です。ソース ZIP は AutoHotkey v2 x64 が必要です。フォントは Windows へのインストールが必要ですが動作には必須ではなく、プログラム検索には別途 [Everything 公式最新版](https://www.voidtools.com/downloads/) が必要です。
 3. `进程守护小助手.exe` を実行します。管理者権限を要求した後、設定に応じてメイン画面を表示するか、通知領域に常駐します。
 4. ［追加］で対象を選ぶか、対応ファイルをメイン画面へドラッグ＆ドロップします。
 5. ［ログ］を開くと、識別根拠、状態確認、復旧試行、アップデート信号を確認できます。
@@ -173,7 +173,7 @@ BAT と CMD の項目に限り、［バッチ出力ログを表示］が追加�
 
 原因を特定しにくい場合は、ログ画面からローカル診断パッケージを出力できます。アプリ、Windows、AutoHotkey、DPI、リソース ハンドル、監視段階、設定警告、現在のログの要約を含みますが、自動では送信しません。
 
-個人設定は実際の実行フォルダーの `watchdog.ini`、未完了のアップデート セッションは同じ場所の `watchdog.maintenance.ini` に保存されます。ポータブル版とソース版は各エントリ フォルダー、単体 EXE は常に `%LOCALAPPDATA%\ProcessWatchdog\Standalone` を使います。どちらのファイルも配布物には含まれず、更新で上書きされません。
+個人設定は実際の実行フォルダーの `watchdog.ini`、未完了のアップデート セッションは同じ場所の `watchdog.maintenance.ini` に保存されます。ポータブル版とソース版は各エントリ フォルダーを使います。どちらのファイルも配布物には含まれず、更新で上書きされません。
 
 ポータブル EXE とソース エントリは同じフォルダーにある場合だけ状態を共有します。単体 EXE は、ダウンロードした起動ファイルの隣にある設定を使いません。全体の単一インスタンス ロックにより複数形態の同時実行はできず、ショートカットとスケジュール タスクは最後に統合した実際の形態を指します。詳しくは[設定、バックアップ、復旧](en/configuration.md)と[インストール、更新、削除](en/installation.md)を参照してください。
 

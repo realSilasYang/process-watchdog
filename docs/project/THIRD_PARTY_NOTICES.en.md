@@ -13,12 +13,12 @@ license texts are included in the repository and release package.
 | --- | --- | --- |
 | AutoHotkey | Embedded x64 runtime and PCRE | GPL-2.0-only and BSD-3-Clause |
 | resvg | In-memory SVG rasterization | MIT or Apache License 2.0 |
-| Everything SDK DLL | Application-search interface | MIT |
-| PingFang | Process-private preferred Simplified, Hong Kong, and Taiwan Chinese UI font | Commercial redistribution authorization |
-| SF Pro Text | Process-private preferred Latin, Vietnamese, and Cyrillic UI font | Commercial redistribution authorization |
-| Apple SD Gothic Neo | Process-private preferred Korean UI font | Commercial redistribution authorization |
-| Harano Aji Gothic | Process-private preferred Japanese UI font | SIL Open Font License 1.1 |
-| Noto Sans and Noto Sans CJK | Process-private UI fallback fonts | SIL Open Font License 1.1 |
+| Everything SDK DLL | Application-search IPC client for the Everything index and background service | MIT |
+| PingFang | Preferred Chinese UI font in the optional font package | Commercial redistribution authorization |
+| SF Pro Text | Preferred Latin, Vietnamese, and Cyrillic UI font in the optional font package | Commercial redistribution authorization |
+| Apple SD Gothic Neo | Preferred Korean UI font in the optional font package | Commercial redistribution authorization |
+| Harano Aji Gothic | Preferred Japanese UI font in the optional font package | SIL Open Font License 1.1 |
+| Noto Sans and Noto Sans CJK | UI fallback fonts in the optional font package | SIL Open Font License 1.1 |
 | Lucide Icons 1.27.0 | SVG icons for buttons, main-list states, and the statistics bar | ISC; selected Feather-derived icons use MIT |
 
 The selected Lucide version, provenance, and complete license text are stored
@@ -36,11 +36,14 @@ published release, which uses WTFPL.
 actionlint and Gitleaks are validation-only tools and are not shipped; both use
 the MIT license.
 
-[`assets/fonts/metadata.json`](../../assets/fonts/metadata.json) records the
-families, versions, sources, and SHA-256 values of packaged fonts. The complete
-OFL text is in [`assets/fonts/OFL-1.1.txt`](../../assets/fonts/OFL-1.1.txt).
-PingFang, SF Pro Text, and Apple SD Gothic Neo are packaged under the commercial
+[`assets/fonts/metadata.json`](https://github.com/realSilasYang/process-watchdog/blob/main/assets/fonts/metadata.json) records the
+families, versions, sources, and SHA-256 values of the optional font package. The complete
+OFL text is in [`assets/fonts/OFL-1.1.txt`](https://github.com/realSilasYang/process-watchdog/blob/main/assets/fonts/OFL-1.1.txt).
+PingFang, SF Pro Text, and Apple SD Gothic Neo are packaged separately under the commercial
 redistribution authorization confirmed by the project owner. The public boundary
-is documented in the [commercial font license notice](../../assets/fonts/COMMERCIAL-LICENSE-NOTICE.en.md),
+is documented in the [commercial font license notice](https://github.com/realSilasYang/process-watchdog/blob/main/assets/fonts/COMMERCIAL-LICENSE-NOTICE.en.md),
 and the project open-source license does not cover those files. Harano Aji Gothic
-and Noto remain under OFL 1.1.
+and Noto remain under OFL 1.1. Neither program edition contains fonts, and runtime
+code never loads them privately. Everything itself is not distributed by this
+project; get the [latest official release](https://www.voidtools.com/downloads/).
+The bundled `Everything64.dll` cannot replace it.

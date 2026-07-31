@@ -318,12 +318,16 @@ function New-MockAsset {
 $script:CurrentVersion = '1.0.0'
 $script:PackageKind = 'compiled'
 $script:MockRelease = New-MockRelease 'v1.1.0' @(
-    (New-MockAsset 'process-watchdog-1.1.0-windows-x64.zip'))
+    (New-MockAsset 'process-watchdog-1.1.0-windows-x64.zip'),
+    (New-MockAsset 'process-watchdog-1.1.0-fonts.zip'))
 Invoke-Check
 Assert-UpdateHelperTest ($script:CapturedCheckResult.Status -ceq 'available') `
     '编译版被缺少无关源码附件或独立校验文件的发行版错误阻断。'
 Assert-UpdateHelperTest ($script:CapturedCheckResult.BinarySha256 -ceq
     ('A' * 64)) '检查阶段没有读取 GitHub 发行附件的 SHA-256 摘要。'
+Assert-UpdateHelperTest ($script:CapturedCheckResult.BinaryUrl -ceq
+    'https://example.invalid/process-watchdog-1.1.0-windows-x64.zip') `
+    '自动更新错误选择了可选字体包而不是完整便携包。'
 
 $script:MockRelease = New-MockRelease 'v1.1.0' @(
     (New-MockAsset 'process-watchdog-1.1.0-windows-x64.zip' 'unsupported'),

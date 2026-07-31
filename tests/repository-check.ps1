@@ -212,7 +212,14 @@ $releaseNotesRelativePath = "docs/release-notes/v$version.md"
 if ($trackedFiles -notcontains $releaseNotesRelativePath) {
     throw "Current release notes are not tracked: $releaseNotesRelativePath"
 }
-Assert-ReleaseNotesContent -Version $version -BodyPath $releaseNotesPath
+# v2.0.5 及更早版本已经按当时的三程序附件模型公开，历史说明必须保持事实不变。
+# 新模型从下一版本起执行完整附件说明契约；旧版本仍统一验证章节结构和风险说明。
+if ([Version]$version -ge [Version]'2.0.6') {
+    Assert-ReleaseNotesContent -Version $version -BodyPath $releaseNotesPath
+} else {
+    Assert-ReleaseNotesNoValidationSection -BodyPath $releaseNotesPath
+    Assert-ReleaseNotesImportantSection -BodyPath $releaseNotesPath
+}
 $allReleaseNotes = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot `
     'docs\release-notes') -File -Filter 'v*.md')
 foreach ($releaseNotesFile in $allReleaseNotes) {
@@ -735,9 +742,9 @@ foreach ($releaseRequirement in @(
         'path: dist/**',
         'include-hidden-files: true',
         '-SecondPowerShellPath powershell.exe',
-        'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.exe',
         'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.zip',
         'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-source.zip',
+        'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-fonts.zip',
         'draft: true',
         '--draft=false')) {
     if (-not $releaseWorkflow.Contains($releaseRequirement)) {

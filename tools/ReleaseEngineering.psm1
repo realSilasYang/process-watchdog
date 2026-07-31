@@ -181,9 +181,9 @@ function Get-ReleaseArtifactNames {
         throw "VERSION 不是规范的三段语义化版本：$Version"
     }
     return @(
-        "process-watchdog-$Version-windows-x64.exe"
         "process-watchdog-$Version-windows-x64.zip"
         "process-watchdog-$Version-source.zip"
+        "process-watchdog-$Version-fonts.zip"
     )
 }
 
@@ -244,7 +244,7 @@ function Assert-ReleaseArtifactInventory {
         -ReferenceObject $expectedNames -DifferenceObject $sortedActualNames)
     if ($difference.Count -ne 0 -or
         $sortedActualNames.Count -ne $expectedNames.Count) {
-        throw "Release 附件必须且只能是三种用户版本；实际为：$($sortedActualNames -join '、')"
+        throw "Release 附件必须且只能是完整便携版、完整源码版和可选字体包；实际为：$($sortedActualNames -join '、')"
     }
 
     $localRoot = ""
@@ -483,18 +483,19 @@ function Assert-ReleaseNotesContent {
 
     $specifications = @(
         @{
-            Name = "process-watchdog-$Version-windows-x64.exe"
-            Required = @('独立可执行版', '无需安装 AutoHotkey', '快速体验')
-        }
-        @{
             Name = "process-watchdog-$Version-windows-x64.zip"
-            Required = @('完整便携版', 'EXE', '说明文档', '许可证', '字体',
-                '运行所需资源', '长期使用', '手动部署')
+            Required = @('完整便携版', 'EXE', '说明文档', '许可证',
+                '运行所需资源', '无需安装 AutoHotkey', '不含字体')
         }
         @{
             Name = "process-watchdog-$Version-source.zip"
             Required = @('完整源码版', 'AHK 源码', '模块', '测试', '文档',
-                '字体', '审阅', '开发', 'AutoHotkey v2 x64')
+                '不含字体', '审阅', '开发', 'AutoHotkey v2 x64')
+        }
+        @{
+            Name = "process-watchdog-$Version-fonts.zip"
+            Required = @('可选字体包', '首选字体', '回退字体',
+                '安装到 Windows', '不是程序运行必需')
         }
     )
     foreach ($specification in $specifications) {
@@ -508,6 +509,13 @@ function Assert-ReleaseNotesContent {
             if (-not $lines[0].Value.Contains([string]$requiredText)) {
                 throw "发布物说明不完整：$name 缺少必要信息：$requiredText"
             }
+        }
+    }
+    foreach ($requiredEverythingText in @('Everything', '程序搜索', '后台服务',
+            'Everything64.dll', '不能替代',
+            'https://www.voidtools.com/downloads/')) {
+        if (-not $sectionText.Contains($requiredEverythingText)) {
+            throw "发布物说明缺少 Everything 用途或官方下载信息：$requiredEverythingText"
         }
     }
 }

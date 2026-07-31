@@ -250,37 +250,25 @@ RunLocalizationTests() {
             == expectedLanguage, "语言选择顺序错误：" expectedLanguage)
     }
 
-    latinFontSpec := {Primary: "SF Pro Text",
-        PrimaryAssets: ["SF-Pro-Text-Regular.otf",
-            "SF-Pro-Text-Bold.otf"], Fallback: "Noto Sans",
-        Asset: "NotoSans-Variable.ttf", System: "Segoe UI"}
+    latinFontSpec := {Primary: "SF Pro Text", Fallback: "Noto Sans",
+        System: "Segoe UI"}
     expectedFontSpecs := Map(
         "zh-CN", {Primary: "PingFang SC",
-            PrimaryAssets: ["PingFang.ttc"],
             Fallback: "Noto Sans CJK SC",
-            Asset: "NotoSansCJK.ttc",
             System: "Microsoft YaHei UI"},
         "zh-HK", {Primary: "PingFang HK",
-            PrimaryAssets: ["PingFang.ttc"],
             Fallback: "Noto Sans CJK HK",
-            Asset: "NotoSansCJK.ttc",
             System: "Microsoft JhengHei UI"},
         "zh-TW", {Primary: "PingFang TC",
-            PrimaryAssets: ["PingFang.ttc"],
             Fallback: "Noto Sans CJK TC",
-            Asset: "NotoSansCJK.ttc",
             System: "Microsoft JhengHei UI"},
         "en-US", latinFontSpec,
         "ja-JP", {Primary: "Harano Aji Gothic",
-            PrimaryAssets: ["HaranoAjiGothic-Regular.otf"],
             Fallback: "Noto Sans CJK JP",
-            Asset: "NotoSansCJK.ttc",
             System: "Yu Gothic UI"},
         "vi-VN", latinFontSpec,
         "ko-KR", {Primary: "AppleSDGothicNeoR00",
-            PrimaryAssets: ["AppleSDGothicNeo-Regular.ttf"],
             Fallback: "Noto Sans CJK KR",
-            Asset: "NotoSansCJK.ttc",
             System: "Malgun Gothic"},
         "es-ES", latinFontSpec,
         "fr-FR", latinFontSpec,
@@ -291,20 +279,11 @@ RunLocalizationTests() {
     for language, expectedSpec in expectedFontSpecs {
         actualSpec := LocalizationService.GetLanguageUiFontSpec(language)
         AssertLocalization(actualSpec.Primary == expectedSpec.Primary
-            && actualSpec.HasOwnProp("PrimaryAssets")
-            && expectedSpec.HasOwnProp("PrimaryAssets")
-            && actualSpec.PrimaryAssets.Length
-                == expectedSpec.PrimaryAssets.Length
+            && !actualSpec.HasOwnProp("PrimaryAssets")
+            && !actualSpec.HasOwnProp("Asset")
             && actualSpec.Fallback == expectedSpec.Fallback
-            && actualSpec.Asset == expectedSpec.Asset
             && actualSpec.System == expectedSpec.System,
             language " 的字体优先级配置错误")
-        for assetIndex, expectedAsset in expectedSpec.PrimaryAssets {
-            AssertLocalization(actualSpec.PrimaryAssets[assetIndex]
-                == expectedAsset, language " 的首选字体资源顺序错误")
-        }
-        privateFontCountBeforeSystemLookup := LocalizationService
-            .GetLoadedPrivateUiFontResourceCount()
         expectedSystemFont := LocalizationService.FindInstalledUiFontName(
             expectedSpec.System)
         if expectedSystemFont == ""
@@ -318,138 +297,42 @@ RunLocalizationTests() {
         }
         resolvedSystemFont := LocalizationService
             .GetLanguageSystemUiFontName(language)
-        AssertLocalization(resolvedSystemFont == expectedSystemFont
-            && LocalizationService.GetLoadedPrivateUiFontResourceCount()
-                == privateFontCountBeforeSystemLookup,
-            language " 的系统强调字体解析错误或触发了私有字体加载")
+        AssertLocalization(resolvedSystemFont == expectedSystemFont,
+            language " 的系统强调字体解析错误")
         installedPrimary := LocalizationService.FindInstalledUiFontName(
             expectedSpec.Primary)
         resolvedFont := LocalizationService
             .GetLanguageDefaultUiFontName(language)
-        resolvedPrimary := LocalizationService.FindInstalledUiFontName(
-            expectedSpec.Primary)
-        if resolvedPrimary != "" {
-            AssertLocalization(resolvedFont == resolvedPrimary,
-                language " 没有优先使用首选字体")
-        } else {
-            installedFallback := LocalizationService
-                .FindInstalledUiFontName(expectedSpec.Fallback)
-            AssertLocalization(installedFallback != ""
-                && resolvedFont == installedFallback,
-                language " 没有加载并使用对应的 Noto 回退字体：primary="
-                    installedPrimary "，fallback=" installedFallback
-                    "，resolved=" resolvedFont "，privateCount="
-                    LocalizationService.GetLoadedPrivateUiFontResourceCount())
-        }
+        expectedResolvedFont := installedPrimary
+        if expectedResolvedFont == ""
+            expectedResolvedFont := LocalizationService.FindInstalledUiFontName(
+                expectedSpec.Fallback)
+        if expectedResolvedFont == ""
+            expectedResolvedFont := resolvedSystemFont
+        if expectedResolvedFont == ""
+            expectedResolvedFont := LocalizationService.FindInstalledUiFontName(
+                "Segoe UI")
+        if expectedResolvedFont == ""
+            expectedResolvedFont := LocalizationService.GetInstalledUiFontNames()[1]
+        AssertLocalization(resolvedFont == expectedResolvedFont,
+            language " 没有按已安装字体优先级解析")
     }
-    expectedPackagedPrimaryAssets := Map(
-        "PingFang SC", ["PingFang.ttc"],
-        "PingFang HK", ["PingFang.ttc"],
-        "PingFang TC", ["PingFang.ttc"],
-        "SF Pro Text", ["SF-Pro-Text-Regular.otf",
-            "SF-Pro-Text-Bold.otf"],
-        "AppleSDGothicNeoR00", ["AppleSDGothicNeo-Regular.ttf"],
-        "Harano Aji Gothic", ["HaranoAjiGothic-Regular.otf"])
-    for fontFamily, expectedAssets in expectedPackagedPrimaryAssets {
-        actualAssets := LocalizationService.GetPackagedUiFontAssetName(
-            fontFamily)
-        AssertLocalization(Type(actualAssets) == "Array"
-            && actualAssets.Length == expectedAssets.Length,
-            fontFamily " 的随包首选字体资源数量错误")
-        for assetIndex, expectedAsset in expectedAssets {
-            AssertLocalization(actualAssets[assetIndex] == expectedAsset,
-                fontFamily " 的随包首选字体资源映射错误")
-        }
-    }
-    fontAssetDirectory := projectRoot "\assets\fonts"
-    AssertLocalization(LocalizationService.GetUiFontAssetDirectory(projectRoot)
-        == fontAssetDirectory,
-        "项目根目录没有解析到随包字体资源目录")
-    AssertLocalization(LocalizationService.GetUiFontAssetDirectory(
-        projectRoot "\app\Windows") == fontAssetDirectory,
-        "子目录运行入口没有向上解析到随包字体资源目录")
-    AssertLocalization(LocalizationService.GetUiFontAssetDirectory(
-        projectRoot "\tests\core") == fontAssetDirectory,
-        "测试入口没有向上解析到随包字体资源目录")
-
-    loadedFontCount := LocalizationService
-        .GetLoadedPrivateUiFontResourceCount()
-    AssertLocalization(LocalizationService.LoadPrivateUiFontAsset(
-        "PingFang.ttc", fontAssetDirectory)
-        && LocalizationService.LoadPrivateUiFontAsset(
-            "SF-Pro-Text-Regular.otf", fontAssetDirectory)
-        && LocalizationService.LoadPrivateUiFontAsset(
-            "SF-Pro-Text-Bold.otf", fontAssetDirectory)
-        && LocalizationService.LoadPrivateUiFontAsset(
-            "AppleSDGothicNeo-Regular.ttf", fontAssetDirectory)
-        && LocalizationService.LoadPrivateUiFontAsset(
-            "HaranoAjiGothic-Regular.otf", fontAssetDirectory)
-        && LocalizationService.LoadPrivateUiFontAsset(
-            "NotoSans-Variable.ttf", fontAssetDirectory)
-        && LocalizationService.LoadPrivateUiFontAsset(
-            "NotoSansCJK.ttc", fontAssetDirectory),
-        "随包界面字体无法按进程私有加载")
-    firstLoadedFontCount := LocalizationService
-        .GetLoadedPrivateUiFontResourceCount()
-    Loop 5 {
-        AssertLocalization(LocalizationService.LoadPrivateUiFontAsset(
-            "PingFang.ttc", fontAssetDirectory)
-            && LocalizationService.LoadPrivateUiFontAsset(
-                "SF-Pro-Text-Regular.otf", fontAssetDirectory)
-            && LocalizationService.LoadPrivateUiFontAsset(
-                "SF-Pro-Text-Bold.otf", fontAssetDirectory)
-            && LocalizationService.LoadPrivateUiFontAsset(
-                "AppleSDGothicNeo-Regular.ttf", fontAssetDirectory)
-            && LocalizationService.LoadPrivateUiFontAsset(
-                "HaranoAjiGothic-Regular.otf", fontAssetDirectory)
-            && LocalizationService.LoadPrivateUiFontAsset(
-                "NotoSans-Variable.ttf", fontAssetDirectory)
-            && LocalizationService.LoadPrivateUiFontAsset(
-                "NotoSansCJK.ttc", fontAssetDirectory),
-            "重复请求随包字体时加载失败")
-    }
-    AssertLocalization(firstLoadedFontCount >= loadedFontCount
-        && firstLoadedFontCount <= 7
-        && LocalizationService.GetLoadedPrivateUiFontResourceCount()
-            == firstLoadedFontCount,
-        "重复切换语言导致私有字体资源增长")
-    retryFontDirectory := A_Temp "\process-watchdog-font-retry-"
-        . A_TickCount "-" Random(1000, 9999)
-    retryFontAssetName := "HaranoAjiGothic-Regular.otf"
-    retryFontPath := retryFontDirectory "\" retryFontAssetName
-    DirCreate(retryFontDirectory)
-    AssertLocalization(!LocalizationService.LoadPrivateUiFontAsset(
-        retryFontAssetName, retryFontDirectory),
-        "缺失的随包字体没有进入安全失败路径")
-    FileCopy(fontAssetDirectory "\" retryFontAssetName, retryFontPath, true)
-    AssertLocalization(!LocalizationService.LoadPrivateUiFontAsset(
-        retryFontAssetName, retryFontDirectory),
-        "刷新前失败缓存没有避免重复探测缺失字体")
-    LocalizationService.RefreshInstalledUiFontNames()
-    AssertLocalization(LocalizationService.LoadPrivateUiFontAsset(
-        retryFontAssetName, retryFontDirectory),
-        "刷新字体列表后没有重试运行期间补齐的随包字体")
-    AssertLocalization(!LocalizationService.LoadPrivateUiFontAsset(
-        "__missing-font__.ttf", fontAssetDirectory),
-        "缺失的随包字体没有安全回退")
     forcedFallbackFont := LocalizationService.ResolveUiFontSpec({
         Primary: "__Watchdog_Missing_Primary_Font__",
-        Fallback: "Noto Sans CJK JP",
-        Asset: "NotoSansCJK.ttc",
+        Fallback: "Segoe UI",
         System: "Yu Gothic UI"
     })
     AssertLocalization(forcedFallbackFont
-        == LocalizationService.FindInstalledUiFontName("Noto Sans CJK JP"),
-        "首选字体缺失时没有确定地选择对应 Noto 家族")
+        == LocalizationService.FindInstalledUiFontName("Segoe UI"),
+        "首选字体缺失时没有选择已安装回退字体")
     forcedSystemFont := LocalizationService.ResolveUiFontSpec({
         Primary: "__Watchdog_Missing_Primary_Font__",
         Fallback: "__Watchdog_Missing_Fallback_Font__",
-        Asset: "__missing-font__.ttf",
         System: "Segoe UI"
     })
     AssertLocalization(forcedSystemFont
         == LocalizationService.FindInstalledUiFontName("Segoe UI"),
-        "首选和随包字体均不可用时没有回退 Windows 界面字体")
+        "首选和 Noto 均未安装时没有回退 Windows 界面字体")
     installedFonts := LocalizationService.GetInstalledUiFontNames()
     AssertLocalization(installedFonts.Length > 0,
         "没有枚举到任何已安装界面字体")
@@ -701,12 +584,6 @@ RunLocalizationTests() {
         && LocalizationService.RenderedSourceSpecCache.Count
             <= expectedLanguages.Length,
         "动态状态模板缓存超过按源语言计算的固定上限")
-    LocalizationService.ShutdownUiFonts()
-    if DirExist(retryFontDirectory)
-        DirDelete retryFontDirectory, true
-    AssertLocalization(LocalizationService
-        .GetLoadedPrivateUiFontResourceCount() == 0,
-        "私有字体资源未在本地化服务关闭时释放")
 }
 
 try {

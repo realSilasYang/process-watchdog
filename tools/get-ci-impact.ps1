@@ -31,11 +31,9 @@ function Test-ReleaseEngineeringPath {
     $normalized = $Path.Replace('\', '/')
     if ($normalized -in @('VERSION', '.gitattributes',
             'runtime/application-update.ps1',
-            'runtime/standalone-install.ps1',
-            'runtime/standalone-launcher.ahk',
             'tests/application-update-helper-tests.ps1',
             'tests/reproducible-build.ps1',
-            'tests/standalone-installer-tests.ps1')) {
+            'tests/reproducible-build.ps1')) {
         return $true
     }
     return $normalized -match '^(?:tools/|third_party/|assets/fonts/|\.github/workflows/(?:ci|release|release-dry-run)\.yml$)'
