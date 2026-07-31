@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../assets/app/watchdog-logo.png" width="112" height="112" alt="Logotipo de Process Watchdog Assistant">
+  <img src="../assets/app/watchdog-logo.png" width="112" alt="Logotipo de Process Watchdog Assistant">
 
   <p><a href="../README.md">简体中文</a> · <a href="./README.zh-HK.md">繁體中文（香港）</a> · <a href="./README.zh-TW.md">繁體中文（台灣）</a> · <a href="./README.en.md">English</a> · <a href="./README.ja.md">日本語</a> · <a href="./README.vi.md">Tiếng Việt</a> · <a href="./README.ko.md">한국어</a> · <strong>Español</strong> · <a href="./README.fr.md">Français</a> · <a href="./README.pt-BR.md">Português</a> · <a href="./README.ru.md">Русский</a> · <a href="./README.de.md">Deutsch</a> · <a href="./README.it.md">Italiano</a></p>
 
@@ -45,7 +45,7 @@ La ventana principal reúne el orden de los objetivos supervisados, el icono, el
 - Supervisa destinos EXE, AHK, Python, JavaScript, PowerShell, BAT, CMD y LNK.
 - Usa los resultados `Running`, `Stopped` y `Unknown`; un resultado desconocido nunca provoca un reinicio a ciegas.
 - Cada destino dispone de controlador, generación y tokens de tarea propios. Las devoluciones de llamada antiguas quedan invalidadas al pausar, eliminar o cambiar la ruta.
-- Permite exigir privilegios de administrador. Avisa si una instancia activa no cumple el requisito y eleva un reinicio manual según la configuración.
+- Permite exigir privilegios de administrador. Avisa si una instancia activa no cumple el requisito y eleva el siguiente inicio supervisado según la configuración.
 - La protección durante actualizaciones está desactivada de forma predeterminada. Al activarla, combina procesos de actualización, relaciones padre-hijo, actividad del directorio de instalación y estabilidad de archivos para pausar o reanudar la supervisión.
 - Sustituye la configuración de manera atómica. Los registros que no puedan analizarse se trasladan a `[Recovery]` en lugar de descartarse en silencio.
 - La búsqueda de aplicaciones usa exclusivamente el servicio Everything, sin análisis local de todo el disco ni límite impuesto al número de resultados. Los conjuntos grandes se añaden en lotes breves para que la extracción de iconos no bloquee la interfaz.
@@ -120,7 +120,7 @@ Cerrar la ventana principal solo la oculta en la bandeja y la supervisión conti
 
 Cada elemento puede definir el punto de entrada, el directorio de trabajo, los argumentos y si necesita privilegios de administrador. El LNK se conserva como punto de entrada y la ruta real del programa se guarda por separado para identificar el proceso; por ello no es necesario sustituir accesos indirectos del instalador por un EXE interno que puede cambiar.
 
-El menú contextual permite abrir la ubicación, reiniciar, cambiar la ruta, configurar la identificación del proceso y el inicio, alternar el requisito de administrador, configurar la protección de actualización y personalizar el nombre y el icono que solo se muestran en la ventana principal. La presentación no cambia la identidad, el inicio ni la protección de actualización. Si ya se muestran los valores predeterminados, la acción de restauración queda desactivada.
+El menú contextual permite abrir la ubicación, finalizar la ejecución del destino, cambiar la ruta, configurar la identificación del proceso y el inicio, alternar el requisito de administrador, configurar la protección de actualización y personalizar el nombre y el icono que solo se muestran en la ventana principal. Finalizar ejecución también pausa la supervisión para impedir un reinicio automático. La presentación no cambia la identidad, el inicio ni la protección de actualización. Si ya se muestran los valores predeterminados, la acción de restauración queda desactivada.
 
 Solo los elementos BAT y CMD muestran además Ver registro de salida por lotes; los demás tipos de destino no muestran esta orden. El archivo de registro independiente solo se crea cuando el asistente inicia realmente ese elemento y captura su salida estándar y de error. Un proceso por lotes que ya estaba en ejecución no recibe el archivo automáticamente.
 

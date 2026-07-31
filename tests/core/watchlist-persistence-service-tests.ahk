@@ -62,6 +62,8 @@ class WatchlistPersistenceSnapshotService {
             ResolvedTarget: stateObj.ResolvedTarget,
             ResolvedTargetManual: stateObj.ResolvedTargetManual,
             ShortcutArgs: stateObj.ShortcutArgs,
+            ContentHash: stateObj.ContentHash,
+            ContentSize: stateObj.ContentSize,
             Maintenance: stateObj.Maintenance,
             Display: stateObj.Display
         }
@@ -69,8 +71,10 @@ class WatchlistPersistenceSnapshotService {
 }
 
 RegisterWatchlistPersistenceRecord(records, record) {
+    if record.Path == "C:\Rejected.exe"
+        return false
     records.Push(record)
-    return record.Path != "C:\Rejected.exe"
+    return true
 }
 
 CreateWatchlistPersistenceValue(path, arguments := "") {
@@ -90,6 +94,8 @@ CreateWatchlistPersistenceState(path, name := "") {
         ResolvedTarget: path,
         ResolvedTargetManual: false,
         ShortcutArgs: "--shortcut",
+        ContentHash: "A" . Format("{:063}", 0),
+        ContentSize: 4096,
         Maintenance: {Value: "M:" path},
         Display: {Name: name, IconPath: name == "" ? "" : path}
     }
@@ -112,7 +118,11 @@ RunWatchlistPersistenceServiceTests() {
                 {Key: "App5", Value: CreateWatchlistPersistenceValue(
                     "C:\BadMaintenance.exe")},
                 {Key: "App6", Value:
-                    "1|0|C:\PlainLegacy.exe||plain-argument|||0|"}
+                    "1|0|C:\PlainLegacy.exe||plain-argument|||0|"},
+                {Key: "App7", Value: CreateWatchlistPersistenceValue(
+                    "C:\LegacyNoIdentity.exe")},
+                {Key: "App8", Value: CreateWatchlistPersistenceValue(
+                    "C:\BadIdentity.exe")}
             ]},
             {Name: "Maintenance", Entries: [
                 {Key: "App1", Value: IniFieldCodec.Encode("maintenance")},
@@ -128,6 +138,13 @@ RunWatchlistPersistenceServiceTests() {
                 {Key: "App1", Value: IniFieldCodec.Encode(A_AhkPath)
                     "|" IniFieldCodec.Encode("/ErrorStdOut")}
             ]},
+            {Name: "Identity", Entries: [
+                {Key: "App1", Value: "128|"
+                    . "B" . Format("{:063}", 0)},
+                {Key: "App5", Value: "256|"
+                    . "C" . Format("{:063}", 0)},
+                {Key: "App8", Value: "not-a-size|invalid-hash"}
+            ]},
             {Name: "Recovery", Entries: [
                 {Key: "Entry1", Value: ""},
                 {Key: "Entry2", Value: IniFieldCodec.Encode("old")}
@@ -139,14 +156,23 @@ RunWatchlistPersistenceServiceTests() {
             WatchlistPersistenceSnapshotService())
         records := []
         loaded := service.Load(RegisterWatchlistPersistenceRecord.Bind(records))
-        AssertWatchlistPersistence(loaded.RegisteredCount == 1
-            && records[1].Path == "C:\Valid.exe"
+        AssertWatchlistPersistence(loaded.RegisteredCount == 2
+            && records.Length == 2,
+            "有效守护对象注册数量错误")
+        AssertWatchlistPersistence(records[1].Path == "C:\Valid.exe"
             && records[1].Args == "--中文"
             && records[1].RuntimePath == A_AhkPath
             && records[1].RuntimeArgs == "/ErrorStdOut"
-            && records[1].Display.Name == "自定义"
-            && loaded.Warnings.Length == 5
-            && loaded.RecoveryEntries.Length == 7
+            && records[1].Display.Name == "自定义",
+            "有效守护对象的关联配置加载错误")
+        AssertWatchlistPersistence(records[1].ContentSize == 128
+            && records[1].ContentHash == "B" . Format("{:063}", 0)
+            && records[2].Path == "C:\LegacyNoIdentity.exe"
+            && records[2].ContentHash == ""
+            && loaded.NeedsIdentitySave,
+            "内容身份加载或旧配置升级标记错误")
+        AssertWatchlistPersistence(loaded.Warnings.Length == 6
+            && loaded.RecoveryEntries.Length == 8
             && loaded.RecoveryEntries[1].HasOwnProp("SerializedValue")
             && loaded.RecoveryEntries[1].SerializedValue == "",
             "有序加载、损坏记录隔离或既有恢复记录保留错误")
@@ -166,6 +192,11 @@ RunWatchlistPersistenceServiceTests() {
             && loaded.Warnings[4].Field == "升级保护配置"
             && loaded.Warnings[4].Target == "C:\BadMaintenance.exe",
             "关联配置损坏没有指向正确的配置节和目标")
+        AssertWatchlistPersistence(loaded.Warnings[6].Key == "App8"
+            && loaded.Warnings[6].Section == "Identity"
+            && loaded.Warnings[6].Field == "文件大小"
+            && loaded.Warnings[6].Target == "C:\BadIdentity.exe",
+            "损坏内容身份没有隔离到 Recovery 或生成精确诊断")
 
         appStates := Map()
         appStates.CaseSense := "Off"
@@ -185,16 +216,26 @@ RunWatchlistPersistenceServiceTests() {
             && repository.ReadSectionEntries("Maintenance").Length == 2
             && repository.ReadSectionEntries("Display").Length == 1
             && repository.ReadSectionEntries("Launch").Length == 2
-            && repository.ReadSectionEntries("Recovery").Length == 7
+            && repository.ReadSectionEntries("Identity").Length == 2
+            && repository.ReadSectionEntries("Recovery").Length == 8
             && repository.Read("Recovery", "Entry1", "missing") == "",
             "守护对象顺序、当前九字段格式或恢复记录没有原子保存")
+        recoveredMaintenanceIdentity := IniFieldCodec.Decode(
+            repository.Read("Recovery", "Entry6", ""))
+        AssertWatchlistPersistence(InStr(recoveredMaintenanceIdentity,
+            "Identity=" IniFieldCodec.Encode("256|"
+                . "C" . Format("{:063}", 0))),
+            "关联配置损坏进入 Recovery 时丢失了内容身份")
 
         reloadedRecords := []
         reloaded := service.Load(
             RegisterWatchlistPersistenceRecord.Bind(reloadedRecords))
         AssertWatchlistPersistence(reloaded.RegisteredCount == 2
             && reloaded.Warnings.Length == 0
-            && reloaded.RecoveryEntries.Length == 7,
+            && !reloaded.NeedsIdentitySave
+            && reloadedRecords[1].ContentSize == 4096
+            && reloadedRecords[1].ContentHash == "A" . Format("{:063}", 0)
+            && reloaded.RecoveryEntries.Length == 8,
             "服务保存的当前格式无法无损重新加载")
     } finally {
         try FileDelete(configPath)

@@ -261,6 +261,9 @@ class WatchdogConfigRepository {
             {Name: "Launch", Lines: [
                 this.Text("; AppN 与 [Apps] 中同名的守护对象一一对应，依次保存启动程序或解释器路径及其参数。"),
                 this.Text("; 两个字段均为 <HEX> 编码；留空时由小助手按目标类型使用默认启动方式。")]},
+            {Name: "Identity", Lines: [
+                this.Text("; AppN 与 [Apps] 中同名的直接文件目标一一对应，依次保存文件大小和 SHA-256 内容哈希。"),
+                this.Text("; 此节由小助手自动维护，用于在文件或目录改名、跨目录或跨磁盘移动后确认内容未变；请勿手动编辑。")]},
             {Name: "Recovery", Lines: [
                 this.Text("; 无法安全解析的监控记录会暂存于此，避免静默丢失；正常情况下无需手动修改。")]}
         ]

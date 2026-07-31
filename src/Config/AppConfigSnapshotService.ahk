@@ -28,6 +28,8 @@ class AppConfigSnapshotService {
                 RuntimeArgs: "",
                 ResolvedTarget: "",
                 ResolvedTargetManual: false,
+                ContentHash: "",
+                ContentSize: 0,
                 Maintenance: this.MaintenanceConfigCodec.CreateDefault(path),
                 Display: this.DisplayConfigCodec.CreateDefault()
             }
@@ -57,6 +59,10 @@ class AppConfigSnapshotService {
             ResolvedTarget: resolvedTarget,
             ResolvedTargetManual: stateObj.HasOwnProp("ResolvedTargetManual")
                 && stateObj.ResolvedTargetManual,
+            ContentHash: stateObj.HasOwnProp("ContentHash")
+                ? stateObj.ContentHash : "",
+            ContentSize: stateObj.HasOwnProp("ContentSize")
+                ? stateObj.ContentSize : 0,
             Maintenance: this.MaintenanceConfigCodec.NormalizeSnapshot(
                 maintenanceConfig, path, resolvedTarget),
             Display: this.DisplayConfigCodec.Clone(displayConfig)
@@ -91,6 +97,10 @@ class AppConfigSnapshotService {
             ResolvedTarget: resolvedTarget,
             ResolvedTargetManual: item.HasOwnProp("ResolvedTargetManual")
                 && item.ResolvedTargetManual,
+            ContentHash: item.HasOwnProp("ContentHash")
+                ? item.ContentHash : "",
+            ContentSize: item.HasOwnProp("ContentSize")
+                ? item.ContentSize : 0,
             Maintenance: this.MaintenanceConfigCodec.NormalizeSnapshot(
                 maintenanceConfig, path, resolvedTarget),
             Display: this.DisplayConfigCodec.Normalize(displayConfig)

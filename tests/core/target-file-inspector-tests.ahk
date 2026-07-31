@@ -65,17 +65,28 @@ RunTargetFileInspectorTests() {
         FileAppend("; changed`n", scriptPath, "UTF-8")
         secondFingerprint := inspector.GetFingerprint(scriptPath)
         AssertTargetFileInspector(firstFingerprint != "MISSING"
-            && InStr(firstFingerprint, "||")
+            && InStr(firstFingerprint, "|")
             && secondFingerprint != firstFingerprint,
             "文件指纹没有稳定标识文件或检测内容变化")
         sameSizeBefore := inspector.GetFingerprint(sameSizePath)
+        contentBefore := inspector.GetContentSignature(sameSizePath)
+        AssertTargetFileInspector(contentBefore.Available
+            && contentBefore.FileSize == 4
+            && contentBefore.ContentHash
+                == "63C1DD951FFEDF6F7FD968AD4EFA39B8ED584F162F46E715114EE184F8DE9201",
+            "SHA-256 内容身份计算错误")
         Sleep(20)
         sameSizeFile := FileOpen(sameSizePath, "w", "UTF-8-RAW")
         sameSizeFile.Write("BBBB")
         sameSizeFile.Close()
         sameSizeAfter := inspector.GetFingerprint(sameSizePath)
+        contentAfter := inspector.GetContentSignature(sameSizePath)
         AssertTargetFileInspector(sameSizeAfter != sameSizeBefore,
             "同秒同尺寸覆盖没有被高精度文件时间识别")
+        AssertTargetFileInspector(contentAfter.Available
+            && contentAfter.FileSize == contentBefore.FileSize
+            && contentAfter.ContentHash != contentBefore.ContentHash,
+            "同尺寸内容变化没有改变 SHA-256 内容身份")
         AssertTargetFileInspector(
             inspector.GetFingerprint("C:\Link\App.lnk")
                 == inspector.GetFingerprint(A_AhkPath),
@@ -112,46 +123,11 @@ RunTargetFileInspectorTests() {
             && !inspector.IsWithinRoot("", "C:\Product"),
             "路径作用根边界判断错误")
 
-        originalIdentity := inspector.GetIdentity(scriptPath)
-        AssertTargetFileInspector(originalIdentity.Available
-            && originalIdentity.NativeIdentityAvailable,
-            "测试文件没有取得可用于更名恢复的 Windows 文件身份")
-        ; 某些受限临时卷允许读取文件 ID，却不允许用 OpenFileById 回开卷句柄。
-        ; 先在原路径仍存在时探测这一卷能力：支持时必须验证跨路径找回；不支持时
-        ; 只允许安全返回空结果，完整的目录重命名事件回退由服务测试单独覆盖。
-        initialResolvedPath := inspector.ResolveCurrentPath(scriptPath,
-            originalIdentity)
-        canResolveByIdentity := initialResolvedPath != ""
-        if canResolveByIdentity {
-            initialResolvedIdentity := inspector.GetIdentity(
-                initialResolvedPath)
-            AssertTargetFileInspector(initialResolvedIdentity.Available
-                    && initialResolvedIdentity.VolumeSerial
-                        == originalIdentity.VolumeSerial
-                    && initialResolvedIdentity.FileIndexHigh
-                        == originalIdentity.FileIndexHigh
-                    && initialResolvedIdentity.FileIndexLow
-                        == originalIdentity.FileIndexLow,
-                "文件 ID 预检返回的路径没有指向原文件")
-        }
         FileMove(scriptPath, renamedScriptPath)
-        resolvedRenamedPath := inspector.ResolveCurrentPath(scriptPath,
-            originalIdentity)
-        if canResolveByIdentity {
-            AssertTargetFileInspector(resolvedRenamedPath != "",
-                "支持按文件 ID 回开的卷未能在更名后找回当前路径")
-        }
-        if resolvedRenamedPath != "" {
-            resolvedIdentity := inspector.GetIdentity(resolvedRenamedPath)
-            AssertTargetFileInspector(resolvedIdentity.Available
-                    && resolvedIdentity.VolumeSerial
-                        == originalIdentity.VolumeSerial
-                    && resolvedIdentity.FileIndexHigh
-                        == originalIdentity.FileIndexHigh
-                    && resolvedIdentity.FileIndexLow
-                        == originalIdentity.FileIndexLow,
-                "文件 ID 回开结果没有指向更名前的同一文件")
-        }
+        AssertTargetFileInspector(inspector.GetFingerprint(scriptPath)
+                == "MISSING"
+            && inspector.GetFingerprint(renamedScriptPath) != "MISSING",
+            "文件改名后的轻量指纹可用性错误")
         FileMove(renamedScriptPath, scriptPath)
     } finally {
         for path in [scriptPath, sameSizePath, emptyPath, damagedExePath,

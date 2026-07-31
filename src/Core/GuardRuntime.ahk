@@ -28,7 +28,7 @@ class GuardRuntime {
         try {
             if this.Runtime.HasOwnProp("targetRelocationService")
                 && !this.Runtime.targetRelocationService.Start()
-                this.Log(this.Text("守护目标更名识别服务未能启动。"))
+                this.Log(this.Text("守护目标内容迁移识别服务未能启动。"))
             SetTimer(this.MonitorTimer, this.Runtime.checkInterval)
             if !this.Runtime.maintenanceCoordinator.StartTimers() {
                 SetTimer(this.MonitorTimer, 0)
@@ -347,27 +347,42 @@ class GuardRuntime {
                     continue
                 }
 
-                ; 文件身份与进程是否仍在运行相互独立。目标更名后，旧进程
-                ; 可能继续存活，进程快照也可能暂不可用；因此必须先尝试找回
-                ; 新路径，不能等到“进程已停止”分支才触发确认。
-                if (InStr(path, "\")
-                    && !this.Runtime.maintenanceCoordinator
+                SplitPath(path, &targetName, , &extension)
+                isScript := RegExMatch(extension,
+                    "i)^(ahk|py|pyw|js|vbs|vbe|wsf|ps1|bat|cmd|rb|pl|php|lua|jar|sh|bash)$")
+                missingState := isScript
+                    ? this.Text("❌ 脚本不存在")
+                    : this.Text("❌ 程序不存在")
+                missingStatusKind := isScript
+                    ? GuardStatusKind.ScriptMissing
+                    : GuardStatusKind.ProgramMissing
+                targetSubjectExists := !InStr(path, "\")
+                    || this.Runtime.maintenanceCoordinator
                         .TargetSubjectExists(path, stateObj)
+
+                ; 文件内容身份与进程是否仍在运行相互独立。目标移动后，旧进程
+                ; 可能继续存活，因此先启动内容迁移识别；未找到候选时仍允许一份
+                ; 确定的运行证据覆盖缺失状态。
+                if (!targetSubjectExists
                     && this.TryDetectTargetRelocation(path, stateObj)) {
                     continue
                 }
 
+                hasLiveIdentity := this.Callbacks
+                    .StateProcessIdentityIsValid.Call(path, stateObj)
                 if (InStr(path, "\") && !snapshotReady
-                    && !this.Callbacks.StateProcessIdentityIsValid.Call(path,
-                        stateObj)) {
-                    this.HandleUncertainObservation(path, stateObj,
-                        ProcessObservation.Unknown(this.Now(),
-                            "process-snapshot", "后台进程快照暂不可用",
-                            ProcessObservationReason.SnapshotUnavailable))
+                    && !hasLiveIdentity) {
+                    if !targetSubjectExists
+                        this.HandleMissingTarget(path, stateObj,
+                            missingState, missingStatusKind)
+                    else
+                        this.HandleUncertainObservation(path, stateObj,
+                            ProcessObservation.Unknown(this.Now(),
+                                "process-snapshot", "后台进程快照暂不可用",
+                                ProcessObservationReason.SnapshotUnavailable))
                     continue
                 }
 
-                SplitPath(path, &targetName, , &extension)
                 if (StrLower(extension) == "lnk"
                     && (!stateObj.ResolvedTarget
                         || !FileExist(stateObj.ResolvedTarget))
@@ -377,13 +392,13 @@ class GuardRuntime {
                 }
                 if this.Runtime.maintenanceCoordinator.TargetSubjectExists(
                     path, stateObj) {
+                    targetSubjectExists := true
                     this.ObserveAvailableRelocationTarget(path, stateObj)
                     this.Runtime.maintenanceCoordinator.ClearTargetMissing(
                         path, stateObj)
                 }
                 observationGeneration := stateObj.Generation
-                targetObservation := this.Callbacks
-                    .StateProcessIdentityIsValid.Call(path, stateObj)
+                targetObservation := hasLiveIdentity
                     ? ProcessObservation.Running(stateObj.PID,
                         stateObj.PIDCreationIdentity, nowTicks,
                         "cached-identity")
@@ -393,8 +408,12 @@ class GuardRuntime {
                     observationGeneration)
                     continue
                 if targetObservation.IsUnknown() {
-                    this.HandleUncertainObservation(path, stateObj,
-                        targetObservation)
+                    if !targetSubjectExists
+                        this.HandleMissingTarget(path, stateObj,
+                            missingState, missingStatusKind)
+                    else
+                        this.HandleUncertainObservation(path, stateObj,
+                            targetObservation)
                     continue
                 }
                 stateObj.UncertainObservationCount := 0
@@ -419,8 +438,12 @@ class GuardRuntime {
                         observationGeneration)
                         continue
                     if targetObservation.IsUnknown() {
-                        this.HandleUncertainObservation(path, stateObj,
-                            targetObservation)
+                        if !targetSubjectExists
+                            this.HandleMissingTarget(path, stateObj,
+                                missingState, missingStatusKind)
+                        else
+                            this.HandleUncertainObservation(path, stateObj,
+                                targetObservation)
                         continue
                     }
                     isRunning := targetObservation.IsRunning()
@@ -429,12 +452,6 @@ class GuardRuntime {
                         this.Callbacks.SetProcessIdentity.Call(stateObj,
                             isRunning, targetObservation.CreationIdentity)
                 }
-
-                isScript := RegExMatch(extension,
-                    "i)^(ahk|py|pyw|js|vbs|vbe|wsf|ps1|bat|cmd|rb|pl|php|lua|jar|sh|bash)$")
-                missingState := isScript
-                    ? this.Text("❌ 脚本不存在")
-                    : this.Text("❌ 程序不存在")
 
                 if isRunning {
                     this.Callbacks.SetProcessIdentity.Call(stateObj,
@@ -445,21 +462,9 @@ class GuardRuntime {
                     continue
                 }
 
-                if (InStr(path, "\")
-                    && !this.Runtime.maintenanceCoordinator
-                        .TargetSubjectExists(path, stateObj)) {
-                    if (this.Runtime.maintenanceCoordinator
-                        .IsProtectionEnabled(path, stateObj)
-                        && this.Runtime.maintenanceCoordinator
-                            .HasRecentSignal(stateObj)) {
-                        this.Runtime.maintenanceCoordinator.Enter(path,
-                            stateObj, this.Text("目标文件缺失时检测到升级活动"))
-                        continue
-                    }
-                    this.Runtime.maintenanceCoordinator.MarkTargetMissing(
-                        path, stateObj, missingState,
-                        isScript ? GuardStatusKind.ScriptMissing
-                            : GuardStatusKind.ProgramMissing)
+                if !targetSubjectExists {
+                    this.HandleMissingTarget(path, stateObj, missingState,
+                        missingStatusKind)
                     continue
                 }
 
@@ -526,6 +531,19 @@ class GuardRuntime {
         return this.Runtime.targetRelocationService.TryDetect(path, stateObj)
     }
 
+    HandleMissingTarget(path, stateObj, statusText, statusKind) {
+        if (this.Runtime.maintenanceCoordinator.IsProtectionEnabled(path,
+            stateObj) && this.Runtime.maintenanceCoordinator
+                .HasRecentSignal(stateObj)) {
+            this.Runtime.maintenanceCoordinator.Enter(path, stateObj,
+                this.Text("目标文件缺失时检测到升级活动"))
+            return true
+        }
+        this.Runtime.maintenanceCoordinator.MarkTargetMissing(path, stateObj,
+            statusText, statusKind)
+        return true
+    }
+
     BuildNativeFallbackSnapshotIndex(orderedPaths) {
         if !IsObject(this.Runtime.processInspector)
             return ""
@@ -586,7 +604,7 @@ class GuardRuntime {
         if !stateObj.Pending
             return false
         if this.Runtime.maintenanceCoordinator.IsBlocking(stateObj)
-            || stateObj.ManualRestartRequested || stateObj.IsRestarting {
+            || stateObj.ManualStopRequested || stateObj.IsRestarting {
             return false
         }
         hasRestartTask := stateObj.RestartTask is TargetScheduledTask
@@ -1127,6 +1145,14 @@ class GuardRuntime {
         errorMessage := IsObject(targetError)
             && targetError.HasOwnProp("Message")
             ? targetError.Message : String(targetError)
+        if IsObject(targetError) {
+            if targetError.HasOwnProp("File") && targetError.File != ""
+                errorMessage .= " | " targetError.File
+            if targetError.HasOwnProp("Line") && targetError.Line
+                errorMessage .= ":" targetError.Line
+            if targetError.HasOwnProp("What") && targetError.What != ""
+                errorMessage .= " | " targetError.What
+        }
         this.Log(this.Text("主进程监控异常：{1}",
             path " | " this.DiagnosticText(errorMessage)))
         return true

@@ -10,7 +10,7 @@ GetGuardActivationStatusKind(enabled) {
     return enabled ? GuardStatusKind.Initializing : GuardStatusKind.Paused
 }
 
-RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", arguments := "", environment := "", maintenanceConfig := "", storedResolvedTarget := "", resolvedTargetManual := false, shortcutArguments := "", displayConfig := "", runtimePath := "", runtimeArguments := "") {
+RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", arguments := "", environment := "", maintenanceConfig := "", storedResolvedTarget := "", resolvedTargetManual := false, shortcutArguments := "", displayConfig := "", runtimePath := "", runtimeArguments := "", storedContentHash := "", storedContentSize := 0) {
     path := NormalizeTargetPath(path)
     if (path == "")
         return false
@@ -56,6 +56,16 @@ RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", argumen
     fingerprintTarget := resolvedTarget != "" ? resolvedTarget : path
     currentFingerprint := App.targetFileInspector.GetFingerprint(
         fingerprintTarget)
+    contentHash := RegExMatch(storedContentHash, "i)^[0-9a-f]{64}$")
+        ? StrUpper(storedContentHash) : ""
+    try contentSize := Max(0, Integer(storedContentSize))
+    catch
+        contentSize := 0
+    contentSignature := App.targetFileInspector.GetContentSignature(path)
+    if contentSignature.Available {
+        contentHash := contentSignature.ContentHash
+        contentSize := contentSignature.FileSize
+    }
     displayConfig := App.displayConfigCodec.Normalize(displayConfig)
     initialStatus := GetGuardActivationStatus(enabled)
     stateObj := TargetSupervisor({
@@ -85,6 +95,7 @@ RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", argumen
         MaintenanceReadyCheckedTicks: 0, MaintenanceLastReady: true,
         SafetyFingerprint: currentFingerprint, SafetyStableSince: GetTickCount64(),
         MaintenanceLearningCandidates: Map(), MissingSinceTicks: 0,
+        ContentHash: contentHash, ContentSize: contentSize,
         DisplayConfig: displayConfig, TargetSpecs: "", TargetSpecsFingerprint: "",
         Scheduler: App.scheduler
     })
@@ -266,7 +277,11 @@ StartNextInlineEdit(GuiCtrlObj, sessionId := 0) {
         App.editMonitorItem := Item
         hEdit := SendMessage(0x1018, 0, 0, GuiCtrlObj.Hwnd)
         if hEdit {
+            ; 原生标签编辑框需要先应用 Edit 自身的深色视觉样式，再由父
+            ; ListView 子类响应 WM_CTLCOLOREDIT。两层缺一都会在真实主窗口
+            ; 的首次编辑生命周期中退回亮色，不能把这里视为重复调用。
             SetDarkControl(hEdit)
+            DarkInlineEditThemeRegistry.Register(hEdit, GuiCtrlObj.Hwnd)
             RegisterTextInputHwnd(hEdit)
             App.activeInlineEditHwnd := hEdit
         }
@@ -282,6 +297,8 @@ CheckEditMonitor(GuiCtrlObj, sessionId := 0) {
         if hEdit
             try SendMessage(0x0100, 27, 0, hEdit)
         if App.activeInlineEditHwnd {
+            DarkInlineEditThemeRegistry.Unregister(
+                App.activeInlineEditHwnd)
             App.uiInteractions.RemoveTextInput(App.activeInlineEditHwnd)
             App.activeInlineEditHwnd := 0
         }
@@ -292,6 +309,8 @@ CheckEditMonitor(GuiCtrlObj, sessionId := 0) {
     if (!hEdit) {
         SetTimer(, 0)
         if App.activeInlineEditHwnd {
+            DarkInlineEditThemeRegistry.Unregister(
+                App.activeInlineEditHwnd)
             App.uiInteractions.RemoveTextInput(App.activeInlineEditHwnd)
             App.activeInlineEditHwnd := 0
         }
@@ -391,7 +410,7 @@ PrepareWatchPathTransitionFromState(previousPath, requestedPath,
 }
 
 ApplyWatchPathTransition(previousPath, requestedPath,
-    historyKind := "edit-path") {
+    historyKind := "edit-path", preserveInlineEditSession := false) {
     transition := PrepareWatchPathTransition(previousPath, requestedPath)
     if !transition.Changed
         return false
@@ -406,7 +425,8 @@ ApplyWatchPathTransition(previousPath, requestedPath,
             break
         }
     }
-    ApplyState(transition.TargetState, transition.BeforeState)
+    ApplyState(transition.TargetState, transition.BeforeState, true,
+        preserveInlineEditSession)
     App.appConfigHistoryService.Commit(transition.BeforeState,
         transition.TargetState, CreateAppHistoryAction(historyKind,
             [transition.PreviousPath, transition.NewPath]))
@@ -510,7 +530,7 @@ ProcessEditFinishCore(GuiCtrlObj, Item, sessionId := 0) {
         previousPath := GuiCtrlObj.GetText(Item, 3)
 
         if (newPath != "" && !PathsEquivalent(newPath, previousPath)) {
-            if ApplyWatchPathTransition(previousPath, newPath)
+            if ApplyWatchPathTransition(previousPath, newPath, "edit-path", true)
                 LogMsg(Tr("已更新守护对象路径。"))
         }
 
@@ -1007,10 +1027,13 @@ SyncMainListToConfigState(items) {
     RefreshMainStatusSortKeys()
 }
 
-ApplyState(stateArr, sourceStateArr := "", rollbackOnFailure := true) {
-    App.editSessionId++
-    App.batchEditRows := []
-    App.editMonitorItem := 0
+ApplyState(stateArr, sourceStateArr := "", rollbackOnFailure := true,
+    preserveInlineEditSession := false) {
+    if !preserveInlineEditSession {
+        App.editSessionId++
+        App.batchEditRows := []
+        App.editMonitorItem := 0
+    }
     Main.contextTargetRow := 0
     currentState := CaptureAppConfigState()
     preparedState := App.appConfigSnapshotService.PrepareState(stateArr)
@@ -1068,7 +1091,8 @@ ApplyState(stateArr, sourceStateArr := "", rollbackOnFailure := true) {
                 if !RegisterApp(item.Path, item.Enabled, item.RunAsAdmin, item.WorkDir, item.Args,
                     item.EnvVars, item.Maintenance, item.ResolvedTarget,
                     item.ResolvedTargetManual, item.ShortcutArgs, item.Display,
-                    item.RuntimePath, item.RuntimeArgs) {
+                    item.RuntimePath, item.RuntimeArgs, item.ContentHash,
+                    item.ContentSize) {
                     throw Error(Tr("守护对象路径无效：{1}", item.Path))
                 }
             }

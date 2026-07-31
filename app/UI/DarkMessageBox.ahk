@@ -14,6 +14,37 @@ CloseDarkMsgBox(mb, ownerLease, &closed) {
     finally WindowHierarchy.CompleteClose(closeContext)
 }
 
+CalculateDarkDialogLayout(windowWidth, messageHeight, buttonWidths,
+    buttonTopGap := 20) {
+    contentTop := 20
+    iconHeight := 30
+    buttonHeight := 30
+    buttonGap := 12
+    rowHeight := Max(iconHeight, Max(1, Integer(messageHeight)))
+    iconY := contentTop + Floor((rowHeight - iconHeight) / 2)
+    messageY := contentTop + Floor((rowHeight - messageHeight) / 2)
+    buttonY := contentTop + rowHeight + buttonTopGap
+    groupWidth := 0
+    for buttonWidth in buttonWidths
+        groupWidth += buttonWidth
+    if buttonWidths.Length > 1
+        groupWidth += buttonGap * (buttonWidths.Length - 1)
+    nextButtonX := Floor((windowWidth - groupWidth) / 2)
+    buttonXs := []
+    for buttonWidth in buttonWidths {
+        buttonXs.Push(nextButtonX)
+        nextButtonX += buttonWidth + buttonGap
+    }
+    return {
+        IconY: iconY,
+        MessageY: messageY,
+        ButtonY: buttonY,
+        ButtonXs: buttonXs,
+        BottomY: buttonY + buttonHeight,
+        WindowHeight: buttonY + buttonHeight + 15
+    }
+}
+
 ShowDarkMsgBox(Message, Title := "", MsgType := "Info", ownerGui := "") {
     if Title == ""
         Title := Tr("提示")
@@ -46,21 +77,26 @@ ShowDarkMsgBox(Message, Title := "", MsgType := "Info", ownerGui := "") {
     ; 图标列保持固定宽度，正文根据消息长度计算高度并允许自然换行。
     iconStr := (MsgType == "Error") ? "❌" : "ℹ️" ; <--- 同步修改这里
     mb.SetFont("s18", "Segoe UI Emoji")
-    mb.Add("Text", "x20 y20 w30 h30 BackgroundTrans c"
+    iconControl := mb.Add("Text", "x20 y20 w30 h30 BackgroundTrans c"
         UiThemeService.Color("Text"), iconStr)
 
     mb.SetFont("s10 c" UiThemeService.Color("Text"),
         LocalizationService.GetUiFontName())
-    mb.Add("Text", "x60 y25 w220 BackgroundTrans", Message)
+    messageControl := mb.Add("Text", "x60 y20 w220 BackgroundTrans", Message)
+    messageControl.GetPos(, , , &messageHeight)
+    layout := CalculateDarkDialogLayout(300, messageHeight, [70])
+    iconControl.Move(, layout.IconY)
+    messageControl.Move(, layout.MessageY)
 
     ; 确认按钮复用全应用圆角绘制、悬浮和抬起后执行规则。
     btnOk := mb.Add("Text",
-        "x115 y+20 w70 h30 Center 0x200 Background"
+        "x" layout.ButtonXs[1] " y" layout.ButtonY
+            " w70 h30 Center 0x200 Background"
             UiThemeService.Color("Primary") " c"
             UiThemeService.Color("ButtonText"),
         Tr("确 定"))
     RegisterHoverButton(btnOk, UiThemeService.Color("Primary"))
-    mb.Add("Text", "x10 y+0 h15", "") ; 底部留白
+    mb.Add("Text", "x10 y" layout.BottomY " w1 h15", "") ; 底部留白
 
     ; 所有关闭入口共享同一幂等收尾函数，避免重复恢复或激活错误窗口。
     closeAction := (*) => CloseDarkMsgBox(mb, ownerLease, &closed)
@@ -69,8 +105,9 @@ ShowDarkMsgBox(Message, Title := "", MsgType := "Info", ownerGui := "") {
     mb.OnEvent("Close", closeAction)
     mb.OnEvent("Escape", closeAction)
 
-    mb.Show("w300 AutoSize")
-    WinWaitClose(mb.Hwnd) ; 挂起线程等待弹窗销毁，实现阻塞式的主线程停滞
+    mbHwnd := mb.Hwnd
+    mb.Show("w300 h" layout.WindowHeight)
+    WinWaitClose(mbHwnd) ; 挂起线程等待弹窗销毁，实现阻塞式的主线程停滞
     } catch as msgErr {
         CloseDarkMsgBox(mb, ownerLease, &closed)
         throw msgErr
@@ -115,22 +152,29 @@ ShowDarkConfirmBox(Message, Title, confirmText, cancelText,
     try {
         InitializeApplicationWindow(mb)
         mb.SetFont("s18", "Segoe UI Emoji")
-        mb.Add("Text", "x20 y20 w30 h30 BackgroundTrans c"
+        iconControl := mb.Add("Text", "x20 y20 w30 h30 BackgroundTrans c"
             UiThemeService.Color("Text"), "⬆️")
         mb.SetFont("s10 c" UiThemeService.Color("Text"),
             LocalizationService.GetUiFontName())
-        mb.Add("Text", "x60 y23 w280 BackgroundTrans", Message)
+        messageControl := mb.Add("Text", "x60 y20 w280 BackgroundTrans", Message)
+        messageControl.GetPos(, , , &messageHeight)
+        layout := CalculateDarkDialogLayout(360, messageHeight,
+            [100, 100], 22)
+        iconControl.Move(, layout.IconY)
+        messageControl.Move(, layout.MessageY)
         btnConfirm := mb.Add("Text",
-            "x92 y+22 w100 h30 Center 0x200 Background"
+            "x" layout.ButtonXs[1] " y" layout.ButtonY
+                " w100 h30 Center 0x200 Background"
                 UiThemeService.Color("Primary") " c"
                 UiThemeService.Color("ButtonText"),
             confirmText)
         btnCancel := mb.Add("Text",
-            "x+12 yp w100 h30 Center 0x200 Background"
+            "x" layout.ButtonXs[2] " y" layout.ButtonY
+                " w100 h30 Center 0x200 Background"
                 UiThemeService.Color("Toolbar") " c"
                 UiThemeService.Color("ToolbarText"),
             cancelText)
-        mb.Add("Text", "x10 y+0 h15", "")
+        mb.Add("Text", "x10 y" layout.BottomY " w1 h15", "")
         RegisterHoverButton(btnConfirm, UiThemeService.Color("Primary"))
         RegisterHoverButton(btnCancel, UiThemeService.Color("Toolbar"))
         closeAction := (*) => CloseDarkMsgBox(mb, ownerLease, &closed)
@@ -142,8 +186,9 @@ ShowDarkConfirmBox(Message, Title, confirmText, cancelText,
             ButtonFeedbackMode.Dismissive)
         mb.OnEvent("Close", closeAction)
         mb.OnEvent("Escape", closeAction)
-        mb.Show("w360 AutoSize")
-        WinWaitClose(mb.Hwnd)
+        mbHwnd := mb.Hwnd
+        mb.Show("w360 h" layout.WindowHeight)
+        WinWaitClose(mbHwnd)
         return accepted
     } catch as confirmError {
         CloseDarkMsgBox(mb, ownerLease, &closed)

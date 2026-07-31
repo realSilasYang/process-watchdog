@@ -43,6 +43,7 @@ class SettingsWindow extends ManagedWindow {
         this.shortcutLabel := ""
         this.taskLabel := ""
         this.shortcutButton := ""
+        this.shortcutFeedbackText := ""
         this.shortcutFeedbackTimer := 0
         this.shortcutFeedbackGeneration := 0
         this.taskButton := ""
@@ -156,6 +157,20 @@ class SettingsWindow extends ManagedWindow {
                 UiThemeService.Color("Toolbar") " c"
                 UiThemeService.Color("ToolbarText"),
             Tr("创建")))
+        this.shortcutFeedbackText := this.AddTabControl(1,
+            this.gui.Add("Text", "x" integrationActionX
+                " y57 h28 Center 0x200 BackgroundTrans c"
+                    UiThemeService.Color("Text"),
+                Tr("创建成功！")))
+        this.shortcutFeedbackText.GetPos(, , &shortcutFeedbackWidth)
+        shortcutFeedbackWidth := Max(integrationButtonWidth,
+            shortcutFeedbackWidth + 8)
+        shortcutFeedbackX := integrationActionX
+            + Floor((integrationButtonWidth - shortcutFeedbackWidth) / 2)
+        shortcutFeedbackX := Max(integrationActionX - integrationGap + 4,
+            Min(shortcutFeedbackX, contentRight - shortcutFeedbackWidth))
+        this.shortcutFeedbackText.Move(shortcutFeedbackX, ,
+            shortcutFeedbackWidth)
         this.taskButton := this.AddTabControl(1, this.gui.Add("Text", "x"
             integrationActionX " y95 w72 h28 Center 0x200 Background"
                 UiThemeService.Color("Toolbar") " c"
@@ -263,8 +278,6 @@ class SettingsWindow extends ManagedWindow {
         RegisterHoverButton(this.cancelButton, UiThemeService.Color("Toolbar"))
         RegisterHoverButton(this.shortcutButton,
             UiThemeService.Color("Toolbar"))
-        SetButtonTooltip(this.shortcutButton,
-            Tr("创建桌面快捷方式，并将小助手加入开始菜单“所有”列表；是否固定到开始菜单由您决定。"))
         RegisterHoverButton(this.taskButton, UiThemeService.Color("Toolbar"))
         SetButtonLucideIcon(this.shortcutButton, "square-plus.svg", 14, 6)
         ; 计划任务状态稍后通过 COM 核对；首屏先显示中性的加载状态，
@@ -277,6 +290,7 @@ class SettingsWindow extends ManagedWindow {
             ObjBindMethod(this, "CreateShortcut"))
         RegisterButtonClick(this.taskButton, ObjBindMethod(this, "ToggleTaskAction"))
         this.SwitchTab(1)
+        this.shortcutFeedbackText.Visible := false
         ShowApplicationWindow(this.gui, "w" windowWidth " h350")
         ; 任务计划程序 COM 查询不参与首屏布局，窗口显示后再读取真实状态。
         SetTimer(this.taskStatusTimer, -1)
@@ -724,8 +738,16 @@ class SettingsWindow extends ManagedWindow {
                 return
             for tabIndex, controls in this.tabControls {
                 isVisible := tabIndex == index
-                for control in controls
-                    try control.Visible := isVisible
+                for control in controls {
+                    controlVisible := isVisible
+                    if control == this.shortcutFeedbackText
+                        controlVisible := isVisible
+                            && !!this.shortcutFeedbackTimer
+                    else if control == this.shortcutButton
+                        controlVisible := isVisible
+                            && !this.shortcutFeedbackTimer
+                    try control.Visible := controlVisible
+                }
             }
             for buttonIndex, button in this.tabButtons {
                 isActive := this.tabButtonPages[buttonIndex] == index
@@ -763,12 +785,13 @@ class SettingsWindow extends ManagedWindow {
 
     ShowShortcutCreatedFeedback() {
         if !this.IsOpen() || !this.shortcutButton
+            || !this.shortcutFeedbackText
             return false
         this.CancelShortcutFeedback()
         this.shortcutFeedbackGeneration++
         generation := this.shortcutFeedbackGeneration
-        this.shortcutButton.Text := Tr("创建成功！")
-        ClearButtonIcon(this.shortcutButton)
+        this.shortcutButton.Visible := false
+        this.shortcutFeedbackText.Visible := this.activeTab == 1
         timer := ObjBindMethod(this, "RestoreShortcutButton", generation)
         this.shortcutFeedbackTimer := timer
         SetTimer(timer, -3000)
@@ -780,9 +803,10 @@ class SettingsWindow extends ManagedWindow {
             return
         this.shortcutFeedbackTimer := 0
         if !this.IsOpen() || !this.shortcutButton
+            || !this.shortcutFeedbackText
             return
-        this.shortcutButton.Text := Tr("创建")
-        SetButtonLucideIcon(this.shortcutButton, "square-plus.svg", 14, 6)
+        this.shortcutFeedbackText.Visible := false
+        this.shortcutButton.Visible := this.activeTab == 1
     }
 
     CancelShortcutFeedback() {
@@ -1067,6 +1091,7 @@ class SettingsWindow extends ManagedWindow {
         this.shortcutLabel := ""
         this.taskLabel := ""
         this.shortcutButton := ""
+        this.shortcutFeedbackText := ""
         this.shortcutFeedbackTimer := 0
         this.taskButton := ""
         this.checkUpdateButton := ""

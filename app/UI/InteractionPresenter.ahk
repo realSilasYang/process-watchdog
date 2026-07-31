@@ -1442,6 +1442,24 @@ RedrawRoundedButton(hWnd) {
             "UInt", Win32.RDW_BUTTON_REFRESH, "Int")
 }
 
+RedrawVisibleRoundedButtons(controls) {
+    if Type(controls) != "Array"
+        return false
+    redrawnAny := false
+    for control in controls {
+        try controlHwnd := control.Hwnd
+        catch
+            continue
+        if !controlHwnd || !DllCall("user32\IsWindowVisible", "Ptr",
+            controlHwnd, "Int") {
+            continue
+        }
+        RedrawRoundedButton(controlHwnd)
+        redrawnAny := true
+    }
+    return redrawnAny
+}
+
 OnDrawRoundedButton(wParam, lParam, msg, hwnd) {
     if !lParam
         return

@@ -18,21 +18,26 @@ class WatchlistPersistenceService {
         result := {
             Warnings: [],
             RecoveryEntries: this.ReadRecoveryEntries(),
-            RegisteredCount: 0
+            RegisteredCount: 0,
+            NeedsIdentitySave: false
         }
         maintenanceValues := this.Repository.ReadSectionMap("Maintenance")
         displayValues := this.Repository.ReadSectionMap("Display")
         launchValues := this.Repository.ReadSectionMap("Launch")
+        identityValues := this.Repository.ReadSectionMap("Identity")
         for appEntry in this.Repository.ReadSectionEntries("Apps") {
             recoveryEntry := this.CreateRecoveryEntry(appEntry,
-                maintenanceValues, displayValues, launchValues)
+                maintenanceValues, displayValues, launchValues,
+                identityValues)
             try {
                 record := this.ParseRecord(appEntry, maintenanceValues,
-                    displayValues, launchValues)
+                    displayValues, launchValues, identityValues)
                 if !registerCallback.Call(record)
                     throw this.CreateLoadError("Apps", "目标路径",
                         "与已加载守护对象重复，或目标格式无效")
                 result.RegisteredCount++
+                if record.ContentHash == ""
+                    result.NeedsIdentitySave := true
             } catch as loadError {
                 result.Warnings.Push(this.CreateLoadWarning(appEntry,
                     loadError))
@@ -52,6 +57,7 @@ class WatchlistPersistenceService {
         maintenanceEntries := []
         displayEntries := []
         launchEntries := []
+        identityEntries := []
         for index, savePath in orderedPaths {
             snapshot := this.SnapshotService.CreateSnapshot(savePath,
                 appStates[savePath])
@@ -77,6 +83,14 @@ class WatchlistPersistenceService {
                     Value: this.FieldCodec.Encode(snapshot.RuntimePath) "|"
                         . this.FieldCodec.Encode(snapshot.RuntimeArgs)})
             }
+            if snapshot.HasOwnProp("ContentHash")
+                && RegExMatch(snapshot.ContentHash, "i)^[0-9a-f]{64}$")
+                && snapshot.HasOwnProp("ContentSize")
+                && snapshot.ContentSize >= 0 {
+                identityEntries.Push({Key: "App" index,
+                    Value: snapshot.ContentSize "|"
+                        . StrUpper(snapshot.ContentHash)})
+            }
         }
         serializedRecovery := this.SerializeRecoveryEntries(recoveryEntries)
         this.Repository.ReplaceSections([
@@ -84,12 +98,14 @@ class WatchlistPersistenceService {
             {Name: "Maintenance", Entries: maintenanceEntries},
             {Name: "Display", Entries: displayEntries},
             {Name: "Launch", Entries: launchEntries},
+            {Name: "Identity", Entries: identityEntries},
             {Name: "Recovery", Entries: serializedRecovery}
         ])
         return {OrderedPaths: orderedPaths, SavedCount: appEntries.Length}
     }
 
-    ParseRecord(appEntry, maintenanceValues, displayValues, launchValues) {
+    ParseRecord(appEntry, maintenanceValues, displayValues, launchValues,
+        identityValues) {
         if (appEntry.Value == "")
             throw this.CreateLoadError("Apps", "整条记录", "内容为空")
         parts := StrSplit(appEntry.Value, "|")
@@ -154,6 +170,26 @@ class WatchlistPersistenceService {
             runtimePath := this.FieldCodec.Decode(launchParts[1])
             runtimeArguments := this.FieldCodec.Decode(launchParts[2])
         }
+        contentHash := ""
+        contentSize := 0
+        if identityValues.Has(appEntry.Key) {
+            identityValue := identityValues[appEntry.Key]
+            identityParts := StrSplit(identityValue, "|")
+            if identityParts.Length != 2
+                throw this.CreateLoadError("Identity", "内容身份",
+                    "字段数量应为 2，实际为 " identityParts.Length)
+            try contentSize := Integer(identityParts[1])
+            catch
+                throw this.CreateLoadError("Identity", "文件大小",
+                    "内容不是整数")
+            contentHash := StrUpper(Trim(identityParts[2]))
+            if contentSize < 0
+                throw this.CreateLoadError("Identity", "文件大小",
+                    "不能小于 0")
+            if !RegExMatch(contentHash, "^[0-9A-F]{64}$")
+                throw this.CreateLoadError("Identity", "内容哈希",
+                    "必须是 64 位十六进制 SHA-256")
+        }
         return {
             Key: appEntry.Key,
             Path: targetPath,
@@ -168,6 +204,8 @@ class WatchlistPersistenceService {
             ResolvedTarget: resolvedTarget,
             ResolvedTargetManual: resolvedTargetManual,
             ShortcutArgs: shortcutArguments,
+            ContentHash: contentHash,
+            ContentSize: contentSize,
             Display: displayConfig
         }
     }
@@ -181,7 +219,7 @@ class WatchlistPersistenceService {
     }
 
     CreateRecoveryEntry(appEntry, maintenanceValues, displayValues,
-        launchValues) {
+        launchValues, identityValues) {
         return {
             Key: appEntry.Key,
             Value: appEntry.Value,
@@ -190,7 +228,9 @@ class WatchlistPersistenceService {
             Display: displayValues.Has(appEntry.Key)
                 ? displayValues[appEntry.Key] : "",
             Launch: launchValues.Has(appEntry.Key)
-                ? launchValues[appEntry.Key] : ""
+                ? launchValues[appEntry.Key] : "",
+            Identity: identityValues.Has(appEntry.Key)
+                ? identityValues[appEntry.Key] : ""
         }
     }
 
@@ -263,6 +303,9 @@ class WatchlistPersistenceService {
                 this.FieldCodec.Encode(recoveryEntry.Display)
             recoveryValue .= "`nLaunch="
                 this.FieldCodec.Encode(recoveryEntry.Launch)
+            recoveryValue .= "`nIdentity=" this.FieldCodec.Encode(
+                recoveryEntry.HasOwnProp("Identity")
+                    ? recoveryEntry.Identity : "")
             serialized.Push({Key: "Entry" index,
                 Value: this.FieldCodec.Encode(recoveryValue)})
         }

@@ -1,27 +1,22 @@
-; 直接文件目标的更名与移动识别服务。
-; 主路径使用卷序列号和文件 ID 直接找回同一卷内的新位置；目录通知仅作为
-; 不支持文件 ID 的回退。候选只冻结对应控制器，必须经用户确认后才会改写配置。
+; 直接文件目标的内容迁移识别服务。
+; 目标消失后在独立工作进程中按扩展名和文件大小筛选候选，再以 SHA-256
+; 确认内容完全一致。路径、文件名、卷和文件系统身份都不参与匹配。
 
 class TargetRelocationService {
     static PollIntervalMs := 500
     static CandidateDelayMs := 1500
-    static RenameEventLifetimeMs := 10000
-    static RenamePairLifetimeMs := 5000
     static DeliveryRetryIntervalMs := 3000
     static IgnoreCooldownMs := 600000
     static BaselineRefreshIntervalMs := 60000
-    static FILE_ACTION_RENAMED_OLD_NAME := 4
-    static FILE_ACTION_RENAMED_NEW_NAME := 5
+    static FullHashRefreshIntervalMs := 600000
+    static ScanRetryIntervalMs := 30000
+    static ScanTimeoutSeconds := 60
 
     __New(runtime, callbacks) {
         this.Runtime := runtime
         this.Callbacks := callbacks
         this.Targets := Map()
         this.Targets.CaseSense := "Off"
-        this.Watchers := Map()
-        this.Watchers.CaseSense := "Off"
-        this.RenameHints := Map()
-        this.RenameHints.CaseSense := "Off"
         this.PendingCandidates := Map()
         this.PendingCandidates.CaseSense := "Off"
         this.IgnoredCandidates := Map()
@@ -49,9 +44,8 @@ class TargetRelocationService {
         this.Stopped := true
         this.Running := false
         try SetTimer(this.PollTimer, 0)
-        for _, entry in this.Watchers
-            try entry.Watcher.Close()
-        this.Watchers.Clear()
+        for _, record in this.Targets
+            this.CancelScan(record)
         for _, candidate in this.PendingCandidates {
             stateObj := candidate.State
             if IsObject(stateObj) && stateObj.HasOwnProp("RelocationPending")
@@ -59,7 +53,6 @@ class TargetRelocationService {
         }
         this.PendingCandidates.Clear()
         this.Targets.Clear()
-        this.RenameHints.Clear()
         this.IgnoredCandidates.Clear()
     }
 
@@ -73,7 +66,6 @@ class TargetRelocationService {
             if this.IsEligiblePath(path)
                 desired[path] := stateObj
         }
-
         stalePaths := []
         for path, record in this.Targets {
             if !desired.Has(path) || desired[path] != record.State
@@ -81,21 +73,39 @@ class TargetRelocationService {
         }
         for path in stalePaths
             this.RemoveTarget(path, false)
-
         for path, stateObj in desired {
             if this.Targets.Has(path)
                 continue
-            identity := this.GetIdentity(path)
-            record := {
+            contentHash := stateObj.HasOwnProp("ContentHash")
+                && this.IsContentHash(stateObj.ContentHash)
+                ? StrUpper(stateObj.ContentHash) : ""
+            contentSize := stateObj.HasOwnProp("ContentSize")
+                ? Max(0, stateObj.ContentSize) : 0
+            signature := this.GetContentSignature(path)
+            if signature.Available {
+                contentHash := signature.ContentHash
+                contentSize := signature.FileSize
+                stateObj.ContentHash := contentHash
+                stateObj.ContentSize := contentSize
+            }
+            nowTicks := this.Now()
+            this.Targets[path] := {
                 Path: path,
                 State: stateObj,
-                Identity: identity,
+                ContentHash: contentHash,
+                ContentSize: contentSize,
+                MetadataKey: signature.Available
+                    ? this.MetadataKey(signature) : "",
                 MissingObservedTicks: 0,
-                LastBaselineTicks: identity.Available ? this.Now() : 0,
-                WatchRoot: ""
+                LastBaselineTicks: signature.Available ? nowTicks : 0,
+                LastHashTicks: signature.Available ? nowTicks : 0,
+                ScanJob: "",
+                SearchRoots: [],
+                SearchRootIndex: 1,
+                ActiveRootIndex: 0,
+                MatchedPaths: [],
+                NextScanTicks: 0
             }
-            this.Targets[path] := record
-            this.SubscribeDirectory(record)
         }
         return this.Targets.Count
     }
@@ -105,8 +115,8 @@ class TargetRelocationService {
         if !this.Targets.Has(path)
             return false
         record := this.Targets[path]
+        this.CancelScan(record)
         this.Targets.Delete(path)
-        this.UnsubscribeDirectory(record)
         if this.PendingCandidates.Has(path) {
             candidate := this.PendingCandidates[path]
             this.PendingCandidates.Delete(path)
@@ -114,9 +124,6 @@ class TargetRelocationService {
             if resetState
                 this.ReleaseState(candidate)
         }
-        canonicalPath := this.CanonicalPath(path)
-        if this.RenameHints.Has(canonicalPath)
-            this.RenameHints.Delete(canonicalPath)
         return true
     }
 
@@ -125,7 +132,6 @@ class TargetRelocationService {
         if path == "" || !InStr(path, "\")
             return false
         SplitPath(path, , , &extension)
-        extension := StrLower(extension)
         return RegExMatch(extension,
             "i)^(exe|com|msc|ahk|py|pyw|js|vbs|vbe|wsf|ps1|bat|cmd|rb|pl|php|lua|jar|sh|bash)$") != 0
     }
@@ -137,7 +143,8 @@ class TargetRelocationService {
         candidateExtension := StrLower(candidateExtension)
         if RegExMatch(previousExtension, "i)^(exe|com)$")
             return RegExMatch(candidateExtension, "i)^(exe|com)$") != 0
-        return previousExtension != "" && previousExtension == candidateExtension
+        return previousExtension != ""
+            && previousExtension == candidateExtension
     }
 
     ObserveAvailable(path, stateObj, force := false) {
@@ -149,21 +156,43 @@ class TargetRelocationService {
         if !this.Targets.Has(path)
             return false
         record := this.Targets[path]
+        record.MissingObservedTicks := 0
+        this.CancelScan(record)
+        if this.IsMaintenanceBusy(path, stateObj)
+            return false
         nowTicks := this.Now()
         if !force && record.LastBaselineTicks
             && nowTicks - record.LastBaselineTicks
-                < TargetRelocationService.BaselineRefreshIntervalMs {
-            record.MissingObservedTicks := 0
+                < TargetRelocationService.BaselineRefreshIntervalMs
+            return false
+        metadata := this.GetContentMetadata(path)
+        if !metadata.Available
+            return false
+        metadataKey := this.MetadataKey(metadata)
+        if !force && metadataKey == record.MetadataKey
+            && record.LastHashTicks
+            && nowTicks - record.LastHashTicks
+                < TargetRelocationService.FullHashRefreshIntervalMs {
+            record.LastBaselineTicks := nowTicks
             return false
         }
-        identity := this.GetIdentity(path)
-        if !identity.Available
+        signature := this.GetContentSignature(path)
+        if !signature.Available
             return false
-        record.Identity := identity
+        changed := record.ContentHash != signature.ContentHash
+            || record.ContentSize != signature.FileSize
+        record.ContentHash := signature.ContentHash
+        record.ContentSize := signature.FileSize
+        record.MetadataKey := this.MetadataKey(signature)
         record.LastBaselineTicks := nowTicks
-        record.MissingObservedTicks := 0
-        this.ClearIgnoredForPath(path)
-        return true
+        record.LastHashTicks := nowTicks
+        if changed {
+            stateObj.ContentHash := signature.ContentHash
+            stateObj.ContentSize := signature.FileSize
+            this.ClearIgnoredForPath(path)
+            this.PersistBaseline(path, stateObj)
+        }
+        return changed
     }
 
     TryDetect(path, stateObj) {
@@ -195,82 +224,126 @@ class TargetRelocationService {
             return false
         if this.IsMaintenanceBusy(path, stateObj)
             return false
-
         candidateInfo := this.ResolveCandidate(record)
         if !candidateInfo
             return false
         candidatePath := this.NormalizePath(candidateInfo.Path)
         if !this.IsCandidatePathValid(path, candidatePath)
             return false
-        signature := this.CandidateSignature(path, candidatePath,
-            candidateInfo.Identity)
-        if this.IgnoredCandidates.Has(signature)
-            && this.IgnoredCandidates[signature] > nowTicks
+        candidateSignature := this.CandidateSignature(path, candidatePath,
+            record.ContentHash)
+        if this.IgnoredCandidates.Has(candidateSignature)
+            && this.IgnoredCandidates[candidateSignature] > nowTicks
             return false
-        if this.IgnoredCandidates.Has(signature)
-            this.IgnoredCandidates.Delete(signature)
+        if this.IgnoredCandidates.Has(candidateSignature)
+            this.IgnoredCandidates.Delete(candidateSignature)
         return this.PublishCandidate(path, candidatePath, stateObj,
-            candidateInfo.Evidence, candidateInfo.Identity, signature)
+            "ContentHash", record.ContentHash, record.ContentSize,
+            candidateSignature)
     }
 
     ResolveCandidate(record) {
-        canonicalOldPath := this.CanonicalPath(record.Path)
-        nowTicks := this.Now()
-        if this.RenameHints.Has(canonicalOldPath) {
-            hint := this.RenameHints[canonicalOldPath]
-            if nowTicks - hint.ObservedTicks
-                <= TargetRelocationService.RenameEventLifetimeMs {
-                hintedIdentity := this.GetIdentity(hint.NewPath)
-                if this.IdentityMatches(record.Identity, hintedIdentity) {
-                    return {Path: hint.NewPath, Evidence: "FileIdentity",
-                        Identity: hintedIdentity}
-                }
-                if !record.Identity.NativeIdentityAvailable
-                    && hintedIdentity.Available {
-                    return {Path: hint.NewPath, Evidence: "RenameEvent",
-                        Identity: hintedIdentity}
-                }
+        if !this.IsContentHash(record.ContentHash)
+            return ""
+        if IsObject(record.ScanJob) {
+            completedRootIndex := record.ActiveRootIndex
+            scanResult := this.PollContentScan(record.ScanJob)
+            if !scanResult.Ready
+                return ""
+            record.ScanJob := ""
+            record.ActiveRootIndex := 0
+            if scanResult.Failed || scanResult.Truncated {
+                this.ResetScanCycle(record,
+                    TargetRelocationService.ScanRetryIntervalMs)
+                return ""
             }
-            this.RenameHints.Delete(canonicalOldPath)
+            for candidatePath in scanResult.Paths {
+                if !this.IsCandidatePathValid(record.Path, candidatePath)
+                    continue
+                signature := this.GetContentSignature(candidatePath)
+                if signature.Available
+                    && signature.FileSize == record.ContentSize
+                    && signature.ContentHash == record.ContentHash
+                    this.AddMatchedPath(record, candidatePath)
+            }
+            if record.MatchedPaths.Length > 1 {
+                this.Log(this.Text(
+                    "发现多个内容完全相同的迁移候选，已暂停自动迁移：{1}",
+                    record.Path))
+                this.ResetScanCycle(record,
+                    TargetRelocationService.ScanRetryIntervalMs)
+                return ""
+            }
+            ; 第一个搜索根是旧路径仍存在的最近祖先。这里的唯一内容匹配
+            ; 比全盘缓存或历史副本更接近原目标，应立即采用；本地没有结果
+            ; 时才把后续盘符根的匹配汇总起来做全局歧义检查。
+            if completedRootIndex == 1 {
+                if record.MatchedPaths.Length == 1 {
+                    candidatePath := record.MatchedPaths[1]
+                    this.ResetScanCycle(record, 0)
+                    return {Path: candidatePath}
+                }
+                record.MatchedPaths := []
+            }
         }
-        if !record.Identity.Available
+        if this.Now() < record.NextScanTicks
             return ""
-        currentPath := this.ResolveIdentityPath(record.Path, record.Identity)
-        if currentPath == "" || this.PathsEquivalent(currentPath, record.Path)
-            return ""
-        currentIdentity := this.GetIdentity(currentPath)
-        if !this.IdentityMatches(record.Identity, currentIdentity)
-            return ""
-        return {Path: currentPath, Evidence: "FileIdentity",
-            Identity: currentIdentity}
+        if !record.SearchRoots.Length {
+            record.SearchRoots := this.GetSearchRoots(record.Path)
+            record.SearchRootIndex := 1
+        }
+        while record.SearchRootIndex <= record.SearchRoots.Length {
+            currentRootIndex := record.SearchRootIndex
+            rootPath := record.SearchRoots[record.SearchRootIndex]
+            record.SearchRootIndex++
+            ; 最近目录直接递归扫描，避免全局索引把编辑器历史混入本地层；
+            ; 扩大到盘符根后才使用受根目录约束的 Everything 查询。
+            useEverything := currentRootIndex > 1
+            scanJob := this.StartContentScan(rootPath, record.Path,
+                record.ContentSize, record.ContentHash,
+                useEverything,
+                TargetRelocationService.ScanTimeoutSeconds)
+            if IsObject(scanJob) {
+                record.ScanJob := scanJob
+                record.ActiveRootIndex := currentRootIndex
+                return ""
+            }
+        }
+        if record.MatchedPaths.Length == 1 {
+            candidatePath := record.MatchedPaths[1]
+            this.ResetScanCycle(record, 0)
+            return {Path: candidatePath}
+        }
+        this.ResetScanCycle(record,
+            TargetRelocationService.ScanRetryIntervalMs)
+        return ""
     }
 
-    PublishCandidate(oldPath, newPath, stateObj, evidence, identity,
-        signature) {
+    PublishCandidate(oldPath, newPath, stateObj, evidence, contentHash,
+        contentSize, candidateSignature) {
         if !this.IsCurrent(oldPath, stateObj)
             return false
         stateObj.CancelScheduledTasks()
         stateObj.RelocationPending := true
-        generation := stateObj.Generation
-        token := this.NextToken
-        this.NextToken++
         candidate := {
-            Token: token,
+            Token: this.NextToken,
             OldPath: oldPath,
             NewPath: newPath,
             Evidence: evidence,
-            Identity: identity,
-            Signature: signature,
+            ContentHash: contentHash,
+            ContentSize: contentSize,
+            Signature: candidateSignature,
             State: stateObj,
-            Generation: generation,
+            Generation: stateObj.Generation,
             DetectedTicks: this.Now(),
             LastDeliveryTicks: 0,
             DeliveryFailures: 0
         }
+        this.NextToken++
         this.PendingCandidates[oldPath] := candidate
         this.UpdatePendingState(candidate)
         this.Log(this.Text(
-            "检测到守护目标可能已更名，等待用户确认：{1} -> {2}",
+            "检测到内容一致的守护目标新位置，等待用户确认：{1} -> {2}",
             oldPath, newPath))
         this.DeliverCandidate(candidate)
         return true
@@ -295,15 +368,10 @@ class TargetRelocationService {
                 currentCandidate.NewPath)
             || this.IsMaintenanceBusy(oldPath, stateObj)
             return false
-        currentIdentity := this.GetIdentity(currentCandidate.NewPath)
-        if (currentCandidate.Evidence == "FileIdentity"
-                && !this.IdentityMatches(currentCandidate.Identity,
-                    currentIdentity))
-            || (currentCandidate.Evidence == "RenameEvent"
-                && !this.FallbackIdentityMatches(currentCandidate.Identity,
-                    currentIdentity))
-            return false
-        return true
+        signature := this.GetContentSignature(currentCandidate.NewPath)
+        return signature.Available
+            && signature.FileSize == currentCandidate.ContentSize
+            && signature.ContentHash == currentCandidate.ContentHash
     }
 
     Complete(candidate) {
@@ -358,9 +426,8 @@ class TargetRelocationService {
         delivered := 0
         for _, candidate in this.PendingCandidates {
             if this.ValidateCandidate(candidate)
-                && this.DeliverCandidate(candidate) {
+                && this.DeliverCandidate(candidate)
                 delivered++
-            }
         }
         return delivered
     }
@@ -388,7 +455,6 @@ class TargetRelocationService {
             return
         try {
             this.SyncTargets()
-            this.PollWatchers()
             invalidCandidates := []
             for _, candidate in this.PendingCandidates {
                 if !this.ValidateCandidate(candidate)
@@ -399,127 +465,9 @@ class TargetRelocationService {
             this.RetryPendingDeliveries()
             this.PurgeExpiredState()
         } catch as pollError {
-            this.Log(this.Text("守护目标更名识别异常：{1}",
+            this.Log(this.Text("守护目标内容迁移识别异常：{1}",
                 this.DiagnosticText(pollError.Message)))
         } finally this.Runtime.guardWorkGate.Leave()
-    }
-
-    SubscribeDirectory(record) {
-        SplitPath(record.Path, , &rootPath)
-        if rootPath == "" || !this.DirectoryExists(rootPath)
-            return false
-        rootKey := this.CanonicalPath(rootPath)
-        if rootKey == ""
-            return false
-        if !this.Watchers.Has(rootKey) {
-            try watcher := this.Callbacks.WatcherFactory.Call(rootPath)
-            catch as watcherError {
-                this.Log(this.Text("守护目标目录监听异常（{1}）：{2}",
-                    rootPath, this.DiagnosticText(watcherError.Message)))
-                return false
-            }
-            if !IsObject(watcher)
-                return false
-            subscribers := Map()
-            subscribers.CaseSense := "Off"
-            this.Watchers[rootKey] := {
-                Root: rootPath,
-                Watcher: watcher,
-                Subscribers: subscribers,
-                PendingOldNames: []
-            }
-        }
-        entry := this.Watchers[rootKey]
-        entry.Subscribers[record.Path] := record.State
-        record.WatchRoot := rootKey
-        return true
-    }
-
-    UnsubscribeDirectory(record) {
-        if record.WatchRoot == "" || !this.Watchers.Has(record.WatchRoot)
-            return false
-        entry := this.Watchers[record.WatchRoot]
-        if entry.Subscribers.Has(record.Path)
-            entry.Subscribers.Delete(record.Path)
-        if !entry.Subscribers.Count {
-            try entry.Watcher.Close()
-            this.Watchers.Delete(record.WatchRoot)
-        }
-        record.WatchRoot := ""
-        return true
-    }
-
-    PollWatchers() {
-        for _, entry in this.Watchers {
-            try {
-                if !entry.Watcher.Active
-                    entry.Watcher.Open()
-                if !entry.Watcher.Active
-                    continue
-                changes := entry.Watcher.Poll()
-                this.ProcessRenameEvents(entry, changes)
-            } catch as watcherError {
-                try entry.Watcher.Close()
-                this.Log(this.Text("守护目标目录监听异常（{1}）：{2}",
-                    entry.Root, this.DiagnosticText(watcherError.Message)))
-            }
-        }
-    }
-
-    ProcessRenameEvents(entry, changes) {
-        nowTicks := this.Now()
-        retainedOldNames := []
-        for pendingOld in entry.PendingOldNames {
-            if nowTicks - pendingOld.ObservedTicks
-                <= TargetRelocationService.RenamePairLifetimeMs
-                retainedOldNames.Push(pendingOld)
-        }
-        entry.PendingOldNames := retainedOldNames
-        for change in changes {
-            if !IsObject(change) || !change.HasOwnProp("Action")
-                || !change.HasOwnProp("RelativePath")
-                continue
-            if change.Action
-                == TargetRelocationService.FILE_ACTION_RENAMED_OLD_NAME {
-                entry.PendingOldNames.Push({
-                    RelativePath: change.RelativePath,
-                    ObservedTicks: nowTicks
-                })
-                continue
-            }
-            if change.Action
-                != TargetRelocationService.FILE_ACTION_RENAMED_NEW_NAME
-                || !entry.PendingOldNames.Length
-                continue
-            oldName := entry.PendingOldNames.RemoveAt(1)
-            this.RecordRenamePair(entry, oldName.RelativePath,
-                change.RelativePath, nowTicks)
-        }
-    }
-
-    RecordRenamePair(entry, oldRelativePath, newRelativePath, observedTicks) {
-        oldPath := this.CombinePath(entry.Root, oldRelativePath)
-        newPath := this.CombinePath(entry.Root, newRelativePath)
-        canonicalOld := this.CanonicalPath(oldPath)
-        if canonicalOld != "" {
-            this.RenameHints[canonicalOld] := {
-                NewPath: newPath,
-                ObservedTicks: observedTicks
-            }
-        }
-        ; 递归监听器也可能收到子目录改名。若守护目标位于旧目录之下，按相同
-        ; 相对后缀推导候选；最终仍需存在性、扩展名与身份冲突复核。
-        oldPrefix := canonicalOld "\"
-        for targetPath in entry.Subscribers {
-            canonicalTarget := this.CanonicalPath(targetPath)
-            if canonicalOld == "" || InStr(canonicalTarget, oldPrefix) != 1
-                continue
-            suffix := SubStr(targetPath, StrLen(oldPath) + 1)
-            this.RenameHints[canonicalTarget] := {
-                NewPath: newPath suffix,
-                ObservedTicks: observedTicks
-            }
-        }
     }
 
     IsCandidatePathValid(oldPath, newPath) {
@@ -535,39 +483,12 @@ class TargetRelocationService {
         return this.Callbacks.IsMaintenanceBlocking.Call(stateObj)
             || (this.Callbacks.IsMaintenanceProtectionEnabled.Call(path,
                     stateObj)
-                && this.Callbacks.HasRecentMaintenanceSignal.Call(path,
-                    stateObj))
+                && this.Callbacks.HasRecentMaintenanceSignal.Call(stateObj))
     }
 
-    IdentityMatches(first, second) {
-        return IsObject(first) && IsObject(second)
-            && first.HasOwnProp("NativeIdentityAvailable")
-            && second.HasOwnProp("NativeIdentityAvailable")
-            && first.NativeIdentityAvailable
-            && second.NativeIdentityAvailable
-            && first.VolumeSerial == second.VolumeSerial
-            && first.FileIndexHigh == second.FileIndexHigh
-            && first.FileIndexLow == second.FileIndexLow
-    }
-
-    FallbackIdentityMatches(first, second) {
-        return IsObject(first) && IsObject(second)
-            && first.HasOwnProp("Available") && first.Available
-            && second.HasOwnProp("Available") && second.Available
-            && first.HasOwnProp("Fingerprint")
-            && second.HasOwnProp("Fingerprint")
-            && first.Fingerprint != ""
-            && first.Fingerprint == second.Fingerprint
-    }
-
-    CandidateSignature(oldPath, newPath, identity) {
-        identityText := IsObject(identity)
-            && identity.HasOwnProp("NativeIdentityAvailable")
-            && identity.NativeIdentityAvailable
-            ? Format("{:08X}{:08X}{:08X}", identity.VolumeSerial,
-                identity.FileIndexHigh, identity.FileIndexLow)
-            : this.CanonicalPath(newPath)
-        return this.CanonicalPath(oldPath) "|" identityText
+    CandidateSignature(oldPath, newPath, contentHash) {
+        return this.CanonicalPath(oldPath) "|" StrUpper(contentHash) "|"
+            . this.CanonicalPath(newPath)
     }
 
     ClearIgnoredForPath(path) {
@@ -583,14 +504,6 @@ class TargetRelocationService {
 
     PurgeExpiredState() {
         nowTicks := this.Now()
-        expiredHints := []
-        for key, hint in this.RenameHints {
-            if nowTicks - hint.ObservedTicks
-                > TargetRelocationService.RenameEventLifetimeMs
-                expiredHints.Push(key)
-        }
-        for key in expiredHints
-            this.RenameHints.Delete(key)
         expiredIgnores := []
         for key, expiresTicks in this.IgnoredCandidates {
             if expiresTicks <= nowTicks
@@ -598,6 +511,34 @@ class TargetRelocationService {
         }
         for key in expiredIgnores
             this.IgnoredCandidates.Delete(key)
+    }
+
+    ResetScanCycle(record, delayMs) {
+        this.CancelScan(record)
+        record.SearchRoots := []
+        record.SearchRootIndex := 1
+        record.ActiveRootIndex := 0
+        record.MatchedPaths := []
+        record.NextScanTicks := this.Now() + Max(0, delayMs)
+    }
+
+    AddMatchedPath(record, candidatePath) {
+        candidatePath := this.NormalizePath(candidatePath)
+        for existingPath in record.MatchedPaths {
+            if this.PathsEquivalent(existingPath, candidatePath)
+                return false
+        }
+        record.MatchedPaths.Push(candidatePath)
+        return true
+    }
+
+    CancelScan(record) {
+        if !IsObject(record) || !record.HasOwnProp("ScanJob")
+            || !IsObject(record.ScanJob)
+            return false
+        try this.Callbacks.StopContentScan.Call(record.ScanJob)
+        record.ScanJob := ""
+        return true
     }
 
     ReleaseState(candidate) {
@@ -612,8 +553,7 @@ class TargetRelocationService {
     UpdatePendingState(candidate) {
         this.Callbacks.UpdateState.Call(candidate.OldPath,
             this.Text("等待确认目标新位置"), candidate.State,
-            candidate.Generation, true,
-            GuardStatusKind.RelocationPending)
+            candidate.Generation, true, GuardStatusKind.RelocationPending)
     }
 
     DeliverCandidate(candidate) {
@@ -622,7 +562,7 @@ class TargetRelocationService {
             deliveryResult := this.Callbacks.OnCandidate.Call(candidate)
             if Type(deliveryResult) == "Integer" && !deliveryResult {
                 candidate.DeliveryFailures++
-                this.Log(this.Text("守护目标更名识别异常：{1}",
+                this.Log(this.Text("守护目标内容迁移识别异常：{1}",
                     this.Text("确认窗口暂时无法显示，将稍后重试")))
                 return false
             }
@@ -630,10 +570,15 @@ class TargetRelocationService {
             return true
         } catch as deliveryError {
             candidate.DeliveryFailures++
-            this.Log(this.Text("守护目标更名识别异常：{1}",
+            this.Log(this.Text("守护目标内容迁移识别异常：{1}",
                 this.DiagnosticText(deliveryError.Message)))
             return false
         }
+    }
+
+    PersistBaseline(path, stateObj) {
+        if this.Callbacks.HasOwnProp("OnBaselineChanged")
+            try this.Callbacks.OnBaselineChanged.Call(path, stateObj)
     }
 
     NotifyInvalidated(candidate) {
@@ -645,26 +590,50 @@ class TargetRelocationService {
             && this.Runtime.appStates[path] == stateObj
     }
 
-    GetIdentity(path) {
-        try return this.Callbacks.GetIdentity.Call(path)
-        catch
-            return {Available: false, NativeIdentityAvailable: false}
+    IsContentHash(value) {
+        return RegExMatch(String(value), "i)^[0-9a-f]{64}$") != 0
     }
 
-    ResolveIdentityPath(path, identity) {
-        try return this.Callbacks.ResolveIdentityPath.Call(path, identity)
+    MetadataKey(signature) {
+        return signature.FileSize "|" signature.ModifiedTime
+    }
+
+    GetContentMetadata(path) {
+        try return this.Callbacks.GetContentMetadata.Call(path)
+        catch
+            return {Available: false, FileSize: 0, ModifiedTime: ""}
+    }
+
+    GetContentSignature(path) {
+        try return this.Callbacks.GetContentSignature.Call(path)
+        catch
+            return {Available: false, FileSize: 0, ModifiedTime: "",
+                ContentHash: ""}
+    }
+
+    GetSearchRoots(path) {
+        try return this.Callbacks.GetSearchRoots.Call(path)
+        catch
+            return []
+    }
+
+    StartContentScan(rootPath, previousPath, expectedSize, expectedHash,
+        useEverything, timeoutSeconds) {
+        try return this.Callbacks.StartContentScan.Call(rootPath,
+            previousPath, expectedSize, expectedHash, useEverything,
+            timeoutSeconds)
         catch
             return ""
     }
 
-    TargetExists(path) {
-        try return !!this.Callbacks.TargetExists.Call(path)
+    PollContentScan(job) {
+        try return this.Callbacks.PollContentScan.Call(job)
         catch
-            return false
+            return {Ready: true, Paths: [], Truncated: false, Failed: true}
     }
 
-    DirectoryExists(path) {
-        try return !!this.Callbacks.DirectoryExists.Call(path)
+    TargetExists(path) {
+        try return !!this.Callbacks.TargetExists.Call(path)
         catch
             return false
     }
@@ -679,10 +648,6 @@ class TargetRelocationService {
 
     PathsEquivalent(firstPath, secondPath) {
         return this.Callbacks.PathsEquivalent.Call(firstPath, secondPath)
-    }
-
-    CombinePath(rootPath, relativePath) {
-        return RTrim(rootPath, "\") "\" LTrim(relativePath, "\")
     }
 
     Now() {

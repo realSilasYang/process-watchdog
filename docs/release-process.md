@@ -44,8 +44,11 @@ tools\invoke-local-release-preflight.ps1`。该入口会按官方摘要准备便
    或 Release Notes。
 8. 检查 README、兼容性、安装和故障排查文档与实际行为一致。CHANGELOG 每项应说明
    用户能够观察到的变化，不直接复制提交信息或内部类名。
-9. 提交全部源码、测试和文档，确保 `main` 工作区可从 Git 重建且 CI 已通过。
-10. 在 GitHub Actions 中从 `main` 人工运行 Release dry run。它以只读权限重新解析
+9. 提交全部源码、测试和文档并推送发布分支。为该分支创建发行工程 Pull Request，
+   等待包括 `verify` 在内的全部必需检查通过；不得绕过受保护规则直接推送 `main`。
+   复核 PR 的提交与变更范围后使用 merge commit 合入 `main`，再确认远端 `main`
+   正好包含该合并提交且可从 Git 重建。此阶段不要手工创建或推送版本标签。
+10. 在 GitHub Actions 中从合并后的 `main` 人工运行 Release dry run。它以只读权限重新解析
     最新上游工具链，执行与正式发布相同的完整验证、GUI 冒烟和双次可复现构建，并
     保留完整 `dist`；它不会创建标签、草稿或 Release。演练失败时不得继续。
 11. 演练通过后，从同一 `main` 提交人工运行 Release。不要预先推送版本标签；工作流

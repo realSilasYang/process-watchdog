@@ -28,6 +28,9 @@ $applicationTelemetrySource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\ApplicationTelemetry.ahk') -Raw -Encoding UTF8
 $mainVisualPipelineSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\UI\MainVisualPipeline.ahk') -Raw -Encoding UTF8
+$darkInlineEditThemeRegistrySource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\UI\DarkInlineEditThemeRegistry.ahk') `
+    -Raw -Encoding UTF8
 $iniFieldCodecSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Config\IniFieldCodec.ahk') -Raw -Encoding UTF8
 $displayConfigCodecSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Config\DisplayConfigCodec.ahk') -Raw -Encoding UTF8
 $maintenanceConfigCodecSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Config\MaintenanceConfigCodec.ahk') -Raw -Encoding UTF8
@@ -49,7 +52,7 @@ $targetSpecsSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\
 $targetSpecsServiceSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\TargetSpecsService.ahk') -Raw -Encoding UTF8
 $targetIdentityServiceSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\TargetIdentityService.ahk') -Raw -Encoding UTF8
 $targetRelocationServiceSource = Get-Content -LiteralPath `
-    (Join-Path $projectRoot 'src\Core\TargetRelocationService.ahk') `
+    (Join-Path $projectRoot 'src\Core\TargetContentRelocationService.ahk') `
     -Raw -Encoding UTF8
 $appConfigHistoryServiceSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\Core\AppConfigHistoryService.ahk') -Raw -Encoding UTF8
 $historyToastSource = Get-Content -LiteralPath `
@@ -108,6 +111,15 @@ $darkMessageBoxSource = Get-Content -LiteralPath `
 $interactionPresenterSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\UI\InteractionPresenter.ahk') `
     -Raw -Encoding UTF8
+$mainWindowControllerSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\MainWindowController.ahk') `
+    -Raw -Encoding UTF8
+$mainWindowStateSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\MainWindowState.ahk') `
+    -Raw -Encoding UTF8
+$win32Source = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'src\Platform\Win32.ahk') `
+    -Raw -Encoding UTF8
 $contextMenuPresenterSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\UI\ContextMenuPresenter.ahk') `
     -Raw -Encoding UTF8
@@ -119,6 +131,19 @@ $guiTestRunnerSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'tests\run-gui-tests.ps1') -Raw -Encoding UTF8
 $displayHotSwitchTestSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'tests\gui\display-hot-switch-tests.ahk') `
+    -Raw -Encoding UTF8
+$inlineEditThemeTestSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'tests\gui\inline-edit-theme-tests.ahk') `
+    -Raw -Encoding UTF8
+$resourceSoakTestSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'tests\gui\resource-soak-tests.ahk') `
+    -Raw -Encoding UTF8
+$targetContentRelocationTestSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot `
+        'tests\core\target-content-relocation-service-tests.ahk') `
+    -Raw -Encoding UTF8
+$fileScanServiceTestSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'tests\core\file-scan-service-tests.ahk') `
     -Raw -Encoding UTF8
 $readmeSource = Get-Content -LiteralPath (Join-Path $projectRoot 'README.md') -Raw -Encoding UTF8
 $documentationSource = $readmeSource + "`n" + ((Get-ChildItem -LiteralPath `
@@ -302,6 +327,56 @@ if ($mainSource -notmatch
     $mainSource -notmatch
         'themeStatePrefix\s*:=\s*UiThemeService\.GetActualTheme\(\)') {
     $failures.Add('Every main theme refresh must resynchronize theme-aware pause/delete command state')
+}
+# 主窗口首次 Show 会先映射原生控件和非客户区；深色主题重申完成前若已进入
+# DWM 合成，就会提交一帧默认浅色表面。隐藏启动不能消耗首次揭示状态，首次
+# 可见 Show 必须在 cloak 内同步刷新完整控件树，之后才能解除 cloak。
+$firstPresentationSource = [regex]::Match($mainWindowControllerSource,
+    '(?ms)^ShowMainGuiWithOptions\(showOptions := ""\)\s*\{.*?(?=^ShowMainGui\()').Value
+$atomicPresenterSource = [regex]::Match($win32Source,
+    '(?ms)^class FirstVisibleWindowPresenter\s*\{.*\z').Value
+$cloakIndex = $atomicPresenterSource.IndexOf(
+    'this.SetCloaked(guiObj.Hwnd, true)')
+$visibleShowIndex = if ($cloakIndex -ge 0) {
+    $atomicPresenterSource.IndexOf('guiObj.Show(showOptions)', $cloakIndex)
+} else { -1 }
+$prepareIndex = $atomicPresenterSource.IndexOf(
+    'prepareVisibleSurface.Call()', [Math]::Max(0, $visibleShowIndex))
+$flushIndex = $atomicPresenterSource.IndexOf(
+    'this.FlushComposition()', [Math]::Max(0, $prepareIndex))
+$uncloakIndex = $atomicPresenterSource.IndexOf(
+    'this.SetCloaked(guiObj.Hwnd, false)', [Math]::Max(0, $flushIndex))
+$completionIndex = $atomicPresenterSource.IndexOf(
+    'FirstVisibleCompleted: surfacePrepared', [Math]::Max(0, $uncloakIndex))
+$firstSurfaceSource = [regex]::Match($mainWindowControllerSource,
+    '(?ms)^PrepareMainWindowFirstVisibleSurface\(\)\s*\{.*?(?=^ShowMainGuiWithOptions\()').Value
+if (-not $firstPresentationSource -or
+    $mainSource -match 'Main\.gui\.Show\(' -or
+    $mainSource -notmatch 'ShowMainGuiWithOptions\("w" App\.savedWidth " h" App\.savedHeight\)' -or
+    $mainSource -notmatch 'ShowMainGuiWithOptions\("w" App\.savedWidth " h" App\.savedHeight[\s\S]{0,80}" Hide"\)' -or
+    $mainWindowStateSource -notmatch 'this\.firstVisiblePresentationCompleted\s*:=\s*false' -or
+    $win32Source -notmatch 'static DWMWA_CLOAK\s*:=\s*13' -or
+    $win32Source -notmatch 'static DWMWA_CLOAKED\s*:=\s*14' -or
+    $atomicPresenterSource -notmatch 'SetCloaked\(hWnd, cloaked\)[\s\S]{0,500}DwmSetWindowAttribute[\s\S]{0,160}Win32\.DWMWA_CLOAK' -or
+    $atomicPresenterSource -notmatch 'GetCloakState\(hWnd\)[\s\S]{0,500}DwmGetWindowAttribute[\s\S]{0,160}Win32\.DWMWA_CLOAKED' -or
+    $atomicPresenterSource -notmatch 'OptionsKeepWindowHidden\(showOptions\)[\s\S]{0,160}\(\^\|\\s\)Hide' -or
+    $atomicPresenterSource -notmatch 'if keepHidden \|\| firstVisibleCompleted\s*\{[\s\S]{0,160}guiObj\.Show\(showOptions\)' -or
+    $cloakIndex -lt 0 -or $visibleShowIndex -lt $cloakIndex -or
+    $prepareIndex -lt $visibleShowIndex -or $flushIndex -lt $prepareIndex -or
+    $uncloakIndex -lt $flushIndex -or $completionIndex -lt $uncloakIndex -or
+    $firstSurfaceSource -notmatch 'UiThemeService\.ApplyProcessPreference\(\)[\s\S]{0,180}ApplyNativeWindowTheme\(Main\.gui\.Hwnd\)' -or
+    $firstSurfaceSource -notmatch 'ApplyDarkListViewTheme\(Main\.lv\.Hwnd\)[\s\S]{0,500}listHeader\.ApplyAppearance' -or
+    $firstSurfaceSource -notmatch 'statsPresenter\.Redraw\(\)[\s\S]{0,300}RefreshMainCommandButtonsAfterShow\(\)[\s\S]{0,260}Win32\.RDW_LAYOUT_REFRESH' -or
+    $firstPresentationSource -notmatch 'FirstVisibleWindowPresenter\.Show\(Main\.gui, showOptions,[\s\S]{0,260}PrepareMainWindowFirstVisibleSurface,[\s\S]{0,120}RefreshMainCommandButtonsAfterShow\)[\s\S]{0,180}Main\.firstVisiblePresentationCompleted\s*:=\s*result\.FirstVisibleCompleted' -or
+    $mainWindowControllerSource -notmatch 'RefreshMainCommandButtonsAfterShow\(\)\s*\{[\s\S]{0,500}RedrawVisibleRoundedButtons\(\[[\s\S]{0,120}Main\.btnAdd, Main\.btnPause, Main\.btnDel,[\s\S]{0,120}Main\.btnSet, Main\.btnSupport, Main\.btnDonate' -or
+    $interactionPresenterSource -notmatch 'RedrawVisibleRoundedButtons\(controls\)[\s\S]{0,500}IsWindowVisible[\s\S]{0,300}RedrawRoundedButton\(controlHwnd\)' -or
+    $mainWindowControllerSource -notmatch 'ShowMainGui\(\*\)\s*\{\s*ShowMainGuiWithOptions\(\)' -or
+    $resourceSoakTestSource -notmatch 'VerifyAtomicMainWindowFirstPresentation\(\)[\s\S]{0,4200}hidden startup consumed the first visible presentation' -or
+    $resourceSoakTestSource -notmatch 'first visible presentation did not acquire DWM cloak' -or
+    $resourceSoakTestSource -notmatch 'first visible presentation did not remove DWM cloak' -or
+    $resourceSoakTestSource -notmatch 'AssertWindowPixelColor\(Main\.lv\.Hwnd,[\s\S]{0,120}"Surface", "ListView"\)' -or
+    $resourceSoakTestSource -notmatch 'normal restore left the main window cloaked') {
+    $failures.Add('The first visible main-window frame must be fully dark-painted under DWM cloak before atomic reveal')
 }
 if ($mainSource -notmatch
         'ShouldToggleMainListPause\(wParam, lParam, ctrlDown, shiftDown, altDown\)[\s\S]{0,260}0x40000000' -or
@@ -889,6 +964,10 @@ foreach ($processInspectorHook in @(
         $failures.Add("Missing native process inspector hook: $processInspectorHook")
     }
 }
+if ($processInspectorSource -match
+        'SeDebugPrivilege|AdjustTokenPrivileges|EnsureDebugPrivilege|OpenQueryHandle') {
+    $failures.Add('Process inspection must not enable debug privilege or retry access-denied queries with elevated rights')
+}
 foreach ($fieldCodecHook in @(
     'class IniFieldCodec',
     'static Encode(value)',
@@ -1049,7 +1128,7 @@ foreach ($launchRuntimeHook in @(
 foreach ($launchRegistrationHook in @(
     'RuntimePath: runtimePath, RuntimeArgs: runtimeArguments',
     'record.ShortcutArgs, record.Display, record.RuntimePath,',
-    'item.RuntimePath, item.RuntimeArgs)',
+    'item.RuntimePath, item.RuntimeArgs, item.ContentHash,',
     '"RuntimePath", "RuntimeArgs"]'
 )) {
     if (-not $source.Contains($launchRegistrationHook)) {
@@ -1592,8 +1671,17 @@ if ($source -notmatch
     $source -notmatch 'App\.guardRuntime\.RestartMonitorTimer\(\)') {
     $failures.Add('Guard runtime must own monitor startup, shutdown and interval changes')
 }
-if ($guardRuntimeSource -notmatch 'ObserveTarget\.Call\(path,[\s\S]{0,260}IsSupervisorCurrent\(path, stateObj,\s*observationGeneration\)') {
+if ($guardRuntimeSource -notmatch
+        'observation\s*:=\s*this\.Callbacks\.ObserveTarget\.Call\(path,[\s\S]{0,320}if\s+!this\.IsSupervisorCurrent\(path,\s*stateObj,\s*observationGeneration\)' -or
+    $guardRuntimeSource -notmatch
+        'targetObservation\s*:=\s*hasLiveIdentity[\s\S]{0,320}this\.Callbacks\.ObserveTarget\.Call\(path,[\s\S]{0,320}if\s+!this\.IsSupervisorCurrent\(path,\s*stateObj,\s*observationGeneration\)' -or
+    $guardRuntimeSource -notmatch
+        'targetObservation\s*:=\s*this\.Callbacks\.ObserveTarget\.Call\([\s\S]{0,320}if\s+!this\.IsSupervisorCurrent\(path,\s*stateObj,\s*observationGeneration\)') {
     $failures.Add('Monitor observations must revalidate controller ownership before mutation')
+}
+if ($guardRuntimeSource -match
+        'CachedNativeFallbackIndex|ObserveTargetWithNativeFallback') {
+    $failures.Add('Published WMI Unknown results must not trigger a second speculative native snapshot')
 }
 if ($targetSupervisorSource -notmatch 'this\.MaintenanceStateMachine\s*:=\s*MaintenanceStateMachine\(\)[\s\S]{0,2600}MaintenanceMode\s*\{[\s\S]{0,220}MaintenanceStateMachine\.Transition\(value\)') {
     $failures.Add('TargetSupervisor must own maintenance phase transitions')
@@ -1969,14 +2057,15 @@ if ($source -notmatch 'SetStateProcessIdentity\(stateObj, pid, observedCreationI
     $maintenanceCoordinatorSource -notmatch 'SetProcessIdentity\.Call\(stateObj,[\s\S]{0,100}observation\.CreationIdentity\)') {
     $failures.Add('Verified creation identities must flow from observations into the owned target state')
 }
-$manualRestartSource = [regex]::Match($mainSource,
-    '(?ms)^PerformManualRestart\(.*?(?=^ScheduleManualRestartRetry\()').Value
-if (-not $manualRestartSource -or $manualRestartSource -match 'SaveAppsToIni\(\)' -or
-    $manualRestartSource -match 'stateObj\.Enabled\s*:=\s*1' -or
-    $manualRestartSource -notmatch 'guardWorkGate\.Leave\(\)[\s\S]{0,180}StopTargetProcess\(pid, creationIdentity\)' -or
-    $manualRestartSource -notmatch 'CompleteManualRestartAfterStop\([\s\S]{0,900}guardWorkGate\.TryEnter\(\)' -or
-    $manualRestartSource -notmatch 'FinalizeManualRestart\(path, stateObj, expectedGeneration\)') {
-    $failures.Add('Manual restart must stop outside the shared gate, revalidate ownership, and avoid unchanged configuration writes')
+$manualStopSource = [regex]::Match($mainSource,
+    '(?ms)^PerformManualStop\(.*?(?=^ScheduleManualStopRetry\()').Value
+if (-not $manualStopSource -or $manualStopSource -match 'SaveAppsToIni\(\)' -or
+    $manualStopSource -match 'stateObj\.Enabled\s*:=\s*1' -or
+    $manualStopSource -notmatch 'guardWorkGate\.Leave\(\)[\s\S]{0,180}StopTargetProcess\(pid, creationIdentity\)' -or
+    $manualStopSource -notmatch 'CompleteManualStopAfterStop\([\s\S]{0,900}guardWorkGate\.TryEnter\(\)' -or
+    $manualStopSource -notmatch 'FinalizeManualStop\(path, stateObj, expectedGeneration\)' -or
+    $manualStopSource -match 'RestartCore\(') {
+    $failures.Add('Manual stop must execute outside the shared gate, revalidate ownership, and never restart the target')
 }
 if ($targetIdentityServiceSource -notmatch 'TargetReferenceExists\(path, stateObj := ""\)[\s\S]{0,160}targetSpecsService\.Get\(path, stateObj\)[\s\S]{0,40}\.Launch\.Available') {
     $failures.Add('Target availability must come from LaunchSpec')
@@ -2033,33 +2122,40 @@ elseif ($runningStateMatch.Value -match 'ScheduleRestart|ProcessClose|StopTarget
 if ($source -notmatch 'ToggleRunAsAdmin\(\*\)[\s\S]{0,2200}UpdateRunningState\(path, stateObj,[\s\S]{0,80}stateObj\.Generation\)') {
     $failures.Add('Changing the administrator requirement must refresh a live item immediately')
 }
-$manualRestartMatch = [regex]::Match($source,
-    '(?ms)^RestartSelectedApp\(\*\)\s*\{.*?(?=^/\*)')
-if (-not $manualRestartMatch.Success) {
-    $failures.Add('Unable to inspect the manual restart boundary')
+$manualStopMatch = [regex]::Match($source,
+    '(?ms)^EndSelectedApp\(\*\)\s*\{.*?(?=^/\*)')
+if (-not $manualStopMatch.Success) {
+    $failures.Add('Unable to inspect the manual stop boundary')
 }
 else {
-    $manualRestartSource = $manualRestartMatch.Value
-    foreach ($manualRestartHook in @(
+    $manualStopSource = $manualStopMatch.Value
+    foreach ($manualStopHook in @(
+        'stateObj.Enabled := 0',
         'stateObj.CancelScheduledTasks()',
         'operationGeneration := stateObj.Generation',
         'StopTargetProcess(pid, creationIdentity)',
-        'App.guardRuntime.RestartCore(path, stateObj)'
+        'FinalizeManualStop(path, stateObj, expectedGeneration)'
     )) {
-        if (-not $manualRestartSource.Contains($manualRestartHook)) {
-            $failures.Add("Manual restart is missing generation-safe execution hook: $manualRestartHook")
+        if (-not $manualStopSource.Contains($manualStopHook)) {
+            $failures.Add("Manual stop is missing generation-safe execution hook: $manualStopHook")
         }
     }
-    if ([regex]::Matches($manualRestartSource,
+    if ([regex]::Matches($manualStopSource,
         'App\.guardRuntime\.IsSupervisorCurrent\(').Count -lt 3) {
-        $failures.Add('Manual restart must revalidate controller ownership after blocking operations')
+        $failures.Add('Manual stop must revalidate controller ownership after blocking operations')
     }
-    if ($manualRestartSource -notmatch 'try stopResult\s*:=\s*StopTargetProcess\(pid, creationIdentity\)[\s\S]{0,900}completionCallback\s*:=\s*CompleteManualRestartAfterStop\.Bind\(' -or
-        $manualRestartSource -notmatch 'CompleteManualRestartAfterStop\([\s\S]{0,500}App\.guardRuntime\.IsSupervisorCurrent\(') {
+    if ($manualStopSource -notmatch 'try stopResult\s*:=\s*StopTargetProcess\(pid, creationIdentity\)[\s\S]{0,900}completionCallback\s*:=\s*CompleteManualStopAfterStop\.Bind\(' -or
+        $manualStopSource -notmatch 'CompleteManualStopAfterStop\([\s\S]{0,500}App\.guardRuntime\.IsSupervisorCurrent\(') {
         $failures.Add('Manual process stop must revalidate controller generation before state mutation')
     }
-    if ($manualRestartSource -match '(?m)\bRun\s*\(') {
-        $failures.Add('Manual restart must not bypass execution services')
+    if ($manualStopSource -match '(?m)\bRun\s*\(' -or
+        $manualStopSource -match 'RestartCore\(') {
+        $failures.Add('Manual stop must not launch or restart a target')
+    }
+    if ($manualStopSource -notmatch 'BeginManualStopRequests\(paths\)[\s\S]{0,900}stateObj\.Enabled\s*:=\s*0[\s\S]{0,1200}SaveAppsToIni\(\)[\s\S]{0,500}SetTimer\(PerformManualStop\.Bind\(' -or
+        $mainSource -notmatch 'contextMenu\.Add\(Tr\("⏹️ 结束运行"\), EndSelectedApp\)' -or
+        $mainSource -match 'RestartSelectedApp|ManualRestartRequested') {
+        $failures.Add('Context-menu stop must persist a paused supervisor before stopping and remove the legacy restart action')
     }
 }
 if ($configRepositorySource -notmatch 'ReadSectionEntries\(sectionName\)[\s\S]{0,700}entries\.Push\(') {
@@ -2189,7 +2285,7 @@ foreach ($projectionMutationCheck in @(
 if ($appConfigSnapshotServiceSource -notmatch 'SnapshotsEqual\(first, second\)[\s\S]{0,1200}DisplayConfigCodec\.Equals\(first\.Display, second\.Display\)') {
     $failures.Add('Display customization must participate in undo snapshots')
 }
-if ($source -notmatch 'RegisterApp\(item\.Path,[\s\S]{0,450}item\.ShortcutArgs, item\.Display,[\s\S]{0,100}item\.RuntimePath, item\.RuntimeArgs\)') {
+if ($source -notmatch 'RegisterApp\(item\.Path,[\s\S]{0,450}item\.ShortcutArgs, item\.Display,[\s\S]{0,100}item\.RuntimePath, item\.RuntimeArgs, item\.ContentHash,[\s\S]{0,80}item\.ContentSize\)') {
     $failures.Add('Undo restore must recreate deleted items with display and launch customization')
 }
 foreach ($windowIsolationHook in @(
@@ -2282,7 +2378,7 @@ if ($logWindowMatch.Success -and
 }
 
 $applyStateMatch = [regex]::Match($source,
-    '(?ms)^ApplyState\(stateArr, sourceStateArr := "", rollbackOnFailure := true\)\s*\{.*?^\}\r?\n\r?\nSaveAppsToIni\(')
+    '(?ms)^ApplyState\(stateArr, sourceStateArr := "", rollbackOnFailure := true,\s*preserveInlineEditSession := false\)\s*\{.*?^\}\r?\n\r?\nSaveAppsToIni\(')
 if (-not $applyStateMatch.Success) {
     $failures.Add('Unable to inspect the undo/redo state application boundary')
 }
@@ -2532,6 +2628,18 @@ $statsProjection = [regex]::Match($applicationTelemetrySource,
 if ($statsProjection -notmatch 'GuardPhase\.' -or
     $statsProjection -match 'InStr\([^\r\n]*(?:运行|暂停|升级|失效|停止)') {
     $failures.Add('Main statistics must classify stable guard state instead of localized status text')
+}
+$watchlistLoadIndex = $mainSource.IndexOf('LoadWatchlistFromConfig()')
+$startupStatsIndex = if ($watchlistLoadIndex -ge 0) {
+    $mainSource.IndexOf('UpdateStatsUI()', $watchlistLoadIndex)
+} else { -1 }
+$firstStartupShowIndex = if ($watchlistLoadIndex -ge 0) {
+    $mainSource.IndexOf('ShowMainGuiWithOptions("w"', $watchlistLoadIndex)
+} else { -1 }
+if ($watchlistLoadIndex -lt 0 -or $startupStatsIndex -lt 0 -or
+    $firstStartupShowIndex -lt 0 -or
+    $startupStatsIndex -gt $firstStartupShowIndex) {
+    $failures.Add('Owner-drawn main statistics must be populated after watchlist initialization and before the first window Show')
 }
 $statusVisualProjection = [regex]::Match($mainVisualPipelineSource,
     '(?ms)^GetMainStatusVisualKind\([^)]*\)\s*\{.*?(?=^[A-Za-z_][A-Za-z0-9_]*\()').Value
@@ -2823,7 +2931,7 @@ if ($applicationSearchSource -notmatch 'CancelEverythingResultLoad\(\)[\s\S]{0,2
     $everythingConsumeSource -notmatch 'sessionId\s*:=\s*this\.everythingSearchSessionId[\s\S]{0,2600}sessionId\s*!=\s*this\.everythingSearchSessionId') {
     $failures.Add('Everything result batches must reject work from superseded searches and stop their timer on close')
 }
-if ($fileScanServiceSource -notmatch 'Start\(rootPath, recursive, maximumResults, timeoutSeconds\)[\s\S]{0,3000}DeadlineTicks:\s*startedTicks\s*\+\s*timeoutSeconds\s*\*\s*1000\s*\+\s*5000' -or
+if ($fileScanServiceSource -notmatch 'StartPreparedWorker\(command, outputPath,[\s\S]{0,3000}DeadlineTicks:\s*startedTicks\s*\+\s*timeoutSeconds\s*\*\s*1000\s*\+\s*5000' -or
     $batchPollSource -notmatch 'workerDeadlineTicks[\s\S]{0,420}GetTickCount64\(\)\s*>=\s*workerDeadlineTicks') {
     $failures.Add('File-scan polling must have a parent-side deadline even when PID identity becomes unavailable')
 }
@@ -2975,7 +3083,8 @@ if ($interactionPresenterSource -notmatch 'SetRegisteredButtonEnabled\(ctrl, ena
     $appModuleSource -match 'try (?:this\.)?[A-Za-z][A-Za-z0-9_]*Button\.Enabled :=') {
     $failures.Add('Registered button enabled state must use the shared interaction reset and redraw path')
 }
-if ($fileScanServiceSource -notmatch 'Start\(rootPath, recursive, maximumResults, timeoutSeconds\)[\s\S]{0,180}static workerSequence\s*:=\s*0[\s\S]{0,300}Critical\("On"\)[\s\S]{0,220}currentWorkerSequence\s*:=\s*workerSequence[\s\S]{0,650}currentWorkerSequence[\s\S]{0,3000}if this\.Stopped[\s\S]{0,120}this\.Workers\[outputPath\]\s*:=\s*job[\s\S]{0,300}if rejectedAfterLaunch[\s\S]{0,160}this\.Stop\(job\.Pid, job\.Path, job\.CreationIdentity, job\.Handle\)' -or
+if ($fileScanServiceSource -notmatch 'Start\(rootPath, recursive, maximumResults, timeoutSeconds\)[\s\S]{0,180}static workerSequence\s*:=\s*0[\s\S]{0,300}Critical\("On"\)[\s\S]{0,220}currentWorkerSequence\s*:=\s*workerSequence[\s\S]{0,1200}StartPreparedWorker\(command, outputPath' -or
+    $fileScanServiceSource -notmatch 'StartPreparedWorker\(command, outputPath,[\s\S]{0,2600}if this\.Stopped[\s\S]{0,120}this\.Workers\[outputPath\]\s*:=\s*job[\s\S]{0,300}if rejectedAfterLaunch[\s\S]{0,160}this\.Stop\(job\.Pid, job\.Path, job\.CreationIdentity, job\.Handle\)' -or
     $addItemDialogSource -notmatch 'seenRoots\s*:=\s*Map\(\)[\s\S]{0,260}!seenRoots\.Has\(canonicalRoot\)') {
     $failures.Add('Concurrent file scans must use unique output paths and deduplicate batch roots')
 }
@@ -3115,6 +3224,10 @@ if ($source -notmatch 'startupHandoffPid\s*:=\s*GetReloadHandoffPid\(\)[\s\S]{0,
     $source -notmatch 'ProcessMaintenanceCommandClient\(\)[\s\S]{0,180}--startup-validation[\s\S]{0,60}ExitApplication\(0\)') {
     $failures.Add('Reload receiver must wait for the prior PID and validation mode must exit before startup')
 }
+if ($mainSource -notmatch 'existingWindowSelector\s*:=\s*"ahk_id " existingWindow[\s\S]{0,220}try WinShow\(existingWindowSelector\)[\s\S]{0,100}try WinRestore\(existingWindowSelector\)[\s\S]{0,100}try WinActivate\(existingWindowSelector\)' -or
+    $mainSource -match '(?m)^\s*(?:try\s+)?Win(?:Show|Restore|Activate)\(\)') {
+    $failures.Add('Single-instance activation must target the discovered HWND explicitly and tolerate reload races')
+}
 $maintenanceClientStart = $source.IndexOf('ProcessMaintenanceCommandClient() {', [System.StringComparison]::Ordinal)
 $maintenanceClientEnd = if ($maintenanceClientStart -ge 0) {
     $source.IndexOf('SendMaintenanceCopyData(', $maintenanceClientStart, [System.StringComparison]::Ordinal)
@@ -3128,7 +3241,7 @@ $maintenanceClientSource = if ($maintenanceClientStart -ge 0 -and
 } else {
     ''
 }
-if ([regex]::Matches($maintenanceClientSource, 'ExitApplication\(').Count -ne 4 -or
+if ([regex]::Matches($maintenanceClientSource, 'ExitApplication\(').Count -ne 5 -or
     $maintenanceClientSource -match '\bExitApp\(' -or
     $source -notmatch 'ExitApplication\(exitCode := 0\)\s*\{[\s\S]{0,220}ShutdownApplication\(\)[\s\S]{0,80}ExitApp\(exitCode\)') {
     $failures.Add('Maintenance command modes must clean up explicitly before ExitApp')
@@ -3148,35 +3261,75 @@ if ($source -match 'OnExit\([^\r\n]*,\s*(?:-100|50|100)\s*\)' -or
     $failures.Add('Legacy multi-hook shutdown priority state must not remain')
 }
 
-# 直接文件目标更名只能由强身份证据触发，并必须复用可撤销的路径迁移事务。
-# 这一门禁防止后续把“同目录相似文件”之类启发式重新接回核心守护路径。
-if (-not $mainSource.Contains('#Include src\Core\TargetRelocationService.ahk') -or
+# 直接文件目标只能由完整内容身份触发，并必须复用可撤销的路径迁移事务。
+# 文件名、目录通知和 Windows 文件 ID 都不能重新成为迁移证据。
+if (-not $mainSource.Contains('#Include src\Core\TargetContentRelocationService.ahk') -or
     -not $mainSource.Contains('#Include app\Windows\TargetRelocationPrompt.ahk') -or
     -not $targetRelocationServiceSource.Contains('class TargetRelocationService') -or
-    -not $targetRelocationServiceSource.Contains('ResolveIdentityPath.Call(path, identity)') -or
-    -not $targetRelocationServiceSource.Contains('FILE_ACTION_RENAMED_OLD_NAME := 4') -or
-    -not $targetRelocationServiceSource.Contains('FILE_ACTION_RENAMED_NEW_NAME := 5') -or
+    -not $targetRelocationServiceSource.Contains('"ContentHash"') -or
+    -not $targetRelocationServiceSource.Contains('StartContentScan.Call(rootPath,') -or
+    -not $targetRelocationServiceSource.Contains('signature.ContentHash == currentCandidate.ContentHash') -or
     -not $targetRelocationServiceSource.Contains('IsMaintenanceBusy(path, stateObj)') -or
     -not $targetRelocationServiceSource.Contains('this.Callbacks.IsMaintenanceProtectionEnabled.Call(path,') -or
     -not $source.Contains('IsMaintenanceProtectionEnabled: ObjBindMethod(') -or
     -not $targetRelocationServiceSource.Contains('stateObj.Generation != currentCandidate.Generation') -or
-    -not $targetFileInspectorSource.Contains('OpenFileById') -or
-    -not $targetFileInspectorSource.Contains('GetFinalPathNameByHandleW') -or
+    -not $targetFileInspectorSource.Contains('BCryptFinishHash') -or
+    -not $fileScanServiceSource.Contains('--content-match-worker') -or
+    -not $fileScanServiceSource.Contains('Everything_SetSearchW') -or
+    -not $fileScanServiceSource.Contains('QueryEverythingCandidates(rootPath,') -or
+    -not $fileScanServiceSource.Contains('IsPathWithinRoot(candidatePath, rootPath)') -or
+    -not $fileScanServiceSource.Contains('IsRelocationCandidatePathAllowed(candidatePath)') -or
+    -not $fileScanServiceSource.Contains('\appdata\roaming\code\user\history\') -or
+    -not $fileScanServiceSource.Contains('\$recycle.bin\') -or
+    -not $fileScanServiceSource.Contains('CandidateExclusionRoots') -or
+    -not $targetRelocationServiceSource.Contains('completedRootIndex == 1') -or
+    -not $targetRelocationServiceSource.Contains('useEverything := currentRootIndex > 1') -or
+    -not $targetContentRelocationTestSource.Contains('最近有效目录中的唯一内容候选没有优先于远端相同副本') -or
+    -not $fileScanServiceTestSource.Contains('VS Code 历史、版本库或缓存副本仍参与内容迁移候选计数') -or
     -not $source.Contains('PrepareWatchPathTransition(previousPath, requestedPath)') -or
     -not $source.Contains('PrepareWatchPathTransitionFromState(previousPath, requestedPath,') -or
     -not $source.Contains('ApplyWatchPathTransition(previousPath, requestedPath,') -or
-    -not $source.Contains('ApplyWatchPathTransition(previousPath, newPath)') -or
+    -not $source.Contains('ApplyWatchPathTransition(previousPath, newPath, "edit-path", true)') -or
     $source -notmatch 'ApplyWatchPathTransition\(candidate\.OldPath,\s*candidate\.NewPath,\s*"relocate-path"\)' -or
-    $source -notmatch 'ApplyState\(transition\.TargetState,\s*transition\.BeforeState\)\s*App\.appConfigHistoryService\.Commit' -or
+    $source -notmatch 'ApplyState\(transition\.TargetState,\s*transition\.BeforeState,\s*true,\s*preserveInlineEditSession\)\s*App\.appConfigHistoryService\.Commit' -or
     -not $source.Contains('if selectedBefore {') -or
     -not $source.Contains('migratedRow := FindRow(transition.NewPath)') -or
     -not $targetRelocationPromptSource.Contains('class TargetRelocationPrompt extends ManagedWindow') -or
     -not $source.Contains('this.targetRelocation := TargetRelocationPrompt(mainGui)')) {
-    $failures.Add('Renamed direct targets must use strong file identity, a confirmed shared migration transaction, and managed-window lifecycle')
+    $failures.Add('Moved direct targets must use SHA-256 content identity, background candidate scanning, a confirmed shared migration transaction, and managed-window lifecycle')
 }
-if ($targetRelocationServiceSource -match '(?i)unique.*exe|only.*exe|single.*exe' -or
-    $targetRelocationServiceSource -match '(?i)Loop Files.*\*\.exe') {
-    $failures.Add('Renamed-target recovery must never guess from a unique or scanned EXE candidate')
+if ($source -notmatch 'ApplyState\(stateArr, sourceStateArr := "", rollbackOnFailure := true,\s*preserveInlineEditSession := false\)' -or
+    $source -notmatch 'if !preserveInlineEditSession \{\s*App\.editSessionId\+\+\s*App\.batchEditRows := \[\]') {
+    $failures.Add('Successful inline path edits must preserve and advance the remaining multi-selection edit session')
+}
+if ($source -notmatch 'hEdit\s*:=\s*SendMessage\(0x1018,[^\r\n]*\)[\s\S]{0,160}if hEdit \{[\s\S]{0,260}SetDarkControl\(hEdit\)[\s\S]{0,180}DarkInlineEditThemeRegistry\.Register\(hEdit, GuiCtrlObj\.Hwnd\)' -or
+    [regex]::Matches($source, 'DarkInlineEditThemeRegistry\.Unregister\(').Count -lt 2 -or
+    -not $mainSource.Contains('#Include app\UI\DarkInlineEditThemeRegistry.ahk') -or
+    -not $darkInlineEditThemeRegistrySource.Contains('class DarkInlineEditThemeRegistry') -or
+    -not $darkInlineEditThemeRegistrySource.Contains('CallbackCreate(') -or
+    -not $darkInlineEditThemeRegistrySource.Contains('SetWindowSubclass') -or
+    -not $darkInlineEditThemeRegistrySource.Contains('RemoveWindowSubclass') -or
+    -not $darkInlineEditThemeRegistrySource.Contains('DefSubclassProc') -or
+    -not $darkInlineEditThemeRegistrySource.Contains('case 0x0133') -or
+    -not $darkInlineEditThemeRegistrySource.Contains('HandleEditColor(hListView, deviceContext, editHwnd)') -or
+    $darkInlineEditThemeRegistrySource.Contains('OnMessage(0x0133') -or
+    -not $darkInlineEditThemeRegistrySource.Contains('UiThemeService.Color("Input")') -or
+    -not $mainSource.Contains('DarkInlineEditThemeRegistry.Refresh(App.activeInlineEditHwnd)') -or
+    $mainSource -notmatch 'if \(wParam == 113\)[\s\S]{0,360}TriggerEdit\(Main\.lv, row\)[\s\S]{0,240}return 0' -or
+    -not $inlineEditThemeTestSource.Contains('user32\PostMessageW') -or
+    -not $inlineEditThemeTestSource.Contains('InlineEditThemeTestF2Count == 1') -or
+    -not $inlineEditThemeTestSource.Contains('F2 被 ListView 重复处理并替换了已主题化的编辑框') -or
+    -not $inlineEditThemeTestSource.Contains('user32\SendMessageW') -or
+    -not $inlineEditThemeTestSource.Contains('"UInt", 0x0133') -or
+    -not $inlineEditThemeTestSource.Contains('SetDarkControl(editHwnd)') -or
+    $inlineEditThemeTestSource.Contains('DarkInlineEditThemeRegistry.HandleEditColor(') -or
+    -not $inlineEditThemeTestSource.Contains('INLINE_EDIT_THEME|PASS') -or
+    -not $guiTestRunnerSource.Contains('gui\inline-edit-theme-tests.ahk')) {
+    $failures.Add('Native ListView path editing must use and test the active dark input palette throughout its lifecycle')
+}
+if ($targetRelocationServiceSource -match 'FileIdentity|ResolveIdentityPath|RenameEvent|ProcessRenameEvents' -or
+    $targetRelocationServiceSource -match '(?i)similar.*name|same.*name') {
+    $failures.Add('Moved-target recovery must not depend on file IDs, rename listeners, or similar file names')
 }
 
 if ($failures.Count) {

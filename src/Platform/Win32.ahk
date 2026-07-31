@@ -1,8 +1,11 @@
-; 项目使用的 Win32 常量集中表。
-; 数值保持与 Windows SDK 一致，业务模块只引用具名常量，避免散落的魔法数字；
-; 本文件不封装状态，也不拥有任何句柄或内存资源。
+; 项目使用的 Win32 常量与顶层窗口首次映射入口。
+; 数值保持与 Windows SDK 一致；首次映射器只编排 DWM 调用与调用方回调，
+; 不持有状态、句柄或内存资源。
 
 class Win32 {
+    static DWMWA_CLOAK := 13
+    static DWMWA_CLOAKED := 14
+    static DWM_CLOAKED_APP := 0x00000001
     static WM_NULL := 0x0000
     static AHK_NOTIFYICON := 0x0404
     static NIN_BALLOONUSERCLICK := 0x0405
@@ -141,4 +144,90 @@ class Win32 {
     static RDW_BUTTON_REFRESH := 0x0121
     static RDW_LAYOUT_REFRESH := 0x0185 ; 同步重绘父窗口局部区域及其中的子控件。
     static RDW_CONTROL_REFRESH := 0x0105 ; 失效、擦除并同步重绘单个控件。
+}
+
+; 首次可见窗口先在 DWM cloak 内完成真实 Show 和同步绘制，再一次性揭示。
+; 该类只拥有映射时序，不知道具体控件；调用方通过回调重建自己的可见表面。
+class FirstVisibleWindowPresenter {
+    static OptionsKeepWindowHidden(showOptions) {
+        return RegExMatch(Trim(String(showOptions)),
+            "i)(^|\s)Hide(?:\s|$)") != 0
+    }
+
+    static SetCloaked(hWnd, cloaked) {
+        if !hWnd || !DllCall("user32\IsWindow", "Ptr", hWnd, "Int")
+            return false
+        cloakValue := cloaked ? 1 : 0
+        try return DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", hWnd,
+            "Int", Win32.DWMWA_CLOAK, "Int*", cloakValue, "Int", 4,
+            "Int") >= 0
+        catch
+            return false
+    }
+
+    static GetCloakState(hWnd) {
+        if !hWnd || !DllCall("user32\IsWindow", "Ptr", hWnd, "Int")
+            return 0
+        cloakState := 0
+        try {
+            result := DllCall("dwmapi\DwmGetWindowAttribute", "Ptr", hWnd,
+                "Int", Win32.DWMWA_CLOAKED, "UInt*", &cloakState,
+                "Int", 4, "Int")
+            return result >= 0 ? cloakState : 0
+        } catch {
+            return 0
+        }
+    }
+
+    static FlushComposition() {
+        try return DllCall("dwmapi\DwmFlush", "Int") >= 0
+        catch
+            return false
+    }
+
+    static Show(guiObj, showOptions, firstVisibleCompleted,
+        prepareVisibleSurface, refreshAfterShow := "") {
+        keepHidden := this.OptionsKeepWindowHidden(showOptions)
+        if keepHidden || firstVisibleCompleted {
+            guiObj.Show(showOptions)
+            if !keepHidden && IsObject(refreshAfterShow)
+                refreshAfterShow.Call()
+            return {
+                Visible: !keepHidden,
+                FirstVisibleCompleted: !!firstVisibleCompleted,
+                CloakApplied: false,
+                Uncloaked: true
+            }
+        }
+
+        previousCritical := A_IsCritical
+        cloakApplied := false
+        uncloaked := true
+        surfacePrepared := false
+        Critical("On")
+        try {
+            cloakApplied := this.SetCloaked(guiObj.Hwnd, true)
+            guiObj.Show(showOptions)
+            surfacePrepared := !IsObject(prepareVisibleSurface)
+                || !!prepareVisibleSurface.Call()
+            this.FlushComposition()
+        } finally {
+            if cloakApplied {
+                uncloaked := this.SetCloaked(guiObj.Hwnd, false)
+                if !uncloaked {
+                    this.FlushComposition()
+                    uncloaked := this.SetCloaked(guiObj.Hwnd, false)
+                }
+            }
+            this.FlushComposition()
+            Critical(previousCritical ? previousCritical : "Off")
+        }
+        return {
+            Visible: true,
+            FirstVisibleCompleted: surfacePrepared
+                && (!cloakApplied || uncloaked),
+            CloakApplied: cloakApplied,
+            Uncloaked: !cloakApplied || uncloaked
+        }
+    }
 }

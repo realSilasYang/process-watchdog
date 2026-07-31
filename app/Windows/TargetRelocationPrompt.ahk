@@ -56,7 +56,7 @@ class TargetRelocationPrompt extends ManagedWindow {
                 LocalizationService.GetUiFontName())
             this.gui.Add("Text", "x24 y52 w" contentWidth
                 " h42 BackgroundTrans", Tr(
-                    "小助手找到了与原文件身份一致的新路径。确认后将更新守护目标，名称、图标和启动设置保持不变。"))
+                    "小助手找到了与原文件内容完全一致的新路径。确认后将更新守护目标，名称、图标和启动设置保持不变。"))
 
             this.gui.SetFont("norm s9 c" UiThemeService.Color("Text"),
                 LocalizationService.GetUiFontName())
@@ -80,9 +80,7 @@ class TargetRelocationPrompt extends ManagedWindow {
 
             this.gui.SetFont("norm s9 c" UiThemeService.Color("MutedText"),
                 LocalizationService.GetUiFontName())
-            evidenceText := candidate.Evidence == "FileIdentity"
-                ? Tr("Windows 文件身份一致")
-                : Tr("Windows 重命名事件")
+            evidenceText := "SHA-256"
             this.gui.Add("Text", "x24 y216 w" contentWidth
                 " h20 Center BackgroundTrans",
                 Tr("识别依据：") evidenceText)

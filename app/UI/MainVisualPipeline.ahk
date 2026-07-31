@@ -116,7 +116,8 @@ SetWindowIcon(hWnd, iconPath) {
 SetDarkListView(hLV) {
     if !hLV
         return
-    ; 控件首次显示时可能被系统重新套用主题，因此显示前后各应用一次。
+    ; 普通对话框通常会在这次异步重申前完成 Show；主窗口启动阶段更长，
+    ; 因而首次可见帧还会在 DWM 遮蔽期间显式重申一次，不能依赖此计时器。
     ApplyDarkListViewTheme(hLV)
     SetTimer(ApplyDarkListViewTheme.Bind(hLV), -100)
 }

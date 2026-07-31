@@ -174,7 +174,7 @@ RegisterPersistedWatchItem(record) {
         record.WorkDir, record.Args, record.EnvVars, record.Maintenance,
         record.ResolvedTarget, record.ResolvedTargetManual,
         record.ShortcutArgs, record.Display, record.RuntimePath,
-        record.RuntimeArgs)
+        record.RuntimeArgs, record.ContentHash, record.ContentSize)
 }
 
 LoadWatchlistFromConfig() {
@@ -182,6 +182,8 @@ LoadWatchlistFromConfig() {
         RegisterPersistedWatchItem)
     App.configLoadWarnings := loadResult.Warnings
     App.configRecoveryEntries := loadResult.RecoveryEntries
+    if loadResult.NeedsIdentitySave
+        SaveAppsToIni()
     if App.configLoadWarnings.Length {
         LogMsg(BuildConfigLoadDiagnostic(App.configLoadWarnings,
             App.configRepository.Path))
@@ -334,6 +336,12 @@ ProcessMaintenanceCommandClient() {
         succeeded := App.fileScanner.WriteWorkerFile(A_Args[2], A_Args[3],
             Integer(A_Args[4]) != 0, Integer(A_Args[5]),
             A_Args.Length >= 6 ? Integer(A_Args[6]) : 60)
+        ExitApplication(succeeded ? 0 : 1)
+    }
+    if (option == "--content-match-worker" && A_Args.Length >= 8) {
+        succeeded := App.fileScanner.WriteContentMatchWorkerFile(A_Args[2],
+            A_Args[3], A_Args[4], Integer(A_Args[5]), A_Args[6],
+            Integer(A_Args[7]) != 0, Integer(A_Args[8]))
         ExitApplication(succeeded ? 0 : 1)
     }
     if (option != "--maintenance-begin" && option != "--maintenance-end")

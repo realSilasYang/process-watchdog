@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./assets/app/watchdog-logo.png" width="112" height="112" alt="进程守护小助手 Logo">
+  <img src="./assets/app/watchdog-logo.png" width="112" alt="进程守护小助手 Logo">
 
   <p><strong>简体中文</strong> · <a href="./docs/README.zh-HK.md">繁體中文（香港）</a> · <a href="./docs/README.zh-TW.md">繁體中文（台灣）</a> · <a href="./docs/README.en.md">English</a> · <a href="./docs/README.ja.md">日本語</a> · <a href="./docs/README.vi.md">Tiếng Việt</a> · <a href="./docs/README.ko.md">한국어</a> · <a href="./docs/README.es.md">Español</a> · <a href="./docs/README.fr.md">Français</a> · <a href="./docs/README.pt-BR.md">Português</a> · <a href="./docs/README.ru.md">Русский</a> · <a href="./docs/README.de.md">Deutsch</a> · <a href="./docs/README.it.md">Italiano</a></p>
 
@@ -45,8 +45,8 @@
 - 守护 EXE、AHK、Python、JavaScript、PowerShell、BAT、CMD 和 LNK。
 - 使用 `Running`、`Stopped`、`Unknown` 三态探活；未知状态不会触发盲目重启。
 - 每个目标拥有独立控制器、代际和任务令牌，暂停、删除或改路径后旧回调立即失效。
-- 直接文件被更名或在同一卷（通常是同一盘符）内移动时，在文件系统允许按 Windows 文件 ID 回开时找回新路径并由用户确认；该能力不可用时仅接受完整的重命名事件，不按目录中的相似文件猜测目标。
-- 支持管理员权限要求；已运行实例权限不符时提示，手动重新启动时按配置提权。
+- 直接文件或其上级目录被更名、跨目录或跨磁盘移动后，会先按扩展名和精确大小高效筛选，再以完整 SHA-256 内容哈希确认新路径并由用户确认；即使移动发生在小助手关闭期间也能识别，文件名、文件 ID 和目录监听不参与判断。
+- 支持管理员权限要求；已运行实例权限不符时提示，后续由守护启动时按配置提权。
 - 软件升级保护默认关闭；启用后结合更新进程、父子关系、安装目录和文件稳定性暂停守护，并在升级结束后恢复。
 - 配置采用原子替换；无法解析的监控记录进入 `[Recovery]`，不会静默丢弃。
 - 程序搜索仅使用 Everything 服务，不启用本地全盘扫描，也不限制匹配结果数量；大量结果会分批加入列表，避免图标提取长时间阻塞界面。
@@ -137,8 +137,8 @@ Release 提供的源码 ZIP 已包含这些资源，不需要 Git LFS。独立 E
 
 在主列表中右键守护对象可以：
 
-- 打开文件所在位置、重新启动、修改目标路径，或配置进程识别与启动设置。
-- 切换管理员运行要求；目标已运行但权限不符时显示警告，右键重新启动会提权启动。
+- 打开文件所在位置、结束目标运行、修改目标路径，或配置进程识别与启动设置。“结束运行”会同时暂停守护，避免目标被自动重新启动。
+- 切换管理员运行要求；目标已运行但权限不符时显示警告，恢复守护后的下一次启动会按配置提权。
 - 配置软件升级保护。
 - BAT／CMD 守护对象会额外显示“查看批处理输出日志”；其他目标不显示此项。该文件只在
   小助手实际启动该批处理入口时创建，用于保存其标准输出和错误输出。

@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../assets/app/watchdog-logo.png" width="112" height="112" alt="Logo von Process Watchdog Assistant">
+  <img src="../assets/app/watchdog-logo.png" width="112" alt="Logo von Process Watchdog Assistant">
 
   <p><a href="../README.md">简体中文</a> · <a href="./README.zh-HK.md">繁體中文（香港）</a> · <a href="./README.zh-TW.md">繁體中文（台灣）</a> · <a href="./README.en.md">English</a> · <a href="./README.ja.md">日本語</a> · <a href="./README.vi.md">Tiếng Việt</a> · <a href="./README.ko.md">한국어</a> · <a href="./README.es.md">Español</a> · <a href="./README.fr.md">Français</a> · <a href="./README.pt-BR.md">Português</a> · <a href="./README.ru.md">Русский</a> · <strong>Deutsch</strong> · <a href="./README.it.md">Italiano</a></p>
 
@@ -45,7 +45,7 @@ Das Hauptfenster zeigt Reihenfolge, Anwendungssymbol, Namen, Rechteanforderung u
 - Überwacht EXE-, AHK-, Python-, JavaScript-, PowerShell-, BAT-, CMD- und LNK-Ziele.
 - Verwendet `Running`, `Stopped` und `Unknown`; ein unbekannter Zustand löst niemals blind einen Neustart aus.
 - Jedes Ziel besitzt eigenen Controller, eigene Generation und Aufgabentoken. Alte Rückrufe werden nach Pause, Löschen oder Pfadänderung sofort ungültig.
-- Administratorrechte können vorgeschrieben werden. Eine laufende Instanz mit unpassenden Rechten wird gemeldet; ein manueller Neustart wird entsprechend erhöht ausgeführt.
+- Administratorrechte können vorgeschrieben werden. Eine laufende Instanz mit unpassenden Rechten wird gemeldet; der nächste überwachte Start wird entsprechend erhöht ausgeführt.
 - Der Updateschutz ist standardmäßig aus. Nach Aktivierung verbindet er Updateprozesse, Eltern-Kind-Beziehungen, Aktivitäten im Installationsordner und Dateistabilität, bevor die Überwachung pausiert oder fortgesetzt wird.
 - Die Konfiguration wird atomar ersetzt. Nicht lesbare Datensätze werden nach `[Recovery]` verschoben, statt still verloren zu gehen.
 - Die Anwendungssuche verwendet ausschließlich den Everything-Dienst, ohne eingebaute Vollplattensuche und ohne Ergebnisgrenze. Große Ergebnismengen werden in kurzen Blöcken ergänzt, damit die Symbolgewinnung die Oberfläche nicht blockiert.
@@ -120,7 +120,7 @@ Das Schließen des Hauptfensters blendet es nur im Infobereich aus; die Überwac
 
 Ein Eintrag kann Einstiegspunkt, Arbeitsordner, Argumente und Administratoranforderung festlegen. Die LNK-Datei bleibt Startpunkt, während der tatsächliche Programmpfad getrennt zur Prozessidentifikation gespeichert wird. Eine vom Installationsprogramm angelegte indirekte Verknüpfung muss deshalb nicht manuell durch eine wechselnde interne EXE ersetzt werden.
 
-Das Kontextmenü öffnet den Speicherort, startet neu, ändert den Pfad, konfiguriert Prozesserkennung und Starteinstellungen, schaltet die Administratoranforderung um, richtet Updateschutz ein und passt Namen oder Symbol nur im Hauptfenster an. Die Darstellung ändert weder Identität, Start noch Schutz. Sind bereits Standardwerte aktiv, ist das Zurücksetzen deaktiviert.
+Das Kontextmenü öffnet den Speicherort, beendet das Ziel, ändert den Pfad, konfiguriert Prozesserkennung und Starteinstellungen, schaltet die Administratoranforderung um, richtet Updateschutz ein und passt Namen oder Symbol nur im Hauptfenster an. „Ausführung beenden“ pausiert zugleich die Überwachung, damit das Ziel nicht automatisch neu gestartet wird. Die Darstellung ändert weder Identität, Start noch Schutz. Sind bereits Standardwerte aktiv, ist das Zurücksetzen deaktiviert.
 
 Nur BAT- und CMD-Ziele zeigen zusätzlich den Befehl „Batch-Ausgabeprotokoll anzeigen“; bei anderen Zieltypen erscheint er nicht. Die eigenständige Protokolldatei wird nur angelegt, wenn der Assistent das Batch-Ziel tatsächlich startet und dessen Standardausgabe und Fehlerausgabe erfasst. Für einen bereits laufenden Batch-Prozess entsteht sie nicht automatisch.
 

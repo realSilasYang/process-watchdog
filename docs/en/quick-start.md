@@ -18,12 +18,13 @@ evidence to choose the main program conservatively.
 
 ## When a target file is renamed or moved
 
-If a directly added EXE or script is renamed while the assistant is running,
-moved elsewhere on the same volume, or moved because a parent folder was
-renamed, the assistant first resolves the same file by its Windows volume
-serial number and file ID. On a file system without usable file IDs, an
-explicit rename event is used as a fallback. A different EXE is never guessed
-merely because it is the only one left in the old folder.
+If a directly added EXE or script is renamed, one of its parent folders is
+renamed, or the file is moved across folders or volumes, the assistant first
+narrows candidates by compatible extension and exact size, then verifies the
+complete SHA-256 content hash. The content baseline is stored with the
+configuration, so recovery also works for moves made while the assistant was
+closed. File names, Windows file IDs, and directory notifications are not used
+as identity evidence.
 
 When a candidate is found, pending restart work for that item is frozen and a
 confirmation window shows the previous path, new path, and identity evidence.
@@ -34,10 +35,10 @@ Rename confirmation is suppressed while update protection is evaluating or
 handling an update, so an updater's backup file is not presented as a new
 target.
 
-Reliable automatic recovery is not possible if the file was renamed while the
-assistant was not running, moved to another volume, or stored on a file system
-that supplies neither a stable file ID nor a complete rename event. In those
-cases, edit the path manually by double-clicking it in the main list.
+Scanning runs in a separate worker process and does not block monitoring or the
+interface. If more than one identical copy is found in a completed search scope,
+or any search scope cannot be scanned completely, the assistant does not guess;
+it keeps the old path and retries later.
 
 ## Monitor scripts and command-line tools
 
@@ -84,8 +85,9 @@ batch import does not depend on Everything.
 ## Require administrator privileges
 
 Enable Run as administrator in the item settings. If an already running target
-does not have the required privileges, the main window reports a mismatch. A
-context-menu restart launches it with elevation according to the saved setting.
+does not have the required privileges, the main window reports a mismatch. To
+restart it under the new setting, use Stop Running and then resume monitoring;
+the next monitored launch uses elevation according to the saved setting.
 
 ## Protect an application that updates itself
 

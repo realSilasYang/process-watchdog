@@ -105,8 +105,8 @@ Enabled|RunAsAdmin|Path|WorkDir|Args|EnvVars|ResolvedTarget|ResolvedTargetManual
 ```
 
 Except for booleans and the target path, text is encoded as `<HEX>`. Do not add
-field separators or edit encoded data by hand. `[Maintenance]`, `[Display]`, and
-`[Launch]` use the matching `AppN` key and are committed atomically with
+field separators or edit encoded data by hand. `[Maintenance]`, `[Display]`,
+`[Launch]`, and `[Identity]` use the matching `AppN` key and are committed atomically with
 `[Apps]`.
 
 `[Launch]` exists for an item only when a custom launcher or runtime is set:
@@ -128,10 +128,22 @@ AppN=<HEX RuntimePath>|<HEX RuntimeArgs>
   such as `%PATH%`. Overrides exist only around the assistant's one target-launch
   call and never permanently modify Windows or the assistant environment.
 
-If `[Launch]` cannot be decoded, its source text is moved to `[Recovery]` with
+`[Identity]` is maintained automatically for direct file targets:
+
+```text
+AppN=FileSize|SHA256
+```
+
+The exact size narrows candidates and the complete SHA-256 hash confirms their
+content. This baseline supports recovery after the file or a parent folder is
+renamed, after cross-folder or cross-volume moves, and after moves made while
+the assistant was closed. File names, Windows file IDs, and directory
+notifications are not identity evidence. Do not edit this section manually.
+
+If `[Launch]` or `[Identity]` cannot be decoded, its source text is moved to `[Recovery]` with
 the corresponding monitored item rather than registering an incomplete launch
-environment. Undo, redo, path changes, and row ordering also preserve both
-fields as part of the item snapshot.
+environment or content identity. Undo, redo, path changes, and row ordering also
+preserve these fields as part of the item snapshot.
 
 ## Back up
 

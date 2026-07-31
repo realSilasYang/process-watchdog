@@ -30,6 +30,8 @@ class GuardRuntimeFakeMaintenance {
         this.Blocking := false
         this.Stopped := false
         this.SubjectExists := true
+        this.MissingCount := 0
+        this.LastMissingKind := ""
     }
 
     IsBlocking(*) {
@@ -65,7 +67,13 @@ class GuardRuntimeFakeMaintenance {
         return false
     }
 
-    MarkTargetMissing(*) {
+    MarkTargetMissing(path, stateObj, statusText, statusKind := "") {
+        this.MissingCount++
+        this.LastMissingKind := statusKind
+        stateObj.Pending := false
+        stateObj.TransitionTo(GuardPhase.Exhausted)
+        GuardRuntimeTestContext.Status := path "|" statusText
+        GuardRuntimeTestContext.StatusKind := statusKind
     }
 
     Enter(*) {
@@ -807,6 +815,54 @@ RunGuardRuntimeTests() {
             is ProcessSnapshotIndex
         && !GuardRuntimeTestContext.LastSnapshotIndex.SupportsCommandLine,
         "原生降级索引错误宣称包含命令行证据")
+
+    ; WMI 已经发布但证据仍为 Unknown 时，保留不确定语义，不再捕获第二份
+    ; 原生快照猜测运行状态。原生回退只属于整个 WMI 快照不可用的分支。
+    wmiUnknownState := CreateGuardRuntimeSupervisor(scheduler)
+    states.Clear()
+    states[fallbackExePath] := wmiUnknownState
+    runtime.appOrder := [fallbackExePath]
+    runtime.processSnapshots.Index := ProcessSnapshotIndex([
+        {pid: currentPid, parent: 0, name: "fallback-target.exe",
+            cmd: "", exe: fallbackExePath, creation: "", identity: "",
+            observedTicks: clock.Ticks}
+    ], clock.Ticks, true, "", ObjBindMethod(inspector,
+        "GetCreationIdentity"))
+    inspector.CaptureCount := 0
+    guard.MonitorTick()
+    AssertGuardRuntime(wmiUnknownState.PID == 0
+        && wmiUnknownState.UncertainObservationCount == 1
+        && GuardRuntimeTestContext.StatusKind
+            == GuardStatusKind.WaitingObservation
+        && inspector.CaptureCount == 0,
+        "WMI Unknown 仍触发了猜测性原生快照或被误判为确定状态")
+
+    ; 文件已不存在时，快照不可用或 Unknown 都不能覆盖确定的缺失事实，
+    ; 否则界面会在“等待进程状态”和“脚本不存在”之间循环。
+    missingScriptPath := "c:\jobs\removed-worker.ahk"
+    missingScriptState := CreateGuardRuntimeSupervisor(scheduler)
+    states.Clear()
+    states[missingScriptPath] := missingScriptState
+    runtime.appOrder := [missingScriptPath]
+    maintenance.SubjectExists := false
+    maintenance.MissingCount := 0
+    maintenance.LastMissingKind := ""
+    relocation.DetectResult := false
+    runtime.processSnapshots.Index := ""
+    GuardRuntimeTestContext.SpecsByPath[missingScriptPath] := TargetSpecs(
+        missingScriptPath,
+        LaunchSpec(TargetLaunchKind.AutoHotkey, missingScriptPath),
+        ProbeSpec(TargetProbeKind.CommandTarget, missingScriptPath))
+    GuardRuntimeTestContext.StatusKind := GuardStatusKind.WaitingObservation
+    guard.MonitorTick()
+    guard.MonitorTick()
+    AssertGuardRuntime(maintenance.MissingCount == 2
+        && maintenance.LastMissingKind == GuardStatusKind.ScriptMissing
+        && GuardRuntimeTestContext.StatusKind == GuardStatusKind.ScriptMissing
+        && missingScriptState.Phase == GuardPhase.Exhausted,
+        "缺失脚本仍在等待进程状态与脚本不存在之间循环")
+
+    maintenance.SubjectExists := true
     GuardRuntimeTestContext.UseIndexedObservation := false
     GuardRuntimeTestContext.SpecsByPath.Clear()
     inspector.Processes := []

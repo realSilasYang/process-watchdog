@@ -167,13 +167,17 @@ Enabled|RunAsAdmin|Path|WorkDir|Args|EnvVars|ResolvedTarget|ResolvedTargetManual
 
 Boolean fields accept only `0` or `1`; non-empty text must decode losslessly. A
 wrong field count, legacy plain text, or damaged encoding is not registered as a
-target. Its original application, display, launch, and update values are moved
-to `[Recovery]`. The optional `[Launch]` section uses the matching `AppN` key for
-two independent `<HEX>` fields: runtime path and runtime arguments. It is
+target. Its original application, display, launch, content-identity, and update
+values are moved to `[Recovery]`. The optional `[Launch]` section uses the
+matching `AppN` key for two independent `<HEX>` fields: runtime path and runtime
+arguments. The optional `[Identity]` section stores a direct file target's
+content baseline as `FileSize|SHA256`, allowing unchanged content to be
+confirmed after a file name, directory, or volume changes without treating file
+IDs or directory notifications as identity evidence. These sections are
 rewritten in the same atomic transaction as `[Apps]`, `[Maintenance]`,
 `[Display]`, and `[Recovery]`. This keeps the existing nine-field record stable
 while ensuring ordering, undo, redo, and recovery never drop launch-environment
-data.
+or content-identity data.
 
 Undo and redo use ordered configuration snapshots and per-field three-way
 merging. Undo reverses only fields changed by the original operation that still

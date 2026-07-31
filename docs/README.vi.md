@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../assets/app/watchdog-logo.png" width="112" height="112" alt="Biểu trưng Process Watchdog Assistant">
+  <img src="../assets/app/watchdog-logo.png" width="112" alt="Biểu trưng Process Watchdog Assistant">
 
   <p><a href="../README.md">简体中文</a> · <a href="./README.zh-HK.md">繁體中文（香港）</a> · <a href="./README.zh-TW.md">繁體中文（台灣）</a> · <a href="./README.en.md">English</a> · <a href="./README.ja.md">日本語</a> · <strong>Tiếng Việt</strong> · <a href="./README.ko.md">한국어</a> · <a href="./README.es.md">Español</a> · <a href="./README.fr.md">Français</a> · <a href="./README.pt-BR.md">Português</a> · <a href="./README.ru.md">Русский</a> · <a href="./README.de.md">Deutsch</a> · <a href="./README.it.md">Italiano</a></p>
 
@@ -45,7 +45,7 @@ Cửa sổ chính hiển thị thứ tự đối tượng giám sát, biểu tư
 - Giám sát đích EXE, AHK, Python, JavaScript, PowerShell, BAT, CMD và LNK.
 - Dùng ba kết quả `Running`, `Stopped`, `Unknown`; trạng thái chưa rõ không bao giờ tự động kích hoạt khởi động lại mù quáng.
 - Mỗi đích có bộ điều khiển, thế hệ và mã tác vụ riêng; lệnh gọi lại cũ bị vô hiệu ngay sau khi tạm dừng, xóa hoặc đổi đường dẫn.
-- Có thể yêu cầu quyền quản trị. Trợ lý báo khi tiến trình đang chạy không đủ quyền và sẽ nâng quyền khi người dùng khởi động lại thủ công.
+- Có thể yêu cầu quyền quản trị. Trợ lý báo khi tiến trình đang chạy không đủ quyền và sẽ nâng quyền cho lần khởi chạy được giám sát tiếp theo.
 - Bảo vệ khi cập nhật mặc định tắt. Khi bật, trợ lý kết hợp tiến trình cập nhật, quan hệ cha con, hoạt động thư mục cài đặt và độ ổn định của tệp trước khi tạm dừng hoặc tiếp tục giám sát.
 - Thay thế cấu hình theo giao dịch nguyên tử. Bản ghi không phân tích được sẽ chuyển vào `[Recovery]` thay vì bị bỏ mất.
 - Tìm ứng dụng chỉ qua dịch vụ Everything, không quét toàn bộ ổ đĩa bằng cơ chế tích hợp và không giới hạn số kết quả. Tập kết quả lớn được thêm theo từng đợt ngắn để việc lấy biểu tượng không làm treo giao diện.
@@ -120,7 +120,7 @@ Nếu trợ lý đã giúp bạn tiết kiệm thời gian tìm lỗi hoặc kh�
 
 Mỗi mục có thể đặt tệp vào để khởi chạy, thư mục làm việc, đối số và yêu cầu quyền quản trị. LNK vẫn là tệp khởi chạy, còn đường dẫn chương trình thật được lưu riêng để nhận diện tiến trình; vì vậy không cần thay lối tắt gián tiếp do trình cài đặt tạo bằng một EXE nội bộ dễ thay đổi.
 
-Nhấp phải một mục để mở vị trí tệp, khởi động lại, sửa đường dẫn, cấu hình nhận diện tiến trình và thiết lập khởi chạy; thay đổi yêu cầu quản trị; cấu hình bảo vệ cập nhật; hoặc tùy chỉnh tên và biểu tượng chỉ dùng trong cửa sổ chính. Tùy chỉnh hiển thị không ảnh hưởng đến danh tính đích, cách khởi chạy hay bảo vệ cập nhật. Nếu hiển thị đang là mặc định, thao tác khôi phục mặc định sẽ bị vô hiệu.
+Nhấp phải một mục để mở vị trí tệp, kết thúc chạy đích, sửa đường dẫn, cấu hình nhận diện tiến trình và thiết lập khởi chạy; thay đổi yêu cầu quản trị; cấu hình bảo vệ cập nhật; hoặc tùy chỉnh tên và biểu tượng chỉ dùng trong cửa sổ chính. Kết thúc chạy cũng tạm dừng giám sát để đích không tự khởi động lại. Tùy chỉnh hiển thị không ảnh hưởng đến danh tính đích, cách khởi chạy hay bảo vệ cập nhật. Nếu hiển thị đang là mặc định, thao tác khôi phục mặc định sẽ bị vô hiệu.
 
 Chỉ mục BAT và CMD mới hiện thêm lệnh Xem nhật ký đầu ra của tập lệnh; các loại đích khác không hiện lệnh này. Tệp nhật ký riêng chỉ được tạo khi trợ lý thực sự khởi chạy mục đó và thu cả đầu ra chuẩn lẫn lỗi chuẩn. Một tiến trình tập lệnh đã chạy sẵn sẽ không tự động có tệp này.
 

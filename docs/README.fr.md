@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../assets/app/watchdog-logo.png" width="112" height="112" alt="Logo de Process Watchdog Assistant">
+  <img src="../assets/app/watchdog-logo.png" width="112" alt="Logo de Process Watchdog Assistant">
 
   <p><a href="../README.md">简体中文</a> · <a href="./README.zh-HK.md">繁體中文（香港）</a> · <a href="./README.zh-TW.md">繁體中文（台灣）</a> · <a href="./README.en.md">English</a> · <a href="./README.ja.md">日本語</a> · <a href="./README.vi.md">Tiếng Việt</a> · <a href="./README.ko.md">한국어</a> · <a href="./README.es.md">Español</a> · <strong>Français</strong> · <a href="./README.pt-BR.md">Português</a> · <a href="./README.ru.md">Русский</a> · <a href="./README.de.md">Deutsch</a> · <a href="./README.it.md">Italiano</a></p>
 
@@ -45,7 +45,7 @@ La fenêtre principale réunit l’ordre des cibles surveillées, l’icône, le
 - Surveille les cibles EXE, AHK, Python, JavaScript, PowerShell, BAT, CMD et LNK.
 - Utilise les résultats `Running`, `Stopped` et `Unknown` ; un état inconnu ne déclenche jamais un redémarrage à l’aveugle.
 - Attribue à chaque cible son propre contrôleur, sa génération et ses jetons de tâche. Les anciens rappels deviennent immédiatement invalides après une suspension, une suppression ou un changement de chemin.
-- Peut exiger les droits administrateur. Une instance active dont les droits ne conviennent pas est signalée, et un redémarrage manuel est élevé conformément au réglage.
+- Peut exiger les droits administrateur. Une instance active dont les droits ne conviennent pas est signalée, et le prochain lancement surveillé est élevé conformément au réglage.
 - La protection des mises à jour est désactivée par défaut. Une fois activée, elle combine processus de mise à jour, relations parent-enfant, activité du dossier d’installation et stabilité des fichiers avant de suspendre ou reprendre la surveillance.
 - Remplace la configuration de manière atomique. Les enregistrements impossibles à analyser sont déplacés vers `[Recovery]` plutôt que perdus silencieusement.
 - La recherche d’applications utilise exclusivement le service Everything, sans analyse locale de tout le disque ni limite de résultats imposée par l’application. Les grands ensembles sont ajoutés par petits lots pour éviter que l’extraction d’icônes ne monopolise l’interface.
@@ -120,7 +120,7 @@ Fermer la fenêtre principale ne fait que la masquer dans la zone de notificatio
 
 Un élément peut définir son point d’entrée, son dossier de travail, ses arguments et l’exigence de droits administrateur. Le LNK reste le point d’entrée, tandis que le chemin réel du programme est conservé séparément pour identifier le processus. Un raccourci indirect créé par un installateur n’a donc pas à être remplacé manuellement par un EXE interne susceptible de changer.
 
-Le menu contextuel permet d’ouvrir l’emplacement, redémarrer, modifier le chemin, configurer l’identification du processus et le lancement, changer l’exigence d’administrateur, régler la protection des mises à jour et personnaliser le nom ou l’icône affichés uniquement dans la fenêtre principale. La présentation ne modifie ni l’identité, ni le lancement, ni la protection. Si les valeurs sont déjà celles par défaut, la restauration est désactivée.
+Le menu contextuel permet d’ouvrir l’emplacement, arrêter la cible, modifier le chemin, configurer l’identification du processus et le lancement, changer l’exigence d’administrateur, régler la protection des mises à jour et personnaliser le nom ou l’icône affichés uniquement dans la fenêtre principale. Arrêter l’exécution suspend aussi la surveillance afin d’éviter tout redémarrage automatique. La présentation ne modifie ni l’identité, ni le lancement, ni la protection. Si les valeurs sont déjà celles par défaut, la restauration est désactivée.
 
 Seuls les éléments BAT et CMD affichent en plus la commande Afficher le journal de sortie du traitement par lots ; elle reste absente pour les autres types de cible. Le fichier de journal distinct n’est créé que lorsque l’assistant lance réellement cet élément et capture sa sortie standard et sa sortie d’erreur. Aucun fichier n’est ajouté automatiquement à un traitement déjà en cours d’exécution.
 

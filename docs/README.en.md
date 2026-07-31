@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../assets/app/watchdog-logo.png" width="112" height="112" alt="Process Watchdog Assistant Logo">
+  <img src="../assets/app/watchdog-logo.png" width="112" alt="Process Watchdog Assistant Logo">
 
   <p><a href="../README.md">简体中文</a> · <a href="./README.zh-HK.md">繁體中文（香港）</a> · <a href="./README.zh-TW.md">繁體中文（台灣）</a> · <strong>English</strong> · <a href="./README.ja.md">日本語</a> · <a href="./README.vi.md">Tiếng Việt</a> · <a href="./README.ko.md">한국어</a> · <a href="./README.es.md">Español</a> · <a href="./README.fr.md">Français</a> · <a href="./README.pt-BR.md">Português</a> · <a href="./README.ru.md">Русский</a> · <a href="./README.de.md">Deutsch</a> · <a href="./README.it.md">Italiano</a></p>
 
@@ -45,8 +45,8 @@ The main window keeps each target's order, application icon, display name, privi
 - Monitor EXE, AHK, Python, JavaScript, PowerShell, BAT, CMD, and LNK targets.
 - Use `Running`, `Stopped`, and `Unknown` probe results; an unknown result never triggers a blind restart.
 - Give every target its own controller, generation, and task tokens, so stale callbacks become invalid immediately after pausing, deletion, or path changes.
-- After a rename or same-volume move, recover a directly added file when the file system permits reopening it by Windows file ID, then ask for confirmation. If that capability is unavailable, accept only a complete rename event and never guess from similar files in the folder.
-- Enforce an administrator requirement when configured; report a privilege mismatch for an existing process and elevate a manual restart.
+- After a directly added file or one of its parent folders is renamed, or the file is moved across folders or volumes, narrow candidates by compatible extension and exact size, verify the complete SHA-256 content hash, then ask for confirmation. Recovery also works for moves made while the assistant was closed; names, file IDs, and directory notifications are not identity evidence.
+- Enforce an administrator requirement when configured; report a privilege mismatch for an existing process and elevate the next monitored launch.
 - Keep update protection off by default. When enabled, combine updater processes, parent-child relationships, installation-directory activity, and file stability before pausing or resuming monitoring.
 - Replace configuration atomically. Records that cannot be parsed are moved to `[Recovery]` instead of being silently discarded.
 - Use the Everything service exclusively for application search, without a local full-disk fallback or an application-imposed result limit. Large result sets are appended in short batches so icon extraction does not monopolize the UI.
@@ -139,8 +139,8 @@ Application search requires a running Everything background instance. The bundle
 
 Right-click an item in the main list to:
 
-- Open its file location, restart it, edit its target path, or configure process identification and launch settings.
-- Toggle the administrator requirement. A running target with insufficient privileges is reported, and a context-menu restart elevates it as configured.
+- Open its file location, stop the target, edit its target path, or configure process identification and launch settings. Stop Running also pauses monitoring so the target is not launched again automatically.
+- Toggle the administrator requirement. A running target with insufficient privileges is reported; after monitoring is resumed, the next launch is elevated as configured.
 - Configure update protection.
 - BAT and CMD entries additionally show View batch output log. Other target
   types do not show this command. The file is created only when the assistant

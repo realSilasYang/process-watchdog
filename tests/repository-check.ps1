@@ -535,7 +535,7 @@ foreach ($readmeDefinition in $localizedReadmes) {
     }
     $logoPattern = '(?s)<div align="center">\s*<img src="' +
         [regex]::Escape($expectedLogoHref) +
-        '" width="112" height="112" alt="[^"]+">\s*<p>(.*?)</p>'
+        '" width="112" alt="[^"]+">\s*<p>(.*?)</p>'
     $languageBarMatch = [regex]::Match($readme,
         $logoPattern)
     if (-not $languageBarMatch.Success) {

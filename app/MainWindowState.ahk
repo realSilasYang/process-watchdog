@@ -25,6 +25,7 @@ class MainWindow {
         this.statsPresenter := ""
         this.contextMenu := ""
         this.contextTargetRow := 0
+        this.firstVisiblePresentationCompleted := false
         this.listProjection := MainListProjection(NormalizeTargetPath)
     }
 }

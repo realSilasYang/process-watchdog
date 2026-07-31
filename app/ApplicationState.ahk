@@ -62,6 +62,8 @@ class ApplicationState {
             this.processInspector, "GetCreationIdentity"))
         this.fileScanner := FileScanService({
             CanonicalPath: GetCanonicalPath,
+            ComputeContentHash: ObjBindMethod(TargetFileInspector,
+                "ComputeContentHash"),
             GetCreationIdentity: ObjBindMethod(this.processInspector,
                 "GetCreationIdentity"),
             Localize: Tr,
@@ -172,11 +174,14 @@ class ApplicationState {
         })
         this.targetRelocationService := TargetRelocationService(this, {
             CanonicalPath: GetCanonicalPath,
-            DirectoryExists: (path) => !!DirExist(path),
             FindConflict: ObjBindMethod(this.targetIdentityService,
                 "FindConflict"),
-            GetIdentity: ObjBindMethod(this.targetFileInspector,
-                "GetIdentity"),
+            GetContentMetadata: ObjBindMethod(this.targetFileInspector,
+                "GetContentMetadata"),
+            GetContentSignature: ObjBindMethod(this.targetFileInspector,
+                "GetContentSignature"),
+            GetSearchRoots: ObjBindMethod(this.targetFileInspector,
+                "GetRelocationSearchRoots"),
             HasRecentMaintenanceSignal: ObjBindMethod(
                 this.maintenanceCoordinator, "HasRecentSignal"),
             IsMaintenanceBlocking: ObjBindMethod(
@@ -188,15 +193,19 @@ class ApplicationState {
             Log: LogMsg,
             NormalizePath: NormalizeTargetPath,
             Now: GetTickCount64,
+            OnBaselineChanged: (path, stateObj) => SaveAppsToIni(),
             OnCandidate: QueueTargetRelocationPrompt,
             OnCandidateInvalidated: InvalidateTargetRelocationPrompt,
             PathsEquivalent: PathsEquivalent,
+            PollContentScan: ObjBindMethod(this.fileScanner,
+                "PollContentMatch"),
             ResetState: ResetTargetRelocationState,
-            ResolveIdentityPath: ObjBindMethod(this.targetFileInspector,
-                "ResolveCurrentPath"),
+            StartContentScan: ObjBindMethod(this.fileScanner,
+                "StartContentMatch"),
+            StopContentScan: ObjBindMethod(this.fileScanner,
+                "StopContentMatch"),
             TargetExists: (path) => !!FileExist(path) && !DirExist(path),
-            UpdateState: UpdateState,
-            WatcherFactory: DirectoryChangeWatcher
+            UpdateState: UpdateState
         })
         this.guardRuntime := GuardRuntime(this, {
             ClearProcessIdentity: ClearStateProcessIdentity,
