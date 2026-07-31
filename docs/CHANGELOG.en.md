@@ -7,7 +7,7 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
-## 🎉 Version [2.0.5] - 2026-07-30
+## 🎉 Version [2.0.5] - 2026-07-31
 
 ### 📦 Release Assets
 
@@ -17,9 +17,30 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+### ✨ Added
+
+- **Content-based moved-target recovery:** Directly added programs and scripts retain an exact-size and SHA-256 content baseline. After the file or a parent folder is renamed, or the file moves across folders or volumes, the monitored path can be updated once unchanged content is confirmed, including moves made while the assistant was closed. File names, file IDs, and directory notifications are not identity evidence.
+- **Dark native path editing:** The main list's in-place full-path editor now uses the active input background and text colors consistently from the context menu, double-click, and F2.
+
+---
+
 ### 🚀 Improvements
 
+- **Efficient conservative relocation scans:** The nearest surviving directory is scanned first. Broader searches use Everything to narrow candidates by compatible extension and exact size before a separate worker computes complete hashes. Multiple identical copies or an incomplete scan never cause a guessed relocation.
+- **Batch path editing:** During multi-selection full-path editing, Enter saves the current item and advances to the next; Escape still cancels only the current edit.
+- **True stop-target command:** Stop Running replaces Restart in the context menu. It pauses monitoring before applying the configured stop policy so the target is not immediately launched again.
+- **System shortcuts and feedback:** Shortcut creation independently writes and verifies both the desktop entry and the Start menu All apps entry, then notifies Windows Shell. Success hides the action button and shows the complete confirmation text; error dialogs align the icon, message, and buttons consistently.
+- **Dark first-frame presentation:** Before the main window first becomes visible, its title bar, list, header, status bar, and command buttons are painted while DWM composition is cloaked, reducing white startup frames in dark mode.
 - **Downloaded-release final audit:** After the formal workflow matches the local build against GitHub metadata and publishes the Release, it downloads the hosted standalone EXE, portable ZIP, and source ZIP, checks their digests again, extracts both archives, and reruns the complete package verifier. The dynamic formal-release toolchain snapshot remains distinct from the pinned ordinary-CI snapshot so the audit cannot use the wrong reference.
+
+---
+
+### 🐛 Fixed
+
+- **Guard-state convergence:** Fixed a content-relocation callback argument mismatch that aborted the main monitor before process observation, leaving several running targets in Initializing, and fixed missing targets oscillating between Waiting for process state and Missing.
+- **Main-window first display:** Fixed command buttons other than Add occasionally remaining blank until hover or click, and fixed delayed initial status-bar content.
+- **Consistent path-edit entry:** Fixed F2 falling through to the ListView default handler and creating a second light editor. Theme changes also refresh an active in-place editor.
+- **Reload and shortcut errors:** Reload handoff now targets an explicit window handle and tolerates the old window exiting between operations, preventing Target window not found. Shortcut failures now identify the entry that was not completed.
 
 ## 🎉 Version [2.0.4] - 2026-07-30
 

@@ -77,7 +77,7 @@ Enabled|RunAsAdmin|Path|WorkDir|Args|EnvVars|ResolvedTarget|ResolvedTargetManual
 ```
 
 其中除布尔值和目标路径外的文本由小助手以 `<HEX>` 编码。不要手工插入竖线或改写
-编码内容。`[Maintenance]`、`[Display]` 和 `[Launch]` 使用相同的 `AppN` 与守护对象
+编码内容。`[Maintenance]`、`[Display]`、`[Launch]` 和 `[Identity]` 使用相同的 `AppN` 与守护对象
 对应，并与 `[Apps]` 在同一个原子事务中保存。
 
 `[Launch]` 只在守护对象指定了自定义启动程序或解释器时保存：
@@ -96,7 +96,17 @@ AppN=<HEX RuntimePath>|<HEX RuntimeArgs>
 - `EnvVars` 每行使用 `KEY=VALUE`。值可以引用 `%PATH%` 等现有变量；这些覆盖只在
   小助手启动目标的一次调用期间生效，不会永久修改系统或小助手环境。
 
-无法解析的 `[Launch]` 内容会与对应守护对象原文一起进入 `[Recovery]`，不会带着
+`[Identity]` 由小助手自动维护，仅为直接文件目标保存内容身份：
+
+```text
+AppN=FileSize|SHA256
+```
+
+文件大小用于快速筛选，完整 SHA-256 用于最终确认。该基线支持文件本身或上级目录
+改名、跨目录和跨磁盘移动后的路径找回，也能识别小助手关闭期间发生的移动；文件名、
+Windows 文件 ID 和目录通知不作为身份依据。不要手工编辑此节。
+
+无法解析的 `[Launch]` 或 `[Identity]` 内容会与对应守护对象原文一起进入 `[Recovery]`，不会带着
 不完整的启动环境注册。撤销、重做、路径修改和守护对象排序也会把这两个字段纳入守护对象快照。
 
 ## 备份

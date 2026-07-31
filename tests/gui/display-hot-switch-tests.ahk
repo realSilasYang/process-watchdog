@@ -444,7 +444,7 @@ AssertPausedReloadResumeProjection() {
     stateObj.VerifyAttempts := 2
     stateObj.UncertainObservationCount := 2
     stateObj.StoppedEvidenceTicks := GetTickCount64()
-    stateObj.ManualRestartRequested := true
+    stateObj.ManualStopRequested := true
     stateObj.IsRestarting := true
 
     App.appStates[targetPath] := stateObj
@@ -471,7 +471,7 @@ AssertPausedReloadResumeProjection() {
             && stateObj.VerifyAttempts == 0
             && stateObj.UncertainObservationCount == 0
             && stateObj.StoppedEvidenceTicks == 0
-            && !stateObj.ManualRestartRequested
+            && !stateObj.ManualStopRequested
             && !stateObj.IsRestarting,
             "恢复守护后仍继承暂停前的倒计时、失败或验证证据")
         AssertDisplayHotSwitch(UpdateState(targetPath, "迟到的旧状态",

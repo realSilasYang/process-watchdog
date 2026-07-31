@@ -95,6 +95,8 @@ class TargetSupervisor {
         this.MaintenanceLearningCandidates := Map()
         this.MissingSinceTicks := 0
         this.RelocationPending := false
+        this.ContentHash := ""
+        this.ContentSize := 0
         this.DisplayConfig := ""
         this.TargetSpecs := ""
         this.TargetSpecsFingerprint := ""
@@ -102,7 +104,7 @@ class TargetSupervisor {
         this.RestartTask := ""
         this.VerifyTask := ""
         this.IsRestarting := false
-        this.ManualRestartRequested := false
+        this.ManualStopRequested := false
         this.StoppedEvidenceTicks := 0
 
         if IsObject(initialValues) {
@@ -156,7 +158,7 @@ class TargetSupervisor {
         this.VerifyAttempts := 0
         this.UncertainObservationCount := 0
         this.IsRestarting := false
-        this.ManualRestartRequested := false
+        this.ManualStopRequested := false
         this.StoppedEvidenceTicks := 0
     }
 

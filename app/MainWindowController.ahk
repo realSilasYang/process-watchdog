@@ -213,8 +213,51 @@ OpenNotificationWindows(*) {
     }
 }
 
+RefreshMainCommandButtonsAfterShow() {
+    ; 这些 STATIC 在隐藏的主窗口中完成 owner-draw 注册。状态同步和 SVG
+    ; 注入会提前消耗无效区域，因此窗口首次显示后必须重新制造一次可见期
+    ; 绘制；这与鼠标首次经过时触发的可靠刷新路径完全相同。
+    return RedrawVisibleRoundedButtons([
+        Main.btnAdd, Main.btnPause, Main.btnDel,
+        Main.btnSet, Main.btnSupport, Main.btnDonate
+    ])
+}
+
+PrepareMainWindowFirstVisibleSurface() {
+    ; Gui.Show 会让原生子控件和非客户区进入可见生命周期。必须在窗口已映射、
+    ; 但仍被 DWM 排除在合成之外时重新声明主题并同步画完全部首帧表面。
+    UiThemeService.ApplyProcessPreference()
+    ApplyNativeWindowTheme(Main.gui.Hwnd)
+    Main.gui.BackColor := UiThemeService.Color("Window")
+    ApplyDarkListViewTheme(Main.lv.Hwnd)
+    if Main.HasOwnProp("listHeader") && IsObject(Main.listHeader) {
+        Main.listHeader.ApplyAppearance(UiThemeService.Color("Toolbar"),
+            UiThemeService.Color("MutedText"),
+            LocalizationService.GetLanguageSystemUiFontName())
+    }
+    if Main.HasOwnProp("statsPresenter") && IsObject(Main.statsPresenter)
+        Main.statsPresenter.Redraw()
+    else if Main.HasOwnProp("statsText") && IsObject(Main.statsText)
+        Main.statsText.Redraw()
+    RefreshMainCommandButtonsAfterShow()
+    DllCall("user32\RedrawWindow", "Ptr", Main.gui.Hwnd, "Ptr", 0,
+        "Ptr", 0, "UInt", Win32.RDW_LAYOUT_REFRESH, "Int")
+    return true
+}
+
+ShowMainGuiWithOptions(showOptions := "") {
+    ; 映射窗口前先遮蔽，避免默认浅色非客户区、ListView 或 owner-draw
+    ; STATIC 在主题重申完成前被 DWM 提交为一个可见帧。
+    result := FirstVisibleWindowPresenter.Show(Main.gui, showOptions,
+        Main.firstVisiblePresentationCompleted,
+        PrepareMainWindowFirstVisibleSurface,
+        RefreshMainCommandButtonsAfterShow)
+    Main.firstVisiblePresentationCompleted := result.FirstVisibleCompleted
+    return result.Visible
+}
+
 ShowMainGui(*) {
-    Main.gui.Show()
+    ShowMainGuiWithOptions()
     if WindowHierarchy.IsOwnerLocked(Main.gui)
         WindowHierarchy.ActivateTopOwned(Main.gui)
 }

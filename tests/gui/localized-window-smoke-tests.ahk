@@ -974,6 +974,7 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
 
         AssertLocalizedWindow(settingsDialog.shortcutLabel
             && settingsDialog.taskLabel && settingsDialog.shortcutButton
+            && settingsDialog.shortcutFeedbackText
             && settingsDialog.taskButton,
             language " 快捷方式或计划任务设置缺少实例控件引用")
         shortcutRect := GetControlClientRect(
@@ -1034,18 +1035,30 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
                 == GetApplicationAssetPath("ui-icons\lucide\"
                     taskIconByText[settingsDialog.taskButton.Text]),
             language " 创建、计划任务或浏览按钮没有使用匹配语义的 SVG 图标")
+        shortcutFeedbackRect := GetControlClientRect(
+            settingsDialog.shortcutFeedbackText.Hwnd,
+            settingsDialog.gui.Hwnd)
+        shortcutFeedbackTextWidth := MeasureNativeControlText(
+            settingsDialog.shortcutFeedbackText.Hwnd,
+            settingsDialog.shortcutFeedbackText.Text)
+        AssertLocalizedWindow(!shortcutButtonState.HasOwnProp("tooltipText")
+            && settingsDialog.shortcutButton.Visible
+            && !settingsDialog.shortcutFeedbackText.Visible
+            && shortcutFeedbackTextWidth <= shortcutFeedbackRect.Width,
+            language " 快捷方式按钮仍有悬浮提示或成功文字宽度不足")
         initialShortcutFeedbackGeneration :=
             settingsDialog.shortcutFeedbackGeneration
         AssertLocalizedWindow(settingsDialog.shortcutButton.Text
                 == Tr("创建")
             && settingsDialog.ShowShortcutCreatedFeedback()
-            && settingsDialog.shortcutButton.Text == Tr("创建成功！")
+            && !settingsDialog.shortcutButton.Visible
+            && settingsDialog.shortcutFeedbackText.Visible
+            && settingsDialog.shortcutFeedbackText.Text == Tr("创建成功！")
             && settingsDialog.shortcutFeedbackTimer
             && settingsDialog.shortcutFeedbackGeneration
                 > initialShortcutFeedbackGeneration
-            && !shortcutButtonState.HasOwnProp("buttonIcon")
-            && !shortcutButtonState.HasOwnProp("buttonImage"),
-            language " 快捷方式创建成功后没有在原按钮中显示无图标反馈")
+            && shortcutButtonState.HasOwnProp("buttonImage"),
+            language " 快捷方式创建成功后没有隐藏按钮并完整显示独立反馈文字")
         shortcutFeedbackTimer := settingsDialog.shortcutFeedbackTimer
         shortcutFeedbackGeneration :=
             settingsDialog.shortcutFeedbackGeneration
@@ -1054,11 +1067,13 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         AssertLocalizedWindow(settingsDialog.shortcutButton.Text
                 == Tr("创建")
             && !settingsDialog.shortcutFeedbackTimer
+            && settingsDialog.shortcutButton.Visible
+            && !settingsDialog.shortcutFeedbackText.Visible
             && shortcutButtonState.HasOwnProp("buttonImage")
             && shortcutButtonState.buttonImage.sourcePath
                 == GetApplicationAssetPath(
                     "ui-icons\lucide\square-plus.svg"),
-            language " 快捷方式按钮没有在三秒反馈结束后恢复文字和 SVG 图标")
+            language " 快捷方式按钮没有在三秒反馈结束后恢复显示")
         comboHandles := GetComboBoxThemeHandles(
             settingsDialog.languageDropDown.Hwnd)
         AssertLocalizedWindow(comboHandles.Combo
@@ -1685,19 +1700,19 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             Token: 101,
             OldPath: "C:\Program Files\Smoke\old-target.exe",
             NewPath: "C:\Program Files\Smoke\renamed-target.exe",
-            Evidence: "FileIdentity"
+            Evidence: "ContentHash"
         }
         secondRelocationCandidate := {
             Token: 102,
             OldPath: "C:\Tools\Smoke\old-script.py",
             NewPath: "C:\Tools\Smoke\renamed-script.py",
-            Evidence: "RenameEvent"
+            Evidence: "ContentHash"
         }
         invalidRelocationCandidate := {
             Token: 103,
             OldPath: "C:\Invalid\old.exe",
             NewPath: "C:\Invalid\new.exe",
-            Evidence: "FileIdentity"
+            Evidence: "ContentHash"
         }
         originalRelocationService := App.targetRelocationService
         relocationServiceStub := LocalizedRelocationServiceStub(

@@ -49,7 +49,6 @@ RunSystemIntegrationShortcutTests() {
         AssertSystemIntegrationShortcut(compiledTarget == A_AhkPath
             && compiledArguments == "",
             "EXE 版快捷方式目标或参数错误")
-
         FileCreateShortcut(A_ComSpec, compiledShortcut, A_Temp)
         AssertSystemIntegrationShortcut(!ApplicationShortcutMatches(
             compiledShortcut, A_AhkPath, true, A_AhkPath),

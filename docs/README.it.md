@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../assets/app/watchdog-logo.png" width="112" height="112" alt="Logo di Process Watchdog Assistant">
+  <img src="../assets/app/watchdog-logo.png" width="112" alt="Logo di Process Watchdog Assistant">
 
   <p><a href="../README.md">简体中文</a> · <a href="./README.zh-HK.md">繁體中文（香港）</a> · <a href="./README.zh-TW.md">繁體中文（台灣）</a> · <a href="./README.en.md">English</a> · <a href="./README.ja.md">日本語</a> · <a href="./README.vi.md">Tiếng Việt</a> · <a href="./README.ko.md">한국어</a> · <a href="./README.es.md">Español</a> · <a href="./README.fr.md">Français</a> · <a href="./README.pt-BR.md">Português</a> · <a href="./README.ru.md">Русский</a> · <a href="./README.de.md">Deutsch</a> · <strong>Italiano</strong></p>
 
@@ -45,7 +45,7 @@ La finestra principale riunisce l’ordine degli obiettivi monitorati, l’icona
 - Sorveglia destinazioni EXE, AHK, Python, JavaScript, PowerShell, BAT, CMD e LNK.
 - Usa i risultati `Running`, `Stopped` e `Unknown`; uno stato sconosciuto non provoca mai un riavvio alla cieca.
 - Ogni destinazione dispone di controller, generazione e token di attività indipendenti. I vecchi callback diventano subito invalidi dopo una pausa, eliminazione o modifica del percorso.
-- Può richiedere privilegi di amministratore. Segnala un’istanza attiva con privilegi insufficienti e innalza un riavvio manuale secondo la configurazione.
+- Può richiedere privilegi di amministratore. Segnala un’istanza attiva con privilegi insufficienti e avvia con privilegi elevati il successivo avvio sorvegliato secondo la configurazione.
 - La protezione degli aggiornamenti è disattivata per impostazione predefinita. Quando è attiva, combina processi di aggiornamento, relazioni padre-figlio, attività della cartella di installazione e stabilità dei file prima di sospendere o riprendere la sorveglianza.
 - Sostituisce la configurazione in modo atomico. I record non analizzabili vengono spostati in `[Recovery]` anziché scartati in silenzio.
 - La ricerca delle applicazioni usa esclusivamente il servizio Everything, senza scansione locale dell’intero disco né limite di risultati imposto dall’app. I gruppi grandi vengono aggiunti in piccoli lotti per evitare che l’estrazione delle icone blocchi l’interfaccia.
@@ -120,7 +120,7 @@ Chiudere la finestra principale la nasconde soltanto nell’area di notifica; la
 
 Un elemento può definire punto di ingresso, cartella di lavoro, argomenti e requisito di amministratore. Il file LNK resta il punto di ingresso e il percorso reale del programma viene memorizzato separatamente per identificare il processo. Non serve quindi sostituire manualmente un collegamento indiretto dell’installatore con un EXE interno soggetto a cambiamenti.
 
-Il menu contestuale permette di aprire la posizione, riavviare, cambiare il percorso, configurare l’identificazione del processo e le impostazioni di avvio, alternare il requisito di amministratore, configurare la protezione e personalizzare nome o icona mostrati solo nella finestra principale. La presentazione non modifica identità, avvio o protezione. Se è già predefinita, il ripristino è disabilitato.
+Il menu contestuale permette di aprire la posizione, terminare l’esecuzione della destinazione, cambiare il percorso, configurare l’identificazione del processo e le impostazioni di avvio, alternare il requisito di amministratore, configurare la protezione e personalizzare nome o icona mostrati solo nella finestra principale. Termina esecuzione mette anche in pausa la sorveglianza per impedire il riavvio automatico. La presentazione non modifica identità, avvio o protezione. Se è già predefinita, il ripristino è disabilitato.
 
 Solo gli elementi BAT e CMD mostrano anche il comando Visualizza registro di output batch; per gli altri tipi di destinazione non compare. Il file di registro separato viene creato soltanto quando l’assistente avvia realmente l’elemento e ne acquisisce l’output standard e quello di errore. Un processo batch già in esecuzione non riceve automaticamente questo file.
 

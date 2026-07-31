@@ -74,6 +74,12 @@ function Invoke-GuiTest {
 
 Write-Host 'Running GUI smoke test...'
 Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\gui-smoke-tests.ahk')
+Write-Host 'Running shared message-box layout test...'
+Invoke-GuiTest (Join-Path $PSScriptRoot `
+    'gui\dark-message-box-layout-tests.ahk')
+Write-Host 'Running inline-edit dark-theme test...'
+Invoke-GuiTest (Join-Path $PSScriptRoot `
+    'gui\inline-edit-theme-tests.ahk')
 Write-Host 'Running log-window and diagnostic smoke test...'
 Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\log-window-smoke-tests.ahk')
 Write-Host 'Running 13-language production-window smoke test...'

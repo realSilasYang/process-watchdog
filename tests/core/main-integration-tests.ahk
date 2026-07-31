@@ -244,6 +244,17 @@ RunMainIntegrationTests() {
         A_ScriptFullPath) != expectedCompiledHandoff {
         throw Error("编译程序重载交接命令拼接错误")
     }
+    messageLayout := CalculateDarkDialogLayout(300, 74, [70])
+    if messageLayout.IconY != 42 || messageLayout.MessageY != 20
+        || messageLayout.ButtonXs[1] != 115 {
+        throw Error("长文本消息框没有垂直居中图标或水平居中确定按钮")
+    }
+    confirmLayout := CalculateDarkDialogLayout(360, 18, [100, 100], 22)
+    if confirmLayout.IconY != 20 || confirmLayout.MessageY != 26
+        || confirmLayout.ButtonXs[1] != 74
+        || confirmLayout.ButtonXs[2] != 186 {
+        throw Error("确认框没有垂直居中正文或水平居中按钮组")
+    }
     readyDirectory := A_Temp "\ProcessWatchdogUpdateApply-"
         . currentPid "-integration"
     readyPath := readyDirectory "\application-ready.signal"

@@ -157,9 +157,6 @@ class GermanStrings {
             "• “监控与启动”可控制是否在启动时后台检查新版；“通用”可随时手动检查。检查过程不会阻塞主界面。",
                 "• Unter „Überwachung und Start“ können Sie die Hintergrundsuche nach neuen Versionen beim Start steuern`; unter „Allgemein“ kann jederzeit manuell gesucht werden. Die Prüfung blockiert das Hauptfenster nicht.")
         catalog.Set(
-            "• “重新启动”会先请求目标正常退出；超过设置时间后，是否强制终止由“停止”中的选项决定。",
-                "• „Neu starten“ fordert das Ziel zunächst zum regulären Beenden auf. Wird die festgelegte Zeit überschritten, bestimmt die entsprechende Option unter „Beenden“, ob das Beenden erzwungen wird.")
-        catalog.Set(
             "• 主界面的“日志”显示本次运行中的监控、重启、升级保护和操作记录，并会自动更新。",
                 "• „Protokoll“ im Hauptfenster zeigt die Überwachungs-, Neustart-, Update-Schutz- und Bedienereignisse der aktuellen Sitzung an und wird automatisch aktualisiert.")
         catalog.Set(
@@ -186,9 +183,6 @@ class GermanStrings {
         catalog.Set(
             "• 可控的更新脚本可显式发送维护指令：",
                 "• Ein von Ihnen verwaltetes Update-Skript kann ausdrückliche Wartungsbefehle senden:")
-        catalog.Set(
-            "• 右键守护对象可自定义主窗口名称和图标，也可打开所在位置、重新启动、编辑路径、切换管理员运行、配置高级运行环境与软件升级保护，并查看批处理输出日志。要求管理员运行但当前权限不符时会显示警告；右键重新启动会按该设置提权启动。",
-                "• Klicken Sie mit der rechten Maustaste auf einen Eintrag, um Namen und Symbol im Hauptfenster anzupassen, den Speicherort zu öffnen, ihn neu zu starten, den Pfad zu bearbeiten, die Ausführung als Administrator umzuschalten, die erweiterte Laufzeitumgebung und den Update-Schutz einzurichten oder das Stapelausgabeprotokoll anzuzeigen. Falls Administratorrechte verlangt werden, der aktuelle Prozess sie aber nicht besitzt, erscheint eine Warnung`; beim Neustart über das Kontextmenü werden die Rechte gemäß dieser Einstellung erhöht.")
         catalog.Set(
             "• 在守护对象右键菜单打开“软件升级保护”，可调整安装足迹目录、退出检测窗口、文件稳定等待和最长升级等待，也可清除已学习的更新程序特征。",
                 "• Öffnen Sie im Kontextmenü eines Eintrags „Software-Update-Schutz“, um Installationsverzeichnis, Ausgangserkennungszeitraum, Dateistabilitätswartezeit und maximale Update-Wartezeit einzustellen oder erlernte Merkmale des Update-Programms zu löschen.")
@@ -253,8 +247,8 @@ class GermanStrings {
             "• 守护对象右键菜单中的“查看运行日志”用于打开 BAT/CMD 目标生成的输出日志；其他类型或尚未生成时会提示文件不存在。",
                 "• „Ausführungsprotokoll anzeigen“ im Kontextmenü öffnet das von BAT/CMD-Zielen erzeugte Ausgabeprotokoll. Bei anderen Typen oder solange es noch nicht erstellt wurde, wird gemeldet, dass die Datei fehlt.")
         catalog.Set(
-            "⏳ 停止原进程...",
-                "⏳ Ursprünglicher Prozess wird beendet...")
+            "⏳ 正在结束运行...",
+                "⏳ Ziel wird beendet...")
         catalog.Set(
             "⏳ 判断是否正在升级",
                 "⏳ Laufendes Update wird geprüft")
@@ -328,8 +322,8 @@ class GermanStrings {
             "取 消",
                 "Abbrechen")
         catalog.Set(
-            "❌ 无法停止原进程",
-                "❌ Ursprünglicher Prozess konnte nicht beendet werden")
+            "❌ 无法结束运行",
+                "❌ Ziel konnte nicht beendet werden")
         catalog.Set(
             "❌ 目标不存在",
                 "❌ Das Ziel ist nicht vorhanden")
@@ -811,11 +805,11 @@ class GermanStrings {
             "手动添加守护对象：{1}",
                 "Überwachung manuell hinzugefügt: {1}")
         catalog.Set(
-            "手动触发了重新启动：{1}",
-                "Neustart manuell ausgelöst: {1}")
+            "已结束运行：{1}",
+                "Ziel beendet: {1}")
         catalog.Set(
-            "手动重启已取消，原进程未能停止：{1}",
-                "Der manuelle Neustart wurde abgebrochen, da der ursprüngliche Prozess nicht beendet werden konnte: {1}")
+            "结束运行失败，目标进程未能停止：{1}",
+                "Zielprozess konnte nicht beendet werden: {1}")
         catalog.Set(
             "托管窗口生命周期尚未配置",
                 "Der Lebenszyklus des verwalteten Fensters wurde noch nicht eingerichtet")
@@ -968,14 +962,14 @@ class GermanStrings {
             "暂停或恢复选中守护对象，不会退出目标`n支持多选；混合状态时逐项反转`n快捷键：Space",
                 "Überwachung der ausgewählten Einträge pausieren oder fortsetzen, ohne die Ziele zu beenden`nMehrfachauswahl unterstützt`; bei gemischten Zuständen wird jeder einzeln umgekehrt`nTastenkürzel: Leertaste")
         catalog.Set(
-            "暂时无法查询进程状态，稍后重试手动重启：{1}",
-                "Der Prozessstatus kann vorübergehend nicht abgefragt werden`; der manuelle Neustart wird später erneut versucht: {1}")
+            "暂时无法查询进程状态，稍后重试结束运行：{1}",
+                "Der Prozessstatus kann vorübergehend nicht abgefragt werden`; das Beenden wird später erneut versucht: {1}")
         catalog.Set(
             "暂时无法核对现有进程，延迟启动以避免重复实例：{1}",
                 "Vorhandene Prozesse können vorübergehend nicht geprüft werden`; der Start wird verzögert, um doppelte Instanzen zu vermeiden: {1}")
         catalog.Set(
-            "暂时无法重新启动",
-                "Neustart ist vorübergehend nicht möglich")
+            "暂时无法结束运行",
+                "Beenden ist vorübergehend nicht möglich")
         catalog.Set(
             "更新助手已启动，小助手即将退出并完成更新。",
                 "Der Update-Assistent wurde gestartet. Der Assistent wird nun beendet, um das Update abzuschließen.")
@@ -1036,9 +1030,6 @@ class GermanStrings {
         catalog.Set(
             "桌面与开始菜单快捷方式",
                 "Verknüpfungen auf dem Desktop und im Startmenü")
-        catalog.Set(
-            "创建桌面快捷方式，并将小助手加入开始菜单“所有”列表；是否固定到开始菜单由您决定。",
-                "Erstellt eine Desktopverknüpfung und fügt den Assistenten unter „Alle Apps“ im Startmenü hinzu. Ob er an „Start“ angeheftet wird, entscheiden Sie selbst.")
         catalog.Set(
             "创建成功！",
                 "Erstellt!")
@@ -1349,8 +1340,8 @@ class GermanStrings {
             "该真实进程已由其他守护对象守护。",
                 "Dieser tatsächliche Prozess wird bereits von einem anderen Überwachungseintrag geschützt.")
         catalog.Set(
-            "该软件正在升级保护中。请等待升级完成，或在“软件升级保护”中结束等待后再重新启动。",
-                "Diese Software befindet sich im Update-Schutz. Warten Sie, bis das Update abgeschlossen ist, oder beenden Sie die Wartezeit unter „Software-Update-Schutz“, bevor Sie sie neu starten.")
+            "该软件正在升级保护中。请等待升级完成，或在“软件升级保护”中结束等待后再结束运行。",
+                "Diese Software befindet sich im Update-Schutz. Warten Sie, bis das Update abgeschlossen ist, oder beenden Sie die Wartezeit unter „Software-Update-Schutz“, bevor Sie die Ausführung beenden.")
         catalog.Set(
             "语义版本无效",
                 "Ungültige semantische Version")
@@ -1562,8 +1553,8 @@ class GermanStrings {
             "🔄 软件升级保护",
                 "🔄 Software-Update-Schutz")
         catalog.Set(
-            "🔄 重新启动",
-                "🔄 Neu starten")
+            "⏹️ 结束运行",
+                "⏹️ Ausführung beenden")
         catalog.Set(
             "搜索...",
                 "Suchen...")
@@ -1606,7 +1597,7 @@ class GermanStrings {
         catalog.Set("{1}（EXE 版）", "{1}（EXE-Version）")
         catalog.Set("{1}（源码版）", "{1}（Quellcode-Version）")
         catalog.Set("• “关于”页可控制是否在启动时后台检查新版，也可随时手动检查。检查过程不会阻塞主界面。", "• Auf der Seite „Info“ lässt sich die Suche nach neuen Versionen beim Start im Hintergrund aktivieren oder jederzeit manuell ausführen. Die Prüfung blockiert das Hauptfenster nicht.")
-        catalog.Set("• “重新启动”会先请求目标正常退出；超过设置时间后，是否强制终止由“停止策略”中的选项决定。", "• „Neu starten“ fordert das Ziel zunächst zum normalen Beenden auf. Nach Ablauf des Zeitlimits bestimmt die Option unter „Beendigungsrichtlinie“, ob es zwangsweise beendet wird.")
+        catalog.Set("• “结束运行”会先请求目标正常退出；超过设置时间后，是否强制终止由“停止策略”中的选项决定。", "• „Ausführung beenden“ fordert das Ziel zunächst zum normalen Beenden auf. Nach Ablauf des Zeitlimits bestimmt die Option unter „Beendigungsrichtlinie“, ob es zwangsweise beendet wird.")
         catalog.Set("• 关于：查看软件版本和 AutoHotkey 运行环境，手动检查更新或打开开源地址。", "• Info: Anwendungsversion und AutoHotkey-Laufzeitumgebung anzeigen, manuell nach Updates suchen oder das Open-Source-Projekt öffnen.")
         catalog.Set("• 监控与启动：设置进程状态检查间隔、崩溃自动重启延迟序列，以及导入文件夹时是否包含子目录。", "• Überwachung & Start: Prüfintervall für Prozesse, Verzögerungsfolge für automatische Neustarts nach einem Absturz und Einbeziehung von Unterordnern beim Ordnerimport festlegen.")
         catalog.Set("• 检测到目标停止后，会先确认状态，再按“崩溃自动重启延迟序列”依次重试；连续失败时采用后续延迟，避免频繁拉起。", "• Wird ein Ziel als beendet erkannt, bestätigt der Assistent zunächst dessen Zustand und versucht es dann gemäß der „Verzögerungsfolge für automatische Neustarts nach einem Absturz“ erneut. Bei wiederholten Fehlern verhindern die folgenden Verzögerungen zu häufige Neustarts.")
@@ -1689,7 +1680,7 @@ class GermanStrings {
         catalog.Set("配置暂未写入", "Konfiguration noch nicht geschrieben")
         catalog.Set("已更新进程识别与启动设置：{1}", "Prozesserkennung und Starteinstellungen wurden aktualisiert: {1}")
         catalog.Set("• 快捷方式：LNK、URL、APPREF-MS，包括可解析真实目标的 MSI 快捷方式。特殊快捷方式可在“进程识别与启动设置”中手动指定真实进程。", "• Verknüpfungen: LNK, URL und APPREF-MS, einschließlich MSI-Verknüpfungen, deren tatsächliches Ziel ermittelt werden kann. Bei besonderen Verknüpfungen können Sie den tatsächlichen Prozess unter Prozesserkennung und Starteinstellungen manuell angeben.")
-        catalog.Set("• 右键守护对象可自定义主窗口名称和图标，也可打开所在位置、重新启动、编辑路径、切换管理员运行、配置进程识别与启动设置及软件升级保护，并查看批处理输出日志。要求管理员运行但当前权限不符时会显示警告；右键重新启动会按该设置提权启动。", "• Klicken Sie mit der rechten Maustaste auf einen Eintrag, um seinen Namen und sein Symbol im Hauptfenster anzupassen, den Speicherort zu öffnen, ihn neu zu starten, den Pfad zu bearbeiten, den Administratorstart umzuschalten, Prozesserkennung, Starteinstellungen und Updateschutz zu konfigurieren oder das Ausgabeprotokoll von Batchdateien anzuzeigen. Wenn Administratorrechte verlangt werden, der laufende Prozess aber nicht erhöht ist, erscheint eine Warnung; ein Neustart über das Kontextmenü startet das Programm entsprechend dieser Einstellung mit erhöhten Rechten.")
+        catalog.Set("• 右键守护对象可自定义主窗口名称和图标，也可打开所在位置、结束运行、编辑路径、切换管理员运行、配置进程识别与启动设置及软件升级保护，并查看批处理输出日志。“结束运行”会同时暂停守护，目标不会被自动重新启动；要求管理员运行但当前权限不符时仍会显示警告。", "• Klicken Sie mit der rechten Maustaste auf einen Eintrag, um Name und Symbol anzupassen, den Speicherort zu öffnen, die Ausführung zu beenden, den Pfad zu bearbeiten sowie Prozesserkennung, Start und Updateschutz zu konfigurieren. Ausführung beenden pausiert zugleich die Überwachung, daher wird das Ziel nicht automatisch neu gestartet; unzureichende Administratorrechte werden weiterhin gemeldet.")
         catalog.Set("添加", "Hinzufügen")
         catalog.Set("暂停", "Pausieren")
         catalog.Set("恢复", "Fortsetzen")
@@ -1763,25 +1754,26 @@ class GermanStrings {
         catalog.Set("自动识别目标新位置", "Neuen Speicherort des Ziels automatisch erkennen")
         catalog.Set("检测到的目标新位置已失效，请重新操作。", "Der erkannte neue Speicherort ist nicht mehr gültig. Bitte versuchen Sie es erneut.")
         catalog.Set("已更新已更名的守护目标：{1} -> {2}", "Das umbenannte Überwachungsziel wurde aktualisiert: {1} -> {2}")
-        catalog.Set("守护目标更名识别服务未能启动。", "Der Dienst zur Erkennung umbenannter Ziele konnte nicht gestartet werden.")
+        catalog.Set("守护目标内容迁移识别服务未能启动。", "Der Dienst zur inhaltsbasierten Verschiebungserkennung von Überwachungszielen konnte nicht gestartet werden.")
         catalog.Set("检测到守护目标可能已更名，等待用户确认：{1} -> {2}", "Ein Überwachungsziel wurde möglicherweise umbenannt`; Bestätigung ausstehend: {1} -> {2}")
-        catalog.Set("守护目标更名识别异常：{1}", "Fehler beim Erkennen eines umbenannten Überwachungsziels: {1}")
         catalog.Set("确认窗口暂时无法显示，将稍后重试", "Das Bestätigungsfenster kann vorübergehend nicht angezeigt werden. Der Vorgang wird in Kürze erneut versucht.")
-        catalog.Set("守护目标目录监听异常（{1}）：{2}", "Fehler bei der Ordnerüberwachung des Ziels（{1}）: {2}")
+        catalog.Set("发现多个内容完全相同的迁移候选，已暂停自动迁移：{1}", "Mehrere Verschiebungskandidaten mit identischem Inhalt gefunden`; die automatische Verschiebung wurde angehalten: {1}")
+        catalog.Set("检测到内容一致的守护目标新位置，等待用户确认：{1} -> {2}", "Neuen Speicherort mit übereinstimmendem Inhalt erkannt`; Bestätigung ausstehend: {1} -> {2}")
+        catalog.Set("守护目标内容迁移识别异常：{1}", "Fehler bei der inhaltsbasierten Verschiebungserkennung des Ziels: {1}")
         catalog.Set("等待确认目标新位置", "Bestätigung des neuen Zielspeicherorts ausstehend")
         catalog.Set("确认目标新位置", "Neuen Zielspeicherort bestätigen")
         catalog.Set("检测到守护目标可能已更名", "Ein Überwachungsziel wurde möglicherweise umbenannt")
-        catalog.Set("小助手找到了与原文件身份一致的新路径。确认后将更新守护目标，名称、图标和启动设置保持不变。", "Der Assistent hat einen neuen Pfad mit derselben Dateiidentität gefunden. Nach der Bestätigung wird das Überwachungsziel aktualisiert`; Name, Symbol und Starteinstellungen bleiben erhalten.")
+        catalog.Set("小助手找到了与原文件内容完全一致的新路径。确认后将更新守护目标，名称、图标和启动设置保持不变。", "Der Assistent hat einen neuen Pfad mit exakt gleichem Dateiinhalt gefunden. Nach der Bestätigung wird das Überwachungsziel aktualisiert`; Name, Symbol und Starteinstellungen bleiben erhalten.")
         catalog.Set("原路径：", "Bisheriger Pfad:")
         catalog.Set("新路径：", "Neuer Pfad:")
-        catalog.Set("Windows 文件身份一致", "Übereinstimmende Windows-Dateiidentität")
-        catalog.Set("Windows 重命名事件", "Windows-Umbenennungsereignis")
         catalog.Set("识别依据：", "Erkennungsgrundlage: ")
         catalog.Set("更新守护路径", "Überwachungspfad aktualisieren")
         catalog.Set("忽略", "Ignorieren")
         catalog.Set("更新已更名的守护目标", "Umbenanntes Überwachungsziel aktualisieren")
-        catalog.Set("• 直接添加的程序或脚本在小助手运行期间更名或在同一卷（通常是同一盘符）内移动后，小助手会按 Windows 文件身份找回新路径并请您确认，不会按相似文件名猜测。", "• Wird ein direkt hinzugefügtes Programm oder Skript bei laufendem Assistenten umbenannt oder auf demselben Volume verschoben, ermittelt der Assistent den neuen Pfad anhand der Windows-Datei-ID und bittet um Bestätigung. Ähnliche Dateinamen werden nicht als Grundlage für Vermutungen verwendet.")
-        catalog.Set("• 确认后只更新守护路径，名称、图标和启动设置保持不变；关闭小助手期间发生的更名或跨磁盘移动无法可靠自动识别，请双击守护对象手动更新完整路径。", "• Nach der Bestätigung wird nur der überwachte Pfad geändert. Name, Symbol und Starteinstellungen bleiben erhalten. Umbenennungen bei beendetem Assistenten und Verschiebungen auf ein anderes Volume lassen sich nicht zuverlässig automatisch erkennen. Doppelklicken Sie dann auf den Eintrag, um den vollständigen Pfad manuell zu aktualisieren.")
+        catalog.Set("• 直接添加的程序或脚本本身或上级目录被更名、跨目录或跨磁盘移动后，小助手会按文件大小筛选并以 SHA-256 内容哈希确认新路径；即使移动发生在小助手关闭期间也能识别。", "• Wird ein direkt hinzugefügtes Programm, Skript oder dessen übergeordneter Ordner umbenannt oder zwischen Ordnern bzw. Laufwerken verschoben, filtert der Assistent nach Dateigröße und bestätigt den neuen Pfad per SHA-256-Inhaltshash, auch wenn er dabei geschlossen war.")
+        catalog.Set("• 文件名、文件 ID 和目录监听不参与迁移判断。发现多个内容相同的副本或扫描未完整完成时不会猜测目标；确认后只更新守护路径，名称、图标和启动设置保持不变。", "• Dateinamen, Datei-IDs und Ordnerüberwachung fließen nicht in die Verschiebungsentscheidung ein. Bei identischen Kopien oder unvollständiger Suche wird kein Ziel geraten. Nach der Bestätigung ändert sich nur der überwachte Pfad`; Name, Symbol und Starteinstellungen bleiben erhalten.")
+        catalog.Set("; AppN 与 [Apps] 中同名的直接文件目标一一对应，依次保存文件大小和 SHA-256 内容哈希。", "; Jeder AppN-Eintrag gehört zur gleichnamigen direkt überwachten Datei in [Apps] und speichert Dateigröße und anschließend den SHA-256-Inhaltshash.")
+        catalog.Set("; 此节由小助手自动维护，用于在文件或目录改名、跨目录或跨磁盘移动后确认内容未变；请勿手动编辑。", "; Der Assistent verwaltet diesen Abschnitt automatisch, um nach Umbenennungen oder Verschiebungen zwischen Ordnern oder Laufwerken unveränderte Inhalte zu bestätigen. Nicht manuell bearbeiten.")
         return catalog
     }
 }

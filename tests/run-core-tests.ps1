@@ -106,6 +106,41 @@ try {
             -ErrorAction SilentlyContinue
     }
 
+    # 生产扫描器默认排除 A_Temp，夹具必须位于该排除根之外才能验证真实命中。
+    $contentWorkerRoot = Join-Path $PSScriptRoot `
+        ("watchdog-content-worker-validation-{0}" -f [guid]::NewGuid().ToString('N'))
+    $contentWorkerOutput = Join-Path $contentWorkerRoot 'result.tmp'
+    try {
+        $contentCandidateDirectory = Join-Path $contentWorkerRoot 'renamed-parent'
+        New-Item -ItemType Directory -Path $contentCandidateDirectory -Force |
+            Out-Null
+        $contentCandidatePath = Join-Path $contentCandidateDirectory `
+            'completely-renamed.ahk'
+        $contentBytes = [System.Text.Encoding]::UTF8.GetBytes(
+            "#Requires AutoHotkey v2.0`r`nMsgBox('content identity')`r`n")
+        [System.IO.File]::WriteAllBytes($contentCandidatePath, $contentBytes)
+        $missingPreviousPath = Join-Path $contentWorkerRoot 'original-name.ahk'
+        $contentHash = (Get-FileHash -Algorithm SHA256 -LiteralPath `
+            $contentCandidatePath).Hash
+        Invoke-AutoHotkeyTest `
+            "/ErrorStdOut `"$($mainScript.FullName)`" --content-match-worker `"$contentWorkerOutput`" `"$contentWorkerRoot`" `"$missingPreviousPath`" $($contentBytes.Length) $contentHash 0 10" `
+            'Content-match worker exit validation failed.'
+        if (-not (Test-Path -LiteralPath $contentWorkerOutput)) {
+            throw 'Content-match worker did not publish its result file.'
+        }
+        $contentWorkerHeader = Get-Content -LiteralPath $contentWorkerOutput `
+            -Encoding Unicode -TotalCount 1
+        if ($contentWorkerHeader -ne 'COMPLETE|1') {
+            throw "Content-match worker published an invalid result header: $contentWorkerHeader"
+        }
+        Write-Host 'Content-match worker exit validation passed.'
+    } finally {
+        if (Test-Path -LiteralPath $contentWorkerRoot) {
+            Remove-Item -LiteralPath $contentWorkerRoot -Recurse -Force `
+                -ErrorAction SilentlyContinue
+        }
+    }
+
     $testScripts = Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'core') -Filter '*-tests.ahk' -File
     if (-not $testScripts.Count) {
         throw 'No core AHK tests were found.'

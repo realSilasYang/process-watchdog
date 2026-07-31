@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../assets/app/watchdog-logo.png" width="112" height="112" alt="Logotipo do Process Watchdog Assistant">
+  <img src="../assets/app/watchdog-logo.png" width="112" alt="Logotipo do Process Watchdog Assistant">
 
   <p><a href="../README.md">简体中文</a> · <a href="./README.zh-HK.md">繁體中文（香港）</a> · <a href="./README.zh-TW.md">繁體中文（台灣）</a> · <a href="./README.en.md">English</a> · <a href="./README.ja.md">日本語</a> · <a href="./README.vi.md">Tiếng Việt</a> · <a href="./README.ko.md">한국어</a> · <a href="./README.es.md">Español</a> · <a href="./README.fr.md">Français</a> · <strong>Português</strong> · <a href="./README.ru.md">Русский</a> · <a href="./README.de.md">Deutsch</a> · <a href="./README.it.md">Italiano</a></p>
 
@@ -45,7 +45,7 @@ A janela principal reúne a ordem dos alvos monitorados, o ícone do aplicativo,
 - Monitora alvos EXE, AHK, Python, JavaScript, PowerShell, BAT, CMD e LNK.
 - Usa os resultados `Running`, `Stopped` e `Unknown`; um resultado desconhecido nunca causa uma reinicialização às cegas.
 - Cada alvo recebe controlador, geração e tokens de tarefa próprios. Retornos antigos são invalidados imediatamente após pausar, excluir ou alterar o caminho.
-- Pode exigir privilégios de administrador. Avisa quando uma instância em execução não cumpre o requisito e eleva uma reinicialização manual conforme a configuração.
+- Pode exigir privilégios de administrador. Avisa quando uma instância em execução não cumpre o requisito e eleva a próxima inicialização monitorada conforme a configuração.
 - A proteção de atualização fica desativada por padrão. Quando ativada, combina processos de atualização, relações pai-filho, atividade da pasta de instalação e estabilidade dos arquivos antes de pausar ou retomar o monitoramento.
 - Substitui a configuração de forma atômica. Registros que não podem ser analisados vão para `[Recovery]` em vez de desaparecer silenciosamente.
 - A busca de aplicativos usa exclusivamente o serviço Everything, sem varredura local de todo o disco nem limite de resultados imposto pelo aplicativo. Conjuntos grandes são adicionados em lotes curtos para que a extração de ícones não bloqueie a interface.
@@ -120,7 +120,7 @@ Fechar a janela principal apenas a oculta na área de notificação; o monitoram
 
 Um item pode definir seu ponto de entrada, pasta de trabalho, argumentos e exigência de administrador. O LNK permanece como ponto de entrada e o caminho real do programa é armazenado separadamente para identificar o processo. Assim, um atalho indireto criado pelo instalador não precisa ser substituído manualmente por um EXE interno que pode mudar.
 
-O menu de contexto permite abrir a pasta, reiniciar, mudar o caminho, configurar a identificação do processo e a inicialização, alternar a exigência de administrador, configurar a proteção e personalizar o nome ou ícone exibido apenas na janela principal. A apresentação não muda a identidade, a inicialização nem a proteção. Se a exibição já for a padrão, a restauração fica desativada.
+O menu de contexto permite abrir a pasta, encerrar a execução do alvo, mudar o caminho, configurar a identificação do processo e a inicialização, alternar a exigência de administrador, configurar a proteção e personalizar o nome ou ícone exibido apenas na janela principal. Encerrar execução também pausa o monitoramento para impedir uma reinicialização automática. A apresentação não muda a identidade, a inicialização nem a proteção. Se a exibição já for a padrão, a restauração fica desativada.
 
 Somente itens BAT e CMD exibem também a opção Ver log de saída em lote; os demais tipos de alvo não mostram esse comando. O arquivo de log separado só é criado quando o assistente realmente inicia o item e captura sua saída padrão e de erro. Um processo em lote que já estava em execução não recebe esse arquivo automaticamente.
 

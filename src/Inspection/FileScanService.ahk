@@ -5,6 +5,7 @@
 
 class FileScanService {
     static MaximumResultLimit := 20000
+    static MaximumContentMatches := 2
 
     __New(callbacks, host := "") {
         this.Callbacks := callbacks
@@ -23,6 +24,13 @@ class FileScanService {
         this.TempDirectory := IsObject(host)
             && host.HasOwnProp("TempDirectory")
             ? host.TempDirectory : A_Temp
+        this.RelocationExcludedRoots := []
+        if IsObject(host) && host.HasOwnProp("CandidateExclusionRoots")
+            && Type(host.CandidateExclusionRoots) == "Array" {
+            for excludedRoot in host.CandidateExclusionRoots
+                this.RelocationExcludedRoots.Push(excludedRoot)
+        } else if A_Temp != ""
+            this.RelocationExcludedRoots.Push(A_Temp)
         this.Workers := Map()
         this.Workers.CaseSense := "Off"
         this.Stopped := false
@@ -151,6 +159,41 @@ class FileScanService {
         command := Format('{} --file-scan-worker "{}" "{}" {} {} {}',
             workerPrefix, outputPath, rootPath, recursive ? 1 : 0,
             maximumResults, timeoutSeconds)
+        return this.StartPreparedWorker(command, outputPath, startedTicks,
+            timeoutSeconds, "Import")
+    }
+
+    StartContentMatch(rootPath, previousPath, expectedSize, expectedHash,
+        useEverything := false, timeoutSeconds := 60) {
+        static contentWorkerSequence := 0
+        if this.Stopped
+            return ""
+        previousCritical := A_IsCritical
+        Critical("On")
+        try {
+            contentWorkerSequence++
+            currentWorkerSequence := contentWorkerSequence
+        } finally {
+            Critical(previousCritical ? previousCritical : "Off")
+        }
+        timeoutSeconds := Max(1, Integer(timeoutSeconds))
+        startedTicks := this.Now()
+        outputPath := Format("{}\watchdog-relocation-{}-{}-{}.tmp",
+            this.TempDirectory, this.ScriptWindow, startedTicks,
+            currentWorkerSequence)
+        workerPrefix := this.Compiled
+            ? '"' this.ScriptPath '"'
+            : '"' this.InterpreterPath '" "' this.ScriptPath '"'
+        command := Format(
+            '{} --content-match-worker "{}" "{}" "{}" {} {} {} {}',
+            workerPrefix, outputPath, rootPath, previousPath, expectedSize,
+            expectedHash, useEverything ? 1 : 0, timeoutSeconds)
+        return this.StartPreparedWorker(command, outputPath, startedTicks,
+            timeoutSeconds, "ContentMatch")
+    }
+
+    StartPreparedWorker(command, outputPath, startedTicks, timeoutSeconds,
+        kind) {
         workerPid := 0
         workerHandle := 0
         creationIdentity := ""
@@ -183,7 +226,8 @@ class FileScanService {
         }
         job := {Pid: workerPid, Handle: workerHandle, Path: outputPath,
             CreationIdentity: creationIdentity,
-            DeadlineTicks: startedTicks + timeoutSeconds * 1000 + 5000}
+            DeadlineTicks: startedTicks + timeoutSeconds * 1000 + 5000,
+            Kind: kind}
         rejectedAfterLaunch := false
         previousCritical := A_IsCritical
         Critical("On")
@@ -200,6 +244,30 @@ class FileScanService {
             return ""
         }
         return job
+    }
+
+    PollContentMatch(job) {
+        if !IsObject(job) || !job.HasOwnProp("Path")
+            return {Ready: true, Paths: [], Truncated: false, Failed: true}
+        if FileExist(job.Path) {
+            paths := this.ReadResult(job.Path, &truncated, &ready)
+            return {Ready: ready, Paths: paths, Truncated: truncated,
+                Failed: !ready}
+        }
+        workerExited := job.HasOwnProp("Handle") && job.Handle
+            && this.GetWorkerHandleStatus(job.Handle) == 0
+        if this.Now() >= job.DeadlineTicks || workerExited {
+            this.Stop(job.Pid, job.Path, job.CreationIdentity, job.Handle)
+            return {Ready: true, Paths: [], Truncated: false, Failed: true}
+        }
+        return {Ready: false, Paths: [], Truncated: false, Failed: false}
+    }
+
+    StopContentMatch(job) {
+        if !IsObject(job) || !job.HasOwnProp("Path")
+            return false
+        this.Stop(job.Pid, job.Path, job.CreationIdentity, job.Handle)
+        return true
     }
 
     LaunchWorker(command) {
@@ -320,6 +388,226 @@ class FileScanService {
         outputDeleted := this.DeletePathWithRetry(outputPath)
         writingDeleted := this.DeletePathWithRetry(outputPath ".writing")
         return outputDeleted && writingDeleted
+    }
+
+    WriteContentMatchWorkerFile(outputPath, rootPath, previousPath,
+        expectedSize, expectedHash, useEverything, timeoutSeconds) {
+        expectedHash := StrUpper(Trim(expectedHash))
+        try expectedSize := Integer(expectedSize)
+        catch
+            return false
+        if expectedSize < 0
+            || !RegExMatch(expectedHash, "^[0-9A-F]{64}$")
+            return false
+        deadlineTicks := this.Now() + Max(1, Integer(timeoutSeconds)) * 1000
+        seen := Map()
+        seen.CaseSense := "Off"
+        results := []
+        completed := false
+        if useEverything {
+            indexedResult := this.QueryEverythingCandidates(rootPath,
+                previousPath, expectedSize)
+            if indexedResult.Available {
+                completed := true
+                for candidatePath in indexedResult.Paths {
+                    if !this.AddContentMatch(candidatePath, previousPath,
+                            expectedSize, expectedHash, deadlineTicks, seen,
+                            results) {
+                        ; 两个匹配已经足以证明歧义；否则中断只能表示截止时间
+                        ; 已到，必须发布 TRUNCATED，不能把尚未哈希的索引结果
+                        ; 当成已排除并据此迁移唯一候选。
+                        completed := results.Length
+                            >= FileScanService.MaximumContentMatches
+                        break
+                    }
+                }
+            }
+        }
+        if !completed {
+            completed := results.Length
+                    >= FileScanService.MaximumContentMatches
+                || this.ScanContentMatches(rootPath, previousPath,
+                    expectedSize, expectedHash, deadlineTicks, seen, results)
+        }
+        return this.WriteResultFile(outputPath, results,
+            completed ? "COMPLETE" : "TRUNCATED")
+    }
+
+    ScanContentMatches(rootPath, previousPath, expectedSize, expectedHash,
+        deadlineTicks, seen, results) {
+        if !DirExist(rootPath)
+            return true
+        try {
+            Loop Files, RTrim(rootPath, "\") "\*.*", "FR" {
+                if this.Now() >= deadlineTicks
+                    return false
+                if results.Length >= FileScanService.MaximumContentMatches
+                    return true
+                if !this.ExtensionsCompatible(previousPath,
+                        A_LoopFileFullPath)
+                    continue
+                try candidateSize := FileGetSize(A_LoopFileFullPath)
+                catch
+                    continue
+                if candidateSize != expectedSize
+                    continue
+                if !this.AddContentMatch(A_LoopFileFullPath, previousPath,
+                        expectedSize, expectedHash, deadlineTicks, seen,
+                        results)
+                    return this.Now() < deadlineTicks
+            }
+        }
+        return this.Now() < deadlineTicks
+    }
+
+    AddContentMatch(candidatePath, previousPath, expectedSize, expectedHash,
+        deadlineTicks, seen, results) {
+        if this.Now() >= deadlineTicks
+            return false
+        if !FileExist(candidatePath) || DirExist(candidatePath)
+            || !this.IsRelocationCandidatePathAllowed(candidatePath)
+            || !this.ExtensionsCompatible(previousPath, candidatePath)
+            || this.CanonicalPath(candidatePath)
+                == this.CanonicalPath(previousPath)
+            return true
+        canonicalPath := this.CanonicalPath(candidatePath)
+        if canonicalPath == "" || seen.Has(canonicalPath)
+            return true
+        seen[canonicalPath] := true
+        try candidateSize := FileGetSize(candidatePath)
+        catch
+            return true
+        if candidateSize != expectedSize
+            return true
+        try contentHash := this.Callbacks.ComputeContentHash.Call(
+            candidatePath)
+        catch
+            contentHash := ""
+        if StrUpper(contentHash) == expectedHash
+            results.Push(candidatePath)
+        return results.Length < FileScanService.MaximumContentMatches
+            && this.Now() < deadlineTicks
+    }
+
+    IsRelocationCandidatePathAllowed(candidatePath) {
+        canonicalPath := this.CanonicalPath(candidatePath)
+        if canonicalPath == ""
+            return false
+        for excludedRoot in this.RelocationExcludedRoots {
+            if this.IsPathWithinRoot(canonicalPath, excludedRoot)
+                return false
+        }
+        ; 编辑器历史、版本库元数据和系统回收目录只保存派生副本，不能
+        ; 成为可执行守护目标的自动迁移落点。
+        static excludedFragments := [
+            "\appdata\roaming\code\user\history\",
+            "\appdata\roaming\code - insiders\user\history\",
+            "\appdata\roaming\vscodium\user\history\",
+            "\appdata\roaming\cursor\user\history\",
+            "\appdata\roaming\windsurf\user\history\",
+            "\.history\", "\.git\", "\.svn\", "\.hg\",
+            "\$recycle.bin\", "\system volume information\",
+            "\node_modules\.cache\", "\__pycache__\"
+        ]
+        pathWithBoundary := RTrim(canonicalPath, "\") "\"
+        for fragment in excludedFragments {
+            if InStr(pathWithBoundary, fragment)
+                return false
+        }
+        return true
+    }
+
+    IsPathWithinRoot(candidatePath, rootPath) {
+        candidatePath := this.CanonicalPath(candidatePath)
+        rootPath := RTrim(this.CanonicalPath(rootPath), "\")
+        if candidatePath == "" || rootPath == ""
+            return false
+        return InStr(candidatePath, rootPath "\") == 1
+    }
+
+    ExtensionsCompatible(previousPath, candidatePath) {
+        SplitPath(previousPath, , , &previousExtension)
+        SplitPath(candidatePath, , , &candidateExtension)
+        previousExtension := StrLower(previousExtension)
+        candidateExtension := StrLower(candidateExtension)
+        if RegExMatch(previousExtension, "i)^(exe|com)$")
+            return RegExMatch(candidateExtension, "i)^(exe|com)$") != 0
+        return previousExtension != ""
+            && previousExtension == candidateExtension
+    }
+
+    WriteResultFile(outputPath, results, status := "COMPLETE") {
+        outputText := Format("{}|{}`r`n", status, results.Length)
+        for filePath in results
+            outputText .= IniFieldCodec.Encode(filePath) "`r`n"
+        tempPath := outputPath ".writing"
+        try {
+            if !this.DeletePathWithRetry(tempPath)
+                return false
+            FileAppend(outputText, tempPath, "UTF-16")
+            FileMove(tempPath, outputPath, 1)
+            return true
+        } catch {
+            this.DeletePathWithRetry(tempPath)
+            return false
+        }
+    }
+
+    QueryEverythingCandidates(rootPath, previousPath, expectedSize) {
+        queryResult := {Available: false, Paths: []}
+        dllPath := this.ScriptDirectory
+            . "\third_party\everything\Everything64.dll"
+        if !FileExist(dllPath)
+            return queryResult
+        moduleHandle := DllCall("kernel32\LoadLibraryExW", "WStr", dllPath,
+            "Ptr", 0, "UInt", 0x00000900, "Ptr")
+        if !moduleHandle
+            return queryResult
+        try {
+            functions := Map()
+            for functionName in ["Everything_SetSearchW",
+                "Everything_SetMax", "Everything_QueryW",
+                "Everything_GetNumResults", "Everything_GetResultFileNameW",
+                "Everything_GetResultPathW"] {
+                address := DllCall("kernel32\GetProcAddress", "Ptr",
+                    moduleHandle, "AStr", functionName, "Ptr")
+                if !address
+                    return queryResult
+                functions[functionName] := address
+            }
+            SplitPath(previousPath, , , &extension)
+            extension := StrLower(extension)
+            extensionQuery := RegExMatch(extension, "i)^(exe|com)$")
+                ? "ext:exe;com" : "ext:" extension
+            query := "size:" expectedSize " " extensionQuery
+            DllCall(functions["Everything_SetSearchW"], "WStr", query)
+            DllCall(functions["Everything_SetMax"], "UInt", 0xFFFFFFFF)
+            if !DllCall(functions["Everything_QueryW"], "Int", true,
+                "Int")
+                return queryResult
+            queryResult.Available := true
+            resultCount := DllCall(
+                functions["Everything_GetNumResults"], "UInt")
+            Loop resultCount {
+                resultIndex := A_Index - 1
+                fileNamePointer := DllCall(
+                    functions["Everything_GetResultFileNameW"], "UInt",
+                    resultIndex, "Ptr")
+                pathPointer := DllCall(
+                    functions["Everything_GetResultPathW"], "UInt",
+                    resultIndex, "Ptr")
+                if !fileNamePointer || !pathPointer
+                    continue
+                fileName := StrGet(fileNamePointer, "UTF-16")
+                directory := StrGet(pathPointer, "UTF-16")
+                candidatePath := RTrim(directory, "\") "\" fileName
+                if this.IsPathWithinRoot(candidatePath, rootPath)
+                    queryResult.Paths.Push(candidatePath)
+            }
+            return queryResult
+        } catch {
+            return queryResult
+        } finally DllCall("kernel32\FreeLibrary", "Ptr", moduleHandle)
     }
 
     OpenWorkerHandle(pid) {
