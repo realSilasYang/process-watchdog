@@ -60,7 +60,7 @@ if ($SecondPowerShellPath) {
         -Raw -Encoding UTF8).Trim()
     $packageName = "process-watchdog-$version-windows-x64"
     $sourceName = "process-watchdog-$version-source"
-    $fontName = "process-watchdog-$version-fonts"
+    $fontName = "fonts"
     $second = [pscustomobject]@{
         PackageDirectory = Join-Path $outputRoot $packageName
         ZipPath = Join-Path $outputRoot "$packageName.zip"

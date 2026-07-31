@@ -106,7 +106,7 @@ resources for the separate font package. Neither the source ZIP nor portable ZIP
 contains fonts. The portable ZIP embeds the AutoHotkey runtime that passed the
 complete release test suite, so ordinary users do not need a separate installation.
 
-The optional `process-watchdog-X.Y.Z-fonts.zip` supplies preferred and Noto fallback UI fonts. Install the desired fonts into Windows before use; they are not required to run the assistant. Application search separately requires the [latest official Everything release](https://www.voidtools.com/downloads/). The bundled `Everything64.dll` is only an IPC client for its index and background service and cannot replace Everything itself.
+The optional `fonts.zip` supplies preferred and Noto fallback UI fonts. Install the desired fonts into Windows before use; they are not required to run the assistant. Application search separately requires the [latest official Everything release](https://www.voidtools.com/downloads/). The bundled `Everything64.dll` is only an IPC client for its index and background service and cannot replace Everything itself.
 
 ### Versions and runtime forms
 

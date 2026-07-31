@@ -742,9 +742,9 @@ foreach ($releaseRequirement in @(
         'path: dist/**',
         'include-hidden-files: true',
         '-SecondPowerShellPath powershell.exe',
-        'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.zip',
+        'dist/fonts.zip',
         'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-source.zip',
-        'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-fonts.zip',
+        'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.zip',
         'draft: true',
         '--draft=false')) {
     if (-not $releaseWorkflow.Contains($releaseRequirement)) {

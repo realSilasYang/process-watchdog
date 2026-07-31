@@ -146,7 +146,7 @@ $sourcePackageDirectory = Assert-OutputPath `
     (Join-Path $outputRoot $sourcePackageName)
 $sourceZipPath = Assert-OutputPath `
     (Join-Path $outputRoot "$sourcePackageName.zip")
-$fontPackageName = "process-watchdog-$version-fonts"
+$fontPackageName = "fonts"
 $fontPackageDirectory = Assert-OutputPath `
     (Join-Path $outputRoot $fontPackageName)
 $fontZipPath = Assert-OutputPath `
@@ -155,9 +155,14 @@ $releaseSbomPath = Assert-OutputPath `
     (Join-Path $outputRoot "$packageName.spdx.json")
 $checksumsPath = Assert-OutputPath (Join-Path $outputRoot 'SHA256SUMS.txt')
 $obsoleteSingleFileExecutablePath = Assert-OutputPath (Join-Path $outputRoot "$packageName.exe")
+$obsoleteVersionedFontDirectory = Assert-OutputPath `
+    (Join-Path $outputRoot "process-watchdog-$version-fonts")
+$obsoleteVersionedFontZipPath = Assert-OutputPath `
+    (Join-Path $outputRoot "process-watchdog-$version-fonts.zip")
 foreach ($path in @($packageDirectory, $zipPath, $sourcePackageDirectory,
         $sourceZipPath, $fontPackageDirectory, $fontZipPath,
-        $releaseSbomPath, $checksumsPath, $obsoleteSingleFileExecutablePath)) {
+        $releaseSbomPath, $checksumsPath, $obsoleteSingleFileExecutablePath,
+        $obsoleteVersionedFontDirectory, $obsoleteVersionedFontZipPath)) {
     if (Test-Path -LiteralPath $path) {
         [void](Assert-OutputPath $path)
         Remove-Item -LiteralPath $path -Recurse -Force

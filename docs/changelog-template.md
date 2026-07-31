@@ -11,10 +11,10 @@
 
 ### 📦 发布物说明
 
-- **`process-watchdog-X.Y.Z-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证和运行所需资源，不含字体；无需安装 AutoHotkey，适合完整解压后长期使用。
+- **`fonts.zip`（可选字体包）**：提供首选字体和回退字体，需先安装到 Windows；它不是程序运行必需。
 - **`process-watchdog-X.Y.Z-source.zip`（完整源码版）**：包含 AHK 源码、模块、测试和文档，不含字体，适合审阅、开发或从源码运行；本机需要 AutoHotkey v2 x64。
-- **`process-watchdog-X.Y.Z-fonts.zip`（可选字体包）**：提供首选字体和回退字体，需先安装到 Windows；它不是程序运行必需。
-- **Everything（官方最新版：https://www.voidtools.com/downloads/）**：为程序搜索提供索引和后台服务；随包 `Everything64.dll` 只是 IPC 客户端，不能替代 Everything 本体。
+- **`process-watchdog-X.Y.Z-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证和运行所需资源，不含字体；无需安装 AutoHotkey，适合完整解压后长期使用。
+- **Everything（[官方最新版](https://www.voidtools.com/downloads/)）**：为程序搜索提供索引和后台服务；随包 `Everything64.dll` 只是 IPC 客户端，不能替代 Everything 本体。
 
 ---
 
@@ -48,7 +48,9 @@
   `🎉 版本 [X.Y.Z] - YYYY-MM-DD`。版本号必须与 `VERSION`、主脚本
   Ahk2Exe 文件版本和 Git 标签一致；构建工具依赖该格式生成 SBOM 时间戳。
 - 每个正式版本必须包含 `📦 发布物说明`，逐项给出三个准确文件名、版本定位、包含
-  内容、AutoHotkey 要求和适用场景；发布门禁会核对这些信息，不能只写“见附件”。
+  内容、AutoHotkey 要求和适用场景；三个附件必须按 GitHub 的固定展示顺序列为
+  `fonts.zip`、源码 ZIP、便携 ZIP，Everything 使用显式 Markdown 链接并排在其后。
+  发布门禁会核对这些信息，不能只写“见附件”。
 - `⚠️ 重要说明` 是可选的警告章节，默认不生成。只有现有数据或配置不兼容、可能
   丢失数据、最低环境或权限发生破坏性变化、原有默认行为带来升级风险，或者用户必须
   在升级前后执行迁移、备份、替换等操作时才加入。
@@ -84,10 +86,10 @@
 
 ### 📦 发布物说明
 
-- **`process-watchdog-1.0.1-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证和运行所需资源，不含字体；无需安装 AutoHotkey，适合完整解压后长期使用。
+- **`fonts.zip`（可选字体包）**：提供首选字体和回退字体，需先安装到 Windows；它不是程序运行必需。
 - **`process-watchdog-1.0.1-source.zip`（完整源码版）**：包含 AHK 源码、模块、测试和文档，不含字体，适合审阅、开发或从源码运行；本机需要 AutoHotkey v2 x64。
-- **`process-watchdog-1.0.1-fonts.zip`（可选字体包）**：提供首选字体和回退字体，需先安装到 Windows；它不是程序运行必需。
-- **Everything（官方最新版：https://www.voidtools.com/downloads/）**：为程序搜索提供索引和后台服务；随包 `Everything64.dll` 只是 IPC 客户端，不能替代 Everything 本体。
+- **`process-watchdog-1.0.1-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证和运行所需资源，不含字体；无需安装 AutoHotkey，适合完整解压后长期使用。
+- **Everything（[官方最新版](https://www.voidtools.com/downloads/)）**：为程序搜索提供索引和后台服务；随包 `Everything64.dll` 只是 IPC 客户端，不能替代 Everything 本体。
 
 ---
 

@@ -319,7 +319,7 @@ $script:CurrentVersion = '1.0.0'
 $script:PackageKind = 'compiled'
 $script:MockRelease = New-MockRelease 'v1.1.0' @(
     (New-MockAsset 'process-watchdog-1.1.0-windows-x64.zip'),
-    (New-MockAsset 'process-watchdog-1.1.0-fonts.zip'))
+    (New-MockAsset 'fonts.zip'))
 Invoke-Check
 Assert-UpdateHelperTest ($script:CapturedCheckResult.Status -ceq 'available') `
     '编译版被缺少无关源码附件或独立校验文件的发行版错误阻断。'

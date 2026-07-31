@@ -11,10 +11,10 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### 📦 Release Assets
 
-- **`process-watchdog-2.0.6-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, and runtime resources without fonts; no AutoHotkey installation is required, and it is intended for long-term use after full extraction.
+- **`fonts.zip` (optional font package):** Provides the preferred and fallback fonts for installation into Windows; it is not required to run the application.
 - **`process-watchdog-2.0.6-source.zip` (complete source package):** Includes the AHK source, modules, tests, and documentation without fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
-- **`process-watchdog-2.0.6-fonts.zip` (optional font package):** Provides the preferred and fallback fonts for installation into Windows; it is not required to run the application.
-- **Everything (latest official version: https://www.voidtools.com/downloads/):** Provides the index and background service used by application searches. The bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+- **`process-watchdog-2.0.6-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, and runtime resources without fonts; no AutoHotkey installation is required, and it is intended for long-term use after full extraction.
+- **Everything ([latest official version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application searches. The bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
 
 ---
 

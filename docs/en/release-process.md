@@ -94,9 +94,12 @@ matching changelog entry as its source of truth, explaining each asset, runtime
 requirement, and intended use. Test and manual-acceptance evidence remains in
 dedicated validation records.
 Each Release contains two program editions (the complete portable ZIP and complete
-source ZIP) plus an optional font ZIP. The font package supplies preferred and fallback
-UI fonts for installation into Windows and is not required to run the program. Release
-notes also link the [latest official Everything release](https://www.voidtools.com/downloads/), explain that it supplies the index and
+source ZIP) plus the fixed-name optional package `fonts.zip`. The release-assets
+section must follow GitHub's fixed filename order: `fonts.zip`, complete source ZIP,
+complete portable ZIP, and then Everything. The Everything URL must be an explicit
+Markdown link rather than a bare URL inside bold text. The font package supplies
+preferred and fallback UI fonts for installation into Windows and is not required to
+run the program. Release notes also link the [latest official Everything release](https://www.voidtools.com/downloads/), explain that it supplies the index and
 background service for application search, and state that `Everything64.dll` is only
 an IPC client and cannot replace Everything itself. The SBOM, `SHA256SUMS.txt`, and extracted
 package directories remain available only in the complete Actions build artifact.

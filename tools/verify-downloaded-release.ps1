@@ -66,10 +66,11 @@ try {
         -Repository $Repository -ArtifactDirectory $fullAuditRoot `
         -BodyPath $BodyPath
 
-    $artifactNames = @(Get-ReleaseArtifactNames $Version)
-    $portableArchivePath = Join-Path $fullAuditRoot $artifactNames[0]
-    $sourceArchivePath = Join-Path $fullAuditRoot $artifactNames[1]
-    $fontArchivePath = Join-Path $fullAuditRoot $artifactNames[2]
+    $portableArchivePath = Join-Path $fullAuditRoot `
+        "process-watchdog-$Version-windows-x64.zip"
+    $sourceArchivePath = Join-Path $fullAuditRoot `
+        "process-watchdog-$Version-source.zip"
+    $fontArchivePath = Join-Path $fullAuditRoot 'fonts.zip'
     $portableRoot = Join-Path $fullAuditRoot 'portable'
     $sourceRoot = Join-Path $fullAuditRoot 'source'
     $fontRoot = Join-Path $fullAuditRoot 'fonts'

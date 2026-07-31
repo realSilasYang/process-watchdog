@@ -181,9 +181,9 @@ function Get-ReleaseArtifactNames {
         throw "VERSION 不是规范的三段语义化版本：$Version"
     }
     return @(
-        "process-watchdog-$Version-windows-x64.zip"
+        'fonts.zip'
         "process-watchdog-$Version-source.zip"
-        "process-watchdog-$Version-fonts.zip"
+        "process-watchdog-$Version-windows-x64.zip"
     )
 }
 
@@ -483,9 +483,9 @@ function Assert-ReleaseNotesContent {
 
     $specifications = @(
         @{
-            Name = "process-watchdog-$Version-windows-x64.zip"
-            Required = @('完整便携版', 'EXE', '说明文档', '许可证',
-                '运行所需资源', '无需安装 AutoHotkey', '不含字体')
+            Name = 'fonts.zip'
+            Required = @('可选字体包', '首选字体', '回退字体',
+                '安装到 Windows', '不是程序运行必需')
         }
         @{
             Name = "process-watchdog-$Version-source.zip"
@@ -493,11 +493,12 @@ function Assert-ReleaseNotesContent {
                 '不含字体', '审阅', '开发', 'AutoHotkey v2 x64')
         }
         @{
-            Name = "process-watchdog-$Version-fonts.zip"
-            Required = @('可选字体包', '首选字体', '回退字体',
-                '安装到 Windows', '不是程序运行必需')
+            Name = "process-watchdog-$Version-windows-x64.zip"
+            Required = @('完整便携版', 'EXE', '说明文档', '许可证',
+                '运行所需资源', '无需安装 AutoHotkey', '不含字体')
         }
     )
+    $lastItemIndex = -1
     foreach ($specification in $specifications) {
         $name = [string]$specification.Name
         $lines = [regex]::Matches($sectionText,
@@ -505,11 +506,21 @@ function Assert-ReleaseNotesContent {
         if ($lines.Count -ne 1) {
             throw "发布物说明必须且只能逐项说明一次：$name"
         }
+        if ($lines[0].Index -le $lastItemIndex) {
+            throw '发布物说明必须按 GitHub Assets 的固定文件名顺序排列：字体包、源码版、便携版。'
+        }
+        $lastItemIndex = $lines[0].Index
         foreach ($requiredText in $specification.Required) {
             if (-not $lines[0].Value.Contains([string]$requiredText)) {
                 throw "发布物说明不完整：$name 缺少必要信息：$requiredText"
             }
         }
+    }
+    $everythingLines = [regex]::Matches($sectionText,
+        '(?m)^- \*\*Everything（\[官方最新版\]\(https://www\.voidtools\.com/downloads/\)）\*\*：[^\r\n]*\r?$')
+    if ($everythingLines.Count -ne 1 -or
+        $everythingLines[0].Index -le $lastItemIndex) {
+        throw 'Everything 必须使用规范 Markdown 链接并排在三个 GitHub 附件之后。'
     }
     foreach ($requiredEverythingText in @('Everything', '程序搜索', '后台服务',
             'Everything64.dll', '不能替代',
