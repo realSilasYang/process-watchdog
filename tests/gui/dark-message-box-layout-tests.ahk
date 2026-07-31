@@ -180,11 +180,15 @@ RunDarkMessageBoxLayoutCase(mode) {
     dialogHwnd := 0
     FileAppend("DARK_MESSAGE_BOX_LAYOUT|STAGE|launch-" mode "`n", "*")
     try {
+        DetectHiddenWindows(false)
         Run(commandLine, A_ScriptDir, "", &childPid)
         dialogHwnd := WinWait(title " ahk_class AutoHotkeyGUI ahk_pid "
             childPid, , 10)
         AssertDarkMessageBox(dialogHwnd,
             "等待弹窗子进程超时：" title "（PID " childPid "）")
+        ; 可见就绪已证明控件构造完成；随后按捕获的 HWND 读取，避免显示过渡
+        ; 瞬间让 WinGetControlsHwnd 再次按可见性过滤掉同一窗口。
+        DetectHiddenWindows(true)
         FileAppend("DARK_MESSAGE_BOX_LAYOUT|STAGE|inspect-" mode "`n", "*")
         InspectDarkMessageBox(dialogHwnd, message, mode)
     } finally {
@@ -202,7 +206,6 @@ RunDarkMessageBoxLayoutCase(mode) {
 }
 
 RunDarkMessageBoxLayoutTests() {
-    DetectHiddenWindows(true)
     RunDarkMessageBoxLayoutCase("message")
     RunDarkMessageBoxLayoutCase("confirm")
 }
