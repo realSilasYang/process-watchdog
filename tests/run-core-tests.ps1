@@ -20,9 +20,46 @@ $ahkCandidates = @(
     'D:\Program Files\AutoHotkey\v2\AutoHotkey64.exe',
     "$env:ProgramFiles\AutoHotkey\v2\AutoHotkey64.exe"
 ) | Where-Object { $_ }
-$ahkPath = $ahkCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-if (-not $ahkPath) {
+$sourceAhkPath = $ahkCandidates | Where-Object {
+    Test-Path -LiteralPath $_ -PathType Leaf
+} | Select-Object -First 1
+if (-not $sourceAhkPath) {
     throw 'AutoHotkey v2 64-bit interpreter was not found.'
+}
+
+# 使用随机中性文件名隔离 Windows 针对 AutoHotkey64.exe 保存的兼容层和
+# 前次失败进程身份，确保本地发布与干净 CI 使用相同的普通权限测试宿主。
+$testHostRoot = Join-Path ([System.IO.Path]::GetTempPath()) `
+    ("process-watchdog-core-host-{0}" -f [guid]::NewGuid().ToString('N'))
+$ahkPath = Join-Path $testHostRoot `
+    ("AutoHotkeyWatchdogTest-{0}.exe" -f [guid]::NewGuid().ToString('N'))
+try {
+    New-Item -ItemType Directory -Path $testHostRoot -Force | Out-Null
+    Copy-Item -LiteralPath $sourceAhkPath -Destination $ahkPath -Force
+} catch {
+    Remove-Item -LiteralPath $testHostRoot -Recurse -Force `
+        -ErrorAction SilentlyContinue
+    throw
+}
+
+function Stop-AutoHotkeyTestTree {
+    param([Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process)
+
+    if ($Process.HasExited) {
+        return
+    }
+    try {
+        & (Join-Path $env:SystemRoot 'System32\taskkill.exe') `
+            /PID $Process.Id /T /F 2>$null | Out-Null
+    } catch {
+    }
+    try {
+        if (-not $Process.WaitForExit(5000)) {
+            $Process.Kill()
+            [void]$Process.WaitForExit(5000)
+        }
+    } catch {
+    }
 }
 
 function Invoke-AutoHotkeyTest {
@@ -47,11 +84,7 @@ function Invoke-AutoHotkeyTest {
     $standardOutputTask = $process.StandardOutput.ReadToEndAsync()
     $standardErrorTask = $process.StandardError.ReadToEndAsync()
     if (-not $process.WaitForExit($TimeoutMilliseconds)) {
-        try {
-            $process.Kill()
-            $process.WaitForExit(5000) | Out-Null
-        } catch {
-        }
+        Stop-AutoHotkeyTestTree $process
         throw "$FailureMessage AutoHotkey process timed out after $TimeoutMilliseconds ms."
     }
     $standardOutput = $standardOutputTask.GetAwaiter().GetResult()
@@ -156,6 +189,7 @@ try {
 
     Write-Host "Core tests passed: $($testScripts.Count) scripts."
 } finally {
+    Remove-Item -LiteralPath $testHostRoot -Recurse -Force
     $configurationHashAfter = if (Test-Path -LiteralPath $configurationPath) {
         (Get-FileHash -Algorithm SHA256 -LiteralPath $configurationPath).Hash
     } else {

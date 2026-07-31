@@ -5,6 +5,10 @@
 ; 创建真实公共消息框并读取原生控件矩形，验证长正文、图标和按钮的共享布局边界。
 
 try {
+    if A_Args.Length == 2 && A_Args[1] == "--dialog-child" {
+        RunDarkMessageBoxChild(A_Args[2])
+        ExitApp(0)
+    }
     RunDarkMessageBoxLayoutTests()
     FileAppend("DARK_MESSAGE_BOX_LAYOUT|PASS`n", "*")
     ExitApp(0)
@@ -103,73 +107,102 @@ ReadDarkMessageControlText(controlHwnd) {
     return StrGet(textBuffer, length, "UTF-16")
 }
 
-InspectDarkMessageBox(title, message, mode, &inspectionError) {
-    dialogHwnd := WinExist(title " ahk_class AutoHotkeyGUI")
-    if !dialogHwnd {
-        ; CI 冷启动时首次定时器可能先于窗口创建触发；返回并重排检查，
-        ; 让被中断的弹窗创建线程继续，避免之后无人关闭弹窗而永久等待。
-        SetTimer(InspectDarkMessageBox.Bind(title, message, mode,
-            &inspectionError), -50)
-        return
+InspectDarkMessageBox(dialogHwnd, message, mode) {
+    clientRect := Buffer(16, 0)
+    DllCall("user32\GetClientRect", "Ptr", dialogHwnd,
+        "Ptr", clientRect)
+    clientWidth := NumGet(clientRect, 8, "Int")
+    controls := Map()
+    for controlHwnd in WinGetControlsHwnd("ahk_id " dialogHwnd)
+        controls[ReadDarkMessageControlText(controlHwnd)] := controlHwnd
+
+    AssertDarkMessageBox(controls.Has(message), "弹窗正文控件缺失")
+    iconText := mode == "message" ? "❌" : "⬆️"
+    AssertDarkMessageBox(controls.Has(iconText), "弹窗图标控件缺失")
+    messageRect := GetDarkMessageControlRect(controls[message], dialogHwnd)
+    iconRect := GetDarkMessageControlRect(controls[iconText], dialogHwnd)
+    AssertDarkMessageBox(Abs((messageRect.Top + messageRect.Bottom)
+            - (iconRect.Top + iconRect.Bottom)) <= 2,
+        "图标与正文没有垂直居中对齐")
+
+    if mode == "message" {
+        buttonRect := GetDarkMessageControlRect(controls["确 定"],
+            dialogHwnd)
+        AssertDarkMessageBox(Abs(buttonRect.Left + buttonRect.Right
+                - clientWidth) <= 2,
+            "确定按钮没有水平居中于窗口：left=" buttonRect.Left
+                " right=" buttonRect.Right " client=" clientWidth)
+    } else {
+        confirmRect := GetDarkMessageControlRect(controls["立即更新"],
+            dialogHwnd)
+        cancelRect := GetDarkMessageControlRect(controls["稍后"],
+            dialogHwnd)
+        AssertDarkMessageBox(Abs(confirmRect.Left + cancelRect.Right
+                - clientWidth) <= 2,
+            "确认框按钮组没有水平居中于窗口：left=" confirmRect.Left
+                " right=" cancelRect.Right " client=" clientWidth)
     }
+}
+
+GetDarkMessageBoxTestTitle(mode) {
+    return mode == "message" ? "消息框布局测试" : "确认框布局测试"
+}
+
+GetDarkMessageBoxTestMessage(mode) {
+    if mode == "message" {
+        return "创建快捷方式失败："
+        . "用户配置目录\AppData\Roaming\Microsoft\Windows\Start Menu\"
+        . "Programs\进程守护小助手.lnk"
+    }
+    return "发现新版本 2.0.6，当前版本为 2.0.5。`n`n"
+        . "更新包验证完成后将自动重启。是否立即更新？"
+}
+
+RunDarkMessageBoxChild(mode) {
+    if mode != "message" && mode != "confirm"
+        throw Error("未知弹窗测试模式：" mode)
+    ; 父测试进程异常退出时，子进程也会自行结束，避免 CI 桌面遗留阻塞弹窗。
+    SetTimer((*) => ExitApp(1), -15000)
+    title := GetDarkMessageBoxTestTitle(mode)
+    message := GetDarkMessageBoxTestMessage(mode)
+    if mode == "message"
+        ShowDarkMsgBox(message, title, "Error")
+    else
+        ShowDarkConfirmBox(message, title, "立即更新", "稍后")
+}
+
+RunDarkMessageBoxLayoutCase(mode) {
+    title := GetDarkMessageBoxTestTitle(mode)
+    message := GetDarkMessageBoxTestMessage(mode)
+    commandLine := '"' A_AhkPath '" /ErrorStdOut "' A_ScriptFullPath
+        . '" --dialog-child ' mode
+    childPid := 0
+    dialogHwnd := 0
+    FileAppend("DARK_MESSAGE_BOX_LAYOUT|STAGE|launch-" mode "`n", "*")
     try {
-        clientRect := Buffer(16, 0)
-        DllCall("user32\GetClientRect", "Ptr", dialogHwnd,
-            "Ptr", clientRect)
-        clientWidth := NumGet(clientRect, 8, "Int")
-        controls := Map()
-        for controlHwnd in WinGetControlsHwnd("ahk_id " dialogHwnd)
-            controls[ReadDarkMessageControlText(controlHwnd)] := controlHwnd
-
-        AssertDarkMessageBox(controls.Has(message), "弹窗正文控件缺失")
-        iconText := mode == "message" ? "❌" : "⬆️"
-        AssertDarkMessageBox(controls.Has(iconText), "弹窗图标控件缺失")
-        messageRect := GetDarkMessageControlRect(controls[message], dialogHwnd)
-        iconRect := GetDarkMessageControlRect(controls[iconText], dialogHwnd)
-        AssertDarkMessageBox(Abs((messageRect.Top + messageRect.Bottom)
-                - (iconRect.Top + iconRect.Bottom)) <= 2,
-            "图标与正文没有垂直居中对齐")
-
-        if mode == "message" {
-            buttonRect := GetDarkMessageControlRect(controls["确 定"],
-                dialogHwnd)
-            AssertDarkMessageBox(Abs(buttonRect.Left + buttonRect.Right
-                    - clientWidth) <= 2,
-                "确定按钮没有水平居中于窗口：left=" buttonRect.Left
-                    " right=" buttonRect.Right " client=" clientWidth)
-        } else {
-            confirmRect := GetDarkMessageControlRect(controls["立即更新"],
-                dialogHwnd)
-            cancelRect := GetDarkMessageControlRect(controls["稍后"],
-                dialogHwnd)
-            AssertDarkMessageBox(Abs(confirmRect.Left + cancelRect.Right
-                    - clientWidth) <= 2,
-                "确认框按钮组没有水平居中于窗口：left=" confirmRect.Left
-                    " right=" cancelRect.Right " client=" clientWidth)
-        }
-    } catch as inspectError {
-        inspectionError := inspectError.Message
+        Run(commandLine, A_ScriptDir, "", &childPid)
+        dialogHwnd := WinWait(title " ahk_class AutoHotkeyGUI ahk_pid "
+            childPid, , 10)
+        AssertDarkMessageBox(dialogHwnd,
+            "等待弹窗子进程超时：" title "（PID " childPid "）")
+        FileAppend("DARK_MESSAGE_BOX_LAYOUT|STAGE|inspect-" mode "`n", "*")
+        InspectDarkMessageBox(dialogHwnd, message, mode)
     } finally {
-        if IsSet(dialogHwnd) && dialogHwnd
+        if dialogHwnd && DllCall("user32\IsWindow", "Ptr", dialogHwnd,
+                "Int")
             try WinClose("ahk_id " dialogHwnd)
+        if childPid {
+            try ProcessWaitClose(childPid, 5)
+            if ProcessExist(childPid)
+                try ProcessClose(childPid)
+            try ProcessWaitClose(childPid, 5)
+        }
     }
+    FileAppend("DARK_MESSAGE_BOX_LAYOUT|STAGE|closed-" mode "`n", "*")
 }
 
 RunDarkMessageBoxLayoutTests() {
     DetectHiddenWindows(true)
-    inspectionError := ""
-    longMessage := "创建快捷方式失败："
-        . "用户配置目录\AppData\Roaming\Microsoft\Windows\Start Menu\"
-        . "Programs\进程守护小助手.lnk"
-    SetTimer(InspectDarkMessageBox.Bind("消息框布局测试", longMessage,
-        "message", &inspectionError), -50)
-    ShowDarkMsgBox(longMessage, "消息框布局测试", "Error")
-    AssertDarkMessageBox(inspectionError == "", inspectionError)
-
-    confirmMessage := "发现新版本 2.0.6，当前版本为 2.0.5。`n`n"
-        . "更新包验证完成后将自动重启。是否立即更新？"
-    SetTimer(InspectDarkMessageBox.Bind("确认框布局测试", confirmMessage,
-        "confirm", &inspectionError), -50)
-    ShowDarkConfirmBox(confirmMessage, "确认框布局测试", "立即更新", "稍后")
-    AssertDarkMessageBox(inspectionError == "", inspectionError)
+    RunDarkMessageBoxLayoutCase("message")
+    RunDarkMessageBoxLayoutCase("confirm")
 }

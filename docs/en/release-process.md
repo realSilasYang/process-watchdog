@@ -58,9 +58,13 @@ after fixing that failure, rerun the same command.
 8. Verify both README languages and the matching compatibility, installation,
    and troubleshooting documents against actual behavior. Each changelog item
    describes observable behavior, not a commit title or internal class.
-9. Commit all source, tests, and documents so Git can reconstruct `main`, and wait
-   for CI to pass.
-10. Manually run Release dry run from `main`. With read-only permissions, it resolves
+9. Commit all source, tests, and documents and push a release branch. Open a
+   release-engineering pull request for that branch and wait for every required
+   check, including `verify`, to pass. Do not bypass branch protection by pushing
+   directly to `main`. After reviewing the PR commits and changed-file scope, merge
+   it with a merge commit, then confirm remote `main` contains that exact merge and
+   remains reproducible from Git. Do not create or push the version tag at this stage.
+10. Manually run Release dry run from the merged `main`. With read-only permissions, it resolves
     the latest upstream toolchain, executes the same full validation, GUI smoke,
     and two reproducible builds as a formal release, and preserves the full `dist`.
     It never creates a tag, draft, or Release. Do not proceed if it fails.
