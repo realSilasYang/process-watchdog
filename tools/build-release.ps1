@@ -4,7 +4,9 @@
 
 [CmdletBinding()]
 param(
-    [string]$OutputDirectory = "",
+    [Parameter(Mandatory)]
+    [ValidateNotNullOrEmpty()]
+    [string]$OutputDirectory,
     [string]$AutoHotkeyPath = "",
     [string]$CompilerPath = "",
     [string]$AutoHotkeySourcePath = "",
@@ -33,11 +35,7 @@ function Write-CanonicalJson {
 }
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$outputRoot = if ($OutputDirectory) {
-    [System.IO.Path]::GetFullPath($OutputDirectory)
-} else {
-    Join-Path $projectRoot 'dist'
-}
+$outputRoot = [System.IO.Path]::GetFullPath($OutputDirectory)
 $version = (Get-Content -LiteralPath (Join-Path $projectRoot 'VERSION') `
     -Raw -Encoding UTF8).Trim()
 if ($version -notmatch `

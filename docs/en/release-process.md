@@ -6,7 +6,10 @@ Before a local release, run `powershell -ExecutionPolicy Bypass -File
 tools\invoke-local-release-preflight.ps1`. This single entry point prepares a
 portable PowerShell 7 from its official checksums, refreshes the upstream build
 tools for the release, and runs the required tests, 300-second Windows/GUI soak,
-and cross-host reproducible build described below. It stops on the first failure;
+and cross-host reproducible build described below. Local artifacts are written to
+a controlled temporary directory and removed after success or failure, so the
+repository does not retain `dist`; only GitHub Actions explicitly uses runner-local
+`dist` for upload and release auditing. It stops on the first failure;
 after fixing that failure, rerun the same command.
 
 1. Prepare user-facing entries with the [changelog template](changelog-template.md)

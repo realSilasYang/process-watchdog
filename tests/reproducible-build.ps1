@@ -14,27 +14,41 @@ param(
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $buildScript = Join-Path $projectRoot 'tools\build-release.ps1'
-$outputRoot = if ($OutputDirectory) {
+$removeOutputRoot = -not $OutputDirectory
+$outputRoot = if (-not $removeOutputRoot) {
     [System.IO.Path]::GetFullPath($OutputDirectory)
 } else {
-    Join-Path $projectRoot 'dist'
+    $tempRoot = [System.IO.Path]::GetFullPath(
+        [System.IO.Path]::GetTempPath()).TrimEnd('\') + '\'
+    $candidate = Join-Path $tempRoot `
+        ('ProcessWatchdogReproducibleBuild-' + [Guid]::NewGuid().ToString('N'))
+    $fullCandidate = [System.IO.Path]::GetFullPath($candidate)
+    if (-not $fullCandidate.StartsWith($tempRoot,
+            [System.StringComparison]::OrdinalIgnoreCase) -or
+        -not ([System.IO.Path]::GetFileName($fullCandidate)).StartsWith(
+            'ProcessWatchdogReproducibleBuild-',
+            [System.StringComparison]::Ordinal)) {
+        throw "可复现构建目录不在受控临时目录中：$fullCandidate"
+    }
+    $fullCandidate
 }
 
-if (-not $AutoHotkeyPath -or -not $CompilerPath -or
-    -not $AutoHotkeySourcePath -or -not $ResolvedToolchainPath) {
-    $toolchain = & (Join-Path $projectRoot `
-        'tools\bootstrap-toolchain.ps1')
-    if (-not $AutoHotkeyPath) { $AutoHotkeyPath = $toolchain.AutoHotkeyPath }
-    if (-not $CompilerPath) { $CompilerPath = $toolchain.CompilerPath }
-    if (-not $AutoHotkeySourcePath) {
-        $AutoHotkeySourcePath = $toolchain.AutoHotkeySourcePath
+try {
+    if (-not $AutoHotkeyPath -or -not $CompilerPath -or
+        -not $AutoHotkeySourcePath -or -not $ResolvedToolchainPath) {
+        $toolchain = & (Join-Path $projectRoot `
+            'tools\bootstrap-toolchain.ps1')
+        if (-not $AutoHotkeyPath) { $AutoHotkeyPath = $toolchain.AutoHotkeyPath }
+        if (-not $CompilerPath) { $CompilerPath = $toolchain.CompilerPath }
+        if (-not $AutoHotkeySourcePath) {
+            $AutoHotkeySourcePath = $toolchain.AutoHotkeySourcePath
+        }
+        if (-not $ResolvedToolchainPath) {
+            $ResolvedToolchainPath = $toolchain.ResolvedToolchainPath
+        }
     }
-    if (-not $ResolvedToolchainPath) {
-        $ResolvedToolchainPath = $toolchain.ResolvedToolchainPath
-    }
-}
 
-$first = & $buildScript -OutputDirectory $outputRoot `
+    $first = & $buildScript -OutputDirectory $outputRoot `
     -AutoHotkeyPath $AutoHotkeyPath -CompilerPath $CompilerPath `
     -AutoHotkeySourcePath $AutoHotkeySourcePath `
     -ResolvedToolchainPath $ResolvedToolchainPath
@@ -135,4 +149,9 @@ foreach ($checksumLine in $checksumLines) {
 Write-Host "Reproducible release ZIP hash: $secondHash"
 Write-Host "Reproducible source ZIP hash: $secondSourceHash"
 Write-Host "Reproducible optional font ZIP hash: $secondFontHash"
-Write-Host "Reproducible release SBOM hash: $secondSbomHash"
+    Write-Host "Reproducible release SBOM hash: $secondSbomHash"
+} finally {
+    if ($removeOutputRoot -and (Test-Path -LiteralPath $outputRoot)) {
+        Remove-Item -LiteralPath $outputRoot -Recurse -Force
+    }
+}

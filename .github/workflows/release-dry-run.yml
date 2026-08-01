@@ -55,6 +55,7 @@ jobs:
           -ActionlintPath '${{ steps.toolchain.outputs.actionlint }}'
           -GitleaksPath '${{ steps.toolchain.outputs.gitleaks }}'
           -SoakSeconds 15
+          -OutputDirectory dist
           -SecondPowerShellPath powershell.exe
 
       - name: Preserve all dry-run build outputs

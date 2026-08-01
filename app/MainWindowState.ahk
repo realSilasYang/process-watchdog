@@ -24,6 +24,7 @@ class MainWindow {
         this.statsText := ""
         this.statsPresenter := ""
         this.contextMenu := ""
+        this.contextPopup := MainContextPopupWindow(this.gui)
         this.contextTargetRow := 0
         this.firstVisiblePresentationCompleted := false
         this.listProjection := MainListProjection(NormalizeTargetPath)

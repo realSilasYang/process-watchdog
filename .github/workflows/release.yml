@@ -57,6 +57,7 @@ jobs:
           -ActionlintPath '${{ steps.toolchain.outputs.actionlint }}'
           -GitleaksPath '${{ steps.toolchain.outputs.gitleaks }}'
           -SoakSeconds 15
+          -OutputDirectory dist
           -SecondPowerShellPath powershell.exe
 
       - name: Attest the two program editions and optional font package

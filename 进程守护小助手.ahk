@@ -13,7 +13,7 @@
 
 ;@Ahk2Exe-SetName 进程守护小助手
 ;@Ahk2Exe-SetDescription 进程、脚本和快捷方式守护工具
-;@Ahk2Exe-SetVersion 2.0.6.0
+;@Ahk2Exe-SetVersion 2.0.7.0
 ;@Ahk2Exe-SetCopyright Copyright (c) 2026 进程守护小助手 contributors
 ;@Ahk2Exe-SetMainIcon assets\app\watchdog.ico
 
@@ -96,6 +96,7 @@
 #Include app\ApplicationTelemetry.ahk
 #Include app\SystemIntegration.ahk
 #Include app\ApplicationState.ahk
+#Include app\Windows\MainContextPopupWindow.ahk
 #Include app\MainWindowState.ahk
 #Include app\MainWindowController.ahk
 #Include app\GuiModuleRegistry.ahk
@@ -436,7 +437,7 @@ Main.gui.SetFont("s10 c" UiThemeService.Color("Text"),
 
 Main.lv.ModifyCol(1, App.savedColumn1)
 statusColumnWidth := LocalizationService.UsesCompactLayout()
-    ? 180
+    ? 200
     : Min(Max(App.savedColumn2, 200), 220)
 Main.lv.ModifyCol(2, statusColumnWidth)
 Main.lv.ModifyCol(3, 0) ; 隐藏路径辅助列
@@ -715,7 +716,27 @@ ConfigureMainContextMenu(isAdmin := false, maintenanceEnabled := false,
         Main.contextMenu := contextMenu
     return contextMenu
 }
-
+BuildMainContextPopupItems(isAdmin := false, maintenanceEnabled := false,
+    maintenanceSupported := true, batchLogSupported := false) {
+    items := [
+        {Text: Tr("📂 打开所在位置"), Action: OpenFileLocation},
+        {Text: Tr("⏹️ 结束运行"), Action: EndSelectedApp},
+        {Text: Tr("✒️ 编辑完整路径（F2）"),
+            Action: (*) => TriggerEdit(Main.lv, Main.contextTargetRow)},
+        {Text: Tr("🎨 自定义名称和图标"), Action: OpenDisplaySettings},
+        {Text: Tr("🛡️ 以管理员身份运行"), Check: isAdmin,
+            Action: ToggleRunAsAdmin},
+        {Text: Tr("⚙️ 进程识别与启动设置"), Action: OpenEnvSettings},
+        {Text: Tr("🔄 软件升级保护"), Check: maintenanceEnabled,
+            Action: OpenMaintenanceSettings, Enabled: maintenanceSupported}
+    ]
+    if batchLogSupported {
+        items.Push({Separator: true})
+        items.Push({Text: Tr("📄 查看批处理输出日志"),
+            Action: OpenProcessLog})
+    }
+    return items
+}
 ConfigureMainContextMenu()
 Main.lv.OnEvent("ContextMenu", ShowContextMenu)
 
@@ -767,7 +788,6 @@ RefreshMainWindowDisplay() {
     ConfigureMainCommandButtonMetrics()
     Main.gui.GetClientPos(,, &clientWidth)
     PositionMainCommandButtons(clientWidth)
-
     RefreshMainWindowTheme()
 
     ; 用户可能已在当前会话拖动列宽。语言或字体切换只更新显示内容，
@@ -783,6 +803,8 @@ RefreshMainWindowDisplay() {
     } finally Main.lv.Opt("+Redraw")
 
     UpdateStatsUI()
+    if IsObject(Main.contextPopup)
+        Main.contextPopup.Hide()
     ConfigureMainContextMenu()
     ConfigureTrayMenu()
     for button in [Main.btnAdd, Main.btnDel, Main.btnPause,

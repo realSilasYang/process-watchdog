@@ -63,6 +63,7 @@ Assert-WorkflowContains 'ci.yml' $ci @(
     '.\tests\verify-fast.ps1'
     '.\tests\verify-windows-integration.ps1'
     '.\tests\reproducible-build.ps1'
+    '-OutputDirectory dist'
     '-SecondPowerShellPath powershell.exe'
     'path: dist/**'
     'include-hidden-files: true'
@@ -93,6 +94,7 @@ Assert-WorkflowContains 'release-dry-run.yml' $dryRun @(
     '.\tools\resolve-release-state.ps1'
     '-RefreshBuildTools'
     '.\tools\invoke-release-validation.ps1'
+    '-OutputDirectory dist'
     '-SecondPowerShellPath powershell.exe'
     'path: dist/**'
     'include-hidden-files: true'
@@ -131,6 +133,7 @@ Assert-WorkflowContains 'release.yml' $release @(
     "-Version '$versionExpression'"
     "-CommitSha '$commitExpression'"
     "-Repository '$repositoryExpression'"
+    '-OutputDirectory dist'
     '-SecondPowerShellPath powershell.exe'
     'include-hidden-files: true'
     'fetch-depth: 0'

@@ -363,8 +363,11 @@ class ApplicationSearchDialog extends ManagedWindow {
             DllCall(this.everythingFunctions["Everything_SetMax"],
                 "UInt", 0xFFFFFFFF)
             if !DllCall(this.everythingFunctions["Everything_QueryW"],
-                    "Int", 1)
+                    "Int", 1) {
+                this.SetEverythingStatus(this.BuildEverythingFailureText(
+                    this.GetEverythingLastError()))
                 return false
+            }
             resultCount := DllCall(
                 this.everythingFunctions["Everything_GetNumResults"],
                 "UInt")
@@ -513,7 +516,7 @@ class ApplicationSearchDialog extends ManagedWindow {
         if (errorCode == 0
             || errorCode == ApplicationSearchDialog.EverythingErrorIpc)
             return this.BeginEverythingStartup()
-        this.ShowEverythingUnavailable()
+        this.ShowEverythingUnavailable(errorCode)
         return false
     }
 
@@ -545,17 +548,20 @@ class ApplicationSearchDialog extends ManagedWindow {
 
     ShowEverythingUnavailable(failure := "") {
         this.ResetSearchResults(false)
-        this.SetEverythingStatus(Tr(
-            "Everything 搜索暂时不可用，请稍后重试。"))
+        errorCode := failure is Integer ? failure : this.GetEverythingLastError()
+        statusText := this.BuildEverythingFailureText(errorCode)
+        this.SetEverythingStatus(statusText)
         if this.everythingUnavailableLogged
             return
         this.everythingUnavailableLogged := true
-        errorCode := this.GetEverythingLastError()
-        diagnosticSuffix := errorCode ? " [Everything=" errorCode "]" : ""
+        diagnosticSuffix := ""
+        if errorCode {
+            errorText := this.DescribeEverythingError(errorCode)
+            diagnosticSuffix := " [Everything=" errorCode " " errorText "]"
+        }
         if failure is Error
             diagnosticSuffix .= " " TrDiagnostic(failure.Message)
-        LogMsg(Tr("Everything 搜索暂时不可用，请稍后重试。")
-            diagnosticSuffix)
+        LogMsg(statusText diagnosticSuffix)
     }
 
     ShowEverythingComponentUnavailable() {
@@ -573,16 +579,17 @@ class ApplicationSearchDialog extends ManagedWindow {
         this.ResetSearchResults(false)
         startResult := this.everythingRuntimeService.StartSilently()
         if !startResult.Found {
-            this.ShowEverythingDownloadLink()
+            this.ShowEverythingDownloadLink(startResult)
             return false
         }
         if !startResult.Started {
             this.SetEverythingStatus(Tr(
-                "已找到 Everything，但无法后台启动，请手动启动后重试。"))
+                "已找到 Everything 本体，但无法后台启动；请手动启动 Everything 后重试。"))
             if !this.everythingUnavailableLogged {
                 this.everythingUnavailableLogged := true
-                LogMsg(Tr("后台启动 Everything 失败：{1}",
-                    TrDiagnostic(startResult.Failure)))
+                LogMsg(Tr("后台启动 Everything 失败：{1}（路径：{2}；发现过程：{3}）",
+                    TrDiagnostic(startResult.Failure), startResult.Path,
+                    startResult.DiscoverySummary))
             }
             return false
         }
@@ -591,7 +598,7 @@ class ApplicationSearchDialog extends ManagedWindow {
         this.everythingStartupDeadline := GetTickCount64()
             + ApplicationSearchDialog.StartupTimeoutMilliseconds
         this.SetEverythingStatus(Tr(
-            "正在后台启动 Everything 并等待搜索服务就绪..."))
+            "正在后台启动 Everything 本体并等待搜索服务就绪..."))
         SetTimer(this.everythingStartupTimer,
             ApplicationSearchDialog.StartupRetryMilliseconds)
         LogMsg(Tr("已在后台启动 Everything：{1}", startResult.Path))
@@ -611,7 +618,8 @@ class ApplicationSearchDialog extends ManagedWindow {
             return
         startupPath := this.everythingStartupPath
         this.CancelEverythingStartup()
-        this.ShowEverythingUnavailable()
+        this.SetEverythingStatus(Tr(
+            "已启动 Everything，但后台搜索服务仍未响应；请确认 Everything 主程序完成启动且服务可用。"))
         LogMsg(Tr("等待 Everything 搜索服务就绪超时：{1}", startupPath))
     }
 
@@ -621,19 +629,28 @@ class ApplicationSearchDialog extends ManagedWindow {
         this.everythingStartupPath := ""
     }
 
-    ShowEverythingDownloadLink() {
+    ShowEverythingDownloadLink(startResult := "") {
         this.ResetSearchResults(false)
         if this.resultStatusText
             this.resultStatusText.Visible := false
         if this.everythingDownloadLink {
             this.everythingDownloadLink.Text := Tr(
-                "未找到 Everything，点击前往官网下载最新版：{1}",
+                "未找到 Everything 本体，点击前往官网下载最新版：{1}",
                 EverythingRuntimeService.DownloadUrl)
             this.everythingDownloadLink.Visible := true
         }
         if !this.everythingUnavailableLogged {
             this.everythingUnavailableLogged := true
-            LogMsg(Tr("本机未找到 Everything；程序搜索需要 Everything 后台服务。"))
+            discoverySummary := IsObject(startResult)
+                && startResult.HasOwnProp("DiscoverySummary")
+                ? startResult.DiscoverySummary : ""
+            failureText := IsObject(startResult)
+                && startResult.HasOwnProp("Failure")
+                ? startResult.Failure : ""
+            LogMsg(Tr(
+                "本机未找到 Everything 本体；程序搜索需要 Everything 的索引和后台服务，随包 Everything64.dll 只是 IPC 客户端。{1}{2}",
+                failureText != "" ? " " failureText : "",
+                discoverySummary != "" ? " " discoverySummary : ""))
         }
     }
 
@@ -657,6 +674,40 @@ class ApplicationSearchDialog extends ManagedWindow {
             this.everythingFunctions["Everything_GetLastError"], "UInt")
         catch
             return 0
+    }
+
+    BuildEverythingFailureText(errorCode) {
+        if errorCode == ApplicationSearchDialog.EverythingErrorIpc {
+            return Tr(
+                "Everything64.dll 已加载，但 Everything 后台实例未响应；正在尝试定位并启动 Everything 本体。")
+        }
+        if errorCode {
+            return Tr("Everything 查询失败：{1}",
+                this.DescribeEverythingError(errorCode))
+        }
+        return Tr(
+            "Everything 搜索暂时不可用：后台实例未返回结果，请稍后重试。")
+    }
+
+    DescribeEverythingError(errorCode) {
+        switch Integer(errorCode) {
+            case 1:
+                return Tr("内存不足")
+            case 2:
+                return Tr("后台 IPC 服务不可用")
+            case 3:
+                return Tr("无法注册 Everything 查询窗口类")
+            case 4:
+                return Tr("无法创建 Everything 查询窗口")
+            case 5:
+                return Tr("无法创建 Everything 查询线程")
+            case 6:
+                return Tr("结果索引无效")
+            case 7:
+                return Tr("调用顺序无效")
+            default:
+                return Tr("未知错误码 {1}", errorCode)
+        }
     }
 
     CancelEverythingResultLoad() {

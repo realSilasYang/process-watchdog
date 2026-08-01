@@ -11,6 +11,7 @@ class TargetRelocationService {
     static FullHashRefreshIntervalMs := 600000
     static ScanRetryIntervalMs := 30000
     static ScanTimeoutSeconds := 60
+    static DiagnosticRepeatIntervalMs := 30000
 
     __New(runtime, callbacks) {
         this.Runtime := runtime
@@ -104,7 +105,9 @@ class TargetRelocationService {
                 SearchRootIndex: 1,
                 ActiveRootIndex: 0,
                 MatchedPaths: [],
-                NextScanTicks: 0
+                NextScanTicks: 0,
+                LastDiagnosticKey: "",
+                LastDiagnosticTicks: 0
             }
         }
         return this.Targets.Count
@@ -214,27 +217,48 @@ class TargetRelocationService {
         if !this.Targets.Has(path)
             return false
         record := this.Targets[path]
+        if !this.IsContentHash(record.ContentHash) {
+            this.NoteDiagnostic(record, "NoBaseline",
+                this.Text("无法执行内容迁移：缺少旧文件的完整内容指纹：{1}",
+                    record.Path))
+            return false
+        }
         nowTicks := this.Now()
         if !record.MissingObservedTicks {
             record.MissingObservedTicks := nowTicks
+            this.NoteDiagnostic(record, "MissingObserved",
+                this.Text("监测到目标文件缺失，内容迁移将在缺失状态稳定后开始扫描：{1}",
+                    record.Path))
             return false
         }
         if nowTicks - record.MissingObservedTicks
             < TargetRelocationService.CandidateDelayMs
             return false
-        if this.IsMaintenanceBusy(path, stateObj)
+        if this.IsMaintenanceBusy(path, stateObj) {
+            this.NoteDiagnostic(record, "MaintenanceBusy",
+                this.Text("内容迁移暂缓：目标正处于升级保护、维护恢复或近期启动信号保护中：{1}",
+                    record.Path))
             return false
+        }
         candidateInfo := this.ResolveCandidate(record)
         if !candidateInfo
             return false
         candidatePath := this.NormalizePath(candidateInfo.Path)
-        if !this.IsCandidatePathValid(path, candidatePath)
+        if !this.IsCandidatePathValid(path, candidatePath) {
+            this.NoteDiagnostic(record, "InvalidCandidate|" candidatePath,
+                this.Text("内容迁移候选已被拒绝：{1} -> {2}（候选不存在、扩展名不兼容、已被守护或与现有目标冲突）",
+                    path, candidatePath))
             return false
+        }
         candidateSignature := this.CandidateSignature(path, candidatePath,
             record.ContentHash)
         if this.IgnoredCandidates.Has(candidateSignature)
-            && this.IgnoredCandidates[candidateSignature] > nowTicks
+            && this.IgnoredCandidates[candidateSignature] > nowTicks {
+            this.NoteDiagnostic(record, "Ignored|" candidatePath,
+                this.Text("内容迁移候选仍在本次忽略冷却期内：{1} -> {2}",
+                    path, candidatePath))
             return false
+        }
         if this.IgnoredCandidates.Has(candidateSignature)
             this.IgnoredCandidates.Delete(candidateSignature)
         return this.PublishCandidate(path, candidatePath, stateObj,
@@ -243,16 +267,29 @@ class TargetRelocationService {
     }
 
     ResolveCandidate(record) {
-        if !this.IsContentHash(record.ContentHash)
+        if !this.IsContentHash(record.ContentHash) {
+            this.NoteDiagnostic(record, "NoBaseline",
+                this.Text("无法执行内容迁移：缺少旧文件的完整内容指纹：{1}",
+                    record.Path))
             return ""
+        }
         if IsObject(record.ScanJob) {
             completedRootIndex := record.ActiveRootIndex
+            completedRoot := this.DescribeSearchRoot(record,
+                completedRootIndex)
             scanResult := this.PollContentScan(record.ScanJob)
             if !scanResult.Ready
                 return ""
             record.ScanJob := ""
             record.ActiveRootIndex := 0
             if scanResult.Failed || scanResult.Truncated {
+                reason := scanResult.Failed
+                    ? this.Text("后台扫描失败或超时")
+                    : this.Text("扫描未能在时限内完整核对")
+                this.NoteDiagnostic(record,
+                    "ScanIncomplete|" completedRootIndex,
+                    this.Text("内容迁移扫描未完成，将稍后重试：{1}（搜索根：{2}；原因：{3}）",
+                        record.Path, completedRoot, reason))
                 this.ResetScanCycle(record,
                     TargetRelocationService.ScanRetryIntervalMs)
                 return ""
@@ -268,8 +305,8 @@ class TargetRelocationService {
             }
             if record.MatchedPaths.Length > 1 {
                 this.Log(this.Text(
-                    "发现多个内容完全相同的迁移候选，已暂停自动迁移：{1}",
-                    record.Path))
+                    "发现多个内容完全相同的迁移候选，已暂停自动迁移：{1}（候选：{2}）",
+                    record.Path, this.DescribeMatchedPaths(record)))
                 this.ResetScanCycle(record,
                     TargetRelocationService.ScanRetryIntervalMs)
                 return ""
@@ -306,14 +343,29 @@ class TargetRelocationService {
             if IsObject(scanJob) {
                 record.ScanJob := scanJob
                 record.ActiveRootIndex := currentRootIndex
+                scanMethod := useEverything
+                    ? this.Text("Everything 索引预筛选")
+                    : this.Text("直接递归扫描")
+                this.NoteDiagnostic(record, "ScanStarted|" currentRootIndex,
+                    this.Text("正在扫描内容迁移候选：{1}（搜索根：{2}；方式：{3}）",
+                        record.Path, rootPath, scanMethod))
                 return ""
             }
+            scanMethod := useEverything
+                ? this.Text("Everything 索引预筛选")
+                : this.Text("直接递归扫描")
+            this.NoteDiagnostic(record, "ScanStartFailed|" currentRootIndex,
+                this.Text("无法启动内容迁移扫描，已尝试下一个搜索根：{1}（搜索根：{2}；方式：{3}）",
+                    record.Path, rootPath, scanMethod))
         }
         if record.MatchedPaths.Length == 1 {
             candidatePath := record.MatchedPaths[1]
             this.ResetScanCycle(record, 0)
             return {Path: candidatePath}
         }
+        this.NoteDiagnostic(record, "NoMatch",
+            this.Text("尚未找到内容完全一致的迁移候选，将稍后重试：{1}（已按扩展名、大小和 SHA-256 完整内容指纹核对）",
+                record.Path))
         this.ResetScanCycle(record,
             TargetRelocationService.ScanRetryIntervalMs)
         return ""
@@ -520,6 +572,46 @@ class TargetRelocationService {
         record.ActiveRootIndex := 0
         record.MatchedPaths := []
         record.NextScanTicks := this.Now() + Max(0, delayMs)
+    }
+
+    NoteDiagnostic(record, key, message) {
+        if !IsObject(record)
+            return false
+        nowTicks := this.Now()
+        if record.HasOwnProp("LastDiagnosticKey")
+            && record.LastDiagnosticKey == key
+            && record.HasOwnProp("LastDiagnosticTicks")
+            && nowTicks - record.LastDiagnosticTicks
+                < TargetRelocationService.DiagnosticRepeatIntervalMs {
+            return false
+        }
+        record.LastDiagnosticKey := key
+        record.LastDiagnosticTicks := nowTicks
+        this.Log(message)
+        return true
+    }
+
+    DescribeSearchRoot(record, rootIndex) {
+        try {
+            if rootIndex >= 1 && rootIndex <= record.SearchRoots.Length
+                return record.SearchRoots[rootIndex]
+        }
+        return this.Text("未知")
+    }
+
+    DescribeMatchedPaths(record) {
+        if !IsObject(record) || !record.HasOwnProp("MatchedPaths")
+            || !record.MatchedPaths.Length
+            return this.Text("无")
+        text := ""
+        for index, matchedPath in record.MatchedPaths {
+            if index > 3 {
+                text .= this.Text("，另有 {1} 个", record.MatchedPaths.Length - 3)
+                break
+            }
+            text .= (text == "" ? "" : "；") matchedPath
+        }
+        return text
     }
 
     AddMatchedPath(record, candidatePath) {

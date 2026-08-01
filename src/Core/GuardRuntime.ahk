@@ -16,6 +16,11 @@ class GuardRuntime {
         this.LaunchStoppedEvidenceRequired := 2
         this.TargetErrorLogTicks := Map()
         this.TargetErrorLogTicks.CaseSense := "Off"
+        this.UncertainObservationLogTicks := Map()
+        this.UncertainObservationLogTicks.CaseSense := "Off"
+        this.UncertainObservationLogKeys := Map()
+        this.UncertainObservationLogKeys.CaseSense := "Off"
+        this.UncertainObservationLogRepeatMs := 30000
         this.Running := false
         this.Stopped := false
         this.MonitorTimer := ObjBindMethod(this, "MonitorTick")
@@ -677,11 +682,112 @@ class GuardRuntime {
         this.UpdateState(path, stateObj,
             this.Text("⏳ 等待进程状态..."),
             GuardStatusKind.WaitingObservation)
-        if stateObj.UncertainObservationCount == 1 {
-            this.Log(this.Text("暂时无法核对现有进程，延迟启动以避免重复实例：{1}",
-                path))
-        }
+        this.LogUncertainObservation(path, observation)
         return false
+    }
+
+    LogUncertainObservation(path, observation) {
+        nowTicks := this.Now()
+        diagnostic := this.BuildObservationDiagnostic(observation)
+        diagnosticKey := path "|" diagnostic
+        if (this.UncertainObservationLogKeys.Has(path)
+            && this.UncertainObservationLogKeys[path] == diagnosticKey
+            && this.UncertainObservationLogTicks.Has(path)
+            && nowTicks - this.UncertainObservationLogTicks[path]
+                < this.UncertainObservationLogRepeatMs) {
+            return false
+        }
+        this.UncertainObservationLogKeys[path] := diagnosticKey
+        this.UncertainObservationLogTicks[path] := nowTicks
+        suffix := ""
+        if diagnostic != ""
+            suffix := this.Text("（{1}）", diagnostic)
+        this.Log(this.Text(
+            "暂时无法核对现有进程，延迟启动以避免重复实例：{1}{2}",
+            path, suffix))
+        return true
+    }
+
+    BuildObservationDiagnostic(observation) {
+        source := ""
+        reason := ""
+        reasonCode := ""
+        if IsObject(observation) {
+            if observation.HasOwnProp("Source")
+                source := observation.Source
+            if observation.HasOwnProp("Reason")
+                reason := observation.Reason
+            if observation.HasOwnProp("ReasonCode")
+                reasonCode := observation.ReasonCode
+        }
+        parts := []
+        sourceText := this.DescribeObservationSource(source)
+        if sourceText != ""
+            parts.Push(this.Text("来源：{1}", sourceText))
+        reasonText := ""
+        if reason != ""
+            reasonText := this.DiagnosticText(reason)
+        else
+            reasonText := this.DescribeObservationReason(reasonCode)
+        if reasonText != ""
+            parts.Push(this.Text("原因：{1}", reasonText))
+        if reasonCode != ""
+            parts.Push(this.Text("原因码：{1}", reasonCode))
+        return this.JoinDiagnosticParts(parts)
+    }
+
+    DescribeObservationSource(source) {
+        switch source {
+            case "process-command":
+                return this.Text("命令行探测")
+            case "process-image":
+                return this.Text("进程路径探测")
+            case "process-working-directory":
+                return this.Text("工作目录探测")
+            case "process-snapshot":
+                return this.Text("后台进程快照")
+            case "process-name":
+                return this.Text("进程名探测")
+            case "autohotkey-window":
+                return this.Text("AutoHotkey 窗口探测")
+            case "target-probe":
+                return this.Text("目标探活配置")
+        }
+        if source != ""
+            return this.DiagnosticText(source)
+        return ""
+    }
+
+    DescribeObservationReason(reasonCode) {
+        switch reasonCode {
+            case ProcessObservationReason.SnapshotUnavailable:
+                return this.Text("后台进程快照不可用")
+            case ProcessObservationReason.CommandLineUnavailable:
+                return this.Text("候选进程命令行不可用")
+            case ProcessObservationReason.RelativeCommandTarget:
+                return this.Text("命令行只提供相对目标路径，无法可靠匹配")
+            case ProcessObservationReason.InaccessibleImagePath:
+                return this.Text("候选进程镜像路径不可访问")
+            case ProcessObservationReason.ProcessIdentityUnavailable:
+                return this.Text("候选进程创建身份无法核对")
+            case ProcessObservationReason.AmbiguousTarget:
+                return this.Text("存在多个候选进程，无法唯一确认")
+            case ProcessObservationReason.InvalidProbe:
+                return this.Text("目标探活规格无效")
+        }
+        return ""
+    }
+
+    JoinDiagnosticParts(parts) {
+        result := ""
+        for _, part in parts {
+            if part == ""
+                continue
+            if result != ""
+                result .= "；"
+            result .= part
+        }
+        return result
     }
 
     ScheduleRestartPreservingSnapshot(path, stateObj, delayMs) {

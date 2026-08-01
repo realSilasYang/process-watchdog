@@ -7,6 +7,33 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.0.7] - 2026-08-01
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides the preferred and fallback fonts for installation into Windows; it is not required to run the application.
+- **`process-watchdog-2.0.7-source.zip` (complete source package):** Includes the AHK source, modules, tests, and documentation without fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+- **`process-watchdog-2.0.7-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, and runtime resources without fonts; no AutoHotkey installation is required, and it is intended for long-term use after full extraction.
+- **Everything ([latest official version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application searches. The bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### 🚀 Improvements
+
+- **More explainable process-identification diagnostics:** When startup is delayed because an existing process cannot be verified reliably, the log now records the observation source, reason, and reason code, with throttling for repeated causes so command-line, process-path, snapshot, and probe-configuration uncertainty is easier to separate.
+- **More transparent content-relocation flow:** Content-based moved-target recovery now records missing-state stabilization, search roots, scan method, failed or timed-out scans, rejected candidates, duplicate copies, and misses so users are not left with a black-box “no relocation” result.
+- **Clearer Everything dependency experience:** Program search distinguishes the bundled `Everything64.dll` from the Everything application itself, tries to locate and start Everything when the background instance is not responding, and shows specific error meanings, discovery details, or the official download entry when recovery fails.
+- **More readable main interface:** The status-information column default width increases from 180 to 200, and the README interface overview now uses the current main-window screenshot.
+- **Cleaner release-engineering output:** Reproducible builds now default to a controlled temporary directory and clean it up automatically, while CI, dry-run, and formal release workflows explicitly write to `dist` so local preflight runs do not leave build artifacts behind.
+
+---
+
+### 🐛 Fixed
+
+- **Everything failure-message stability:** Fixed Everything-unavailable diagnostic text composition that could trigger an AutoHotkey ternary-expression parse error.
+- **About-page information-column layout:** Version and runtime information columns now use the About page divider bounds, preventing the row from crossing the divider or inheriting the settings-form right margin.
+- **Open File Location file-manager routing:** Explorer still selects the file when it is the system default file manager; otherwise the default file manager opens the containing directory.
+
 ## 🎉 Version [2.0.6] - 2026-07-31
 
 ### 📦 Release Assets
@@ -381,7 +408,9 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.5...HEAD
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.7...HEAD
+[2.0.7]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.6...v2.0.7
+[2.0.6]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.5...v2.0.6
 [2.0.5]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.4...v2.0.5
 [2.0.4]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.3...v2.0.4
 [2.0.3]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.2...v2.0.3

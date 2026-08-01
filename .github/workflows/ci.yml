@@ -167,6 +167,7 @@ jobs:
           -CompilerPath '${{ steps.toolchain.outputs.compiler }}'
           -AutoHotkeySourcePath '${{ steps.toolchain.outputs.ahk_source }}'
           -ResolvedToolchainPath '${{ steps.toolchain.outputs.resolved }}'
+          -OutputDirectory dist
           -SecondPowerShellPath powershell.exe
 
       - name: Preserve all build outputs

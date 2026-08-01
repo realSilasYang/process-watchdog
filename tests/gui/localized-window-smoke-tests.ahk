@@ -919,6 +919,15 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             settingsDialog.aboutTopDivider.Hwnd, settingsDialog.gui.Hwnd)
         bottomDividerRect := GetControlClientRect(
             settingsDialog.aboutBottomDivider.Hwnd, settingsDialog.gui.Hwnd)
+        AssertLocalizedWindow(versionLabelRect.Left >= topDividerRect.Left
+                && versionValueRect.Left >= topDividerRect.Left
+                && runtimeLabelRect.Right <= topDividerRect.Right
+                && runtimeValueRect.Right <= topDividerRect.Right
+                && versionLabelRect.Right < infoDividerRect.Left
+                && versionValueRect.Right < infoDividerRect.Left
+                && runtimeLabelRect.Left > infoDividerRect.Right
+                && runtimeValueRect.Left > infoDividerRect.Right,
+            language " 关于页版本信息行越过水平分隔线")
         updateButtonRect := GetControlClientRect(
             settingsDialog.checkUpdateButton.Hwnd, settingsDialog.gui.Hwnd)
         projectButtonRect := GetControlClientRect(

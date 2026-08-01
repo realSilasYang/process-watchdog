@@ -552,14 +552,17 @@ class RoundedButtonRenderer {
             DllCall("gdiplus\GdipSetSmoothingMode", "Ptr", graphics, "Int", 4)
             DllCall("gdiplus\GdipSetPixelOffsetMode", "Ptr", graphics, "Int", 4)
             DllCall("gdiplus\GdipSetCompositingQuality", "Ptr", graphics, "Int", 2)
-            parentColor := UiThemeService.Color("Window")
+            parentColor := state.HasOwnProp("parentColor")
+                ? state.parentColor : UiThemeService.Color("Window")
             DllCall("gdiplus\GdipGraphicsClear", "Ptr", graphics,
                 "UInt", this.ColorToArgb(parentColor))
 
             dpi := DllCall("user32\GetDpiForWindow", "Ptr", state.ctrl.Hwnd, "UInt")
             if !dpi
                 dpi := 96
-            radius := Max(3, Round(this.RadiusDip * dpi / 96))
+            radiusDip := state.HasOwnProp("radiusDip")
+                ? state.radiusDip : this.RadiusDip
+            radius := Max(3, Round(radiusDip * dpi / 96))
             path := this.CreateRoundedPath(width, height, radius)
             if !path
                 return false
@@ -598,7 +601,9 @@ class RoundedButtonRenderer {
             textColor := state.HasOwnProp("textColor") ? state.textColor : "FFFFFF"
             if this.IsDisabled(state)
                 textColor := this.MixColor(textColor,
-                    UiThemeService.Color("Window"), 0.58)
+                    state.HasOwnProp("parentColor")
+                        ? state.parentColor : UiThemeService.Color("Window"),
+                    0.58)
             DllCall("gdi32\SetTextColor", "Ptr", hdc, "UInt", this.ColorToBgr(textColor))
             dpi := DllCall("user32\GetDpiForWindow", "Ptr", state.ctrl.Hwnd, "UInt")
             if !dpi
@@ -712,6 +717,35 @@ class RoundedButtonRenderer {
                 return
             }
             if !state.HasOwnProp("buttonIcon") {
+                if state.HasOwnProp("rightText")
+                    && String(state.rightText) != "" {
+                    rightSlotWidthDip := state.HasOwnProp("rightTextWidthDip")
+                        ? state.rightTextWidthDip : 24
+                    rightGapDip := state.HasOwnProp("rightTextGapDip")
+                        ? state.rightTextGapDip : 8
+                    rightInsetDip := state.HasOwnProp("rightTextInsetDip")
+                        ? state.rightTextInsetDip : horizontalInsetDip
+                    rightSlotWidth := Max(12,
+                        Round(rightSlotWidthDip * dpi / 96))
+                    rightGap := Max(0, Round(rightGapDip * dpi / 96))
+                    rightInset := Max(3, Round(rightInsetDip * dpi / 96))
+                    bodyRight := Max(horizontalInset,
+                        width - rightInset - rightSlotWidth - rightGap)
+                    bodyRect := Buffer(16, 0)
+                    NumPut("Int", horizontalInset, "Int", 0,
+                        "Int", bodyRight, "Int", height, bodyRect)
+                    DllCall("user32\DrawTextW", "Ptr", hdc, "Str", text,
+                        "Int", -1, "Ptr", bodyRect, "UInt", textFlags,
+                        "Int")
+                    rightRect := Buffer(16, 0)
+                    NumPut("Int", width - rightInset - rightSlotWidth,
+                        "Int", 0, "Int", width - rightInset,
+                        "Int", height, rightRect)
+                    DllCall("user32\DrawTextW", "Ptr", hdc,
+                        "Str", String(state.rightText), "Int", -1,
+                        "Ptr", rightRect, "UInt", 0x00008826, "Int")
+                    return
+                }
                 DllCall("user32\DrawTextW", "Ptr", hdc, "Str", text,
                     "Int", -1, "Ptr", textRect, "UInt", textFlags, "Int")
                 return
@@ -1383,7 +1417,12 @@ ButtonControlSubclassProc(hWnd, message, wParam, lParam, subclassId, referenceDa
             case Win32.WM_MOUSELEAVE:
                 HandleButtonMouseLeave(hWnd)
             case Win32.WM_LBUTTONDOWN, Win32.WM_LBUTTONDBLCLK:
-                DllCall("user32\SetFocus", "Ptr", hWnd, "Ptr")
+                if App.uiInteractions.HasButton(hWnd) {
+                    downState := App.uiInteractions.GetButton(hWnd)
+                    if !(downState.HasOwnProp("noFocus")
+                            && downState.noFocus)
+                        DllCall("user32\SetFocus", "Ptr", hWnd, "Ptr")
+                }
                 BeginButtonPress(hWnd)
                 return 0
             case Win32.WM_LBUTTONUP:

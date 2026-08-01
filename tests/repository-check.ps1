@@ -741,6 +741,7 @@ foreach ($releaseRequirement in @(
         'actions/upload-artifact@',
         'path: dist/**',
         'include-hidden-files: true',
+        '-OutputDirectory dist',
         '-SecondPowerShellPath powershell.exe',
         'dist/fonts.zip',
         'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-source.zip',
@@ -759,6 +760,7 @@ $ciWorkflow = Get-Content -LiteralPath `
     (Join-Path $projectRoot '.github\workflows\ci.yml') -Raw -Encoding UTF8
 if (-not $ciWorkflow.Contains('path: dist/**') -or
     -not $ciWorkflow.Contains('include-hidden-files: true') -or
+    -not $ciWorkflow.Contains('-OutputDirectory dist') -or
     -not $ciWorkflow.Contains('-SecondPowerShellPath powershell.exe') -or
     -not $ciWorkflow.Contains('tools\ci-toolchain.resolved.json') -or
     -not $ciWorkflow.Contains('.\tools\get-ci-impact.ps1') -or
@@ -773,9 +775,24 @@ if (-not $ciWorkflow.Contains('path: dist/**') -or
 
 $buildScript = Get-Content -LiteralPath (Join-Path $projectRoot `
     'tools\build-release.ps1') -Raw -Encoding UTF8
-if ($buildScript -match "'/setversion'" -or
+if ($buildScript.Contains("Join-Path `$projectRoot 'dist'") -or
+    -not $buildScript.Contains('[Parameter(Mandatory)]') -or
+    $buildScript -match "'/setversion'" -or
     -not $buildScript.Contains(';@Ahk2Exe-SetVersion $version.0')) {
-    throw 'Release build must inject the source SetVersion directive instead of passing an unsupported Ahk2Exe CLI switch.'
+    throw 'Release build must require an explicit output directory and inject the source SetVersion directive.'
+}
+$reproducibleBuild = Get-Content -LiteralPath (Join-Path $projectRoot `
+    'tests\reproducible-build.ps1') -Raw -Encoding UTF8
+foreach ($localCleanupRequirement in @(
+        'ProcessWatchdogReproducibleBuild-',
+        '$removeOutputRoot = -not $OutputDirectory',
+        'Remove-Item -LiteralPath $outputRoot -Recurse -Force')) {
+    if (-not $reproducibleBuild.Contains($localCleanupRequirement)) {
+        throw "Local reproducible build cleanup is missing: $localCleanupRequirement"
+    }
+}
+if ($reproducibleBuild.Contains("Join-Path `$projectRoot 'dist'")) {
+    throw 'Local reproducible builds must not retain repository dist output by default.'
 }
 foreach ($determinismRequirement in @(
         'function Write-CanonicalJson',

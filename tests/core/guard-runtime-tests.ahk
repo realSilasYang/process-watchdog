@@ -230,6 +230,23 @@ GuardRuntimeLog(message) {
     GuardRuntimeTestContext.Logs.Push(message)
 }
 
+GuardRuntimeLogContainsAll(startIndex, needles*) {
+    for index, message in GuardRuntimeTestContext.Logs {
+        if index < startIndex
+            continue
+        matched := true
+        for _, needle in needles {
+            if !InStr(message, needle) {
+                matched := false
+                break
+            }
+        }
+        if matched
+            return true
+    }
+    return false
+}
+
 GuardRuntimeLogSlow(*) {
 }
 
@@ -582,6 +599,7 @@ RunGuardRuntimeTests() {
     permanentUnknownState := CreateGuardRuntimeSupervisor(scheduler)
     states[path] := permanentUnknownState
     permanentRequestCount := runtime.processSnapshots.RequestCount
+    permanentLogStart := GuardRuntimeTestContext.Logs.Length + 1
     GuardRuntimeTestContext.Observation := ProcessObservation.Unknown(
         clock.Ticks, "process-command", "候选解释器的命令行不可用",
         ProcessObservationReason.CommandLineUnavailable)
@@ -591,6 +609,22 @@ RunGuardRuntimeTests() {
         && permanentUnknownState.RestartTask == ""
         && runtime.processSnapshots.RequestCount == permanentRequestCount,
         "永久证据不足被错误当作瞬态快照缺失重复请求")
+    AssertGuardRuntime(GuardRuntimeLogContainsAll(permanentLogStart,
+            "命令行探测", "候选解释器的命令行不可用",
+            "CommandLineUnavailable"),
+        "永久证据不足没有记录可解释的观测来源、原因和原因码")
+    repeatedUnknownLogCount := GuardRuntimeTestContext.Logs.Length
+    guard.HandleUncertainObservation(path, permanentUnknownState,
+        GuardRuntimeTestContext.Observation)
+    AssertGuardRuntime(GuardRuntimeTestContext.Logs.Length
+            == repeatedUnknownLogCount,
+        "相同不确定观测在诊断节流窗口内重复刷屏")
+    clock.Ticks += guard.UncertainObservationLogRepeatMs + 1
+    guard.HandleUncertainObservation(path, permanentUnknownState,
+        GuardRuntimeTestContext.Observation)
+    AssertGuardRuntime(GuardRuntimeTestContext.Logs.Length
+            == repeatedUnknownLogCount + 1,
+        "相同不确定观测超过诊断节流窗口后没有重新提醒")
 
     interruptedState := CreateGuardRuntimeSupervisor(scheduler)
     states[path] := interruptedState

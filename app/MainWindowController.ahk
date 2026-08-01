@@ -130,20 +130,14 @@ ShowContextMenu(GuiCtrlObj, Item, IsRightClick, X, Y) {
         return
     Main.contextTargetRow := Item
     ; 右键未选中的行时将其设为唯一选中项，避免菜单误作用于旧选择。
-    isSelected := false
-    probeRow := 0
-    Loop {
-        probeRow := Main.lv.GetNext(probeRow)
-        if !probeRow
-            break
-        if (probeRow == Item) {
-            isSelected := true
-            break
-        }
-    }
-    if !isSelected {
+    selectedRow := Main.lv.GetNext(0)
+    hasAdditionalSelection := selectedRow
+        && Main.lv.GetNext(selectedRow) > 0
+    if selectedRow != Item || hasAdditionalSelection {
         Main.lv.Modify(0, "-Select")
-        Main.lv.Modify(Item, "Select Focus")
+        Main.lv.Modify(Item, "Select Focus Vis")
+    } else {
+        Main.lv.Modify(Item, "Focus Vis")
     }
     path := Main.lv.GetText(Item, 3)
     if !App.appStates.Has(path) {
@@ -159,12 +153,14 @@ ShowContextMenu(GuiCtrlObj, Item, IsRightClick, X, Y) {
     batchLogSupported := false
     try batchLogSupported := App.targetSpecsService.Get(path,
         stateObj).Launch.Kind == TargetLaunchKind.Batch
-    ; 每次弹出前在同一菜单句柄上刷新条目，避免保留上一个守护对象的勾选或禁用状态。
-    ConfigureMainContextMenu(isAdmin, maintenanceEnabled,
+    ; 使用不激活的自绘浮层而非原生 Menu.Show，避免右键菜单接管焦点时
+    ; ListView 在首帧把选中背景重绘成方形。
+    popupItems := BuildMainContextPopupItems(isAdmin, maintenanceEnabled,
         maintenanceSupported, batchLogSupported)
     if Main.HasOwnProp("listSelectionPresenter")
         Main.listSelectionPresenter.RefreshItem(Item)
-    ContextMenuPresenter.Show(Main.contextMenu)
+    if IsObject(Main.contextPopup)
+        Main.contextPopup.Show(popupItems)
 }
 
 OpenFileLocation(*) {
@@ -173,11 +169,110 @@ OpenFileLocation(*) {
     path := Main.lv.GetText(Main.contextTargetRow, 3)
     locationPath := FileExist(path) ? path
         : App.targetIdentityService.GetMonitoredTargetPath(path)
-    SplitPath(locationPath, , &dir)
-    if FileExist(locationPath)
-        Run('explorer.exe /select,"' locationPath '"')
-    else if FileExist(dir)
-        Run('explorer.exe "' dir '"')
+    if locationPath != "" && FileExist(locationPath)
+            && !DirExist(locationPath)
+            && IsExplorerDefaultFileManager()
+            && OpenFileSelectionWithExplorer(locationPath)
+        return
+    directoryPath := ResolveOpenLocationDirectory(locationPath)
+    if directoryPath != ""
+        OpenDirectoryWithDefaultFileManager(directoryPath)
+}
+
+ResolveOpenLocationDirectory(locationPath) {
+    try locationPath := Trim(String(locationPath))
+    catch
+        return ""
+    if locationPath == ""
+        return ""
+    if DirExist(locationPath)
+        return locationPath
+    SplitPath(locationPath, , &directoryPath)
+    return DirExist(directoryPath) ? directoryPath : ""
+}
+
+OpenFileSelectionWithExplorer(filePath) {
+    if filePath == "" || !FileExist(filePath) || DirExist(filePath)
+        return false
+    try {
+        Run('explorer.exe /select,"' filePath '"')
+        return true
+    } catch {
+        return false
+    }
+}
+
+OpenDirectoryWithDefaultFileManager(directoryPath) {
+    if directoryPath == "" || !DirExist(directoryPath)
+        return false
+    try {
+        Run('"' directoryPath '"')
+        return true
+    } catch {
+        return false
+    }
+}
+
+IsExplorerDefaultFileManager() {
+    for shellClass in ["Directory", "Drive", "Folder"] {
+        defaultVerb := ReadFolderShellDefaultVerb(shellClass)
+        if !IsExplorerFolderShellVerb(shellClass, defaultVerb)
+            return false
+    }
+    return true
+}
+
+ReadFolderShellDefaultVerb(shellClass) {
+    for keyName in [
+        "HKEY_CURRENT_USER\Software\Classes\" shellClass "\shell",
+        "HKEY_LOCAL_MACHINE\Software\Classes\" shellClass "\shell",
+        "HKEY_CLASSES_ROOT\" shellClass "\shell"
+    ] {
+        defaultVerb := ReadRegistryDefaultValue(keyName)
+        if defaultVerb != ""
+            return defaultVerb
+    }
+    return ""
+}
+
+IsExplorerFolderShellVerb(shellClass, defaultVerb) {
+    try defaultVerb := Trim(String(defaultVerb))
+    catch
+        return true
+    normalizedVerb := StrLower(defaultVerb)
+    if normalizedVerb == "" || normalizedVerb == "none"
+        return true
+
+    command := ReadFolderShellVerbCommand(shellClass, defaultVerb)
+    if command != "" {
+        normalizedCommand := StrLower(command)
+        if InStr(normalizedCommand, "explorer.exe")
+            return true
+        if normalizedVerb != "open"
+                && normalizedVerb != "opennewwindow"
+                && normalizedVerb != "explore"
+            return false
+    }
+    return normalizedVerb == "open"
+        || normalizedVerb == "opennewwindow"
+        || normalizedVerb == "explore"
+}
+
+ReadFolderShellVerbCommand(shellClass, verb) {
+    for rootKey in ["HKEY_CURRENT_USER", "HKEY_LOCAL_MACHINE",
+            "HKEY_CLASSES_ROOT"] {
+        keyName := rootKey "\Software\Classes\" shellClass "\shell\" verb "\command"
+        command := ReadRegistryDefaultValue(keyName)
+        if command != ""
+            return command
+    }
+    return ""
+}
+
+ReadRegistryDefaultValue(keyName) {
+    try return Trim(String(RegRead(keyName)))
+    catch
+        return ""
 }
 
 ; 托盘、通知和标题栏关闭最终都汇入同一组窗口生命周期操作。

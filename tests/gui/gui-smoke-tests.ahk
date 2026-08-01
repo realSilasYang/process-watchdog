@@ -536,6 +536,35 @@ try {
     } finally DllCall("user32\ReleaseDC", "Ptr", list.Hwnd,
         "Ptr", listDc)
     ReportGuiSmokeStage("active-selection-pixels")
+    list.Modify(1, "Focus Vis")
+    AssertGuiSmoke(list.GetNext(0) == 1
+            && list.GetNext(0, "Focused") == 1,
+        "Right-click context selection should keep the native focus row visible")
+    contextRefreshCount := listSelectionPresenter.nativeRefreshCount
+    AssertGuiSmoke(listSelectionPresenter.RefreshItem(1),
+        "Selected ListView item could not be redrawn before context menu")
+    AssertGuiSmoke(listSelectionPresenter.nativeRefreshCount
+            == contextRefreshCount,
+        "Right-click context selection must redraw the active row without a delayed full-list repaint")
+    contextListDc := DllCall("user32\GetDC", "Ptr", list.Hwnd, "Ptr")
+    try {
+        contextCornerColor := DllCall("gdi32\GetPixel", "Ptr",
+            contextListDc, "Int", NumGet(itemRect, 0, "Int") + 1,
+            "Int", NumGet(itemRect, 4, "Int") + 1, "UInt")
+        contextSelectedColor := DllCall("gdi32\GetPixel", "Ptr",
+            contextListDc, "Int",
+            NumGet(itemRect, 8, "Int") - Round(14 * dpi / 96),
+            "Int", (NumGet(itemRect, 4, "Int")
+                + NumGet(itemRect, 12, "Int")) // 2, "UInt")
+        AssertGuiSmoke(contextCornerColor
+                == RoundedButtonRenderer.ColorToBgr(
+                    UiThemeService.Color("Surface"))
+            && contextSelectedColor != RoundedButtonRenderer.ColorToBgr(
+                UiThemeService.Color("Surface")),
+            "ListView right-click selection reverted to a square background")
+    } finally DllCall("user32\ReleaseDC", "Ptr", list.Hwnd,
+        "Ptr", contextListDc)
+    ReportGuiSmokeStage("context-selection-pixels")
     DllCall("user32\SetFocus", "Ptr", ownerEdit.Hwnd, "Ptr")
     AssertGuiSmoke(listSelectionPresenter.RefreshItem(1),
         "Selected ListView item could not be redrawn after losing focus")
