@@ -49,7 +49,10 @@ class ListViewSelectionPresenter {
     RefreshItem(row) {
         if !this.attached || row <= 0 || row > this.listView.GetCount()
             return false
-        return this.RefreshNativeSurface()
+        result := SendMessage(Win32.LVM_REDRAWITEMS, row - 1, row - 1,
+            this.listView.Hwnd)
+        DllCall("user32\UpdateWindow", "Ptr", this.listView.Hwnd, "Int")
+        return result != 0
     }
 
     ScheduleNativeSurfaceRefresh(delayMs := 15) {

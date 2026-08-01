@@ -965,6 +965,19 @@ RunDisplayHotSwitchTests() {
             && DisplayHotSwitchMenuHasItem(Main.contextMenu,
                 "📂 Open File Location"),
             "主按钮、托盘或右键菜单没有立即切换为英文")
+        Main.contextTargetRow := 1
+        DllCall("user32\SetFocus", "Ptr", Main.lv.Hwnd, "Ptr")
+        focusedBeforePopup := DllCall("user32\GetFocus", "Ptr")
+        AssertDisplayHotSwitch(focusedBeforePopup == Main.lv.Hwnd,
+            "右键浮层测试前 ListView 没有获得焦点")
+        popupItems := BuildMainContextPopupItems(false, false, true, false)
+        AssertDisplayHotSwitch(Main.contextPopup.Show(popupItems),
+            "主列表右键浮层没有显示")
+        Sleep(50)
+        AssertDisplayHotSwitch(Main.contextPopup.IsVisible()
+                && DllCall("user32\GetFocus", "Ptr") == focusedBeforePopup,
+            "主列表右键浮层不应抢走 ListView 焦点")
+        Main.contextPopup.Hide()
         AssertDisplayHotSwitch(stateObj.State == "⏳ Retry in 7 seconds"
             && stateObj.StatusKind == GuardStatusKind.RetryCountdown
             && Main.lv.GetText(1, 2) == "Retry in 7 seconds",

@@ -275,7 +275,7 @@ class ApplicationState {
         this.savedWidth := 730
         this.savedHeight := 520
         this.savedColumn1 := 500
-        this.savedColumn2 := 180
+        this.savedColumn2 := 200
         this.batchImportMaxResults := 2000
     }
 

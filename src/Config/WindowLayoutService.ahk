@@ -15,7 +15,7 @@ class WindowLayoutService {
                 300, 32767),
             Column1: this.Repository.ReadBoundedInt("Layout", "Col1W", 500,
                 200, 32767),
-            Column2: this.Repository.ReadBoundedInt("Layout", "Col2W", 180,
+            Column2: this.Repository.ReadBoundedInt("Layout", "Col2W", 200,
                 140, 32767)
         }
     }

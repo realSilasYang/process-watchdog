@@ -163,7 +163,7 @@ RunApplicationConfigServiceTests() {
             && layout.Column1 == 500 && layout.Column2 == 250,
             "损坏布局没有逐字段限制到安全默认值")
         repository.WriteValue("Layout", "Col2W", "bad")
-        AssertApplicationConfig(layoutService.Load().Column2 == 180,
+        AssertApplicationConfig(layoutService.Load().Column2 == 200,
             "损坏的状态列宽度没有回退到收窄后的默认值")
         layoutService.Save({Width: 580, Height: 300,
             Column1: 250, Column2: 180})

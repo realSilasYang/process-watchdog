@@ -519,7 +519,6 @@ class SettingsWindow extends ManagedWindow {
         layout := this.layout
         windowWidth := layout.WindowWidth
         contentX := layout.ContentX
-        contentRight := layout.ContentRight
         fontName := layout.FontName
         ; 关于页是只读的产品信息面板：品牌居中，版本与运行环境并列展示，
         ; 两个操作入口保持同一视觉层级，不沿用设置表单的标签和值布局。
@@ -541,14 +540,17 @@ class SettingsWindow extends ManagedWindow {
                     UiThemeService.Color("MutedText"),
             Tr("持续守护重要程序与自动化任务，让日常工作稳定运行")))
         aboutDividerWidth := windowWidth - 2 * contentX
+        aboutDividerRight := contentX + aboutDividerWidth
         this.aboutTopDivider := this.AddTabControl(5, this.gui.Add("Text",
             "x" contentX " y182 w" aboutDividerWidth
                 " h1 Background" UiThemeService.Color("Divider")))
-        infoCenterX := Floor(windowWidth / 2)
+        ; 信息列必须使用关于页分隔线的边界。ContentRight 是设置表单输入控件
+        ; 的右边界，带有不同的右侧余量，直接复用会让运行环境一列越过分隔线。
+        infoCenterX := Floor((contentX + aboutDividerRight) / 2)
         infoGap := layout.IsCompact ? 14 : 20
         leftInfoWidth := infoCenterX - infoGap - contentX
         rightInfoX := infoCenterX + infoGap
-        rightInfoWidth := contentRight - rightInfoX
+        rightInfoWidth := aboutDividerRight - rightInfoX
         versionCaption := this.SplitFieldCaption(Tr("当前版本：")).Label
         runtimeCaption := this.SplitFieldCaption(Tr("运行环境：")).Label
         this.gui.SetFont("norm s10 c" UiThemeService.Color("MutedText"),

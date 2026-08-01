@@ -130,6 +130,8 @@ ShutdownApplicationUi(*) {
         try App.fileScanner.Shutdown()
     if !IsSet(Main)
         return
+    if Main.contextPopup
+        try Main.contextPopup.Dispose()
     if Main.listSelectionPresenter
         try Main.listSelectionPresenter.Dispose()
     try UnregisterGuiControls(Main.gui.Hwnd)

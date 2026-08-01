@@ -126,6 +126,9 @@ $win32Source = Get-Content -LiteralPath `
 $contextMenuPresenterSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\UI\ContextMenuPresenter.ahk') `
     -Raw -Encoding UTF8
+$mainContextPopupWindowSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\Windows\MainContextPopupWindow.ahk') `
+    -Raw -Encoding UTF8
 $listViewSelectionPresenterSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\UI\ListViewSelectionPresenter.ahk') `
     -Raw -Encoding UTF8
@@ -174,11 +177,12 @@ $iniLines = Get-Content -LiteralPath $iniPath -Encoding Unicode
 
 $failures = New-Object 'System.Collections.Generic.List[string]'
 
-# 两个布尔状态使用菜单文本的快捷键栏统一右对齐，不能再退回 Windows 原生左侧
-# 勾选位；打开窗口的菜单文案也不应保留会被误认为截断提示的字面省略号。
+# 两个布尔状态不能退回 Windows 原生左侧勾选位；主列表右键菜单必须使用
+# 不激活浮层，避免原生 Menu.Show 抢走 ListView 焦点。浮层菜单项必须由单个
+# owner-draw 行控件绘制，避免拆成文字/勾选/背景多层控件后留下方角残影。
 if (-not $source.Contains('FormatContextMenuToggleLabel(label, checked)') -or
     -not $source.Contains('return checked ? label "`t✓" : label') -or
-    -not $source.Contains('ConfigureMainContextMenu(isAdmin := false, maintenanceEnabled := false,') -or
+    -not $source.Contains('BuildMainContextPopupItems(isAdmin := false, maintenanceEnabled := false,') -or
     -not $source.Contains('maintenanceSupported := true, batchLogSupported := false)') -or
     -not $source.Contains('if batchLogSupported {') -or
     -not $source.Contains('Tr("📄 查看批处理输出日志")') -or
@@ -189,6 +193,24 @@ if (-not $source.Contains('FormatContextMenuToggleLabel(label, checked)') -or
     -not $source.Contains('SuppressNativeMenuCheckGutter(contextMenu)') -or
     -not $source.Contains('ContextMenuPresenter.Detach(contextMenu.Handle)') -or
     -not $source.Contains('ContextMenuPresenter.Attach(contextMenu, Main.gui.Hwnd)') -or
+    -not $mainSource.Contains('#Include app\Windows\MainContextPopupWindow.ahk') -or
+    -not $mainWindowStateSource.Contains('this.contextPopup := MainContextPopupWindow(this.gui)') -or
+    -not $source.Contains('Main.contextPopup.Show(popupItems)') -or
+    -not $source.Contains('Main.contextPopup.Dispose()') -or
+    -not $mainContextPopupWindowSource.Contains('+E0x08000000') -or
+    -not $mainContextPopupWindowSource.Contains('NoActivate') -or
+    -not $mainContextPopupWindowSource.Contains('OnMessage(Win32.WM_RBUTTONDOWN, this.PointerDownCallback)') -or
+    -not $mainContextPopupWindowSource.Contains('RegisterHoverButton(rowButton, menuColor, hoverColor,') -or
+    -not $mainContextPopupWindowSource.Contains('RegisterButtonClick(rowButton,') -or
+    -not $mainContextPopupWindowSource.Contains('ButtonFeedbackMode.Dismissive') -or
+    -not $mainContextPopupWindowSource.Contains('buttonState.parentColor := menuColor') -or
+    -not $mainContextPopupWindowSource.Contains('buttonState.rightTextInsetDip :=') -or
+    -not $mainContextPopupWindowSource.Contains('SetRegisteredButtonEnabled(rowButton, false)') -or
+    $mainContextPopupWindowSource.Contains('checkCtrl :=') -or
+    $mainContextPopupWindowSource.Contains('rowBg :=') -or
+    -not $mainContextPopupWindowSource.Contains('SetWindowRgn') -or
+    -not $mainContextPopupWindowSource.Contains('SetWindowPos') -or
+    $source.Contains('ContextMenuPresenter.Show(Main.contextMenu)') -or
     -not $mainSource.Contains('OnMessage(Win32.WM_MEASUREITEM, OnMeasureApplicationControl)') -or
     -not $contextMenuPresenterSource.Contains('static FontSizePt := 10') -or
     -not $contextMenuPresenterSource.Contains('static ItemHeightDip := 30') -or
@@ -203,7 +225,6 @@ if (-not $source.Contains('FormatContextMenuToggleLabel(label, checked)') -or
     -not $contextMenuPresenterSource.Contains('SetWindowRgn') -or
     -not $contextMenuPresenterSource.Contains('FillRoundedRectangle(hdc,') -or
     -not $contextMenuPresenterSource.Contains('static Show(menuObj, coordinates*)') -or
-    -not $source.Contains('ContextMenuPresenter.Show(Main.contextMenu)') -or
     -not $contextMenuPresenterSource.Contains('StopPopupWindowHook()') -or
     -not $source.Contains('if Main.contextMenu is Menu') -or
     -not $source.Contains('contextMenu.Delete()') -or
@@ -212,7 +233,7 @@ if (-not $source.Contains('FormatContextMenuToggleLabel(label, checked)') -or
     -not $source.Contains('contextMenu.Disable(maintenanceLabel)') -or
     $source -match '\.contextMenu\.(?:Check|Uncheck)\(' -or
     $source.Contains('SetWindowsStockMenuIcon(')) {
-    $failures.Add('Main context-menu toggles must rebuild with right-aligned text checks and no native left gutter')
+    $failures.Add('Main context menu must use a no-activate rounded popup without triggering native Menu.Show focus loss')
 }
 if (-not $mainSource.Contains('#Include app\UI\ListViewSelectionPresenter.ahk') -or
     -not $mainSource.Contains('Main.listSelectionPresenter := ListViewSelectionPresenter(Main.lv)') -or
@@ -224,13 +245,27 @@ if (-not $mainSource.Contains('#Include app\UI\ListViewSelectionPresenter.ahk') 
     -not $listViewSelectionPresenterSource.Contains('Win32.LVIS_SELECTED') -or
     -not $listViewSelectionPresenterSource.Contains('ScheduleNativeSurfaceRefresh(delayMs := 15)') -or
     -not $listViewSelectionPresenterSource.Contains('Win32.RDW_CONTROL_REFRESH') -or
+    -not $listViewSelectionPresenterSource.Contains('Win32.LVM_REDRAWITEMS') -or
+    -not $listViewSelectionPresenterSource.Contains('DllCall("user32\UpdateWindow"') -or
     -not $listViewSelectionPresenterSource.Contains('MaskOutsideRoundedRectangle(hdc,') -or
     $listViewSelectionPresenterSource.Contains('DrawColumnSeparators') -or
     $listViewSelectionPresenterSource.Contains('SetDCBrushColor') -or
     -not $mainVisualPipelineSource.Contains('ScheduleMainListNativeSurfaceRefresh(delayMs := 15)') -or
     -not $source.Contains('Main.listSelectionPresenter.RefreshItem(Item)') -or
+    -not $source.Contains('Main.lv.Modify(Item, "Select Focus Vis")') -or
+    -not $source.Contains('Main.lv.Modify(Item, "Focus Vis")') -or
+    $source.Contains('PrepareMainListContextPointerDown') -or
+    $source.Contains('ShowPreparedMainListContextMenu') -or
+    $source.Contains('Main.listSelectionPresenter.ScheduleNativeSurfaceRefresh(35)') -or
     -not $source.Contains('Main.listSelectionPresenter.Dispose()')) {
     $failures.Add('Main ListView selection must use a DPI-aware rounded background while preserving native item content and cleanup')
+}
+if (-not $mainWindowControllerSource.Contains('IsExplorerDefaultFileManager()') -or
+    -not $mainWindowControllerSource.Contains('OpenFileSelectionWithExplorer(locationPath)') -or
+    -not $mainWindowControllerSource.Contains('OpenDirectoryWithDefaultFileManager(directoryPath)') -or
+    -not $mainWindowControllerSource.Contains('explorer.exe /select,"') -or
+    $mainWindowControllerSource.Contains('explorer.exe "') ) {
+    $failures.Add('Open File Location must use Explorer selection only when Explorer is the default file manager, otherwise open the directory through the default handler')
 }
 foreach ($obsoleteContextMenuText in @(
     '🎨 自定义名称和图标…',
@@ -3062,7 +3097,9 @@ foreach ($windowFile in Get-ChildItem -LiteralPath `
         $windowSource -notmatch '\bInitializeApplicationWindow\(this\.gui') {
         $failures.Add("Managed application window bypasses shared visual initialization: $($windowFile.Name)")
     }
-    if ($windowFile.Name -ne 'HistoryToastWindow.ahk' -and
+    if ($windowFile.Name -notin @(
+            'HistoryToastWindow.ahk',
+            'MainContextPopupWindow.ahk') -and
         $windowSource -match 'this\.gui\.Show\(') {
         $failures.Add("Managed application window bypasses shared visibility policy: $($windowFile.Name)")
     }

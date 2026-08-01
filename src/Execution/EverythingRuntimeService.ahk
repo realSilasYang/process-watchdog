@@ -4,12 +4,13 @@
 
 class EverythingRuntimeStartResult {
     __New(found := false, started := false, path := "", pid := 0,
-        failure := "") {
+        failure := "", discoverySummary := "") {
         this.Found := !!found
         this.Started := !!started
         this.Path := path
         this.PID := pid ? Integer(pid) : 0
         this.Failure := failure
+        this.DiscoverySummary := discoverySummary
     }
 }
 
@@ -19,6 +20,8 @@ class EverythingRuntimeService {
 
     __New(callbacks := "") {
         this.CachedExecutable := ""
+        this.LastDiscoverySummary := ""
+        this.LastCandidateCount := 0
         this.CandidateCollector := this.GetCallback(callbacks,
             "CollectCandidates")
         this.FileExistsCallback := this.GetCallback(callbacks, "FileExists")
@@ -38,6 +41,7 @@ class EverythingRuntimeService {
             ? this.CandidateCollector.Call() : this.CollectCandidates()
         if Type(candidates) != "Array"
             candidates := []
+        this.LastCandidateCount := candidates.Length
         seen := Map()
         seen.CaseSense := "Off"
         for rawCandidate in candidates {
@@ -47,17 +51,23 @@ class EverythingRuntimeService {
             seen[candidate] := true
             if this.IsExecutable(candidate) {
                 this.CachedExecutable := candidate
+                this.LastDiscoverySummary := this.BuildDiscoverySummary(
+                    candidates.Length, candidate)
                 return candidate
             }
         }
         this.CachedExecutable := ""
+        this.LastDiscoverySummary := this.BuildDiscoverySummary(
+            candidates.Length, "")
         return ""
     }
 
     StartSilently() {
         executablePath := this.FindExecutable()
         if executablePath == ""
-            return EverythingRuntimeStartResult()
+            return EverythingRuntimeStartResult(false, false, "", 0,
+                "未在注册表、常见安装目录、PATH、桌面或开始菜单快捷方式中找到 Everything.exe。",
+                this.LastDiscoverySummary)
         try {
             if this.LaunchCallback
                 pid := this.LaunchCallback.Call(executablePath,
@@ -67,11 +77,22 @@ class EverythingRuntimeService {
                 Run('"' executablePath '" -startup', "", "Hide", &pid)
             }
             return EverythingRuntimeStartResult(true, true,
-                executablePath, pid)
+                executablePath, pid, "", this.LastDiscoverySummary)
         } catch as launchError {
             return EverythingRuntimeStartResult(true, false,
-                executablePath, 0, launchError.Message)
+                executablePath, 0, launchError.Message,
+                this.LastDiscoverySummary)
         }
+    }
+
+    BuildDiscoverySummary(candidateCount, selectedPath) {
+        if selectedPath != "" {
+            return Format("已检查 {1} 个 Everything 候选，采用：{2}",
+                candidateCount, selectedPath)
+        }
+        return Format(
+            "已检查 {1} 个 Everything 候选；来源包括注册表、标准安装目录、PATH、桌面和开始菜单快捷方式。",
+            candidateCount)
     }
 
     IsExecutable(path) {

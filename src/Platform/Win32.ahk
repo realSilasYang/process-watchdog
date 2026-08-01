@@ -31,6 +31,7 @@ class Win32 {
     static WM_LBUTTONDOWN := 0x0201
     static WM_LBUTTONUP := 0x0202
     static WM_LBUTTONDBLCLK := 0x0203
+    static WM_RBUTTONDOWN := 0x0204
     static WM_CAPTURECHANGED := 0x0215
     static WM_MOUSELEAVE := 0x02A3
     static WM_DPICHANGED := 0x02E0
@@ -63,6 +64,7 @@ class Win32 {
     static LVM_GETHEADER := 0x101F
     static LVM_GETIMAGELIST := 0x1002
     static LVM_HITTEST := 0x1012
+    static LVM_REDRAWITEMS := 0x1015
     static LVM_SETITEMSTATE := 0x102B
     static LVM_GETITEMSTATE := 0x102C
     static LVM_SETCOLUMNORDERARRAY := 0x103A
