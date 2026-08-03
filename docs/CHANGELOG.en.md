@@ -7,6 +7,31 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.0.8] - 2026-08-03
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides the preferred and fallback fonts for installation into Windows; it is not required to run the application.
+- **`process-watchdog-2.0.8-source.zip` (complete source package):** Includes the AHK source, modules, tests, and documentation without fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+- **`process-watchdog-2.0.8-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, and runtime resources without fonts; no AutoHotkey installation is required, and it is intended for long-term use after full extraction.
+- **Everything ([latest official version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application searches. The bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### ✨ Added
+
+- **Manual restart for watched targets:** The context menu now includes Restart, which closes the current target under the configured stop policy and launches it again. Paused targets resume monitoring as part of the operation, while upgrade protection or an uncertain process identity prevents unsafe termination.
+
+---
+
+### 🚀 Improvements
+
+- **Context actions follow the operating workflow:** Restart, Stop Running, Edit Full Path, and Open File Location now appear in that order, and Process Identification and Launch Settings appears before the administrator toggle so frequent actions are easier to find.
+- **Clearer application-icon rendering:** The main list prefers a real native frame with an appropriate size from ICO, EXE, DLL, and CPL resources, then applies high-quality scaling instead of accepting a system-prescaled image with blurred or distorted edges.
+- **Consolidated About and support entry points:** About replaces the former Donate button in the main window and opens a dedicated child window for version, runtime, update checking, Donate, and project access. Help and Donate terminology plus feedback and project hover hints are streamlined consistently.
+- **More stable font-list browsing:** The UI content-font list displays a fixed 12 rows and preserves the user's current scroll position after installed fonts are refreshed instead of jumping back to the selected item.
+- **More recognizable update icon:** The refresh icon now uses the existing blue-violet update semantic while retaining the ordinary toolbar-button background and text treatment.
+
 ## 🎉 Version [2.0.7] - 2026-08-01
 
 ### 📦 Release Assets
@@ -408,7 +433,8 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.7...HEAD
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.8...HEAD
+[2.0.8]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.7...v2.0.8
 [2.0.7]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.6...v2.0.7
 [2.0.6]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.5...v2.0.6
 [2.0.5]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.4...v2.0.5

@@ -609,6 +609,7 @@ class GuardRuntime {
         if !stateObj.Pending
             return false
         if this.Runtime.maintenanceCoordinator.IsBlocking(stateObj)
+            || stateObj.ManualRestartRequested
             || stateObj.ManualStopRequested || stateObj.IsRestarting {
             return false
         }

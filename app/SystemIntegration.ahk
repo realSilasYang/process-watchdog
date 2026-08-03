@@ -58,6 +58,10 @@ ShowSettings(*) {
     GuiModules.settings.Show()
 }
 
+ShowAbout(*) {
+    GuiModules.about.Show()
+}
+
 CreateApplicationShortcutFile(shortcutPath, scriptPath, workingDirectory,
     iconPath, compiled, interpreterPath) {
     if compiled {
@@ -161,10 +165,6 @@ ShowSupportInfo(*) {
     GuiModules.supportInfo.Show()
 }
 
-ShowDonation(*) {
-    GuiModules.donation.Show()
-}
-
 ; 检查工作位于独立进程；这里只负责启动任务以及在结果返回后提供统一的用户决策。
 CheckForApplicationUpdate(ownerGui := "", interactive := true, *) {
     try {
@@ -189,9 +189,9 @@ CheckForApplicationUpdate(ownerGui := "", interactive := true, *) {
 HandleApplicationUpdateCheckResult(result, interactive := false,
     ownerGui := "") {
     ; 服务在进入结果回调前已经结束工作进程并清理计时器。无论结果内容
-    ; 是否有效，都先恢复设置窗口按钮，避免异常结果让界面永久停在检查态。
+    ; 是否有效，都先恢复关于窗口按钮，避免异常结果让界面永久停在检查态。
     if IsSet(GuiModules)
-        try GuiModules.settings.SetUpdateCheckActive(false)
+        try GuiModules.about.SetUpdateCheckActive(false)
     if !IsObject(result)
         return
     activeOwner := ""

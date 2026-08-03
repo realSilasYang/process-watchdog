@@ -1,11 +1,8 @@
 ; 小助手设置窗口。
-; 通用、监控与启动、停止策略、日志和关于按选项卡组织；所有输入先完成范围校验，
+; 通用、监控与启动、停止策略和日志按选项卡组织；所有输入先完成范围校验，
 ; 再通过配置服务一次提交并应用，避免部分字段已经生效而其余字段仍保存失败。
 
 class SettingsWindow extends ManagedWindow {
-    static ProjectHomeUrl :=
-        "https://github.com/realSilasYang/process-watchdog"
-
     __New(mainGui) {
         this.owner := mainGui
         this.tabButtons := []
@@ -20,6 +17,7 @@ class SettingsWindow extends ManagedWindow {
         this.fontLabel := ""
         this.fontDropDown := ""
         this.fontValues := []
+        this.fontDropDownTopIndex := 0
         this.themeLabel := ""
         this.themeDropDown := ""
         this.themeValues := []
@@ -49,19 +47,6 @@ class SettingsWindow extends ManagedWindow {
         this.taskButton := ""
         this.taskStatusTimer := ObjBindMethod(this,
             "RefreshTaskStatusAfterShow")
-        this.checkUpdateButton := ""
-        this.updateCheckActive := false
-        this.versionLabel := ""
-        this.versionValue := ""
-        this.runtimeLabel := ""
-        this.runtimeValue := ""
-        this.aboutLogo := ""
-        this.aboutName := ""
-        this.aboutSubtitle := ""
-        this.aboutTopDivider := ""
-        this.aboutInfoDivider := ""
-        this.aboutBottomDivider := ""
-        this.projectButton := ""
         this.saveButton := ""
         this.cancelButton := ""
     }
@@ -86,17 +71,17 @@ class SettingsWindow extends ManagedWindow {
         this.tabControls := []
         this.tabBuilt := []
         this.activeTab := 0
-        Loop 5
+        Loop 4
             this.tabControls.Push([])
-        Loop 5
+        Loop 4
             this.tabBuilt.Push(false)
 
         this.gui.SetFont("norm " (isCompact ? "s9" : "s8") " c"
             UiThemeService.Color("Text"), fontName)
         tabLabels := [Tr("通用"), Tr("监控与启动"), Tr("停止策略"),
-            Tr("日志"), Tr("关于")]
+            Tr("日志")]
         tabIconNames := ["sliders-horizontal.svg", "activity.svg",
-            "octagon-x.svg", "logs.svg", "circle-info.svg"]
+            "octagon-x.svg", "logs.svg"]
         tabGap := 8
         tabWidths := this.GetTabButtonWidths(tabLabels, windowWidth - 30,
             isCompact, tabGap)
@@ -227,9 +212,10 @@ class SettingsWindow extends ManagedWindow {
             if StrLower(installedFont) == StrLower(App.uiFont)
                 selectedFontIndex := this.fontValues.Length
         }
+        fontDropDownRows := 12
         this.fontDropDown := this.AddTabControl(1, this.gui.Add(
             "DropDownList", "x" languageInputX " y216 w"
-                (actionX - languageInputX - 8) " Choose"
+                (actionX - languageInputX - 8) " r" fontDropDownRows " Choose"
                 selectedFontIndex " Background" UiThemeService.Color("Input")
                     " c" UiThemeService.Color("Text") " -Border -E0x200",
                 AddComboBoxDisplayPadding(fontLabels)))
@@ -401,7 +387,6 @@ class SettingsWindow extends ManagedWindow {
             case 2: this.BuildMonitoringTab()
             case 3: this.BuildStopPolicyTab()
             case 4: this.BuildLogTab()
-            case 5: this.BuildAboutTab()
             default: return false
         }
         return this.tabBuilt[index]
@@ -515,119 +500,40 @@ class SettingsWindow extends ManagedWindow {
         this.tabBuilt[4] := true
     }
 
-    BuildAboutTab() {
-        layout := this.layout
-        windowWidth := layout.WindowWidth
-        contentX := layout.ContentX
-        fontName := layout.FontName
-        ; 关于页是只读的产品信息面板：品牌居中，版本与运行环境并列展示，
-        ; 两个操作入口保持同一视觉层级，不沿用设置表单的标签和值布局。
-        logoSize := 44
-        this.aboutLogo := this.AddTabControl(5, this.gui.Add("Picture",
-            "x" Floor((windowWidth - logoSize) / 2) " y62 w" logoSize
-                " h" logoSize, GetApplicationIconPath()))
-        this.gui.SetFont("norm s14 c" UiThemeService.Color("Text"),
-            LocalizationService.GetLanguageSystemUiFontName())
-        this.aboutName := this.AddTabControl(5, this.gui.Add("Text",
-            "x" contentX " y112 w" (windowWidth - 2 * contentX)
-                " h30 Center 0x200 BackgroundTrans", Tr("进程守护小助手")))
-        this.aboutName.SetFont("bold")
-        this.gui.SetFont("norm s9 c" UiThemeService.Color("MutedText"),
-            fontName)
-        this.aboutSubtitle := this.AddTabControl(5, this.gui.Add("Text",
-            "x" contentX " y148 w" (windowWidth - 2 * contentX)
-                " h22 Center 0x200 BackgroundTrans c"
-                    UiThemeService.Color("MutedText"),
-            Tr("持续守护重要程序与自动化任务，让日常工作稳定运行")))
-        aboutDividerWidth := windowWidth - 2 * contentX
-        aboutDividerRight := contentX + aboutDividerWidth
-        this.aboutTopDivider := this.AddTabControl(5, this.gui.Add("Text",
-            "x" contentX " y182 w" aboutDividerWidth
-                " h1 Background" UiThemeService.Color("Divider")))
-        ; 信息列必须使用关于页分隔线的边界。ContentRight 是设置表单输入控件
-        ; 的右边界，带有不同的右侧余量，直接复用会让运行环境一列越过分隔线。
-        infoCenterX := Floor((contentX + aboutDividerRight) / 2)
-        infoGap := layout.IsCompact ? 14 : 20
-        leftInfoWidth := infoCenterX - infoGap - contentX
-        rightInfoX := infoCenterX + infoGap
-        rightInfoWidth := aboutDividerRight - rightInfoX
-        versionCaption := this.SplitFieldCaption(Tr("当前版本：")).Label
-        runtimeCaption := this.SplitFieldCaption(Tr("运行环境：")).Label
-        this.gui.SetFont("norm s10 c" UiThemeService.Color("MutedText"),
-            fontName)
-        this.versionLabel := this.AddTabControl(5, this.gui.Add("Text",
-            "x" contentX " y195 w" leftInfoWidth
-                " h22 Center 0x200 BackgroundTrans c"
-                    UiThemeService.Color("MutedText"), versionCaption))
-        this.runtimeLabel := this.AddTabControl(5, this.gui.Add("Text",
-            "x" rightInfoX " y195 w" rightInfoWidth
-                " h22 Center 0x200 BackgroundTrans c"
-                    UiThemeService.Color("MutedText"), runtimeCaption))
-        this.gui.SetFont("norm s11 c" UiThemeService.Color("Text"),
-            fontName)
-        this.versionValue := this.AddTabControl(5, this.gui.Add("Text",
-            "x" contentX " y222 w" leftInfoWidth
-                " h28 Center 0x200 BackgroundTrans",
-            GetApplicationEditionSummary()))
-        this.runtimeValue := this.AddTabControl(5, this.gui.Add("Text",
-            "x" rightInfoX " y222 w" rightInfoWidth
-                " h28 Center 0x200 BackgroundTrans",
-            GetAutoHotkeyRuntimeSummary()))
-        this.aboutInfoDivider := this.AddTabControl(5, this.gui.Add("Text",
-            "x" infoCenterX " y195 w1 h55 Background"
-                UiThemeService.Color("Divider")))
-        this.aboutBottomDivider := this.AddTabControl(5, this.gui.Add("Text",
-            "x" contentX " y263 w" aboutDividerWidth
-                " h1 Background" UiThemeService.Color("Divider")))
-        updateButtonWidth := layout.IsCompact ? 126 : 205
-        projectButtonWidth := layout.IsCompact ? 112 : 175
-        aboutActionGap := 12
-        aboutActionWidth := updateButtonWidth + aboutActionGap
-            + projectButtonWidth
-        aboutActionX := Floor((windowWidth - aboutActionWidth) / 2)
-        this.checkUpdateButton := this.AddTabControl(5,
-            this.gui.Add("Text", "x" aboutActionX
-                " y279 w" updateButtonWidth
-                " h36 Center 0x200 Background" UiThemeService.Color("Primary")
-                    " c" UiThemeService.Color("ButtonText"),
-            Tr("立即检查更新")))
-        this.projectButton := this.AddTabControl(5,
-            this.gui.Add("Text", "x"
-                (aboutActionX + updateButtonWidth + aboutActionGap)
-                " y279 w" projectButtonWidth
-                " h36 Center 0x200 Background" UiThemeService.Color("Toolbar")
-                    " c" UiThemeService.Color("ToolbarText"),
-            Tr("开源地址")))
-        aboutActionFont := LocalizationService.GetLanguageSystemUiFontName()
-        this.checkUpdateButton.SetFont("s10 bold", aboutActionFont)
-        this.projectButton.SetFont("s10 bold", aboutActionFont)
-        RegisterHoverButton(this.checkUpdateButton,
-            UiThemeService.Color("Primary"))
-        RegisterHoverButton(this.projectButton, UiThemeService.Color("Toolbar"))
-        SetButtonLucideIcon(this.checkUpdateButton,
-            "refresh-cw-action.svg", 15, 7)
-        ; 外链图形保留为 SVG 源资源，由共享圆角按钮渲染器按当前 DPI 一次性
-        ; 转为透明像素；加载失败时按钮会安全退回原有纯文本显示。
-        SetButtonSvgIcon(this.projectButton,
-            GetApplicationAssetPath("ui-icons\external-link.svg"), 14, 7)
-        SetButtonTooltip(this.projectButton, SettingsWindow.ProjectHomeUrl)
-        RegisterButtonClick(this.checkUpdateButton,
-            ObjBindMethod(this, "CheckUpdate"))
-        RegisterButtonClick(this.projectButton,
-            ObjBindMethod(this, "OpenProjectHomepage"))
-        this.OffsetTabControlsY(8, 5)
-        this.tabBuilt[5] := true
-        this.SetUpdateCheckActive(App.applicationUpdateService.IsChecking())
-    }
-
     OnFontDropDownCommand(wParam, lParam, *) {
-        ; ComboBox 展开时由父窗口收到 CBN_DROPDOWN（7）。只处理本设置窗口的
-        ; 字体控件，避免语言列表或其它窗口的 WM_COMMAND 触发字体枚举。
+        ; 只处理字体控件的展开和关闭通知，避免其它下拉框触发字体枚举。
         if !this.fontDropDownCommandRegistered || !this.IsOpen()
             || !this.fontDropDown || lParam != this.fontDropDown.Hwnd
-            || ((wParam >> 16) & 0xFFFF) != Win32.CBN_DROPDOWN
+            return
+        notificationCode := (wParam >> 16) & 0xFFFF
+        if notificationCode == Win32.CBN_CLOSEUP {
+            this.CaptureFontDropDownTopIndex()
+            return
+        }
+        if notificationCode != Win32.CBN_DROPDOWN
             return
         this.RefreshFontDropDown()
+        this.RestoreFontDropDownTopIndex()
+    }
+
+    CaptureFontDropDownTopIndex() {
+        if !this.fontDropDown
+            return this.fontDropDownTopIndex
+        topIndex := SendMessage(Win32.CB_GETTOPINDEX, 0, 0,
+            this.fontDropDown.Hwnd)
+        if topIndex >= 0
+            this.fontDropDownTopIndex := topIndex
+        return this.fontDropDownTopIndex
+    }
+
+    RestoreFontDropDownTopIndex() {
+        if !this.fontDropDown || !this.fontValues.Length
+            return false
+        topIndex := Max(0, Min(this.fontDropDownTopIndex,
+            this.fontValues.Length - 1))
+        SendMessage(Win32.CB_SETTOPINDEX, topIndex, 0,
+            this.fontDropDown.Hwnd)
+        return true
     }
 
     RefreshFontDropDown(*) {
@@ -758,11 +664,6 @@ class SettingsWindow extends ManagedWindow {
                 this.SetTabButtonVisualState(button, normalColor, textColor)
             }
             this.activeTab := index
-            showSettingsActions := index != 5
-            if this.saveButton
-                try this.saveButton.Visible := showSettingsActions
-            if this.cancelButton
-                try this.cancelButton.Visible := showSettingsActions
             return true
         } finally this.ResumeTabRedraw(redrawTransaction)
     }
@@ -819,35 +720,6 @@ class SettingsWindow extends ManagedWindow {
     ToggleTaskAction(*) {
         if this.IsOpen()
             ToggleTask(this.gui)
-    }
-
-    OpenProjectHomepage(*) {
-        if !this.IsOpen()
-            return
-        try Run(SettingsWindow.ProjectHomeUrl)
-    }
-
-    CheckUpdate(*) {
-        if !this.IsOpen() || this.updateCheckActive
-            return
-        this.SetUpdateCheckActive(true)
-        CheckForApplicationUpdate(this.gui, true)
-        ; 启动检查发生异常时服务不会进入运行态，应立即恢复按钮；正常启动
-        ; 后则由统一结果回调恢复，避免网络检查期间出现重复请求。
-        this.SetUpdateCheckActive(
-            App.applicationUpdateService.IsChecking())
-    }
-
-    SetUpdateCheckActive(active) {
-        this.updateCheckActive := !!active
-        if !this.IsOpen()
-            return
-        if this.checkUpdateButton {
-            try this.checkUpdateButton.Text := this.updateCheckActive
-                ? Tr("正在检查更新…") : Tr("立即检查更新")
-            SetRegisteredButtonEnabled(this.checkUpdateButton,
-                !this.updateCheckActive)
-        }
     }
 
     Save(*) {
@@ -1071,6 +943,7 @@ class SettingsWindow extends ManagedWindow {
         this.fontLabel := ""
         this.fontDropDown := ""
         this.fontValues := []
+        this.fontDropDownTopIndex := 0
         this.themeLabel := ""
         this.themeDropDown := ""
         this.themeValues := []
@@ -1094,19 +967,6 @@ class SettingsWindow extends ManagedWindow {
         this.shortcutFeedbackText := ""
         this.shortcutFeedbackTimer := 0
         this.taskButton := ""
-        this.checkUpdateButton := ""
-        this.updateCheckActive := false
-        this.versionLabel := ""
-        this.versionValue := ""
-        this.runtimeLabel := ""
-        this.runtimeValue := ""
-        this.aboutLogo := ""
-        this.aboutName := ""
-        this.aboutSubtitle := ""
-        this.aboutTopDivider := ""
-        this.aboutInfoDivider := ""
-        this.aboutBottomDivider := ""
-        this.projectButton := ""
         this.saveButton := ""
         this.cancelButton := ""
     }

@@ -87,6 +87,40 @@ CreateWhiteMatteBmpFixture(filePath) {
     }
 }
 
+CreateSingleFrameIcoFixture(sourcePath, filePath, frameSize) {
+    source := FileRead(sourcePath, "RAW")
+    entryCount := NumGet(source, 4, "UShort")
+    selectedOffset := -1
+    Loop entryCount {
+        entryOffset := 6 + (A_Index - 1) * 16
+        width := NumGet(source, entryOffset, "UChar")
+        width := width ? width : 256
+        if width == frameSize
+            && NumGet(source, entryOffset + 6, "UShort") >= 24 {
+            selectedOffset := entryOffset
+            break
+        }
+    }
+    if selectedOffset < 0
+        throw Error("测试 ICO 缺少指定的真彩色帧：" frameSize)
+    dataSize := NumGet(source, selectedOffset + 8, "UInt")
+    dataOffset := NumGet(source, selectedOffset + 12, "UInt")
+    output := Buffer(22 + dataSize, 0)
+    NumPut("UShort", 0, output, 0)
+    NumPut("UShort", 1, output, 2)
+    NumPut("UShort", 1, output, 4)
+    DllCall("ntdll\RtlMoveMemory", "Ptr", output.Ptr + 6,
+        "Ptr", source.Ptr + selectedOffset, "UPtr", 12)
+    NumPut("UInt", 22, output, 18)
+    DllCall("ntdll\RtlMoveMemory", "Ptr", output.Ptr + 22,
+        "Ptr", source.Ptr + dataOffset, "UPtr", dataSize)
+    outputFile := FileOpen(filePath, "w")
+    if !outputFile
+        throw Error("无法创建单帧 ICO 测试文件")
+    outputFile.RawWrite(output)
+    outputFile.Close()
+}
+
 ReadIconPixelSnapshot(iconHandle) {
     iconInfo := Buffer(A_PtrSize == 8 ? 32 : 20, 0)
     if !DllCall("user32\GetIconInfo", "Ptr", iconHandle, "Ptr", iconInfo)
@@ -288,12 +322,57 @@ AssertBmpMatteRemoved(filePath) {
     }
 }
 
-AssertIndexedIconResourceSelection() {
-    AssertCustomIcon(SelectHighQualityMainIconSourceSize(28) == 64
-        && SelectHighQualityMainIconSourceSize(42) == 96
-        && SelectHighQualityMainIconSourceSize(56) == 128
+AssertIndexedIconResourceSelection(singleFrameIcoPath) {
+    AssertCustomIcon(SelectHighQualityMainIconSourceSize(28) == 128
+        && SelectHighQualityMainIconSourceSize(42) == 256
+        && SelectHighQualityMainIconSourceSize(56) == 256
         && SelectHighQualityMainIconSourceSize(84) == 256,
-        "主列表图标没有按 DPI 选择约两倍尺寸的高清源资源")
+        "主列表图标没有按 DPI 选择四倍尺寸上限的高清源资源")
+    candidateIndex := FindPreferredIconCandidateIndex([
+        {Width: 256, Height: 256, BitsPerPixel: 8, DataSize: 7000},
+        {Width: 128, Height: 128, BitsPerPixel: 32, DataSize: 68000},
+        {Width: 256, Height: 256, BitsPerPixel: 32, DataSize: 40000}
+    ], 224)
+    AssertCustomIcon(candidateIndex == 3
+        && FindPreferredIconCandidateIndex([
+            {Width: 256, Height: 256, BitsPerPixel: 8, DataSize: 7000},
+            {Width: 128, Height: 128, BitsPerPixel: 32, DataSize: 68000},
+            {Width: 256, Height: 256, BitsPerPixel: 32, DataSize: 40000}
+        ], 96) == 2,
+        "真实图标帧没有优先选择真彩色和最接近的足够尺寸")
+
+    icoPath := A_ScriptDir "\..\..\assets\app\watchdog.ico"
+    exactIcoHandle := CreateExactIconFromIco(icoPath, 224)
+    AssertCustomIcon(exactIcoHandle, "无法从 ICO 精确提取原生高清帧")
+    try {
+        exactIcoSnapshot := ReadIconPixelSnapshot(exactIcoHandle)
+        AssertCustomIcon(exactIcoSnapshot.Width == 256
+            && exactIcoSnapshot.Height == 256,
+            "ICO 的 256px 原生帧被系统隐式缩放替代")
+    } finally DllCall("user32\DestroyIcon", "Ptr", exactIcoHandle)
+
+    lowResolutionHandle := CreateExactIconFromIco(singleFrameIcoPath, 256)
+    AssertCustomIcon(lowResolutionHandle,
+        "无法从低分辨率 ICO 提取唯一的原生帧")
+    try {
+        lowResolutionSnapshot := ReadIconPixelSnapshot(lowResolutionHandle)
+        AssertCustomIcon(lowResolutionSnapshot.Width == 32
+            && lowResolutionSnapshot.Height == 32,
+            "低分辨率 ICO 被系统预先放大，仍会产生二次采样")
+        paddedHandle := CreateHighQualityPaddedIcon(lowResolutionHandle,
+            56, 72)
+        AssertCustomIcon(paddedHandle,
+            "低分辨率原生帧无法通过 WIC 单次放大")
+        try {
+            paddedSnapshot := ReadIconPixelSnapshot(paddedHandle)
+            paddedBounds := GetOpaqueIconBounds(paddedSnapshot)
+            AssertCustomIcon(paddedSnapshot.Width == 72
+                && paddedSnapshot.Height == 72
+                && paddedBounds.Width <= 56 && paddedBounds.Height <= 56,
+                "低分辨率图标放大后没有保持主列表透明边距")
+        } finally DllCall("user32\DestroyIcon", "Ptr", paddedHandle)
+    } finally DllCall("user32\DestroyIcon", "Ptr", lowResolutionHandle)
+
     resourcePath := A_WinDir "\System32\shell32.dll"
     indexedSource := FormatCustomIconSource(resourcePath, 44, true)
     parsedSource := ParseCustomIconSource(indexedSource)
@@ -316,11 +395,9 @@ AssertIndexedIconResourceSelection() {
     try {
         snapshot := ReadIconPixelSnapshot(iconHandle)
         bounds := GetOpaqueIconBounds(snapshot)
-        AssertCustomIcon(snapshot.Width
-                == SelectHighQualityMainIconSourceSize(
-                    App.iconResources.MainIconPixelSize)
+        AssertCustomIcon(snapshot.Width >= App.iconResources.MainIconPixelSize
             && snapshot.Height == snapshot.Width,
-            "原生资源没有按高清源尺寸提取")
+            "原生资源没有按真实的高清帧尺寸提取")
         AssertCustomIcon(bounds.Width > 0 && bounds.Height > 0,
             "指定索引的 DLL 图标资源渲染为空")
     } finally {
@@ -495,7 +572,8 @@ AssertStatusIconResources() {
     semanticIconColors := Map(
         "ban.svg", "#EF4444",
         "settings.svg", "#BABABC",
-        "circle-question-mark.svg", "#23A9F2")
+        "circle-question-mark.svg", "#23A9F2",
+        "refresh-cw-action.svg", "#878DF9")
     for resourceName, expectedColor in semanticIconColors {
         resourcePath := GetApplicationAssetPath(
             "ui-icons\lucide\" resourceName)
@@ -729,6 +807,7 @@ RunCustomIconImageTests() {
     matteBmpPath := fixtureDirectory "\white-matte.bmp"
     svgPath := fixtureDirectory "\wide.svg"
     complexSvgPath := fixtureDirectory "\complex.svg"
+    singleFrameIcoPath := fixtureDirectory "\single-32.ico"
     try {
         CreateRasterIconFixture(pngPath,
             "{557CF406-1A04-11D3-9A73-0000F81EF32E}")
@@ -757,6 +836,8 @@ RunCustomIconImageTests() {
             . 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQ'
             . 'IHWP4z8DwHwAFgAI/ScL1AAAAABJRU5ErkJggg=="/>'
             . '</svg>', complexSvgPath, "UTF-8-RAW")
+        CreateSingleFrameIcoFixture(A_ScriptDir
+            "\..\..\assets\app\watchdog.ico", singleFrameIcoPath, 32)
 
         missingRenderer := SvgRenderLibrary(
             fixtureDirectory "\missing-resvg.dll")
@@ -775,7 +856,7 @@ RunCustomIconImageTests() {
             AssertPaddedCustomIcon(externalSvgPath, false)
             AssertNativeSvgRasterization(externalSvgPath)
         }
-        AssertIndexedIconResourceSelection()
+        AssertIndexedIconResourceSelection(singleFrameIcoPath)
         AssertStatusIconResources()
         AssertAdminOverlayIcon()
         AssertCompleteMainImageList()

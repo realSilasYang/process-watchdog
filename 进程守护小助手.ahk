@@ -13,7 +13,7 @@
 
 ;@Ahk2Exe-SetName 进程守护小助手
 ;@Ahk2Exe-SetDescription 进程、脚本和快捷方式守护工具
-;@Ahk2Exe-SetVersion 2.0.7.0
+;@Ahk2Exe-SetVersion 2.0.8.0
 ;@Ahk2Exe-SetCopyright Copyright (c) 2026 进程守护小助手 contributors
 ;@Ahk2Exe-SetMainIcon assets\app\watchdog.ico
 
@@ -105,6 +105,7 @@
 #Include app\Windows\EnvironmentSettingsDialog.ahk
 #Include app\Windows\AddItemDialog.ahk
 #Include app\Windows\SettingsWindow.ahk
+#Include app\Windows\AboutWindow.ahk
 #Include app\Windows\LogWindow.ahk
 #Include app\Windows\HelpWindow.ahk
 #Include app\Windows\BatchOutputLogNoticeWindow.ahk
@@ -290,20 +291,20 @@ ConfigureTrayMenu()
 ConfigureMainCommandButtonMetrics() {
     compactLayout := LocalizationService.UsesCompactLayout()
     Main.settingsButtonWidth := compactLayout ? 70 : 80
-    Main.supportButtonWidth := compactLayout ? 100 : 110
-    Main.donateButtonWidth := compactLayout ? 70 : 80
+    Main.supportButtonWidth := compactLayout ? 70 : 80
+    Main.aboutButtonWidth := compactLayout ? 70 : 80
     Main.commandButtonGap := 10
     Main.commandButtonRightMargin := 10
 }
 
 GetMainCommandButtonPositions(clientWidth) {
-    donateX := clientWidth - Main.commandButtonRightMargin
-        - Main.donateButtonWidth
-    supportX := donateX - Main.commandButtonGap
+    aboutX := clientWidth - Main.commandButtonRightMargin
+        - Main.aboutButtonWidth
+    supportX := aboutX - Main.commandButtonGap
         - Main.supportButtonWidth
     settingsX := supportX - Main.commandButtonGap
         - Main.settingsButtonWidth
-    return {Settings: settingsX, Support: supportX, Donate: donateX}
+    return {Settings: settingsX, Support: supportX, About: aboutX}
 }
 
 GetControlRectInParentClient(control, parentHwnd) {
@@ -327,7 +328,7 @@ GetControlRectInParentClient(control, parentHwnd) {
 
 GetMainCommandButtonBounds() {
     bounds := false
-    for button in [Main.btnSet, Main.btnSupport, Main.btnDonate] {
+    for button in [Main.btnSet, Main.btnSupport, Main.btnAbout] {
         rect := GetControlRectInParentClient(button, Main.gui.Hwnd)
         if !rect
             continue
@@ -370,8 +371,8 @@ PositionMainCommandButtons(clientWidth) {
         Main.settingsButtonWidth, 30)
     Main.btnSupport.Move(positions.Support, 15,
         Main.supportButtonWidth, 30)
-    Main.btnDonate.Move(positions.Donate, 15,
-        Main.donateButtonWidth, 30)
+    Main.btnAbout.Move(positions.About, 15,
+        Main.aboutButtonWidth, 30)
     RedrawMainCommandButtonLayout(oldBounds, GetMainCommandButtonBounds())
 }
 
@@ -382,9 +383,6 @@ InitializeApplicationWindow(Main.gui)
 Main.btnAdd  := Main.gui.Add("Text", "x10 y15 w80 h30 Center 0x200 Background"
     UiThemeService.Color("Add") " c" UiThemeService.Color("ButtonText"),
     Tr("➕ 添加"))
-
-
-
 Main.btnPause:= Main.gui.Add("Text", "x+10 y15 w80 h30 Center 0x200 Background"
     UiThemeService.Color("PauseDisabled") " c"
         UiThemeService.Color("DisabledButtonText"),
@@ -397,8 +395,8 @@ Main.btnDel  := Main.gui.Add("Text", "x+10 y15 w80 h30 Center 0x200 Background"
 ConfigureMainCommandButtonMetrics()
 buttonPositions := GetMainCommandButtonPositions(App.savedWidth)
 Main.btnSet  := Main.gui.Add("Text", "x" buttonPositions.Settings " y15 w" Main.settingsButtonWidth " h30 Center 0x200 Background" UiThemeService.Color("Toolbar") " c" UiThemeService.Color("ToolbarText"), Tr("设置"))
-Main.btnSupport := Main.gui.Add("Text", "x" buttonPositions.Support " y15 w" Main.supportButtonWidth " h30 Center 0x200 Background" UiThemeService.Color("Toolbar") " c" UiThemeService.Color("ToolbarText"), Tr("帮助信息"))
-Main.btnDonate := Main.gui.Add("Text", "x" buttonPositions.Donate " y15 w" Main.donateButtonWidth " h30 Center 0x200 Background" UiThemeService.Color("Toolbar") " c" UiThemeService.Color("ToolbarText"), Tr("捐赠"))
+Main.btnSupport := Main.gui.Add("Text", "x" buttonPositions.Support " y15 w" Main.supportButtonWidth " h30 Center 0x200 Background" UiThemeService.Color("Toolbar") " c" UiThemeService.Color("ToolbarText"), Tr("帮助"))
+Main.btnAbout := Main.gui.Add("Text", "x" buttonPositions.About " y15 w" Main.aboutButtonWidth " h30 Center 0x200 Background" UiThemeService.Color("Toolbar") " c" UiThemeService.Color("ToolbarText"), Tr("关于"))
 RegisterHoverButton(Main.btnAdd, UiThemeService.Color("Add"))
 SetButtonLeadingTextSlot(Main.btnAdd, 20, 4)
 RegisterHoverButton(Main.btnPause, UiThemeService.Color("PauseDisabled"),
@@ -411,10 +409,10 @@ RegisterHoverButton(Main.btnDel, UiThemeService.Color("DeleteDisabled"),
 SetButtonLeadingTextSlot(Main.btnDel, 20, 4)
 RegisterHoverButton(Main.btnSet, UiThemeService.Color("Toolbar"))
 RegisterHoverButton(Main.btnSupport, UiThemeService.Color("Toolbar"))
-RegisterHoverButton(Main.btnDonate, UiThemeService.Color("Toolbar"))
+RegisterHoverButton(Main.btnAbout, UiThemeService.Color("Toolbar"))
 SetButtonLucideIcon(Main.btnSet, "settings.svg", 15, 6)
 SetButtonLucideIcon(Main.btnSupport, "circle-question-mark.svg", 15, 6)
-SetButtonLucideIcon(Main.btnDonate, "heart.svg", 15, 6)
+SetButtonLucideIcon(Main.btnAbout, "circle-info.svg", 15, 6)
 ; 主列表统一使用 28px 逻辑尺寸，并按窗口 DPI 缩放。
 Main.appIcons := CreateMainImageList(Main.statusIconIndices)
 
@@ -475,9 +473,9 @@ Main.statsPresenter := SvgStatusBarPresenter(Main.statsText)
 RegisterButtonClick(Main.btnAdd, AddItem)
 RegisterButtonClick(Main.btnPause, ToggleItemPause)
 RegisterButtonClick(Main.btnDel, DelItem)
-    RegisterButtonClick(Main.btnSet, ShowSettings)
-    RegisterButtonClick(Main.btnSupport, ShowSupportInfo)
-    RegisterButtonClick(Main.btnDonate, ShowDonation)
+RegisterButtonClick(Main.btnSet, ShowSettings)
+RegisterButtonClick(Main.btnSupport, ShowSupportInfo)
+RegisterButtonClick(Main.btnAbout, ShowAbout)
 
 ; 选择变化只刷新命令状态，不重新投影列表或触发守护对象初始化。
 Main.lv.OnEvent("ItemSelect", OnLVSelectChange)
@@ -691,15 +689,16 @@ ConfigureMainContextMenu(isAdmin := false, maintenanceEnabled := false,
         contextMenu.Delete()
     } else
         contextMenu := Menu()
-    contextMenu.Add(Tr("📂 打开所在位置"), OpenFileLocation)
+    contextMenu.Add(Tr("🔄 重新启动"), RestartSelectedApp)
     contextMenu.Add(Tr("⏹️ 结束运行"), EndSelectedApp)
     contextMenu.Add(Tr("✒️ 编辑完整路径（F2）"),
         (*) => TriggerEdit(Main.lv, Main.contextTargetRow))
+    contextMenu.Add(Tr("📂 打开所在位置"), OpenFileLocation)
     contextMenu.Add(Tr("🎨 自定义名称和图标"), OpenDisplaySettings)
+    contextMenu.Add(Tr("⚙️ 进程识别与启动设置"), OpenEnvSettings)
     adminLabel := FormatContextMenuToggleLabel(
         Tr("🛡️ 以管理员身份运行"), isAdmin)
     contextMenu.Add(adminLabel, ToggleRunAsAdmin)
-    contextMenu.Add(Tr("⚙️ 进程识别与启动设置"), OpenEnvSettings)
     maintenanceLabel := FormatContextMenuToggleLabel(
         Tr("🔄 软件升级保护"), maintenanceEnabled)
     contextMenu.Add(maintenanceLabel, OpenMaintenanceSettings)
@@ -719,14 +718,15 @@ ConfigureMainContextMenu(isAdmin := false, maintenanceEnabled := false,
 BuildMainContextPopupItems(isAdmin := false, maintenanceEnabled := false,
     maintenanceSupported := true, batchLogSupported := false) {
     items := [
-        {Text: Tr("📂 打开所在位置"), Action: OpenFileLocation},
+        {Text: Tr("🔄 重新启动"), Action: RestartSelectedApp},
         {Text: Tr("⏹️ 结束运行"), Action: EndSelectedApp},
         {Text: Tr("✒️ 编辑完整路径（F2）"),
             Action: (*) => TriggerEdit(Main.lv, Main.contextTargetRow)},
+        {Text: Tr("📂 打开所在位置"), Action: OpenFileLocation},
         {Text: Tr("🎨 自定义名称和图标"), Action: OpenDisplaySettings},
+        {Text: Tr("⚙️ 进程识别与启动设置"), Action: OpenEnvSettings},
         {Text: Tr("🛡️ 以管理员身份运行"), Check: isAdmin,
             Action: ToggleRunAsAdmin},
-        {Text: Tr("⚙️ 进程识别与启动设置"), Action: OpenEnvSettings},
         {Text: Tr("🔄 软件升级保护"), Check: maintenanceEnabled,
             Action: OpenMaintenanceSettings, Enabled: maintenanceSupported}
     ]
@@ -770,7 +770,7 @@ RefreshMainWindowDisplay() {
     Main.gui.SetFont("s10 c" UiThemeService.Color("Text"), fontName)
 
     for button in [Main.btnAdd, Main.btnDel, Main.btnPause,
-            Main.btnSet, Main.btnSupport, Main.btnDonate]
+            Main.btnSet, Main.btnSupport, Main.btnAbout]
         button.SetFont("s10 bold", systemFontName)
     Main.lv.SetFont("s12 c" UiThemeService.Color("Text"), fontName)
     RefreshMainStatusIconAlignment()
@@ -782,8 +782,8 @@ RefreshMainWindowDisplay() {
     Main.btnAdd.Text := Tr("➕ 添加")
     Main.btnDel.Text := Tr("🗑️ 删除")
     Main.btnSet.Text := Tr("设置")
-    Main.btnSupport.Text := Tr("帮助信息")
-    Main.btnDonate.Text := Tr("捐赠")
+    Main.btnSupport.Text := Tr("帮助")
+    Main.btnAbout.Text := Tr("关于")
 
     ConfigureMainCommandButtonMetrics()
     Main.gui.GetClientPos(,, &clientWidth)
@@ -808,7 +808,7 @@ RefreshMainWindowDisplay() {
     ConfigureMainContextMenu()
     ConfigureTrayMenu()
     for button in [Main.btnAdd, Main.btnDel, Main.btnPause,
-            Main.btnSet, Main.btnSupport, Main.btnDonate]
+            Main.btnSet, Main.btnSupport, Main.btnAbout]
         button.Redraw()
 }
 
@@ -820,7 +820,7 @@ RefreshMainWindowTheme() {
     SetHoverButtonColors(Main.btnAdd, UiThemeService.Color("Add"))
     SetButtonBackground(Main.btnAdd, UiThemeService.Color("Add"))
     SetButtonTextColor(Main.btnAdd, UiThemeService.Color("ButtonText"))
-    for button in [Main.btnSet, Main.btnSupport, Main.btnDonate] {
+    for button in [Main.btnSet, Main.btnSupport, Main.btnAbout] {
         SetHoverButtonColors(button, UiThemeService.Color("Toolbar"))
         SetButtonBackground(button, UiThemeService.Color("Toolbar"))
         SetButtonTextColor(button, UiThemeService.Color("ToolbarText"))

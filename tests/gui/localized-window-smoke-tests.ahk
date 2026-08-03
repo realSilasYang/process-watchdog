@@ -224,16 +224,12 @@ AssertSettingsPageContentInset(settingsDialog, language, pageName) {
     firstTab := settingsDialog.tabButtons[1]
     firstTabRect := GetControlClientRect(firstTab.Hwnd,
         settingsDialog.gui.Hwnd)
-    firstTabTextWidth := MeasureNativeControlText(firstTab.Hwnd,
-        firstTab.Text)
     windowDpi := DllCall("user32\GetDpiForWindow", "Ptr",
         settingsDialog.gui.Hwnd, "UInt")
     if !windowDpi
         windowDpi := 96
-    ; 内容不仅不能越过首个选项卡文字的左边，还要保留至少 4 个逻辑像素。
-    requiredLeft := firstTabRect.Left
-        + Floor((firstTabRect.Width - firstTabTextWidth) / 2)
-        + Max(4, Round(4 * windowDpi / 96))
+    ; 页签组独立居中；正文允许使用完整客户区，但必须保留窗口内边距。
+    requiredLeft := Max(15, Round(15 * windowDpi / 96))
     tolerance := Max(2, Round(2 * windowDpi / 96))
     firstContentTop := ""
     for control in settingsDialog.tabControls[settingsDialog.activeTab] {
@@ -244,7 +240,7 @@ AssertSettingsPageContentInset(settingsDialog, language, pageName) {
         if firstContentTop == "" || controlRect.Top < firstContentTop
             firstContentTop := controlRect.Top
         AssertLocalizedWindow(controlRect.Left + tolerance >= requiredLeft,
-            language " " pageName " 的内容越过选项卡文字安全线："
+            language " " pageName " 的内容越过窗口安全线："
                 GetNativeWindowText(control.Hwnd))
     }
     requiredTopGap := Max(20, Round(20 * windowDpi / 96))
@@ -347,6 +343,7 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
     logWindowInstance := ""
     batchLogNoticeDialog := ""
     supportInfoDialog := ""
+    aboutDialog := ""
     donationDialog := ""
     tooltipDialog := ""
     try {
@@ -378,89 +375,53 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         shortcutState.ResolvedTarget := executablePath
         shortcutState.ShortcutTargetSource := "快捷方式目标"
 
+        if previewAbout {
+            aboutDialog := AboutWindow(owner)
+            aboutDialog.Show()
+            ; 视觉预览解除测试所有者关系，便于截图工具单独定位关于窗口。
+            DllCall("user32\SetWindowLongPtrW", "Ptr",
+                aboutDialog.gui.Hwnd, "Int", -8, "Ptr", 0, "Ptr")
+            DllCall("user32\EnableWindow", "Ptr", owner.Hwnd, "Int", true)
+            WinHide("ahk_id " owner.Hwnd)
+            aboutDialog.gui.Show("x0 y0")
+            DllCall("user32\SetFocus", "Ptr", 0)
+            WinSetAlwaysOnTop(1, "ahk_id " aboutDialog.gui.Hwnd)
+            WinActivate("ahk_id " aboutDialog.gui.Hwnd)
+            while aboutDialog.IsOpen()
+                Sleep(50)
+            return
+        }
+
         settingsDialog := SettingsWindow(owner)
         settingsDialog.Show()
         if ApplicationWindowPresenter.AutomationHidden
             AssertLocalizedWindow(!DllCall("user32\IsWindowVisible", "Ptr",
                 settingsDialog.gui.Hwnd, "Int"),
                 language " 自动化设置窗口意外映射到用户桌面")
-        AssertLocalizedWindow(settingsDialog.tabBuilt.Length == 5
+        AssertLocalizedWindow(settingsDialog.tabBuilt.Length == 4
             && settingsDialog.tabBuilt[1]
             && !settingsDialog.tabBuilt[2]
             && !settingsDialog.tabBuilt[3]
             && !settingsDialog.tabBuilt[4]
-            && !settingsDialog.tabBuilt[5]
             && settingsDialog.tabControls[1].Length > 0
             && settingsDialog.tabControls[2].Length == 0
             && settingsDialog.tabControls[3].Length == 0
-            && settingsDialog.tabControls[4].Length == 0
-            && settingsDialog.tabControls[5].Length == 0,
+            && settingsDialog.tabControls[4].Length == 0,
             language " 设置窗口首开没有只构建当前可见的通用页")
-        if previewAbout {
-            settingsDialog.SwitchTab(5)
-            ; 视觉预览解除测试所有者关系，便于截图工具单独定位设置窗口。
-            DllCall("user32\SetWindowLongPtrW", "Ptr",
-                settingsDialog.gui.Hwnd, "Int", -8, "Ptr", 0, "Ptr")
-            DllCall("user32\EnableWindow", "Ptr", owner.Hwnd, "Int", true)
-            WinHide("ahk_id " owner.Hwnd)
-            settingsDialog.gui.Show("x0 y0")
-            DllCall("user32\SetFocus", "Ptr", 0)
-            WinSetAlwaysOnTop(1, "ahk_id " settingsDialog.gui.Hwnd)
-            WinActivate("ahk_id " settingsDialog.gui.Hwnd)
-            while settingsDialog.IsOpen()
-                Sleep(50)
-            return
-        }
-        initialSettingsControlCount := WinGetControlsHwnd(
-            "ahk_id " settingsDialog.gui.Hwnd).Length
-        AssertLocalizedWindow(settingsDialog.SwitchTab(5)
-            && settingsDialog.activeTab == 5
-            && settingsDialog.tabBuilt[5]
-            && settingsDialog.tabControls[5].Length > 0
-            && WinGetControlsHwnd("ahk_id " settingsDialog.gui.Hwnd).Length
-                > initialSettingsControlCount,
-            language " 关于页没有在首次切换的重绘事务中延迟构建")
-        AssertLocalizedWindow(settingsDialog.aboutLogo.Visible
-            && !settingsDialog.showAtStartupCheck.Visible
-            && !settingsDialog.saveButton.Visible
-            && !settingsDialog.cancelButton.Visible,
-            language " 首次切换关于页后仍显示其他页面或全局保存区")
-        AssertLocalizedWindow(settingsDialog.SwitchTab(1)
-            && settingsDialog.activeTab == 1
-            && settingsDialog.showAtStartupCheck.Visible
-            && !settingsDialog.aboutLogo.Visible
-            && settingsDialog.saveButton.Visible
-            && settingsDialog.cancelButton.Visible,
-            language " 关于页切回通用页后没有一次性恢复最终可见状态")
         WinHide("ahk_id " settingsDialog.gui.Hwnd)
         AssertWindowTitle(settingsDialog.gui, Tr("小助手设置"), language,
             "SettingsWindow")
         AssertProductionWindowLayout(settingsDialog.gui, language,
             "SettingsWindow")
-        versionCaption := settingsDialog.SplitFieldCaption(Tr("当前版本："))
-        runtimeCaption := settingsDialog.SplitFieldCaption(Tr("运行环境："))
-        AssertLocalizedWindow(settingsDialog.versionLabel.Text
-            == versionCaption.Label
-            && settingsDialog.versionValue.Text
-                == GetApplicationEditionSummary(),
-            language " 关于页没有显示当前版本和发行形态")
-        AssertLocalizedWindow(settingsDialog.runtimeLabel.Text
-            == runtimeCaption.Label
-            && settingsDialog.runtimeValue.Text
-                == GetAutoHotkeyRuntimeSummary(),
-            language " 关于页没有显示实际 AutoHotkey 运行环境")
-        AssertLocalizedWindow(settingsDialog.checkUpdateButton.Text
-            == Tr("立即检查更新"),
-            language " 设置窗口没有显示立即检查更新按钮")
         AssertLocalizedWindow(settingsDialog.tabButtons[1].Text == Tr("通用"),
             language " 设置窗口首个选项卡没有显示为通用")
         expectedTabLabels := [Tr("通用"), Tr("监控与启动"),
-            Tr("停止策略"), Tr("日志"), Tr("关于")]
+            Tr("停止策略"), Tr("日志")]
         expectedTabIcons := ["sliders-horizontal.svg", "activity.svg",
-            "octagon-x.svg", "logs.svg", "circle-info.svg"]
-        AssertLocalizedWindow(settingsDialog.tabButtons.Length == 5
-            && settingsDialog.tabControls.Length == 5,
-            language " 设置窗口没有严格收敛为五个选项卡")
+            "octagon-x.svg", "logs.svg"]
+        AssertLocalizedWindow(settingsDialog.tabButtons.Length == 4
+            && settingsDialog.tabControls.Length == 4,
+            language " 设置窗口没有严格收敛为四个选项卡")
         for tabIndex, expectedTabLabel in expectedTabLabels {
             AssertLocalizedWindow(settingsDialog.tabButtons[tabIndex].Text
                 == expectedTabLabel,
@@ -498,7 +459,7 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         tabFont := GetLocalizedWindowFontSpec(
             settingsDialog.tabButtons[1].Hwnd)
         actionFont := GetLocalizedWindowFontSpec(
-            settingsDialog.checkUpdateButton.Hwnd)
+            settingsDialog.saveButton.Hwnd)
         AssertLocalizedWindow(tabFont.Face == expectedSystemFont
             && tabFont.Weight >= 700
             && actionFont.Face == expectedSystemFont
@@ -562,6 +523,10 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         ; 再发送原生 CBN_DROPDOWN，验证每次展开都会抛弃旧缓存并保留有效选择。
         selectedFontBeforeRefresh := settingsDialog.fontValues[
             settingsDialog.fontDropDown.Value]
+        expectedFontTopIndex := Min(5, settingsDialog.fontValues.Length - 1)
+        SendMessage(Win32.CB_SETTOPINDEX, expectedFontTopIndex, 0,
+            settingsDialog.fontDropDown.Hwnd)
+        settingsDialog.CaptureFontDropDownTopIndex()
         LocalizationService.InstalledUiFonts :=
             ["__Watchdog_Stale_Font_Cache__"]
         fontControlId := DllCall("user32\GetDlgCtrlID", "Ptr",
@@ -584,8 +549,10 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             && SubStr(settingsDialog.fontDropDown.Text, 1, 1)
                 == comboPadding
             && SubStr(settingsDialog.fontDropDown.Text, -1)
-                == comboPadding,
-            language " 展开字体下拉框时没有同步最新字体状态")
+                == comboPadding
+            && SendMessage(Win32.CB_GETTOPINDEX, 0, 0,
+                settingsDialog.fontDropDown.Hwnd) == expectedFontTopIndex,
+            language " 展开字体下拉框时没有同步字体或保持手动滚动位置")
 
         ; 逐页验证所有设置项的归属；每次切页后同时执行边界与截断检查，
         ; 避免隐藏页中的问题被默认页掩盖。
@@ -670,8 +637,7 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             && settingsDialog.logRetentionEdit.Visible
             && settingsDialog.logDirEdit.Visible
             && settingsDialog.clearLogsOnStartupCheck.Visible
-            && !settingsDialog.gracefulStopEdit.Visible
-            && !settingsDialog.aboutLogo.Visible,
+            && !settingsDialog.gracefulStopEdit.Visible,
             language " 日志页的控件归属错误")
         AssertProductionWindowLayout(settingsDialog.gui, language,
             "SettingsWindow Logs")
@@ -757,74 +723,10 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             && guiTimeoutInputWidth > cliTimeoutInputWidth,
             language " 设置输入框宽度没有按字段通常输入长度固定分配")
 
-        aboutControlCountBeforeRepeat := settingsDialog.tabControls[5].Length
-        settingsDialog.SwitchTab(5)
-        AssertLocalizedWindow(settingsDialog.tabControls[5].Length
-                == aboutControlCountBeforeRepeat,
-            language " 重复切换关于页时又创建了一批控件")
-        AssertLocalizedWindow(settingsDialog.aboutLogo.Visible
-            && settingsDialog.aboutName.Visible
-            && settingsDialog.aboutSubtitle.Visible
-            && settingsDialog.versionLabel.Visible
-            && settingsDialog.versionValue.Visible
-            && settingsDialog.runtimeLabel.Visible
-            && settingsDialog.runtimeValue.Visible
-            && settingsDialog.aboutTopDivider.Visible
-            && settingsDialog.aboutInfoDivider.Visible
-            && settingsDialog.aboutBottomDivider.Visible
-            && settingsDialog.checkUpdateButton.Visible
-            && settingsDialog.projectButton.Visible
-            && !settingsDialog.saveButton.Visible
-            && !settingsDialog.cancelButton.Visible
-            && !settingsDialog.checkUpdatesOnStartupCheck.Visible
-            && !settingsDialog.logMaxEdit.Visible,
-            language " 关于页的控件归属错误")
-        AssertLocalizedWindow(settingsDialog.aboutName.Text
-            == Tr("进程守护小助手"),
-            language " 关于页没有显示标准软件名称")
-        AssertLocalizedWindow(settingsDialog.aboutSubtitle.Text
-            == Tr("持续守护重要程序与自动化任务，让日常工作稳定运行"),
-            language " 关于页没有显示本地化产品简介")
-        AssertLocalizedWindow(settingsDialog.projectButton.Text
-            == Tr("开源地址")
-            && App.uiInteractions.HasButton(
-                settingsDialog.projectButton.Hwnd)
-            && SettingsWindow.ProjectHomeUrl
-                == "https://github.com/realSilasYang/process-watchdog",
-            language " 关于页的开源地址按钮文本、交互或地址错误")
-        updateButtonState := App.uiInteractions.GetButton(
-            settingsDialog.checkUpdateButton.Hwnd)
-        projectButtonState := App.uiInteractions.GetButton(
-            settingsDialog.projectButton.Hwnd)
-        AssertLocalizedWindow(!updateButtonState.HasOwnProp("buttonIcon")
-            && updateButtonState.HasOwnProp("buttonImage")
-            && updateButtonState.buttonImage.sourcePath
-                == GetApplicationAssetPath(
-                    "ui-icons\lucide\refresh-cw-action.svg"),
-            language " 关于页立即检查更新按钮缺少匹配语义的 SVG 图标")
-        AssertLocalizedWindow(!projectButtonState.HasOwnProp("buttonIcon")
-            && projectButtonState.HasOwnProp("buttonImage")
-            && projectButtonState.buttonImage.Width >= 64
-            && projectButtonState.buttonImage.Height >= 64
-            && projectButtonState.buttonImage.Pixels.Size
-                == projectButtonState.buttonImage.Width
-                    * projectButtonState.buttonImage.Height * 4
-            && projectButtonState.buttonImage.sourcePath
-                == GetApplicationAssetPath("ui-icons\external-link.svg")
-            && projectButtonState.HasOwnProp("tooltipText")
-            && projectButtonState.tooltipText
-                == SettingsWindow.ProjectHomeUrl,
-            language " 关于页开源地址按钮没有加载透明 SVG 外链图标")
-        tooltipDialog := DarkTooltipWindow()
-        tooltipDialog.HandleMouseMove(0, 0, Win32.WM_MOUSEMOVE,
-            settingsDialog.projectButton.Hwnd)
-        Sleep(550)
-        AssertLocalizedWindow(tooltipDialog.IsOpen()
-            && tooltipDialog.textControl.Text
-                == SettingsWindow.ProjectHomeUrl,
-            language " 开源地址按钮悬浮后没有显示完整网址")
-        tooltipDialog.Close()
-        tooltipDialog := ""
+        settingsDialog.SwitchTab(1)
+        AssertLocalizedWindow(settingsDialog.saveButton.Visible
+            && settingsDialog.cancelButton.Visible,
+            language " 返回可编辑设置页后没有恢复全局保存区")
         saveButtonState := App.uiInteractions.GetButton(
             settingsDialog.saveButton.Hwnd)
         cancelButtonState := App.uiInteractions.GetButton(
@@ -834,153 +736,6 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             && !cancelButtonState.HasOwnProp("buttonImage")
             && !cancelButtonState.HasOwnProp("buttonIcon"),
             language " 设置窗口保存或取消按钮不应显示前置图标")
-        aboutTitleFont := GetLocalizedWindowFontSpec(
-            settingsDialog.aboutName.Hwnd)
-        aboutSubtitleFont := GetLocalizedWindowFontSpec(
-            settingsDialog.aboutSubtitle.Hwnd)
-        versionLabelFont := GetLocalizedWindowFontSpec(
-            settingsDialog.versionLabel.Hwnd)
-        versionValueFont := GetLocalizedWindowFontSpec(
-            settingsDialog.versionValue.Hwnd)
-        runtimeLabelFont := GetLocalizedWindowFontSpec(
-            settingsDialog.runtimeLabel.Hwnd)
-        runtimeValueFont := GetLocalizedWindowFontSpec(
-            settingsDialog.runtimeValue.Hwnd)
-        updateButtonFont := GetLocalizedWindowFontSpec(
-            settingsDialog.checkUpdateButton.Hwnd)
-        projectButtonFont := GetLocalizedWindowFontSpec(
-            settingsDialog.projectButton.Hwnd)
-        expectedContentFont := LocalizationService.GetUiFontName()
-        AssertLocalizedWindow(aboutTitleFont.Face == expectedSystemFont
-            && aboutTitleFont.Weight >= 700
-            && (language != "zh-CN"
-                || aboutTitleFont.Face == "Microsoft YaHei UI")
-            && aboutSubtitleFont.Face == expectedContentFont
-            && aboutSubtitleFont.Weight < 700
-            && versionLabelFont.Face == expectedContentFont
-            && versionLabelFont.Weight < 700
-            && versionValueFont.Face == expectedContentFont
-            && versionValueFont.Weight < 700
-            && runtimeLabelFont.Face == expectedContentFont
-            && runtimeLabelFont.Weight < 700
-            && runtimeValueFont.Face == expectedContentFont
-            && runtimeValueFont.Weight < 700
-            && updateButtonFont.Face == expectedSystemFont
-            && updateButtonFont.Weight >= 700
-            && projectButtonFont.Face == expectedSystemFont
-            && projectButtonFont.Weight >= 700
-            && Abs(aboutTitleFont.Height) > Abs(versionValueFont.Height)
-            && Abs(versionValueFont.Height) > Abs(versionLabelFont.Height)
-            && Abs(versionLabelFont.Height) > Abs(aboutSubtitleFont.Height),
-            language " 关于页标题、信息或操作按钮的字体层级错误")
-        aboutWindowRect := Buffer(16, 0)
-        DllCall("user32\GetClientRect", "Ptr", settingsDialog.gui.Hwnd,
-            "Ptr", aboutWindowRect)
-        aboutCenterX := NumGet(aboutWindowRect, 8, "Int") / 2
-        aboutCenteredControls := [settingsDialog.aboutLogo,
-            settingsDialog.aboutName, settingsDialog.aboutSubtitle,
-            settingsDialog.aboutTopDivider,
-            settingsDialog.aboutInfoDivider,
-            settingsDialog.aboutBottomDivider]
-        for aboutControl in aboutCenteredControls {
-            aboutRect := GetControlClientRect(aboutControl.Hwnd,
-                settingsDialog.gui.Hwnd)
-            AssertLocalizedWindow(Abs((aboutRect.Left + aboutRect.Right) / 2
-                    - aboutCenterX) <= centerTolerance,
-                language " 关于页项目没有水平居中："
-                    GetNativeWindowText(aboutControl.Hwnd))
-        }
-        versionLabelRect := GetControlClientRect(
-            settingsDialog.versionLabel.Hwnd, settingsDialog.gui.Hwnd)
-        versionValueRect := GetControlClientRect(
-            settingsDialog.versionValue.Hwnd, settingsDialog.gui.Hwnd)
-        runtimeLabelRect := GetControlClientRect(
-            settingsDialog.runtimeLabel.Hwnd, settingsDialog.gui.Hwnd)
-        runtimeValueRect := GetControlClientRect(
-            settingsDialog.runtimeValue.Hwnd, settingsDialog.gui.Hwnd)
-        infoDividerRect := GetControlClientRect(
-            settingsDialog.aboutInfoDivider.Hwnd, settingsDialog.gui.Hwnd)
-        AssertLocalizedWindow(versionLabelRect.Right < infoDividerRect.Left
-            && versionValueRect.Right < infoDividerRect.Left
-            && runtimeLabelRect.Left > infoDividerRect.Right
-            && runtimeValueRect.Left > infoDividerRect.Right
-            && versionLabelRect.Top == runtimeLabelRect.Top
-            && versionValueRect.Top == runtimeValueRect.Top
-            && versionLabelRect.Bottom < versionValueRect.Top
-            && runtimeLabelRect.Bottom < runtimeValueRect.Top,
-            language " 关于页版本和运行环境没有按双列信息层级排列")
-        aboutLogoRect := GetControlClientRect(settingsDialog.aboutLogo.Hwnd,
-            settingsDialog.gui.Hwnd)
-        aboutNameRect := GetControlClientRect(settingsDialog.aboutName.Hwnd,
-            settingsDialog.gui.Hwnd)
-        aboutSubtitleRect := GetControlClientRect(
-            settingsDialog.aboutSubtitle.Hwnd, settingsDialog.gui.Hwnd)
-        topDividerRect := GetControlClientRect(
-            settingsDialog.aboutTopDivider.Hwnd, settingsDialog.gui.Hwnd)
-        bottomDividerRect := GetControlClientRect(
-            settingsDialog.aboutBottomDivider.Hwnd, settingsDialog.gui.Hwnd)
-        AssertLocalizedWindow(versionLabelRect.Left >= topDividerRect.Left
-                && versionValueRect.Left >= topDividerRect.Left
-                && runtimeLabelRect.Right <= topDividerRect.Right
-                && runtimeValueRect.Right <= topDividerRect.Right
-                && versionLabelRect.Right < infoDividerRect.Left
-                && versionValueRect.Right < infoDividerRect.Left
-                && runtimeLabelRect.Left > infoDividerRect.Right
-                && runtimeValueRect.Left > infoDividerRect.Right,
-            language " 关于页版本信息行越过水平分隔线")
-        updateButtonRect := GetControlClientRect(
-            settingsDialog.checkUpdateButton.Hwnd, settingsDialog.gui.Hwnd)
-        projectButtonRect := GetControlClientRect(
-            settingsDialog.projectButton.Hwnd, settingsDialog.gui.Hwnd)
-        AssertLocalizedWindow(aboutNameRect.Bottom < aboutSubtitleRect.Top
-            && aboutSubtitleRect.Bottom < topDividerRect.Top
-            && topDividerRect.Bottom < versionLabelRect.Top
-            && versionLabelRect.Bottom < versionValueRect.Top
-            && versionValueRect.Bottom < bottomDividerRect.Top
-            && bottomDividerRect.Bottom < updateButtonRect.Top
-            && updateButtonRect.Top == projectButtonRect.Top
-            && updateButtonRect.Right < projectButtonRect.Left
-            && Abs((updateButtonRect.Left + projectButtonRect.Right) / 2
-                    - aboutCenterX) <= centerTolerance
-            && topDividerRect.Left == bottomDividerRect.Left
-            && topDividerRect.Right == bottomDividerRect.Right,
-            language " 关于页分区顺序、间距或分割线宽度错误")
-        aboutContentBoundary := Round(47 * windowDpi / 96)
-        aboutTopMargin := aboutLogoRect.Top - aboutContentBoundary
-        aboutBottomMargin := NumGet(aboutWindowRect, 12, "Int")
-            - Max(updateButtonRect.Bottom, projectButtonRect.Bottom)
-        aboutCenterTolerance := Max(6, Round(6 * windowDpi / 96))
-        minimumActionHeight := Round(36 * windowDpi / 96)
-        AssertLocalizedWindow(Abs(aboutTopMargin - aboutBottomMargin)
-                <= aboutCenterTolerance
-            && updateButtonRect.Height >= minimumActionHeight
-            && projectButtonRect.Height >= minimumActionHeight,
-            language " 关于页内容没有垂直居中，或操作按钮仍然过矮")
-        AssertProductionWindowLayout(settingsDialog.gui, language,
-            "SettingsWindow About")
-        AssertSettingsPageContentInset(settingsDialog, language,
-            "SettingsWindow About")
-        settingsDialog.SetUpdateCheckActive(true)
-        AssertLocalizedWindow(settingsDialog.checkUpdateButton.Visible
-            && !settingsDialog.checkUpdateButton.Enabled
-            && settingsDialog.checkUpdateButton.Text == Tr("正在检查更新…"),
-            language " 更新检查期间没有在原按钮内显示检查状态")
-        AssertProductionWindowLayout(settingsDialog.gui, language,
-            "SettingsWindow checking update")
-        AssertSettingsPageContentInset(settingsDialog, language,
-            "SettingsWindow checking update")
-        settingsDialog.SetUpdateCheckActive(false)
-        AssertLocalizedWindow(settingsDialog.checkUpdateButton.Visible
-            && settingsDialog.checkUpdateButton.Enabled
-            && settingsDialog.checkUpdateButton.Text
-                == Tr("立即检查更新"),
-            language " 更新检查结束后没有恢复按钮")
-
-        settingsDialog.SwitchTab(1)
-        AssertLocalizedWindow(settingsDialog.saveButton.Visible
-            && settingsDialog.cancelButton.Visible,
-            language " 返回可编辑设置页后没有恢复全局保存区")
-
         AssertLocalizedWindow(settingsDialog.shortcutLabel
             && settingsDialog.taskLabel && settingsDialog.shortcutButton
             && settingsDialog.shortcutFeedbackText
@@ -1126,6 +881,19 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             && DllCall("user32\IsWindow", "Ptr", fontComboHandles.List,
                 "Int"),
             language " 内容字体下拉列表窗口不存在")
+        fontDroppedRect := Buffer(16, 0)
+        fontDroppedRectReady := DllCall("user32\SendMessageW", "Ptr",
+            settingsDialog.fontDropDown.Hwnd, "UInt",
+            Win32.CB_GETDROPPEDCONTROLRECT, "Ptr", 0,
+            "Ptr", fontDroppedRect.Ptr, "Ptr")
+        fontItemHeight := DllCall("user32\SendMessageW", "Ptr",
+            settingsDialog.fontDropDown.Hwnd, "UInt",
+            Win32.CB_GETITEMHEIGHT, "Ptr", 0, "Ptr", 0, "Ptr")
+        fontDroppedHeight := NumGet(fontDroppedRect, 12, "Int")
+            - NumGet(fontDroppedRect, 4, "Int")
+        AssertLocalizedWindow(fontDroppedRectReady && fontItemHeight > 0
+            && fontDroppedHeight <= fontItemHeight * 14,
+            language " 内容字体下拉列表没有限制为十二行高度")
         AssertLocalizedWindow(
             DarkComboBoxListThemeRegistry.IsRegistered(
                 fontComboHandles.List),
@@ -1158,6 +926,88 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             !DarkComboBoxListThemeRegistry.IsRegistered(
                 fontComboHandles.List),
             language " 设置窗口关闭后仍保留字体下拉列表深色绘制注册")
+
+        aboutDialog := AboutWindow(owner)
+        aboutDialog.Show()
+        WinHide("ahk_id " aboutDialog.gui.Hwnd)
+        AssertWindowTitle(aboutDialog.gui, Tr("关于"), language,
+            "AboutWindow")
+        AssertProductionWindowLayout(aboutDialog.gui, language,
+            "AboutWindow")
+        AssertLocalizedWindow(aboutDialog.logo.Visible
+            && aboutDialog.productName.Text == Tr("进程守护小助手")
+            && aboutDialog.subtitle.Text
+                == Tr("持续守护重要程序与自动化任务，让日常工作稳定运行")
+            && aboutDialog.versionLabel.Text
+                == aboutDialog.SplitFieldCaption(Tr("当前版本："))
+            && aboutDialog.versionValue.Text
+                == GetApplicationEditionSummary()
+            && aboutDialog.runtimeLabel.Text
+                == aboutDialog.SplitFieldCaption(Tr("运行环境："))
+            && aboutDialog.runtimeValue.Text
+                == GetAutoHotkeyRuntimeSummary(),
+            language " 关于窗口没有显示完整产品、版本或运行环境信息")
+        AssertLocalizedWindow(aboutDialog.checkUpdateButton.Text
+                == Tr("检查更新")
+            && aboutDialog.donationButton.Text == Tr("打赏")
+            && aboutDialog.projectButton.Text == Tr("开源地址")
+            && AboutWindow.ProjectHomeUrl
+                == "https://github.com/realSilasYang/process-watchdog",
+            language " 关于窗口操作名称或项目地址错误")
+
+        updateButtonState := App.uiInteractions.GetButton(
+            aboutDialog.checkUpdateButton.Hwnd)
+        donationButtonState := App.uiInteractions.GetButton(
+            aboutDialog.donationButton.Hwnd)
+        projectButtonState := App.uiInteractions.GetButton(
+            aboutDialog.projectButton.Hwnd)
+        AssertLocalizedWindow(updateButtonState.normal
+                == UiThemeService.Color("Toolbar")
+            && donationButtonState.normal == UiThemeService.Color("Toolbar")
+            && projectButtonState.normal == UiThemeService.Color("Toolbar")
+            && updateButtonState.buttonImage.sourcePath
+                == GetApplicationAssetPath(
+                    "ui-icons\lucide\refresh-cw-action.svg")
+            && donationButtonState.buttonImage.sourcePath
+                == GetApplicationAssetPath("ui-icons\lucide\heart.svg")
+            && projectButtonState.buttonImage.sourcePath
+                == GetApplicationAssetPath("ui-icons\external-link.svg")
+            && donationButtonState.tooltipText
+                == Tr("快揭不开锅了（≥Д≤）")
+            && projectButtonState.tooltipText == Tr("点个 star 吧~"),
+            language " 关于窗口按钮样式、图标或悬浮提示错误")
+
+        updateButtonRect := GetControlClientRect(
+            aboutDialog.checkUpdateButton.Hwnd, aboutDialog.gui.Hwnd)
+        donationButtonRect := GetControlClientRect(
+            aboutDialog.donationButton.Hwnd, aboutDialog.gui.Hwnd)
+        projectButtonRect := GetControlClientRect(
+            aboutDialog.projectButton.Hwnd, aboutDialog.gui.Hwnd)
+        AssertLocalizedWindow(updateButtonRect.Top == donationButtonRect.Top
+            && donationButtonRect.Top == projectButtonRect.Top
+            && updateButtonRect.Right < donationButtonRect.Left
+            && donationButtonRect.Right < projectButtonRect.Left,
+            language " 关于窗口按钮没有按检查更新、打赏、开源地址排列")
+
+        tooltipDialog := DarkTooltipWindow()
+        tooltipDialog.HandleMouseMove(0, 0, Win32.WM_MOUSEMOVE,
+            aboutDialog.projectButton.Hwnd)
+        Sleep(550)
+        AssertLocalizedWindow(tooltipDialog.IsOpen()
+            && tooltipDialog.textControl.Text == Tr("点个 star 吧~"),
+            language " 开源地址按钮悬浮后没有显示 star 提示")
+        tooltipDialog.Close()
+        tooltipDialog := ""
+
+        aboutDialog.SetUpdateCheckActive(true)
+        AssertLocalizedWindow(!aboutDialog.checkUpdateButton.Enabled
+            && aboutDialog.checkUpdateButton.Text == Tr("正在检查更新…"),
+            language " 更新检查期间没有在关于窗口按钮内显示检查状态")
+        aboutDialog.SetUpdateCheckActive(false)
+        AssertLocalizedWindow(aboutDialog.checkUpdateButton.Enabled
+            && aboutDialog.checkUpdateButton.Text == Tr("检查更新"),
+            language " 更新检查结束后没有恢复普通检查更新按钮")
+        aboutDialog.Close()
 
         addWindow := AddItemDialog(owner)
         addWindow.Show()
@@ -1834,7 +1684,7 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         supportInfoDialog := SupportInfoWindow(owner)
         supportInfoDialog.Show()
         WinHide("ahk_id " supportInfoDialog.gui.Hwnd)
-        AssertWindowTitle(supportInfoDialog.gui, Tr("帮助信息"), language,
+        AssertWindowTitle(supportInfoDialog.gui, Tr("帮助"), language,
             "SupportInfoWindow")
         AssertProductionWindowLayout(supportInfoDialog.gui, language,
             "SupportInfoWindow")
@@ -1844,7 +1694,7 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
                 supportInfoDialog.logButton.Hwnd)
             && App.uiInteractions.HasButton(
                 supportInfoDialog.feedbackButton.Hwnd),
-            language " 帮助信息窗口按钮没有注册交互")
+            language " 帮助窗口按钮没有注册交互")
         supportGuideState := App.uiInteractions.GetButton(
             supportInfoDialog.guideButton.Hwnd)
         supportLogState := App.uiInteractions.GetButton(
@@ -1865,8 +1715,9 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             && supportFeedbackState.buttonImage.sourcePath
                 == GetApplicationAssetPath(
                     "ui-icons\lucide\message-square-text.svg")
-            && !supportFeedbackState.HasOwnProp("tooltipText"),
-            language " 帮助信息窗口 SVG 图标或反馈按钮提示状态错误")
+            && supportFeedbackState.HasOwnProp("tooltipText")
+            && supportFeedbackState.tooltipText == Tr("找作者对线"),
+            language " 帮助窗口 SVG 图标或反馈按钮提示状态错误")
         supportInfoRect := GetWindowClientRect(supportInfoDialog.gui.Hwnd)
         supportButtonRects := [
             GetControlClientRect(supportInfoDialog.guideButton.Hwnd,
@@ -1896,7 +1747,7 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             && supportButtonRects[2].Top < supportButtonRects[3].Top
             && supportButtonRects[1].Left == supportButtonRects[2].Left
             && supportButtonRects[2].Left == supportButtonRects[3].Left,
-            language " 帮助信息窗口没有按窄窗口纵向排列三个操作")
+            language " 帮助窗口没有按窄窗口纵向排列三个操作")
         AssertLocalizedWindow(supportInfoDialog.guideButton.Text
             == Tr("使用说明")
             && supportInfoDialog.logButton.Text == Tr("运行日志")
@@ -1905,13 +1756,13 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
                 Tr("请选择要打开的内容："))
             && SupportInfoWindow.FeedbackUrl
                 == "https://github.com/realSilasYang/process-watchdog/issues?q=sort:updated-desc+is:issue+state:open+",
-            language " 帮助信息窗口文本精简或反馈地址错误")
+            language " 帮助窗口文本精简或反馈地址错误")
         supportInfoDialog.Close()
 
         donationDialog := DonationWindow(owner)
         donationDialog.Show()
         if previewDonation {
-            ; 视觉预览解除测试所有者关系，便于截图工具单独定位捐赠窗口。
+            ; 视觉预览解除测试所有者关系，便于截图工具单独定位打赏窗口。
             DllCall("user32\SetWindowLongPtrW", "Ptr",
                 donationDialog.gui.Hwnd, "Int", -8, "Ptr", 0, "Ptr")
             DllCall("user32\EnableWindow", "Ptr", owner.Hwnd, "Int", true)
@@ -1930,10 +1781,10 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         AssertProductionWindowLayout(donationDialog.gui, language,
             "DonationWindow")
         AssertLocalizedWindow(donationDialog.qrPictures.Length == 2,
-            language " 捐赠窗口没有加载两张二维码")
+            language " 打赏窗口没有加载两张二维码")
         AssertLocalizedWindow(donationDialog.qrLabels.Length == 2
             && donationDialog.messageText,
-            language " 捐赠窗口缺少说明或支付方式标签")
+            language " 打赏窗口缺少说明或支付方式标签")
         donationClientRect := GetWindowClientRect(donationDialog.gui.Hwnd)
         donationMessageRect := GetControlClientRect(
             donationDialog.messageText.Hwnd, donationDialog.gui.Hwnd)
@@ -1977,7 +1828,7 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
                 >= Round(18 * donationDpi / 96)
             && donationClientRect.Height - donationPictureRects[1].Bottom
                 <= Round(26 * donationDpi / 96),
-            language " 捐赠窗口说明、标签、二维码或底部留白布局失衡")
+            language " 打赏窗口说明、标签、二维码或底部留白布局失衡")
         donationDialog.Close()
 
         tooltipDialog := DarkTooltipWindow()
@@ -1996,6 +1847,8 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             try tooltipDialog.Close()
         if donationDialog
             try donationDialog.Close()
+        if aboutDialog
+            try aboutDialog.Close()
         if batchLogNoticeDialog
             try batchLogNoticeDialog.Close()
         if supportInfoDialog

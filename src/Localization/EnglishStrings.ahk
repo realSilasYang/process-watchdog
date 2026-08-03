@@ -1043,9 +1043,6 @@ class EnglishStrings {
             "检查更新",
                 "Check for Updates")
         catalog.Set(
-            "立即检查更新",
-                "Check for Updates Now")
-        catalog.Set(
             "检查更新失败：{1}",
                 "Update check failed: {1}")
         catalog.Set(
@@ -1601,9 +1598,6 @@ class EnglishStrings {
             "{1}（源码版）",
                 "{1}（source edition）")
         catalog.Set(
-            "• “关于”页可控制是否在启动时后台检查新版，也可随时手动检查。检查过程不会阻塞主界面。",
-                "• The “About” page lets you check for updates in the background at startup or manually at any time. Checking never blocks the main window.")
-        catalog.Set(
             "• “结束运行”会先请求目标正常退出；超过设置时间后，是否强制终止由“停止策略”中的选项决定。",
                 "• “Stop Target” first asks the target to exit normally. If the timeout expires, the option under “Stop Policy” determines whether it is forcibly terminated.")
         catalog.Set(
@@ -1670,8 +1664,8 @@ class EnglishStrings {
             "扩展设置包含无效数值。`n`nGUI 程序关闭超时：1-300 秒`nCLI 程序关闭超时：1-60 秒`n运行日志显示上限：50-10000 条`n批处理日志保留天数：1-3650 天",
                 "Some advanced settings contain invalid values.`n`nGUI application shutdown timeout: 1-300 seconds`nCLI application shutdown timeout: 1-60 seconds`nRuntime log display limit: 50-10000 entries`nBatch-output log retention: 1-3650 days")
         catalog.Set(
-            "配置通用、监控与启动、停止策略、日志`n以及关于选项",
-                "Configure General, Monitoring & Startup, Stop Policy, Logs,`nand About options")
+            "配置通用、监控与启动、停止策略与日志",
+                "Configure General, Monitoring & Startup, Stop Policy, and Logs")
         catalog.Set(
             "批处理日志保存路径：",
                 "Batch-output log save path:")
@@ -1723,16 +1717,16 @@ class EnglishStrings {
         catalog.Set(
             "• 界面语言、内容字体和主题保存后会立即更新主窗口、菜单和托盘，无需重新启动。",
                 "• Saving the interface language, content font, or theme immediately updates the main window, menus, and tray without restarting.")
-        catalog.Set("打开帮助信息`n可选择查看使用说明、运行日志或提交反馈", "Open Help`nChoose the user guide, runtime log, or feedback page")
+        catalog.Set("打开帮助`n可选择查看使用说明、运行日志或提交反馈", "Open Help`nChoose the user guide, runtime log, or feedback page")
         catalog.Set("快揭不开锅了（≥Д≤）", "The budget's almost gone（≥Д≤）")
-        catalog.Set("帮助信息", "Help")
+        catalog.Set("帮助", "Help")
         catalog.Set("提交反馈", "Submit Feedback")
         catalog.Set("支持开源项目", "Support the Open-Source Project")
         catalog.Set("如果小助手为您节省了排查问题和恢复程序的时间，欢迎通过下方二维码打赏作者！`n请选择扶贫方式：", "If the assistant has saved you time diagnosing problems and getting programs running again, please consider supporting the author through one of the QR codes below!`nChoose how you'd like to help:")
         catalog.Set("微信支付", "WeChat Pay")
         catalog.Set("支付宝", "Alipay")
         catalog.Set("二维码图片未找到", "QR code image not found")
-        catalog.Set("• 主界面的“帮助信息”可打开使用说明、本次运行日志或项目反馈页面；日志包含监控、重启、升级保护和操作记录，并会自动更新。", "• Open Help from the main window to view the user guide, this session's runtime log, or the project feedback page. The log includes monitoring, restarts, update protection, and user actions, and updates automatically.")
+        catalog.Set("• 主界面的“帮助”可打开使用说明、本次运行日志或项目反馈页面；日志包含监控、重启、升级保护和操作记录，并会自动更新。", "• Open Help from the main window to view the user guide, this session's runtime log, or the project feedback page. The log includes monitoring, restarts, update protection, and user actions, and updates automatically.")
         catalog.Set("⚙️ 进程识别与启动设置", "⚙️ Process Identification and Launch Settings")
         catalog.Set("进程识别与启动设置", "Process Identification and Launch Settings")
         catalog.Set("进程识别", "Process identification")
@@ -1772,7 +1766,7 @@ class EnglishStrings {
         catalog.Set("恢复", "Resume")
         catalog.Set("删除", "Delete")
         catalog.Set("设置", "Settings")
-        catalog.Set("捐赠", "Donate")
+        catalog.Set("打赏", "Donate")
         catalog.Set("保存", "Save")
         catalog.Set("取消", "Cancel")
         catalog.Set("反转状态", "Toggle States")
@@ -1964,6 +1958,18 @@ class EnglishStrings {
             "Multiple candidate processes exist, so the target cannot be uniquely confirmed")
         catalog.Set("目标探活规格无效",
             "The target probe specification is invalid")
+        catalog.Set("🔄 重新启动", "🔄 Restart")
+        catalog.Set("点个 star 吧~", "Give us a little star~")
+        catalog.Set("⏳ 停止原进程...", "⏳ Stopping the existing process...")
+        catalog.Set("❌ 无法停止原进程", "❌ Could Not Stop Existing Process")
+        catalog.Set("手动触发了重新启动：{1}", "Restart requested manually: {1}")
+        catalog.Set("手动重启已取消，原进程未能停止：{1}", "Manual restart was cancelled because the existing process could not be stopped: {1}")
+        catalog.Set("暂时无法查询进程状态，稍后重试手动重启：{1}", "Process status is temporarily unavailable. Manual restart will be retried later: {1}")
+        catalog.Set("暂时无法重新启动", "Restart Temporarily Unavailable")
+        catalog.Set("该软件正在升级保护中。请等待升级完成，或在“软件升级保护”中结束等待后再重新启动。", "Update protection is active for this application. Wait for the update to finish, or end the wait in Update Protection before restarting it.")
+        catalog.Set("• “重新启动”会先请求目标正常退出；超过设置时间后，是否强制终止由“停止策略”中的选项决定。", "• “Restart” first asks the target to exit normally. If the timeout expires, the option under “Stop Policy” determines whether it is forcibly terminated.")
+        catalog.Set("查看版本、运行环境和项目入口", "View version, runtime, and project links")
+        catalog.Set("找作者对线", "Talk to the author")
         return catalog
     }
 }

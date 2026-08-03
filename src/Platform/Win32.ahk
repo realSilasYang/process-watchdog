@@ -47,6 +47,11 @@ class Win32 {
     static CDRF_NOTIFYITEMDRAW := 0x00000020
     static CDIS_SELECTED := 0x0001
     static CBN_DROPDOWN := 7
+    static CBN_CLOSEUP := 8
+    static CB_GETDROPPEDCONTROLRECT := 0x0152
+    static CB_GETITEMHEIGHT := 0x0154
+    static CB_GETTOPINDEX := 0x015B
+    static CB_SETTOPINDEX := 0x015C
     static EM_SETSEL := 0x00B1
     static EM_SCROLLCARET := 0x00B7
     static EM_SETMARGINS := 0x00D3
@@ -79,8 +84,12 @@ class Win32 {
     static ICON_BIG := 1
     static LR_LOADFROMFILE := 0x00000010
     static LR_DEFAULTSIZE := 0x00000040
+    static LOAD_LIBRARY_AS_DATAFILE := 0x00000002
+    static LOAD_LIBRARY_AS_IMAGE_RESOURCE := 0x00000020
     static IMAGE_ICON := 1
     static IMAGE_CURSOR := 2
+    static RT_ICON := 3
+    static RT_GROUP_ICON := 14
     static GGO_METRICS := 0
     static GDI_ERROR := 0xFFFFFFFF
     static GENERIC_READ := 0x80000000

@@ -38,7 +38,7 @@ The project provides light and dark GUIs, automatic recovery, update protection,
   <img src="images/process-watchdog-overview.png" alt="Process Watchdog Assistant main window" width="100%">
 </p>
 
-The main window keeps each target's order, application icon, display name, privilege requirement, and current state in one view. The command bar provides add, delete, pause, settings, help, and donation actions; Help lets users choose the guide, runtime log, or feedback page. The footer summarizes running, recovery, update, paused, and failed targets, while the runtime log exposes the evidence behind abnormal states.
+The main window keeps each target's order, application icon, display name, privilege requirement, and current state in one view. The command bar provides add, delete, pause, settings, help, and About actions; Help lets users choose the guide, runtime log, or feedback page, while About brings version, runtime, update, project, and Donate actions together. The footer summarizes running, recovery, update, paused, and failed targets, while the runtime log exposes the evidence behind abnormal states.
 
 ## Highlights
 
@@ -74,7 +74,7 @@ A complete GUI automation run is recorded on real Windows 11 at 200% DPI, with r
 **[Developer guide](#developer-guide)**<br>
 [Directories](#1-directories-and-responsibilities) · [Correctness boundaries](#2-correctness-boundaries) · [Validation](#3-validation-commands) · [Release and contribution](#4-release-and-contribution)
 
-# Support the project
+# Donate
 
 If the assistant has saved you time diagnosing failures or recovering applications, you can support the author using either QR code below. Choose how you'd like to help:
 
@@ -98,7 +98,7 @@ If the assistant has saved you time diagnosing failures or recovering applicatio
 
 3. Run `进程守护小助手.exe`. The application requests administrator privileges, then shows the main window or starts in the system tray according to its settings.
 4. Select Add to choose a target, or drag supported files into the main window.
-5. Open Logs to see which identity evidence, state checks, recovery attempts, and update signals the assistant actually used.
+5. Open Help → Runtime Log to see which identity evidence, state checks, recovery attempts, and update signals the assistant actually used.
 
 To run from source, install AutoHotkey v2 x64 and execute `进程守护小助手.ahk`.
 A Git clone also requires Git LFS and `git lfs pull` to materialize the build
@@ -116,7 +116,7 @@ The optional `fonts.zip` supplies preferred and Noto fallback UI fonts. Install 
 | AutoHotkey | Embedded and updated with a later assistant release package | Uses the local interpreter; assistant updates do not upgrade AutoHotkey for the user |
 | Ahk2Exe | Used only to produce the official EXE and never installed on user computers | Not required |
 
-“The assistant is up to date” and “local AutoHotkey is up to date” are different claims. At the start of every official release, the workflow selects the latest stable AutoHotkey and latest published Ahk2Exe release, freezes them, and runs the complete test suite before embedding the selected AutoHotkey. Assistant Settings → About shows the current assistant version, EXE/source form, and actual AutoHotkey version together; the update-check button is there. See [Versions, runtime forms, and update responsibility](en/versioning.md).
+“The assistant is up to date” and “local AutoHotkey is up to date” are different claims. At the start of every official release, the workflow selects the latest stable AutoHotkey and latest published Ahk2Exe release, freezes them, and runs the complete test suite before embedding the selected AutoHotkey. Main window → About shows the current assistant version, EXE/source form, and actual AutoHotkey version together, with update checking and project access in the same child window. See [Versions, runtime forms, and update responsibility](en/versioning.md).
 
 Closing the main window only hides it to the system tray; monitoring continues. Use Exit from the tray menu to stop the application completely. See [Installation, upgrades, and removal](en/installation.md) for shortcuts, scheduled startup, and upgrade details.
 
@@ -129,9 +129,9 @@ The six main-window buttons have the following roles:
 | Add | Select one target, search installed applications, or import a folder; folder import scans subdirectories by default |
 | Delete | Remove selected watched targets; multiple selections are supported and deletion can be undone |
 | Pause / Resume | Change automatic monitoring only; the currently running target is not closed, and a mixed selection is toggled item by item |
-| Settings | Configure General, Monitoring & startup, Stop Policy, Logs, and About |
+| Settings | Configure General, Monitoring & startup, Stop Policy, and Logs |
 | Help | Choose the built-in user guide, this session's runtime log, or the GitHub feedback page |
-| Donate | Show the WeChat Pay and Alipay QR codes that support ongoing maintenance |
+| About | View version and runtime information, check for updates, open the project, or enter Donate |
 
 An item can define its launch entry, working directory, arguments, environment variables, and administrator requirement. A direct script can also select any runtime and runtime arguments in Process Identification and Launch Settings, including a Python virtual environment, AutoHotkey, PowerShell, Node.js, or Java. The fixed order is runtime arguments, target path, then target arguments; leaving the runtime blank preserves the default launch behavior. An LNK remains the launch entry while the resolved application path is stored separately for process identification. Indirect shortcuts created by installers therefore do not have to be replaced manually with a version-specific internal EXE.
 
@@ -139,7 +139,8 @@ Application search requires a running Everything background instance. The bundle
 
 Right-click an item in the main list to:
 
-- Open its file location, stop the target, edit its target path, or configure process identification and launch settings. Stop Running also pauses monitoring so the target is not launched again automatically.
+- Restart the target, stop it, edit its full path, or open its file location. Restart applies the configured stop policy before launching again; Stop Running also pauses monitoring so the target is not launched again automatically.
+- Configure process identification and launch settings before the administrator toggle.
 - Toggle the administrator requirement. A running target with insufficient privileges is reported; after monitoring is resumed, the next launch is elevated as configured.
 - Configure update protection.
 - BAT and CMD entries additionally show View batch output log. Other target
@@ -191,7 +192,6 @@ Assistant Settings is divided by responsibility:
 | Monitoring & startup | Process status interval, automatic restart delay sequence after a crash, and subfolder inclusion during folder import |
 | Stop Policy | GUI and CLI shutdown timeouts and whether force termination is allowed after timeout |
 | Logs | Startup clearing, runtime-log display limit, batch-log retention days, and save path |
-| About | Application/runtime versions, manual update checks, and the open-source project link |
 
 Numeric ranges are validated by the settings window. Comments in `watchdog.ini` sit beside their corresponding sections and settings. Prefer the GUI for edits so encoded fields remain intact. See [Configuration, backup, and recovery](en/configuration.md).
 

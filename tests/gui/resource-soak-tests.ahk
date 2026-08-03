@@ -72,7 +72,7 @@ VerifyMainCommandButtonFirstPaint() {
         {Property: "btnDel", Text: "Delete", Color: "73464B"},
         {Property: "btnSet", Text: "Settings", Color: "333333"},
         {Property: "btnSupport", Text: "Help", Color: "333333"},
-        {Property: "btnDonate", Text: "Donate", Color: "333333"}
+        {Property: "btnAbout", Text: "About", Color: "333333"}
     ]
     buttons := []
     try {
@@ -158,7 +158,7 @@ PrepareAtomicTestWindowSurface() {
     Main.statsText.Redraw()
     RedrawVisibleRoundedButtons([
         Main.btnAdd, Main.btnPause, Main.btnDel,
-        Main.btnSet, Main.btnSupport, Main.btnDonate
+        Main.btnSet, Main.btnSupport, Main.btnAbout
     ])
     DllCall("user32\RedrawWindow", "Ptr", Main.gui.Hwnd, "Ptr", 0,
         "Ptr", 0, "UInt", Win32.RDW_LAYOUT_REFRESH, "Int")
@@ -168,7 +168,7 @@ PrepareAtomicTestWindowSurface() {
 RefreshAtomicTestButtonsAfterShow() {
     return RedrawVisibleRoundedButtons([
         Main.btnAdd, Main.btnPause, Main.btnDel,
-        Main.btnSet, Main.btnSupport, Main.btnDonate
+        Main.btnSet, Main.btnSupport, Main.btnAbout
     ])
 }
 
@@ -188,7 +188,7 @@ VerifyAtomicMainWindowFirstPresentation() {
         {Property: "btnDel", Text: "Delete", Color: UiThemeService.Color("Toolbar")},
         {Property: "btnSet", Text: "Settings", Color: UiThemeService.Color("Toolbar")},
         {Property: "btnSupport", Text: "Help", Color: UiThemeService.Color("Toolbar")},
-        {Property: "btnDonate", Text: "Donate", Color: UiThemeService.Color("Toolbar")}
+        {Property: "btnAbout", Text: "About", Color: UiThemeService.Color("Toolbar")}
     ]
     try {
         for index, definition in buttonDefinitions {

@@ -157,7 +157,7 @@ CreateDisplayHotSwitchMainWindow() {
         Tr("🗑️ 删除"))
     Main.settingsButtonWidth := 70
     Main.supportButtonWidth := 100
-    Main.donateButtonWidth := 70
+    Main.aboutButtonWidth := 70
     Main.btnSet := Main.gui.Add("Text",
         "x480 y15 w70 h30 Center 0x200 Background"
             UiThemeService.Color("Toolbar") " c"
@@ -167,12 +167,12 @@ CreateDisplayHotSwitchMainWindow() {
         "x560 y15 w100 h30 Center 0x200 Background"
             UiThemeService.Color("Toolbar") " c"
             UiThemeService.Color("ToolbarText"),
-        Tr("帮助信息"))
-    Main.btnDonate := Main.gui.Add("Text",
+        Tr("帮助"))
+    Main.btnAbout := Main.gui.Add("Text",
         "x670 y15 w50 h30 Center 0x200 Background"
             UiThemeService.Color("Toolbar") " c"
             UiThemeService.Color("ToolbarText"),
-        Tr("捐赠"))
+        Tr("关于"))
     RegisterHoverButton(Main.btnAdd, UiThemeService.Color("Add"))
     SetButtonLeadingTextSlot(Main.btnAdd, 20, 4)
     RegisterHoverButton(Main.btnPause,
@@ -187,10 +187,10 @@ CreateDisplayHotSwitchMainWindow() {
     SetButtonLeadingTextSlot(Main.btnDel, 20, 4)
     RegisterHoverButton(Main.btnSet, UiThemeService.Color("Toolbar"))
     RegisterHoverButton(Main.btnSupport, UiThemeService.Color("Toolbar"))
-    RegisterHoverButton(Main.btnDonate, UiThemeService.Color("Toolbar"))
+    RegisterHoverButton(Main.btnAbout, UiThemeService.Color("Toolbar"))
     SetButtonLucideIcon(Main.btnSet, "settings.svg", 15, 6)
     SetButtonLucideIcon(Main.btnSupport, "circle-question-mark.svg", 15, 6)
-    SetButtonLucideIcon(Main.btnDonate, "heart.svg", 15, 6)
+    SetButtonLucideIcon(Main.btnAbout, "circle-info.svg", 15, 6)
 
     Main.gui.SetFont("s12 c" UiThemeService.Color("Text"),
         LocalizationService.GetUiFontName())
@@ -221,15 +221,15 @@ AssertMainCommandButtonLayout(clientWidth) {
     Main.btnDel.GetPos(&deleteX,, &deleteW)
     Main.btnSet.GetPos(&settingsX,, &settingsW)
     Main.btnSupport.GetPos(&supportX,, &supportW)
-    Main.btnDonate.GetPos(&donateX,, &donateW)
+    Main.btnAbout.GetPos(&aboutX,, &aboutW)
     AssertDisplayHotSwitch(deleteX >= pauseX + pauseW,
         clientWidth " 宽度下暂停和删除按钮顺序或间距错误")
     AssertDisplayHotSwitch(settingsX >= deleteX + deleteW,
         clientWidth " 宽度下右侧按钮侵入左侧命令区")
     AssertDisplayHotSwitch(settingsX + settingsW <= supportX
-        && supportX + supportW <= donateX,
+        && supportX + supportW <= aboutX,
         clientWidth " 宽度下右侧按钮互相重叠")
-    AssertDisplayHotSwitch(donateX + donateW
+    AssertDisplayHotSwitch(aboutX + aboutW
         <= clientWidth - Main.commandButtonRightMargin,
         clientWidth " 宽度下右侧按钮超出客户区")
 }
@@ -444,6 +444,8 @@ AssertPausedReloadResumeProjection() {
     stateObj.VerifyAttempts := 2
     stateObj.UncertainObservationCount := 2
     stateObj.StoppedEvidenceTicks := GetTickCount64()
+    stateObj.ManualRestartRequested := true
+    stateObj.ManualRestartGeneration := 7
     stateObj.ManualStopRequested := true
     stateObj.IsRestarting := true
 
@@ -471,6 +473,8 @@ AssertPausedReloadResumeProjection() {
             && stateObj.VerifyAttempts == 0
             && stateObj.UncertainObservationCount == 0
             && stateObj.StoppedEvidenceTicks == 0
+            && !stateObj.ManualRestartRequested
+            && stateObj.ManualRestartGeneration == 0
             && !stateObj.ManualStopRequested
             && !stateObj.IsRestarting,
             "恢复守护后仍继承暂停前的倒计时、失败或验证证据")
@@ -693,28 +697,38 @@ AssertContextMenuToggleLayout() {
     contextMenuHandle := Main.contextMenu.Handle
     AssertDisplayHotSwitch(
         GetDisplayHotSwitchMenuStyle(Main.contextMenu) & Win32.MNS_NOCHECK
+        && GetDisplayHotSwitchMenuText(Main.contextMenu, 0)
+            == Tr("🔄 重新启动")
+        && GetDisplayHotSwitchMenuText(Main.contextMenu, 1)
+            == Tr("⏹️ 结束运行")
+        && GetDisplayHotSwitchMenuText(Main.contextMenu, 2)
+            == Tr("✒️ 编辑完整路径（F2）")
         && GetDisplayHotSwitchMenuText(Main.contextMenu, 3)
-            == Tr("🎨 自定义名称和图标")
+            == Tr("📂 打开所在位置")
         && GetDisplayHotSwitchMenuText(Main.contextMenu, 4)
-            == Tr("🛡️ 以管理员身份运行") "`t✓"
+            == Tr("🎨 自定义名称和图标")
+        && GetDisplayHotSwitchMenuText(Main.contextMenu, 5)
+            == Tr("⚙️ 进程识别与启动设置")
         && GetDisplayHotSwitchMenuText(Main.contextMenu, 6)
+            == Tr("🛡️ 以管理员身份运行") "`t✓"
+        && GetDisplayHotSwitchMenuText(Main.contextMenu, 7)
             == Tr("🔄 软件升级保护") "`t✓"
-        && GetDisplayHotSwitchMenuText(Main.contextMenu, 8)
+        && GetDisplayHotSwitchMenuText(Main.contextMenu, 9)
             == Tr("📄 查看批处理输出日志"),
-        "右键菜单仍保留左侧勾选栏、勾号没有统一靠右或菜单仍含省略号")
+        "右键菜单顺序、靠右勾号或批处理日志项不正确")
 
     ConfigureMainContextMenu(false, false, false, false)
     maintenanceState := DllCall("user32\GetMenuState", "Ptr",
-        Main.contextMenu.Handle, "UInt", 6, "UInt", 0x0400, "UInt")
+        Main.contextMenu.Handle, "UInt", 7, "UInt", 0x0400, "UInt")
     AssertDisplayHotSwitch(
-        GetDisplayHotSwitchMenuText(Main.contextMenu, 4)
+        GetDisplayHotSwitchMenuText(Main.contextMenu, 6)
             == Tr("🛡️ 以管理员身份运行")
         && Main.contextMenu.Handle == contextMenuHandle
-        && GetDisplayHotSwitchMenuText(Main.contextMenu, 6)
+        && GetDisplayHotSwitchMenuText(Main.contextMenu, 7)
             == Tr("🔄 软件升级保护")
         && (maintenanceState & 0x0003)
         && DllCall("user32\GetMenuItemCount", "Ptr",
-            Main.contextMenu.Handle, "Int") == 7,
+            Main.contextMenu.Handle, "Int") == 8,
         "非批处理守护对象仍显示输出日志，或关闭状态菜单没有正确刷新")
     ConfigureMainContextMenu(false, false, true, true)
     AssertContextMenuPresentation()
@@ -971,6 +985,14 @@ RunDisplayHotSwitchTests() {
         AssertDisplayHotSwitch(focusedBeforePopup == Main.lv.Hwnd,
             "右键浮层测试前 ListView 没有获得焦点")
         popupItems := BuildMainContextPopupItems(false, false, true, false)
+        AssertDisplayHotSwitch(popupItems.Length == 8
+                && popupItems[1].Text == Tr("🔄 重新启动")
+                && popupItems[2].Text == Tr("⏹️ 结束运行")
+                && popupItems[3].Text == Tr("✒️ 编辑完整路径（F2）")
+                && popupItems[4].Text == Tr("📂 打开所在位置")
+                && popupItems[6].Text == Tr("⚙️ 进程识别与启动设置")
+                && popupItems[7].Text == Tr("🛡️ 以管理员身份运行"),
+            "主列表右键浮层顶部命令没有按指定顺序切换为英文")
         AssertDisplayHotSwitch(Main.contextPopup.Show(popupItems),
             "主列表右键浮层没有显示")
         Sleep(50)

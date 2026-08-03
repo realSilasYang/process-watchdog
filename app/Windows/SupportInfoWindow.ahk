@@ -1,4 +1,4 @@
-; 主窗口的帮助信息入口。
+; 主窗口的帮助入口。
 ; 该窗口只负责在使用说明、运行日志和反馈页面之间分流；选择后先释放自身的
 ; 所有权租约，再打开目标内容，避免形成不必要的三级窗口关系。
 
@@ -16,7 +16,7 @@ class SupportInfoWindow extends ManagedWindow {
         if this.ShowExisting()
             return
 
-        if !this.CreateOwnedGui(this.owner, "", Tr("帮助信息"))
+        if !this.CreateOwnedGui(this.owner, "", Tr("帮助"))
             return
         try {
             this.gui.OnEvent("Escape", ObjBindMethod(this, "Close"))
@@ -49,6 +49,7 @@ class SupportInfoWindow extends ManagedWindow {
             SetButtonLucideIcon(this.logButton, "logs.svg", 16, 7)
             SetButtonLucideIcon(this.feedbackButton,
                 "message-square-text.svg", 16, 7)
+            SetButtonTooltip(this.feedbackButton, Tr("找作者对线"))
             RegisterButtonClick(this.guideButton,
                 ObjBindMethod(this, "OpenGuide"), ButtonFeedbackMode.Dismissive)
             RegisterButtonClick(this.logButton,

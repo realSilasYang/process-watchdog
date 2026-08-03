@@ -99,6 +99,9 @@ $localizationServiceSource = Get-Content -LiteralPath `
 $settingsWindowSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\Windows\SettingsWindow.ahk') `
     -Raw -Encoding UTF8
+$aboutWindowSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\Windows\AboutWindow.ahk') `
+    -Raw -Encoding UTF8
 $customDisplayDialogSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\Windows\CustomDisplayDialog.ahk') `
     -Raw -Encoding UTF8
@@ -406,7 +409,7 @@ if (-not $firstPresentationSource -or
     $firstSurfaceSource -notmatch 'ApplyDarkListViewTheme\(Main\.lv\.Hwnd\)[\s\S]{0,500}listHeader\.ApplyAppearance' -or
     $firstSurfaceSource -notmatch 'statsPresenter\.Redraw\(\)[\s\S]{0,300}RefreshMainCommandButtonsAfterShow\(\)[\s\S]{0,260}Win32\.RDW_LAYOUT_REFRESH' -or
     $firstPresentationSource -notmatch 'FirstVisibleWindowPresenter\.Show\(Main\.gui, showOptions,[\s\S]{0,260}PrepareMainWindowFirstVisibleSurface,[\s\S]{0,120}RefreshMainCommandButtonsAfterShow\)[\s\S]{0,180}Main\.firstVisiblePresentationCompleted\s*:=\s*result\.FirstVisibleCompleted' -or
-    $mainWindowControllerSource -notmatch 'RefreshMainCommandButtonsAfterShow\(\)\s*\{[\s\S]{0,500}RedrawVisibleRoundedButtons\(\[[\s\S]{0,120}Main\.btnAdd, Main\.btnPause, Main\.btnDel,[\s\S]{0,120}Main\.btnSet, Main\.btnSupport, Main\.btnDonate' -or
+    $mainWindowControllerSource -notmatch 'RefreshMainCommandButtonsAfterShow\(\)\s*\{[\s\S]{0,500}RedrawVisibleRoundedButtons\(\[[\s\S]{0,120}Main\.btnAdd, Main\.btnPause, Main\.btnDel,[\s\S]{0,120}Main\.btnSet, Main\.btnSupport, Main\.btnAbout' -or
     $interactionPresenterSource -notmatch 'RedrawVisibleRoundedButtons\(controls\)[\s\S]{0,500}IsWindowVisible[\s\S]{0,300}RedrawRoundedButton\(controlHwnd\)' -or
     $mainWindowControllerSource -notmatch 'ShowMainGui\(\*\)\s*\{\s*ShowMainGuiWithOptions\(\)' -or
     $resourceSoakTestSource -notmatch 'VerifyAtomicMainWindowFirstPresentation\(\)[\s\S]{0,4200}hidden startup consumed the first visible presentation' -or
@@ -2197,10 +2200,58 @@ else {
         $failures.Add('Manual stop must not launch or restart a target')
     }
     if ($manualStopSource -notmatch 'BeginManualStopRequests\(paths\)[\s\S]{0,900}stateObj\.Enabled\s*:=\s*0[\s\S]{0,1200}SaveAppsToIni\(\)[\s\S]{0,500}SetTimer\(PerformManualStop\.Bind\(' -or
-        $mainSource -notmatch 'contextMenu\.Add\(Tr\("⏹️ 结束运行"\), EndSelectedApp\)' -or
-        $mainSource -match 'RestartSelectedApp|ManualRestartRequested') {
-        $failures.Add('Context-menu stop must persist a paused supervisor before stopping and remove the legacy restart action')
+        $mainSource -notmatch 'contextMenu\.Add\(Tr\("⏹️ 结束运行"\), EndSelectedApp\)') {
+        $failures.Add('Context-menu stop must persist a paused supervisor before stopping')
     }
+}
+$manualRestartMatch = [regex]::Match($mainWindowControllerSource,
+    '(?ms)^RestartSelectedApp\(\*\)\s*\{.*?(?=^; 托盘)')
+if (-not $manualRestartMatch.Success) {
+    $failures.Add('Unable to inspect the manual restart boundary')
+}
+else {
+    $manualRestartSource = $manualRestartMatch.Value
+    foreach ($manualRestartHook in @(
+        'stateObj.Enabled := 1',
+        'stateObj.CancelScheduledTasks()',
+        'stateObj.ManualRestartRequested := true',
+        'stateObj.ManualRestartGeneration := operationGeneration',
+        'StopTargetProcess(pid, creationIdentity)',
+        'FinalizeManualRestart(path, stateObj, expectedGeneration)',
+        'App.guardRuntime.RestartCore(path, stateObj)',
+        'ClearManualRestartRequest(stateObj, expectedGeneration)'
+    )) {
+        if (-not $manualRestartSource.Contains($manualRestartHook)) {
+            $failures.Add("Manual restart is missing generation-safe execution hook: $manualRestartHook")
+        }
+    }
+    if ([regex]::Matches($manualRestartSource,
+        'App\.guardRuntime\.IsSupervisorCurrent\(').Count -lt 3) {
+        $failures.Add('Manual restart must revalidate controller ownership after blocking operations')
+    }
+    if ($manualRestartSource -notmatch 'guardWorkGate\.Leave\(\)[\s\S]{0,220}StopTargetProcess\(pid, creationIdentity\)' -or
+        $manualRestartSource -notmatch 'CompleteManualRestartAfterStop\([\s\S]{0,700}guardWorkGate\.TryEnter\(\)') {
+        $failures.Add('Manual restart must stop outside the shared gate and reacquire it before launch')
+    }
+    if ($manualRestartSource -notmatch 'ManualRestartRequested\s*\|\|\s*stateObj\.ManualStopRequested' -or
+        $manualRestartSource -notmatch 'ClearManualRestartRequest\(stateObj, expectedGeneration\)[\s\S]{0,220}ManualRestartGeneration\s*!=\s*expectedGeneration' -or
+        $targetSupervisorSource -notmatch 'ResetGuardAttemptState\(\)[\s\S]{0,350}ManualRestartRequested\s*:=\s*false[\s\S]{0,100}ManualRestartGeneration\s*:=\s*0[\s\S]{0,100}ManualStopRequested\s*:=\s*false' -or
+        $guardRuntimeSource -notmatch 'RecoverOrphanedPending\(path, stateObj\)[\s\S]{0,180}ManualRestartRequested') {
+        $failures.Add('Manual restart must interlock with stop and reject stale generation cleanup')
+    }
+}
+$mainContextOrderPattern =
+    'contextMenu\.Add\(Tr\("🔄 重新启动"\), RestartSelectedApp\)[\s\S]{0,160}' +
+    'contextMenu\.Add\(Tr\("⏹️ 结束运行"\), EndSelectedApp\)[\s\S]{0,200}' +
+    'Tr\("✒️ 编辑完整路径（F2）"\)[\s\S]{0,180}' +
+    'contextMenu\.Add\(Tr\("📂 打开所在位置"\), OpenFileLocation\)[\s\S]{0,220}' +
+    'Tr\("🎨 自定义名称和图标"\)[\s\S]{0,180}' +
+    'Tr\("⚙️ 进程识别与启动设置"\)[\s\S]{0,220}' +
+    'Tr\("🛡️ 以管理员身份运行"\)[\s\S]{0,260}' +
+    'Tr\("🔄 软件升级保护"\)'
+if ($mainSource -notmatch $mainContextOrderPattern -or
+    $mainSource -notmatch '\{Text: Tr\("🔄 重新启动"\), Action: RestartSelectedApp\}[\s\S]{0,140}\{Text: Tr\("⏹️ 结束运行"\), Action: EndSelectedApp\}[\s\S]{0,180}\{Text: Tr\("✒️ 编辑完整路径（F2）"\)[\s\S]{0,180}\{Text: Tr\("📂 打开所在位置"\), Action: OpenFileLocation\}') {
+    $failures.Add('Main context menu must preserve the requested restart, stop, edit, location, display, launch, admin, and maintenance order')
 }
 if ($configRepositorySource -notmatch 'ReadSectionEntries\(sectionName\)[\s\S]{0,700}entries\.Push\(') {
     $failures.Add('INI sections must expose ordered entries for order-sensitive consumers')
@@ -2764,21 +2815,24 @@ if ($settingsWindowSource -match '搜索与导入|PreferEverything|NativeScanTim
     $failures.Add('Removed search choices, native-scan settings, and result-limit configuration must not remain in production state or Settings UI')
 }
 if ($localizationServiceSource -notmatch 'RefreshInstalledUiFontNames\(\)[\s\S]{0,260}this\.InstalledUiFonts\s*:=\s*""[\s\S]{0,160}this\.GetInstalledUiFontNames\(\)' -or
-    $settingsWindowSource -notmatch 'OnFontDropDownCommand\([^)]*\)[\s\S]{0,420}CBN_DROPDOWN' -or
+    $settingsWindowSource -notmatch 'OnFontDropDownCommand\([^)]*\)[\s\S]{0,800}CBN_DROPDOWN' -or
     $settingsWindowSource -notmatch '(?ms)^    RefreshFontDropDown\([^)]*\)\s*\{.*?RefreshInstalledUiFontNames\(\)' -or
+    $settingsWindowSource -notmatch 'fontDropDownRows\s*:=\s*12[\s\S]{0,220}" r" fontDropDownRows " Choose"' -or
+    $settingsWindowSource -notmatch 'CBN_CLOSEUP[\s\S]{0,180}CaptureFontDropDownTopIndex\(\)[\s\S]{0,260}RefreshFontDropDown\(\)[\s\S]{0,100}RestoreFontDropDownTopIndex\(\)' -or
+    $settingsWindowSource -notmatch 'CaptureFontDropDownTopIndex\(\)[\s\S]{0,500}CB_GETTOPINDEX' -or
+    $settingsWindowSource -notmatch 'RestoreFontDropDownTopIndex\(\)[\s\S]{0,500}CB_SETTOPINDEX' -or
     $settingsWindowSource -notmatch 'OnMessage\(Win32\.WM_COMMAND, this\.fontDropDownCommandHandler\)' -or
     $settingsWindowSource -notmatch 'OnMessage\(Win32\.WM_COMMAND,[\s\S]{0,80}this\.fontDropDownCommandHandler, 0\)') {
-    $failures.Add('The font picker must refresh installed fonts on every native drop-down opening and unregister its message hook on close')
+    $failures.Add('The font picker must use a fixed 12-row list, preserve manual scroll position across refreshes, and unregister its message hook on close')
 }
 
-# 设置窗口的五页分类、关于信息和输入对齐属于同一布局契约。旧标签若回流，
-# 不仅会造成文案退化，还常意味着控件重新落回了错误页面。
-if ($settingsWindowSource -notmatch 'Loop\s+5[\s\S]{0,280}Tr\("通用"\)[\s\S]{0,80}Tr\("监控与启动"\)[\s\S]{0,80}Tr\("停止策略"\)[\s\S]{0,80}Tr\("日志"\)[\s\S]{0,80}Tr\("关于"\)' -or
+# 设置窗口只保留四页可编辑配置；产品信息、更新、开源与打赏在独立关于窗口。
+if ($settingsWindowSource -notmatch 'Loop\s+4[\s\S]{0,280}Tr\("通用"\)[\s\S]{0,80}Tr\("监控与启动"\)[\s\S]{0,80}Tr\("停止策略"\)[\s\S]{0,80}Tr\("日志"\)' -or
     $settingsWindowSource -notmatch 'this\.SwitchTab\(1\)' -or
     $settingsWindowSource -notmatch 'this\.showAtStartupCheck\s*:=\s*this\.AddTabControl\(1,' -or
     $settingsWindowSource -notmatch 'this\.checkUpdatesOnStartupCheck\s*:=\s*this\.AddTabControl\(1,' -or
-    $settingsWindowSource -notmatch 'this\.checkUpdateButton\s*:=\s*this\.AddTabControl\(5,') {
-    $failures.Add('Settings must keep the five ordered pages and their startup/update controls in the intended page')
+    $settingsWindowSource -match 'BuildAboutTab|Tr\("关于"\)|checkUpdateButton|projectButton|donationButton') {
+    $failures.Add('Settings must keep four ordered editable pages and must not retain About controls')
 }
 $alignedSettingLabels = @(
     '进程状态检查间隔（毫秒）：',
@@ -2797,41 +2851,19 @@ foreach ($alignedSettingLabel in $alignedSettingLabels) {
         $failures.Add("Settings input label must remain right-aligned: $alignedSettingLabel")
     }
 }
-$aboutPageSource = [regex]::Match($settingsWindowSource,
-    '(?ms)^    BuildAboutTab\(\)\s*\{.*?(?=^    OnFontDropDownCommand\()').Value
-if (-not $settingsWindowSource.Contains(
+if (-not $aboutWindowSource.Contains(
         'https://github.com/realSilasYang/process-watchdog') -or
-    -not $settingsWindowSource.Contains('GetApplicationEditionSummary()') -or
-    -not $settingsWindowSource.Contains('GetAutoHotkeyRuntimeSummary()') -or
-    -not $settingsWindowSource.Contains('Tr("开源地址")') -or
-    -not $settingsWindowSource.Contains('this.versionLabel') -or
-    -not $settingsWindowSource.Contains('this.versionValue') -or
-    -not $settingsWindowSource.Contains('this.runtimeLabel') -or
-    -not $settingsWindowSource.Contains('this.runtimeValue') -or
-    -not $settingsWindowSource.Contains('this.checkUpdatesOnStartupCheck') -or
-    -not $settingsWindowSource.Contains('this.aboutSubtitle') -or
-    -not $settingsWindowSource.Contains('this.aboutTopDivider') -or
-    -not $settingsWindowSource.Contains('this.aboutInfoDivider') -or
-    -not $settingsWindowSource.Contains('this.aboutBottomDivider') -or
-    -not $settingsWindowSource.Contains('this.projectButton') -or
-    -not $settingsWindowSource.Contains('showSettingsActions := index != 5') -or
-    [string]::IsNullOrWhiteSpace($aboutPageSource) -or
-    $aboutPageSource -notmatch 'GetLanguageSystemUiFontName\(\)' -or
-    $aboutPageSource -notmatch 'this\.aboutName\.SetFont\("bold"\)' -or
-    $aboutPageSource -notmatch 'Tr\("持续守护重要程序与自动化任务，让日常工作稳定运行"\)' -or
-    $aboutPageSource -notmatch 'this\.aboutSubtitle[\s\S]{0,240}UiThemeService\.Color\("MutedText"\)' -or
-    $aboutPageSource -notmatch 'this\.gui\.SetFont\("norm s14 c"' -or
-    $aboutPageSource -notmatch 'this\.gui\.SetFont\("norm s11 c"[\s\S]{0,120}fontName\)' -or
-    $aboutPageSource -notmatch 'this\.gui\.SetFont\("norm s10 c"[\s\S]{0,120}UiThemeService\.Color\("MutedText"\)' -or
-    $aboutPageSource -notmatch 'this\.gui\.SetFont\("norm s9 c"[\s\S]{0,120}UiThemeService\.Color\("MutedText"\)' -or
-    $aboutPageSource -notmatch 'SplitFieldCaption\(Tr\("当前版本："\)\)' -or
-    $aboutPageSource -notmatch 'SplitFieldCaption\(Tr\("运行环境："\)\)' -or
-    $aboutPageSource -notmatch 'this\.versionLabel[\s\S]{0,500}this\.runtimeLabel[\s\S]{0,500}this\.versionValue[\s\S]{0,500}this\.runtimeValue[\s\S]{0,500}this\.aboutInfoDivider' -or
-    $aboutPageSource -notmatch 'this\.checkUpdateButton[\s\S]{0,260}UiThemeService\.Color\("Primary"\)' -or
-    $aboutPageSource -match 'SetButtonIcon\(' -or
-    $settingsWindowSource -notmatch 'SetButtonLucideIcon\(this\.checkUpdateButton,[\s\S]{0,100}refresh-cw-action\.svg' -or
-    $settingsWindowSource -notmatch 'SetButtonSvgIcon\(this\.projectButton,[\s\S]{0,160}ui-icons\\external-link\.svg') {
-    $failures.Add('About page must use a centered brand, two-column information band, primary update action, and a read-only footer state')
+    -not $aboutWindowSource.Contains('GetApplicationEditionSummary()') -or
+    -not $aboutWindowSource.Contains('GetAutoHotkeyRuntimeSummary()') -or
+    $aboutWindowSource -notmatch 'Tr\("检查更新"\)[\s\S]{0,500}Tr\("打赏"\)[\s\S]{0,500}Tr\("开源地址"\)' -or
+    $aboutWindowSource -notmatch 'for button in \[this\.checkUpdateButton, this\.donationButton,[\s\S]{0,100}this\.projectButton\][\s\S]{0,120}UiThemeService\.Color\("Toolbar"\)' -or
+    $aboutWindowSource -match 'UiThemeService\.Color\("Primary"\)' -or
+    $aboutWindowSource -notmatch 'SetButtonLucideIcon\(this\.checkUpdateButton,[\s\S]{0,100}refresh-cw-action\.svg' -or
+    $aboutWindowSource -notmatch 'SetButtonLucideIcon\(this\.donationButton, "heart\.svg"' -or
+    $aboutWindowSource -notmatch 'SetButtonTooltip\(this\.donationButton,[\s\S]{0,100}快揭不开锅了' -or
+    $aboutWindowSource -notmatch 'SetButtonTooltip\(this\.projectButton, Tr\("点个 star 吧~"\)\)' -or
+    $aboutWindowSource -notmatch 'GuiModules\.donation\.Show\(this\.gui\)') {
+    $failures.Add('About window must keep its read-only information and ordinary Check Update, Donate, Open Source actions in order')
 }
 if (-not $settingsWindowSource.Contains(
         'this.shortcutLabel.Move(integrationGroupX)') -or
@@ -2852,8 +2884,7 @@ if ($settingsWindowSource -notmatch 'this\.tabBuilt\[1\]\s*:=\s*true' -or
     $settingsWindowSource -notmatch 'SwitchTab\(index,[\s\S]{0,520}EnsureTabBuilt\(index\)' -or
     $settingsWindowSource -notmatch 'case 2: this\.BuildMonitoringTab\(\)' -or
     $settingsWindowSource -notmatch 'case 3: this\.BuildStopPolicyTab\(\)' -or
-    $settingsWindowSource -notmatch 'case 4: this\.BuildLogTab\(\)' -or
-    $settingsWindowSource -notmatch 'case 5: this\.BuildAboutTab\(\)') {
+    $settingsWindowSource -notmatch 'case 4: this\.BuildLogTab\(\)') {
     $failures.Add('Settings must build only the visible general tab initially and create other pages on first selection')
 }
 $settingsTabSwitchSource = [regex]::Match($settingsWindowSource,
@@ -3123,7 +3154,7 @@ if ($displayHotSwitchTestSource -match
 }
 if ($interactionPresenterSource -notmatch 'SetRegisteredButtonEnabled\(ctrl, enabled\)[\s\S]{0,800}ClearHoveredButton\(hWnd\)[\s\S]{0,500}ctrl\.Enabled := enabled[\s\S]{0,220}RedrawRoundedButton\(hWnd\)' -or
     $customDisplayDialogSource -notmatch 'SetRegisteredButtonEnabled\(this\.defaultNameButton' -or
-    $settingsWindowSource -notmatch 'SetRegisteredButtonEnabled\(this\.checkUpdateButton' -or
+    $aboutWindowSource -notmatch 'SetRegisteredButtonEnabled\(this\.checkUpdateButton' -or
     $addItemDialogSource -notmatch 'for button in \[this\.searchButton, this\.browseButton, this\.okButton\][\s\S]{0,100}SetRegisteredButtonEnabled\(button, !active\)' -or
     $customDisplayDialogSource -match 'SetDefaultButtonEnabled\(' -or
     $appModuleSource -match 'try (?:this\.)?[A-Za-z][A-Za-z0-9_]*Button\.Enabled :=') {

@@ -1043,9 +1043,6 @@ class ItalianStrings {
             "检查更新",
                 "Controlla aggiornamenti")
         catalog.Set(
-            "立即检查更新",
-                "Controlla subito gli aggiornamenti")
-        catalog.Set(
             "检查更新失败：{1}",
                 "Controllo degli aggiornamenti non riuscito: {1}")
         catalog.Set(
@@ -1596,7 +1593,6 @@ class ItalianStrings {
                 "Risultati di ricerca Everything: {1}")
         catalog.Set("{1}（EXE 版）", "{1}（versione EXE）")
         catalog.Set("{1}（源码版）", "{1}（versione sorgente）")
-        catalog.Set("• “关于”页可控制是否在启动时后台检查新版，也可随时手动检查。检查过程不会阻塞主界面。", "• La pagina “Informazioni” consente di cercare nuove versioni in background all'avvio o di avviare manualmente il controllo in qualsiasi momento. Il controllo non blocca la finestra principale.")
         catalog.Set("• “结束运行”会先请求目标正常退出；超过设置时间后，是否强制终止由“停止策略”中的选项决定。", "• “Termina esecuzione” chiede prima all'applicazione di chiudersi normalmente. Se il tempo scade, l'opzione in “Criteri di arresto” stabilisce se terminarla forzatamente.")
         catalog.Set("• 关于：查看软件版本和 AutoHotkey 运行环境，手动检查更新或打开开源地址。", "• Informazioni: visualizza la versione dell'applicazione e l'ambiente di esecuzione AutoHotkey, cerca manualmente gli aggiornamenti o apri il progetto open source.")
         catalog.Set("• 监控与启动：设置进程状态检查间隔、崩溃自动重启延迟序列，以及导入文件夹时是否包含子目录。", "• Monitoraggio e avvio: imposta l'intervallo di controllo dei processi, la sequenza di ritardi per il riavvio automatico dopo un arresto anomalo e l'inclusione delle sottocartelle durante l'importazione di una cartella.")
@@ -1619,7 +1615,7 @@ class ItalianStrings {
         catalog.Set("进程状态检查间隔（毫秒）：", "Intervallo di controllo dei processi（millisecondi）:")
         catalog.Set("进程状态检查间隔必须为 500-86400000 毫秒的正整数！", "L'intervallo di controllo dei processi deve essere un numero intero positivo compreso tra 500 e 86400000 millisecondi.")
         catalog.Set("扩展设置包含无效数值。`n`nGUI 程序关闭超时：1-300 秒`nCLI 程序关闭超时：1-60 秒`n运行日志显示上限：50-10000 条`n批处理日志保留天数：1-3650 天", "Le impostazioni avanzate contengono valori non validi.`n`nTempo massimo di chiusura delle applicazioni GUI: 1-300 secondi`nTempo massimo di chiusura delle applicazioni CLI: 1-60 secondi`nLimite di visualizzazione del registro di esecuzione: 50-10000 voci`nConservazione dei registri di output batch: 1-3650 giorni")
-        catalog.Set("配置通用、监控与启动、停止策略、日志`n以及关于选项", "Configura Generale, Monitoraggio e avvio, Criteri di arresto,`nRegistri e Informazioni")
+        catalog.Set("配置通用、监控与启动、停止策略与日志", "Configura Generale, Monitoraggio e avvio, Criteri di arresto e Registri")
         catalog.Set("批处理日志保存路径：", "Percorso dei registri di output batch:")
         catalog.Set("批处理日志保留天数：", "Giorni di conservazione dei registri di output batch:")
         catalog.Set("启动时显示主窗口", "Mostra la finestra principale all'avvio")
@@ -1637,16 +1633,16 @@ class ItalianStrings {
         catalog.Set("界面语言、字体和主题已即时更新，无需重新启动小助手。", "La lingua, il carattere e il tema dell'interfaccia sono stati aggiornati subito; non è necessario riavviare l'assistente.")
         catalog.Set("• 通用：创建桌面与开始菜单快捷方式，开启或关闭计划任务自启，设置启动时显示主窗口和启动时检查小助手更新，以及界面语言、内容字体和主题。", "• Generale: crea collegamenti sul desktop e nel menu Start, attiva o disattiva l'avvio pianificato, scegli se mostrare la finestra principale e controllare gli aggiornamenti all'avvio e imposta lingua, carattere dei contenuti e tema dell'interfaccia.")
         catalog.Set("• 界面语言、内容字体和主题保存后会立即更新主窗口、菜单和托盘，无需重新启动。", "• Salvando la lingua, il carattere dei contenuti o il tema, la finestra principale, i menu e l'area di notifica vengono aggiornati subito senza riavvio.")
-        catalog.Set("打开帮助信息`n可选择查看使用说明、运行日志或提交反馈", "Apri Aiuto`nScegli la guida utente, il registro di esecuzione o l’invio di feedback")
+        catalog.Set("打开帮助`n可选择查看使用说明、运行日志或提交反馈", "Apri Aiuto`nScegli la guida utente, il registro di esecuzione o l’invio di feedback")
         catalog.Set("快揭不开锅了（≥Д≤）", "La cassa è quasi vuota（≥Д≤）")
-        catalog.Set("帮助信息", "Aiuto")
+        catalog.Set("帮助", "Aiuto")
         catalog.Set("提交反馈", "Invia feedback")
         catalog.Set("支持开源项目", "Sostieni il progetto open source")
         catalog.Set("如果小助手为您节省了排查问题和恢复程序的时间，欢迎通过下方二维码打赏作者！`n请选择扶贫方式：", "Se l’assistente ti ha fatto risparmiare tempo nella diagnosi dei problemi e nel ripristino dei programmi, puoi sostenere l’autore tramite i codici QR qui sotto!`nScegli come vuoi contribuire:")
         catalog.Set("微信支付", "WeChat Pay")
         catalog.Set("支付宝", "Alipay")
         catalog.Set("二维码图片未找到", "Immagine del codice QR non trovata")
-        catalog.Set("• 主界面的“帮助信息”可打开使用说明、本次运行日志或项目反馈页面；日志包含监控、重启、升级保护和操作记录，并会自动更新。", "• Apri Aiuto nella finestra principale per consultare la guida utente, il registro di questa sessione o la pagina dei feedback del progetto. Il registro include monitoraggio, riavvii, protezione degli aggiornamenti e azioni dell’utente, e si aggiorna automaticamente.")
+        catalog.Set("• 主界面的“帮助”可打开使用说明、本次运行日志或项目反馈页面；日志包含监控、重启、升级保护和操作记录，并会自动更新。", "• Apri Aiuto nella finestra principale per consultare la guida utente, il registro di questa sessione o la pagina dei feedback del progetto. Il registro include monitoraggio, riavvii, protezione degli aggiornamenti e azioni dell’utente, e si aggiorna automaticamente.")
         catalog.Set("⚙️ 进程识别与启动设置", "⚙️ Identificazione del processo e impostazioni di avvio")
         catalog.Set("进程识别与启动设置", "Identificazione del processo e impostazioni di avvio")
         catalog.Set("进程识别", "Identificazione del processo")
@@ -1686,7 +1682,7 @@ class ItalianStrings {
         catalog.Set("恢复", "Riprendi")
         catalog.Set("删除", "Elimina")
         catalog.Set("设置", "Impostazioni")
-        catalog.Set("捐赠", "Dona")
+        catalog.Set("打赏", "Dona")
         catalog.Set("保存", "Salva")
         catalog.Set("取消", "Annulla")
         catalog.Set("反转状态", "Inverti stato")
@@ -1826,6 +1822,18 @@ class ItalianStrings {
         catalog.Set("未知", "Unknown")
         catalog.Set("无", "None")
         catalog.Set("，另有 {1} 个", ", plus {1} more")
+        catalog.Set("🔄 重新启动", "🔄 Riavvia")
+        catalog.Set("点个 star 吧~", "Regalaci una stellina~")
+        catalog.Set("⏳ 停止原进程...", "⏳ Arresto del processo originale...")
+        catalog.Set("❌ 无法停止原进程", "❌ Impossibile arrestare il processo originale")
+        catalog.Set("手动触发了重新启动：{1}", "Riavvio avviato manualmente: {1}")
+        catalog.Set("手动重启已取消，原进程未能停止：{1}", "Il riavvio manuale è stato annullato perché non è stato possibile arrestare il processo originale: {1}")
+        catalog.Set("暂时无法查询进程状态，稍后重试手动重启：{1}", "Al momento non è possibile interrogare lo stato del processo`; il riavvio manuale verrà ritentato più tardi: {1}")
+        catalog.Set("暂时无法重新启动", "Al momento non è possibile riavviare")
+        catalog.Set("该软件正在升级保护中。请等待升级完成，或在“软件升级保护”中结束等待后再重新启动。", "Il software è sottoposto a protezione durante l'aggiornamento. Attendere il completamento o terminare l'attesa in “Protezione aggiornamenti software” prima di riavviarlo.")
+        catalog.Set("• “重新启动”会先请求目标正常退出；超过设置时间后，是否强制终止由“停止策略”中的选项决定。", "• “Riavvia” chiede prima all'applicazione di chiudersi normalmente. Se il tempo scade, l'opzione in “Criteri di arresto” stabilisce se terminarla forzatamente.")
+        catalog.Set("查看版本、运行环境和项目入口", "Visualizza versione, ambiente runtime e link del progetto")
+        catalog.Set("找作者对线", "Parla con autore")
         return catalog
     }
 }

@@ -1043,9 +1043,6 @@ class GermanStrings {
             "检查更新",
                 "Nach Updates suchen")
         catalog.Set(
-            "立即检查更新",
-                "Jetzt nach Updates suchen")
-        catalog.Set(
             "检查更新失败：{1}",
                 "Update-Suche fehlgeschlagen: {1}")
         catalog.Set(
@@ -1596,7 +1593,6 @@ class GermanStrings {
                 "Everything-Suchergebnisse: {1} Einträge")
         catalog.Set("{1}（EXE 版）", "{1}（EXE-Version）")
         catalog.Set("{1}（源码版）", "{1}（Quellcode-Version）")
-        catalog.Set("• “关于”页可控制是否在启动时后台检查新版，也可随时手动检查。检查过程不会阻塞主界面。", "• Auf der Seite „Info“ lässt sich die Suche nach neuen Versionen beim Start im Hintergrund aktivieren oder jederzeit manuell ausführen. Die Prüfung blockiert das Hauptfenster nicht.")
         catalog.Set("• “结束运行”会先请求目标正常退出；超过设置时间后，是否强制终止由“停止策略”中的选项决定。", "• „Ausführung beenden“ fordert das Ziel zunächst zum normalen Beenden auf. Nach Ablauf des Zeitlimits bestimmt die Option unter „Beendigungsrichtlinie“, ob es zwangsweise beendet wird.")
         catalog.Set("• 关于：查看软件版本和 AutoHotkey 运行环境，手动检查更新或打开开源地址。", "• Info: Anwendungsversion und AutoHotkey-Laufzeitumgebung anzeigen, manuell nach Updates suchen oder das Open-Source-Projekt öffnen.")
         catalog.Set("• 监控与启动：设置进程状态检查间隔、崩溃自动重启延迟序列，以及导入文件夹时是否包含子目录。", "• Überwachung & Start: Prüfintervall für Prozesse, Verzögerungsfolge für automatische Neustarts nach einem Absturz und Einbeziehung von Unterordnern beim Ordnerimport festlegen.")
@@ -1619,7 +1615,7 @@ class GermanStrings {
         catalog.Set("进程状态检查间隔（毫秒）：", "Prüfintervall für Prozesse（Millisekunden）:")
         catalog.Set("进程状态检查间隔必须为 500-86400000 毫秒的正整数！", "Das Prüfintervall für Prozesse muss eine positive Ganzzahl zwischen 500 und 86400000 Millisekunden sein!")
         catalog.Set("扩展设置包含无效数值。`n`nGUI 程序关闭超时：1-300 秒`nCLI 程序关闭超时：1-60 秒`n运行日志显示上限：50-10000 条`n批处理日志保留天数：1-3650 天", "Die erweiterten Einstellungen enthalten ungültige Werte.`n`nZeitlimit für GUI-Anwendungen: 1-300 Sekunden`nZeitlimit für CLI-Anwendungen: 1-60 Sekunden`nAnzeigelimit des Laufzeitprotokolls: 50-10000 Einträge`nAufbewahrung der Stapelausgabeprotokolle: 1-3650 Tage")
-        catalog.Set("配置通用、监控与启动、停止策略、日志`n以及关于选项", "Allgemein, Überwachung & Start, Beendigungsrichtlinie,`nProtokolle und Info konfigurieren")
+        catalog.Set("配置通用、监控与启动、停止策略与日志", "Allgemein, Überwachung & Start, Beendigungsrichtlinie und Protokolle konfigurieren")
         catalog.Set("批处理日志保存路径：", "Speicherort der Stapelausgabeprotokolle:")
         catalog.Set("批处理日志保留天数：", "Aufbewahrung der Stapelausgabeprotokolle（Tage）:")
         catalog.Set("启动时显示主窗口", "Hauptfenster beim Start anzeigen")
@@ -1637,16 +1633,16 @@ class GermanStrings {
         catalog.Set("界面语言、字体和主题已即时更新，无需重新启动小助手。", "Sprache, Schriftart und Design der Oberfläche wurden sofort aktualisiert; ein Neustart des Assistenten ist nicht erforderlich.")
         catalog.Set("• 通用：创建桌面与开始菜单快捷方式，开启或关闭计划任务自启，设置启动时显示主窗口和启动时检查小助手更新，以及界面语言、内容字体和主题。", "• Allgemein: Desktop- und Startmenüverknüpfungen erstellen, den geplanten Autostart ein- oder ausschalten, die Anzeige des Hauptfensters und die Updateprüfung beim Start festlegen sowie Sprache, Inhaltsschriftart und Design auswählen.")
         catalog.Set("• 界面语言、内容字体和主题保存后会立即更新主窗口、菜单和托盘，无需重新启动。", "• Nach dem Speichern von Sprache, Inhaltsschriftart oder Design werden Hauptfenster, Menüs und Infobereich sofort ohne Neustart aktualisiert.")
-        catalog.Set("打开帮助信息`n可选择查看使用说明、运行日志或提交反馈", "Hilfe öffnen`nBenutzerhandbuch oder Laufzeitprotokoll öffnen oder Feedback senden")
+        catalog.Set("打开帮助`n可选择查看使用说明、运行日志或提交反馈", "Hilfe öffnen`nBenutzerhandbuch oder Laufzeitprotokoll öffnen oder Feedback senden")
         catalog.Set("快揭不开锅了（≥Д≤）", "Die Kasse ist fast leer（≥Д≤）")
-        catalog.Set("帮助信息", "Hilfe")
+        catalog.Set("帮助", "Hilfe")
         catalog.Set("提交反馈", "Feedback senden")
         catalog.Set("支持开源项目", "Open-Source-Projekt unterstützen")
         catalog.Set("如果小助手为您节省了排查问题和恢复程序的时间，欢迎通过下方二维码打赏作者！`n请选择扶贫方式：", "Wenn Ihnen der Assistent Zeit bei der Fehlersuche und Wiederherstellung von Programmen erspart hat, unterstützen Sie den Autor gern über die QR-Codes unten!`nWählen Sie aus, wie Sie helfen möchten:")
         catalog.Set("微信支付", "WeChat Pay")
         catalog.Set("支付宝", "Alipay")
         catalog.Set("二维码图片未找到", "QR-Code-Bild nicht gefunden")
-        catalog.Set("• 主界面的“帮助信息”可打开使用说明、本次运行日志或项目反馈页面；日志包含监控、重启、升级保护和操作记录，并会自动更新。", "• Öffnen Sie Hilfe im Hauptfenster, um das Benutzerhandbuch, das Laufzeitprotokoll dieser Sitzung oder die Feedbackseite des Projekts aufzurufen. Das Protokoll enthält Überwachung, Neustarts, Update-Schutz und Benutzeraktionen und wird automatisch aktualisiert.")
+        catalog.Set("• 主界面的“帮助”可打开使用说明、本次运行日志或项目反馈页面；日志包含监控、重启、升级保护和操作记录，并会自动更新。", "• Öffnen Sie Hilfe im Hauptfenster, um das Benutzerhandbuch, das Laufzeitprotokoll dieser Sitzung oder die Feedbackseite des Projekts aufzurufen. Das Protokoll enthält Überwachung, Neustarts, Update-Schutz und Benutzeraktionen und wird automatisch aktualisiert.")
         catalog.Set("⚙️ 进程识别与启动设置", "⚙️ Prozesserkennung und Starteinstellungen")
         catalog.Set("进程识别与启动设置", "Prozesserkennung und Starteinstellungen")
         catalog.Set("进程识别", "Prozesserkennung")
@@ -1686,7 +1682,7 @@ class GermanStrings {
         catalog.Set("恢复", "Fortsetzen")
         catalog.Set("删除", "Löschen")
         catalog.Set("设置", "Einstellungen")
-        catalog.Set("捐赠", "Spenden")
+        catalog.Set("打赏", "Spenden")
         catalog.Set("保存", "Speichern")
         catalog.Set("取消", "Abbrechen")
         catalog.Set("反转状态", "Status umkehren")
@@ -1826,6 +1822,18 @@ class GermanStrings {
         catalog.Set("未知", "Unknown")
         catalog.Set("无", "None")
         catalog.Set("，另有 {1} 个", ", plus {1} more")
+        catalog.Set("🔄 重新启动", "🔄 Neu starten")
+        catalog.Set("点个 star 吧~", "Schenk uns ein Sternchen~")
+        catalog.Set("⏳ 停止原进程...", "⏳ Ursprünglicher Prozess wird beendet...")
+        catalog.Set("❌ 无法停止原进程", "❌ Ursprünglicher Prozess konnte nicht beendet werden")
+        catalog.Set("手动触发了重新启动：{1}", "Neustart manuell ausgelöst: {1}")
+        catalog.Set("手动重启已取消，原进程未能停止：{1}", "Der manuelle Neustart wurde abgebrochen, da der ursprüngliche Prozess nicht beendet werden konnte: {1}")
+        catalog.Set("暂时无法查询进程状态，稍后重试手动重启：{1}", "Der Prozessstatus kann vorübergehend nicht abgefragt werden`; der manuelle Neustart wird später erneut versucht: {1}")
+        catalog.Set("暂时无法重新启动", "Neustart ist vorübergehend nicht möglich")
+        catalog.Set("该软件正在升级保护中。请等待升级完成，或在“软件升级保护”中结束等待后再重新启动。", "Diese Software befindet sich im Update-Schutz. Warten Sie, bis das Update abgeschlossen ist, oder beenden Sie die Wartezeit unter „Software-Update-Schutz“, bevor Sie sie neu starten.")
+        catalog.Set("• “重新启动”会先请求目标正常退出；超过设置时间后，是否强制终止由“停止策略”中的选项决定。", "• „Neu starten“ fordert das Ziel zunächst zum normalen Beenden auf. Nach Ablauf des Zeitlimits bestimmt die Option unter „Beendigungsrichtlinie“, ob es zwangsweise beendet wird.")
+        catalog.Set("查看版本、运行环境和项目入口", "Version, Laufzeitumgebung und Projektlinks anzeigen")
+        catalog.Set("找作者对线", "Mit dem Autor diskutieren")
         return catalog
     }
 }

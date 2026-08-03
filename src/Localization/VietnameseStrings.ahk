@@ -1043,9 +1043,6 @@ class VietnameseStrings {
             "检查更新",
                 "Kiểm tra cập nhật")
         catalog.Set(
-            "立即检查更新",
-                "Kiểm tra bản cập nhật ngay")
-        catalog.Set(
             "检查更新失败：{1}",
                 "Kiểm tra cập nhật thất bại: {1}")
         catalog.Set(
@@ -1601,9 +1598,6 @@ class VietnameseStrings {
             "{1}（源码版）",
                 "{1}（bản mã nguồn）")
         catalog.Set(
-            "• “关于”页可控制是否在启动时后台检查新版，也可随时手动检查。检查过程不会阻塞主界面。",
-                "• Trang “Giới thiệu” cho phép kiểm tra bản mới trong nền khi khởi động hoặc kiểm tra thủ công bất cứ lúc nào. Quá trình kiểm tra không làm gián đoạn cửa sổ chính.")
-        catalog.Set(
             "• “结束运行”会先请求目标正常退出；超过设置时间后，是否强制终止由“停止策略”中的选项决定。",
                 "• “Kết thúc tiến trình” trước tiên sẽ yêu cầu ứng dụng đích thoát bình thường. Khi hết thời gian chờ, tùy chọn trong “Chính sách dừng” sẽ quyết định có buộc ứng dụng kết thúc hay không.")
         catalog.Set(
@@ -1670,8 +1664,8 @@ class VietnameseStrings {
             "扩展设置包含无效数值。`n`nGUI 程序关闭超时：1-300 秒`nCLI 程序关闭超时：1-60 秒`n运行日志显示上限：50-10000 条`n批处理日志保留天数：1-3650 天",
                 "Cài đặt nâng cao có giá trị không hợp lệ.`n`nThời gian chờ đóng ứng dụng GUI: 1-300 giây`nThời gian chờ đóng ứng dụng CLI: 1-60 giây`nGiới hạn hiển thị nhật ký hoạt động: 50-10000 mục`nSố ngày giữ nhật ký đầu ra lô: 1-3650 ngày")
         catalog.Set(
-            "配置通用、监控与启动、停止策略、日志`n以及关于选项",
-                "Thiết lập Chung, Theo dõi và khởi chạy, Chính sách dừng,`nNhật ký và Giới thiệu")
+            "配置通用、监控与启动、停止策略与日志",
+                "Cấu hình Chung, Giám sát và khởi động, Chính sách dừng và Nhật ký")
         catalog.Set(
             "批处理日志保存路径：",
                 "Đường dẫn lưu nhật ký đầu ra lô:")
@@ -1703,16 +1697,16 @@ class VietnameseStrings {
         catalog.Set("界面语言、字体和主题已即时更新，无需重新启动小助手。", "Ngôn ngữ, phông chữ và chủ đề giao diện đã được cập nhật ngay; không cần khởi động lại trợ lý.")
         catalog.Set("• 通用：创建桌面与开始菜单快捷方式，开启或关闭计划任务自启，设置启动时显示主窗口和启动时检查小助手更新，以及界面语言、内容字体和主题。", "• Chung: tạo lối tắt trên màn hình nền và menu Bắt đầu, bật hoặc tắt tự khởi động bằng tác vụ đã lên lịch, chọn hiển thị cửa sổ chính và kiểm tra cập nhật khi khởi động, đồng thời đặt ngôn ngữ, phông chữ nội dung và chủ đề giao diện.")
         catalog.Set("• 界面语言、内容字体和主题保存后会立即更新主窗口、菜单和托盘，无需重新启动。", "• Sau khi lưu ngôn ngữ, phông chữ nội dung hoặc chủ đề giao diện, cửa sổ chính, menu và khay hệ thống sẽ cập nhật ngay mà không cần khởi động lại.")
-        catalog.Set("打开帮助信息`n可选择查看使用说明、运行日志或提交反馈", "Mở Trợ giúp`nChọn hướng dẫn sử dụng, nhật ký chạy hoặc gửi phản hồi")
+        catalog.Set("打开帮助`n可选择查看使用说明、运行日志或提交反馈", "Mở Trợ giúp`nChọn hướng dẫn sử dụng, nhật ký chạy hoặc gửi phản hồi")
         catalog.Set("快揭不开锅了（≥Д≤）", "Sắp cạn kinh phí rồi（≥Д≤）")
-        catalog.Set("帮助信息", "Trợ giúp")
+        catalog.Set("帮助", "Trợ giúp")
         catalog.Set("提交反馈", "Gửi phản hồi")
         catalog.Set("支持开源项目", "Ủng hộ dự án mã nguồn mở")
         catalog.Set("如果小助手为您节省了排查问题和恢复程序的时间，欢迎通过下方二维码打赏作者！`n请选择扶贫方式：", "Nếu trợ lý đã giúp bạn tiết kiệm thời gian tìm nguyên nhân sự cố và khôi phục chương trình, hãy ủng hộ tác giả qua mã QR bên dưới!`nVui lòng chọn cách ủng hộ:")
         catalog.Set("微信支付", "WeChat Pay")
         catalog.Set("支付宝", "Alipay")
         catalog.Set("二维码图片未找到", "Không tìm thấy ảnh mã QR")
-        catalog.Set("• 主界面的“帮助信息”可打开使用说明、本次运行日志或项目反馈页面；日志包含监控、重启、升级保护和操作记录，并会自动更新。", "• Mục Trợ giúp trên cửa sổ chính mở hướng dẫn sử dụng, nhật ký của phiên hiện tại hoặc trang phản hồi của dự án. Nhật ký ghi lại việc giám sát, khởi động lại, bảo vệ cập nhật và thao tác của người dùng, đồng thời tự động cập nhật.")
+        catalog.Set("• 主界面的“帮助”可打开使用说明、本次运行日志或项目反馈页面；日志包含监控、重启、升级保护和操作记录，并会自动更新。", "• Mục Trợ giúp trên cửa sổ chính mở hướng dẫn sử dụng, nhật ký của phiên hiện tại hoặc trang phản hồi của dự án. Nhật ký ghi lại việc giám sát, khởi động lại, bảo vệ cập nhật và thao tác của người dùng, đồng thời tự động cập nhật.")
         catalog.Set("⚙️ 进程识别与启动设置", "⚙️ Nhận diện tiến trình và thiết lập khởi chạy")
         catalog.Set("进程识别与启动设置", "Nhận diện tiến trình và thiết lập khởi chạy")
         catalog.Set("进程识别", "Nhận diện tiến trình")
@@ -1752,7 +1746,7 @@ class VietnameseStrings {
         catalog.Set("恢复", "Tiếp tục")
         catalog.Set("删除", "Xóa")
         catalog.Set("设置", "Cài đặt")
-        catalog.Set("捐赠", "Ủng hộ")
+        catalog.Set("打赏", "Ủng hộ")
         catalog.Set("保存", "Lưu")
         catalog.Set("取消", "Hủy")
         catalog.Set("反转状态", "Đảo trạng thái")
@@ -1892,6 +1886,18 @@ class VietnameseStrings {
         catalog.Set("未知", "Unknown")
         catalog.Set("无", "None")
         catalog.Set("，另有 {1} 个", ", plus {1} more")
+        catalog.Set("🔄 重新启动", "🔄 Khởi động lại")
+        catalog.Set("点个 star 吧~", "Hãy thắp sáng một ngôi sao nhỏ~")
+        catalog.Set("⏳ 停止原进程...", "⏳ Đang dừng tiến trình cũ...")
+        catalog.Set("❌ 无法停止原进程", "❌ Không thể dừng tiến trình cũ")
+        catalog.Set("手动触发了重新启动：{1}", "Đã yêu cầu khởi động lại thủ công: {1}")
+        catalog.Set("手动重启已取消，原进程未能停止：{1}", "Đã hủy khởi động lại thủ công vì không thể dừng tiến trình cũ: {1}")
+        catalog.Set("暂时无法查询进程状态，稍后重试手动重启：{1}", "Tạm thời không thể truy vấn trạng thái tiến trình`; sẽ thử lại thao tác khởi động lại thủ công sau: {1}")
+        catalog.Set("暂时无法重新启动", "Tạm thời không thể khởi động lại")
+        catalog.Set("该软件正在升级保护中。请等待升级完成，或在“软件升级保护”中结束等待后再重新启动。", "Phần mềm này đang được bảo vệ khi cập nhật. Hãy đợi cập nhật hoàn tất hoặc kết thúc chờ trong “Bảo vệ khi cập nhật” rồi mới khởi động lại.")
+        catalog.Set("• “重新启动”会先请求目标正常退出；超过设置时间后，是否强制终止由“停止策略”中的选项决定。", "• “Khởi động lại” trước tiên sẽ yêu cầu ứng dụng đích thoát bình thường. Khi hết thời gian chờ, tùy chọn trong “Chính sách dừng” sẽ quyết định có buộc ứng dụng kết thúc hay không.")
+        catalog.Set("查看版本、运行环境和项目入口", "Xem phiên bản, môi trường chạy và liên kết dự án")
+        catalog.Set("找作者对线", "Trao đổi với tác giả")
         return catalog
     }
 }
