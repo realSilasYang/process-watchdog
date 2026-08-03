@@ -13,10 +13,10 @@ class MainWindow {
         this.btnPause := ""
         this.btnSet := ""
         this.btnSupport := ""
-        this.btnDonate := ""
+        this.btnAbout := ""
         this.settingsButtonWidth := 70
         this.supportButtonWidth := 100
-        this.donateButtonWidth := 70
+        this.aboutButtonWidth := 70
         this.commandButtonGap := 10
         this.commandButtonRightMargin := 10
         this.appIcons := 0

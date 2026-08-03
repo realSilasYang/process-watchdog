@@ -275,6 +275,299 @@ ReadRegistryDefaultValue(keyName) {
         return ""
 }
 
+RestartSelectedApp(*) {
+    paths := CaptureSelectedWatchPaths(true)
+    if !paths.Length
+        return
+    QueueGuardMutation(BeginManualRestartRequests.Bind(paths))
+}
+
+ClearManualRestartRequest(stateObj, expectedGeneration) {
+    if !stateObj.ManualRestartRequested
+            || stateObj.ManualRestartGeneration != expectedGeneration {
+        return false
+    }
+    stateObj.ManualRestartRequested := false
+    stateObj.ManualRestartGeneration := 0
+    return true
+}
+
+BeginManualRestartRequests(paths) {
+    resumedAny := false
+    resumedPaths := []
+    blockedAny := false
+    undoState := ""
+    for path in paths {
+        if !App.appStates.Has(path)
+            continue
+        stateObj := App.appStates[path]
+        if App.maintenanceCoordinator.IsBlocking(stateObj) {
+            blockedAny := true
+            continue
+        }
+        if stateObj.ManualRestartRequested || stateObj.ManualStopRequested
+            continue
+        wasEnabled := !!stateObj.Enabled
+        if !wasEnabled {
+            if Type(undoState) != "Array"
+                undoState := CaptureAppConfigState()
+            stateObj.Enabled := 1
+            try App.maintenanceCoordinator.EnsureWatcher(path, stateObj)
+            catch {
+                stateObj.Enabled := 0
+                try App.maintenanceCoordinator.CloseWatcher(stateObj)
+                stateObj.TransitionTo(GuardPhase.Paused)
+                throw
+            }
+        }
+        stateObj.CancelScheduledTasks()
+        stateObj.ResetGuardAttemptState()
+        operationGeneration := stateObj.Generation
+        stateObj.ManualRestartRequested := true
+        stateObj.ManualRestartGeneration := operationGeneration
+        stateObj.Pending := true
+        ; 暂停项被隐式恢复后立即投影重启状态，不能在异步任务运行前继续显示暂停。
+        UpdateState(path, Tr("⏳ 停止原进程..."), stateObj,
+            operationGeneration, !wasEnabled)
+        try {
+            SetTimer(PerformManualRestart.Bind(path, stateObj,
+                operationGeneration, 0), -1)
+            if !wasEnabled {
+                resumedAny := true
+                resumedPaths.Push(path)
+            }
+        }
+        catch {
+            ClearManualRestartRequest(stateObj, operationGeneration)
+            stateObj.Pending := false
+            if !wasEnabled {
+                stateObj.Enabled := 0
+                try App.maintenanceCoordinator.CleanupTarget(path,
+                    stateObj, false)
+                stateObj.TransitionTo(GuardPhase.Paused)
+                UpdateState(path, Tr("⏸️ 已暂停"), stateObj,
+                    stateObj.Generation)
+            } else {
+                UpdateState(path, Tr("❌ 无法停止原进程"), stateObj,
+                    stateObj.Generation)
+            }
+            LogMsg(Tr("手动重启已取消，原进程未能停止：{1}", path))
+        }
+    }
+
+    if resumedAny {
+        CommitUndoState(undoState,
+            CreateAppHistoryAction("toggle-pause", resumedPaths))
+        SaveAppsToIni()
+    }
+    if blockedAny {
+        ShowDarkMsgBoxDeferred(Tr("该软件正在升级保护中。请等待升级完成，或在“软件升级保护”中结束等待后再重新启动。"),
+            Tr("暂时无法重新启动"), "Info", Main.gui)
+    }
+    if paths.Length > 0
+        OnLVSelectChange()
+}
+
+PerformManualRestart(path, expectedSupervisor, expectedGeneration,
+    attempt) {
+    if !App.guardRuntime.IsSupervisorCurrent(path, expectedSupervisor,
+            expectedGeneration) {
+        if App.appStates.Has(path)
+                && App.appStates[path] == expectedSupervisor
+            ClearManualRestartRequest(expectedSupervisor,
+                expectedGeneration)
+        return
+    }
+    if App.maintenanceCoordinator.IsBlocking(expectedSupervisor) {
+        ClearManualRestartRequest(expectedSupervisor, expectedGeneration)
+        return
+    }
+    if !App.guardWorkGate.TryEnter() {
+        retryCallback := PerformManualRestart.Bind(path,
+            expectedSupervisor, expectedGeneration, attempt)
+        TryScheduleManualRestartCallback(retryCallback, path,
+            expectedSupervisor, expectedGeneration)
+        return
+    }
+
+    operationGeneration := expectedGeneration
+    gateHeld := true
+    try {
+        if !App.guardRuntime.IsSupervisorCurrent(path, expectedSupervisor,
+                expectedGeneration)
+            return
+        stateObj := expectedSupervisor
+        stateObj.CancelScheduledTasks()
+        operationGeneration := stateObj.Generation
+        stateObj.ManualRestartGeneration := operationGeneration
+        stateObj.Pending := true
+        stateObj.TargetStartTicks := 0
+        UpdateState(path, Tr("⏳ 停止原进程..."), stateObj,
+            operationGeneration)
+        observation := ObserveTarget(path, "", 1000)
+        if !App.guardRuntime.IsSupervisorCurrent(path, stateObj,
+                operationGeneration)
+            return
+        if observation.IsUnknown() {
+            ScheduleManualRestartRetry(path, stateObj,
+                operationGeneration, attempt)
+            return
+        }
+        if observation.IsRunning() {
+            pid := observation.PID
+            creationIdentity := observation.CreationIdentity
+            if creationIdentity == ""
+                creationIdentity := App.processInspector
+                    .GetCreationIdentity(pid)
+            if creationIdentity == "" {
+                ScheduleManualRestartRetry(path, stateObj,
+                    operationGeneration, attempt)
+                return
+            }
+            ; 目标身份和事务代际已在门内冻结；耗时停止在门外执行，避免阻塞其它目标。
+            App.guardWorkGate.Leave()
+            gateHeld := false
+            try stopResult := StopTargetProcess(pid, creationIdentity)
+            catch as stopError {
+                errorDetail := TrDiagnostic(stopError.Message)
+                LogMsg(Tr("无法停止进程 PID：{1}{2}", pid,
+                    Tr("（{1}）", errorDetail)))
+                stopResult := TargetStopResult(false,
+                    TargetStopStage.Failed, errorDetail)
+            }
+            completionCallback := CompleteManualRestartAfterStop.Bind(path,
+                stateObj, operationGeneration, pid, creationIdentity,
+                stopResult)
+            try SetTimer(completionCallback, -1)
+            catch
+                completionCallback.Call()
+            return
+        }
+
+        FinalizeManualRestart(path, stateObj, operationGeneration)
+    } finally {
+        if App.appStates.Has(path)
+                && App.appStates[path] == expectedSupervisor
+                && expectedSupervisor.ManualRestartRequested
+                && expectedSupervisor.Generation != operationGeneration {
+            ClearManualRestartRequest(expectedSupervisor,
+                operationGeneration)
+        }
+        if gateHeld
+            App.guardWorkGate.Leave()
+    }
+}
+
+CompleteManualRestartAfterStop(path, expectedSupervisor,
+    expectedGeneration, pid, creationIdentity, stopResult) {
+    if !App.guardRuntime.IsSupervisorCurrent(path, expectedSupervisor,
+            expectedGeneration) {
+        if App.appStates.Has(path)
+                && App.appStates[path] == expectedSupervisor
+            ClearManualRestartRequest(expectedSupervisor,
+                expectedGeneration)
+        return
+    }
+    if !App.guardWorkGate.TryEnter() {
+        retryCallback := CompleteManualRestartAfterStop.Bind(path,
+            expectedSupervisor, expectedGeneration, pid,
+            creationIdentity, stopResult)
+        TryScheduleManualRestartCallback(retryCallback, path,
+            expectedSupervisor, expectedGeneration)
+        return
+    }
+    try {
+        if !App.guardRuntime.IsSupervisorCurrent(path, expectedSupervisor,
+                expectedGeneration)
+            return
+        stateObj := expectedSupervisor
+        if App.maintenanceCoordinator.IsBlocking(stateObj) {
+            ClearManualRestartRequest(stateObj, expectedGeneration)
+            return
+        }
+        if !stopResult.Stopped {
+            ClearManualRestartRequest(stateObj, expectedGeneration)
+            stateObj.Pending := false
+            identityStatus := App.targetStopper.GetIdentityStatus(pid,
+                creationIdentity)
+            if identityStatus == 0
+                ClearStateProcessIdentity(stateObj)
+            else
+                SetStateProcessIdentity(stateObj, pid, creationIdentity)
+            UpdateState(path, Tr("❌ 无法停止原进程"), stateObj,
+                expectedGeneration)
+            LogMsg(Tr("手动重启已取消，原进程未能停止：{1}", path))
+            return
+        }
+        FinalizeManualRestart(path, stateObj, expectedGeneration)
+    } finally App.guardWorkGate.Leave()
+}
+
+FinalizeManualRestart(path, stateObj, expectedGeneration) {
+    if !App.guardRuntime.IsSupervisorCurrent(path, stateObj,
+            expectedGeneration) || !stateObj.Enabled
+            || App.maintenanceCoordinator.IsBlocking(stateObj) {
+        ClearManualRestartRequest(stateObj, expectedGeneration)
+        if !stateObj.Enabled {
+            stateObj.Pending := false
+            stateObj.TargetStartTicks := 0
+        }
+        return false
+    }
+    stateObj.Pending := true
+    stateObj.TargetStartTicks := 0
+    stateObj.FailCount := 0
+    ClearManualRestartRequest(stateObj, expectedGeneration)
+    ClearStateProcessIdentity(stateObj)
+    ; 调用方持有共享工作门，直接进入核心启动事务，避免重复获取工作门。
+    App.guardRuntime.RestartCore(path, stateObj)
+    LogMsg(Tr("手动触发了重新启动：{1}", path))
+    return true
+}
+
+ScheduleManualRestartRetry(path, stateObj, operationGeneration, attempt) {
+    if attempt >= 4 {
+        ClearManualRestartRequest(stateObj, operationGeneration)
+        stateObj.Pending := false
+        UpdateState(path, Tr("⏳ 等待进程状态..."), stateObj,
+            operationGeneration)
+        LogMsg(Tr("暂时无法查询进程状态，稍后重试手动重启：{1}", path))
+        return false
+    }
+    UpdateState(path, Tr("⏳ 等待进程状态..."), stateObj,
+        operationGeneration)
+    if attempt == 0
+        LogMsg(Tr("暂时无法查询进程状态，稍后重试手动重启：{1}", path))
+    retryCallback := PerformManualRestart.Bind(path, stateObj,
+        operationGeneration, attempt + 1)
+    return TryScheduleManualRestartCallback(retryCallback, path, stateObj,
+        operationGeneration, 2000)
+}
+
+TryScheduleManualRestartCallback(callback, path, stateObj,
+    expectedGeneration, delayMs := 100) {
+    try {
+        SetTimer(callback, -Max(1, delayMs))
+        return true
+    } catch as timerError {
+        if App.guardRuntime.IsSupervisorCurrent(path, stateObj,
+                expectedGeneration) {
+            ClearManualRestartRequest(stateObj, expectedGeneration)
+            stateObj.Pending := App.maintenanceCoordinator.IsBlocking(
+                stateObj)
+            stateObj.TargetStartTicks := 0
+            if !stateObj.Pending {
+                stateObj.TransitionTo(GuardPhase.Initializing)
+                UpdateState(path, Tr("初始化..."), stateObj,
+                    expectedGeneration)
+            }
+        }
+        LogMsg(Tr("后台调度任务异常（{1}）：{2}", path,
+            TrDiagnostic(timerError.Message)))
+        return false
+    }
+}
+
 ; 托盘、通知和标题栏关闭最终都汇入同一组窗口生命周期操作。
 IsApplicationNotificationClick(lParam, hwnd) {
     return hwnd == A_ScriptHwnd
@@ -314,7 +607,7 @@ RefreshMainCommandButtonsAfterShow() {
     ; 绘制；这与鼠标首次经过时触发的可靠刷新路径完全相同。
     return RedrawVisibleRoundedButtons([
         Main.btnAdd, Main.btnPause, Main.btnDel,
-        Main.btnSet, Main.btnSupport, Main.btnDonate
+        Main.btnSet, Main.btnSupport, Main.btnAbout
     ])
 }
 

@@ -70,8 +70,9 @@ assistant release resolves it again, passes the tests, and publishes a new packa
 
 ## Where users can inspect the versions
 
-- Assistant Settings → About shows the current assistant version, EXE/source
-  form, and actual AutoHotkey runtime; the update-check button is on the same page.
+- Main window → About shows the current assistant version, EXE/source form, and
+  actual AutoHotkey runtime; update checking, the project link, and Donate are on
+  the same child window.
 - The same summary is written to the runtime log at every startup.
 - EXE file properties contain the compiled assistant version; source mode uses
   the `VERSION` file beside the entry script.

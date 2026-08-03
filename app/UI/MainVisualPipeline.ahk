@@ -249,12 +249,19 @@ GetPreferredMainIcon(filePath, &useHighQualityResampling := false) {
         || extension == "dll" || extension == "cpl" {
         targetSize := App.iconResources.MainIconPixelSize
         preferredSize := SelectHighQualityMainIconSourceSize(targetSize)
+        exactIcon := 0
+        try exactIcon := extension == "ico"
+            ? CreateExactIconFromIco(sourcePath, preferredSize)
+            : CreateExactIconFromResourceContainer(sourcePath,
+                iconSource.Index, preferredSize)
+        if exactIcon {
+            useHighQualityResampling := true
+            return exactIcon
+        }
         fallbackSize := SelectClosestIconSourceSize(targetSize)
         sourceSizes := preferredSize == fallbackSize
             ? [preferredSize] : [preferredSize, fallbackSize]
-        ; 主列表最终会经过 WIC 高质量缩小。优先请求约两倍尺寸，可避开部分
-        ; 程序专为小尺寸准备、但质量反而较差的资源；若高分辨率请求失败，
-        ; 再回退到贴近显示尺寸的资源，兼容只提供旧式小图标的程序。
+        ; 无法解析旧式资源容器时才交给系统提取，并保留贴近显示尺寸的回退。
         for sourceSize in sourceSizes {
             hIcon := 0
             iconResourceId := 0
@@ -284,7 +291,202 @@ SelectClosestIconSourceSize(targetSize) {
 }
 
 SelectHighQualityMainIconSourceSize(targetSize) {
-    return SelectClosestIconSourceSize(Max(targetSize, Ceil(targetSize * 2)))
+    ; 四倍源尺寸能让圆弧和斜边在高 DPI 下获得稳定的子像素覆盖；资源枚举器
+    ; 只会选择文件中真实存在的帧，不会为了满足此尺寸先制造一张放大图。
+    return SelectClosestIconSourceSize(Max(targetSize, Ceil(targetSize * 4)))
+}
+
+IsFullColorIconCandidate(candidate) {
+    return candidate.BitsPerPixel == 0 || candidate.BitsPerPixel >= 24
+}
+
+FindPreferredIconCandidateIndex(candidates, preferredSize) {
+    bestIndex := 0
+    for candidateIndex, candidate in candidates {
+        if !bestIndex {
+            bestIndex := candidateIndex
+            continue
+        }
+        best := candidates[bestIndex]
+        candidateSize := Max(candidate.Width, candidate.Height)
+        bestSize := Max(best.Width, best.Height)
+        candidateLargeEnough := candidateSize >= preferredSize
+        bestLargeEnough := bestSize >= preferredSize
+        if candidateLargeEnough != bestLargeEnough {
+            if candidateLargeEnough
+                bestIndex := candidateIndex
+            continue
+        }
+        if candidateSize != bestSize {
+            if (candidateLargeEnough && candidateSize < bestSize)
+                || (!candidateLargeEnough && candidateSize > bestSize)
+                bestIndex := candidateIndex
+            continue
+        }
+        candidateFullColor := IsFullColorIconCandidate(candidate)
+        bestFullColor := IsFullColorIconCandidate(best)
+        if candidateFullColor != bestFullColor {
+            if candidateFullColor
+                bestIndex := candidateIndex
+            continue
+        }
+        if candidate.BitsPerPixel > best.BitsPerPixel
+            || (candidate.BitsPerPixel == best.BitsPerPixel
+                && candidate.DataSize > best.DataSize)
+            bestIndex := candidateIndex
+    }
+    return bestIndex
+}
+
+CreateIconFromResourcePixels(resourcePointer, resourceSize, candidate) {
+    if !resourcePointer || resourceSize <= 0
+        return 0
+    try return DllCall("user32\CreateIconFromResourceEx",
+        "Ptr", resourcePointer, "UInt", resourceSize, "Int", true,
+        "UInt", 0x00030000, "Int", candidate.Width,
+        "Int", candidate.Height, "UInt", 0, "Ptr")
+    catch
+        return 0
+}
+
+CreateExactIconFromIco(filePath, preferredSize) {
+    try icoData := FileRead(filePath, "RAW")
+    catch
+        return 0
+    if !IsObject(icoData) || icoData.Size < 22
+        || NumGet(icoData, 0, "UShort") != 0
+        || NumGet(icoData, 2, "UShort") != 1
+        return 0
+    entryCount := NumGet(icoData, 4, "UShort")
+    if entryCount <= 0 || 6 + entryCount * 16 > icoData.Size
+        return 0
+    candidates := []
+    Loop entryCount {
+        entryOffset := 6 + (A_Index - 1) * 16
+        width := NumGet(icoData, entryOffset, "UChar")
+        height := NumGet(icoData, entryOffset + 1, "UChar")
+        dataSize := NumGet(icoData, entryOffset + 8, "UInt")
+        dataOffset := NumGet(icoData, entryOffset + 12, "UInt")
+        if dataSize <= 0 || dataOffset > icoData.Size
+            || dataSize > icoData.Size - dataOffset
+            continue
+        candidates.Push({
+            Width: width ? width : 256,
+            Height: height ? height : 256,
+            BitsPerPixel: NumGet(icoData, entryOffset + 6, "UShort"),
+            DataSize: dataSize,
+            DataOffset: dataOffset
+        })
+    }
+    while candidates.Length {
+        candidateIndex := FindPreferredIconCandidateIndex(candidates,
+            preferredSize)
+        if !candidateIndex
+            break
+        candidate := candidates.RemoveAt(candidateIndex)
+        iconHandle := CreateIconFromResourcePixels(
+            icoData.Ptr + candidate.DataOffset, candidate.DataSize, candidate)
+        if iconHandle
+            return iconHandle
+    }
+    return 0
+}
+
+CaptureIconGroupResourceName(names, moduleHandle, resourceType,
+    resourceName, context) {
+    try names.Push(resourceName <= 0xFFFF
+        ? {IsInteger: true, Value: resourceName}
+        : {IsInteger: false, Value: StrGet(resourceName, "UTF-16")})
+    return true
+}
+
+ResolveIconGroupResourceName(moduleHandle, iconIndex) {
+    if iconIndex < 0
+        return {IsInteger: true, Value: -iconIndex}
+    names := []
+    callback := CallbackCreate(CaptureIconGroupResourceName.Bind(names), , 4)
+    try DllCall("kernel32\EnumResourceNamesW", "Ptr", moduleHandle,
+        "Ptr", Win32.RT_GROUP_ICON, "Ptr", callback, "Ptr", 0, "Int")
+    finally CallbackFree(callback)
+    return iconIndex < names.Length ? names[iconIndex + 1] : 0
+}
+
+FindIconResource(moduleHandle, resourceName, resourceType) {
+    if !IsObject(resourceName)
+        return 0
+    try return resourceName.IsInteger
+        ? DllCall("kernel32\FindResourceW", "Ptr", moduleHandle,
+            "Ptr", resourceName.Value, "Ptr", resourceType, "Ptr")
+        : DllCall("kernel32\FindResourceW", "Ptr", moduleHandle,
+            "WStr", resourceName.Value, "Ptr", resourceType, "Ptr")
+    catch
+        return 0
+}
+
+CreateExactIconFromResourceContainer(filePath, iconIndex, preferredSize) {
+    loadFlags := Win32.LOAD_LIBRARY_AS_DATAFILE
+        | Win32.LOAD_LIBRARY_AS_IMAGE_RESOURCE
+    try moduleHandle := DllCall("kernel32\LoadLibraryExW", "WStr", filePath,
+        "Ptr", 0, "UInt", loadFlags, "Ptr")
+    catch
+        return 0
+    if !moduleHandle
+        return 0
+    try {
+        groupName := ResolveIconGroupResourceName(moduleHandle, iconIndex)
+        groupResource := FindIconResource(moduleHandle, groupName,
+            Win32.RT_GROUP_ICON)
+        if !groupResource
+            return 0
+        groupSize := DllCall("kernel32\SizeofResource", "Ptr", moduleHandle,
+            "Ptr", groupResource, "UInt")
+        groupHandle := DllCall("kernel32\LoadResource", "Ptr", moduleHandle,
+            "Ptr", groupResource, "Ptr")
+        groupPointer := groupHandle
+            ? DllCall("kernel32\LockResource", "Ptr", groupHandle, "Ptr") : 0
+        if !groupPointer || groupSize < 20
+            return 0
+        entryCount := NumGet(groupPointer, 4, "UShort")
+        if entryCount <= 0 || 6 + entryCount * 14 > groupSize
+            return 0
+        candidates := []
+        Loop entryCount {
+            entryOffset := 6 + (A_Index - 1) * 14
+            width := NumGet(groupPointer, entryOffset, "UChar")
+            height := NumGet(groupPointer, entryOffset + 1, "UChar")
+            candidates.Push({
+                Width: width ? width : 256,
+                Height: height ? height : 256,
+                BitsPerPixel: NumGet(groupPointer, entryOffset + 6, "UShort"),
+                DataSize: NumGet(groupPointer, entryOffset + 8, "UInt"),
+                ResourceId: NumGet(groupPointer, entryOffset + 12, "UShort")
+            })
+        }
+        while candidates.Length {
+            candidateIndex := FindPreferredIconCandidateIndex(candidates,
+                preferredSize)
+            if !candidateIndex
+                break
+            candidate := candidates.RemoveAt(candidateIndex)
+            iconResource := DllCall("kernel32\FindResourceW",
+                "Ptr", moduleHandle, "Ptr", candidate.ResourceId,
+                "Ptr", Win32.RT_ICON, "Ptr")
+            if !iconResource
+                continue
+            iconSize := DllCall("kernel32\SizeofResource", "Ptr", moduleHandle,
+                "Ptr", iconResource, "UInt")
+            iconResourceHandle := DllCall("kernel32\LoadResource",
+                "Ptr", moduleHandle, "Ptr", iconResource, "Ptr")
+            iconPointer := iconResourceHandle
+                ? DllCall("kernel32\LockResource", "Ptr", iconResourceHandle,
+                    "Ptr") : 0
+            iconHandle := CreateIconFromResourcePixels(iconPointer,
+                iconSize, candidate)
+            if iconHandle
+                return iconHandle
+        }
+        return 0
+    } finally DllCall("kernel32\FreeLibrary", "Ptr", moduleHandle)
 }
 
 EnsureIconResampler() {
@@ -1623,8 +1825,11 @@ CreateHighQualityPaddedIcon(hIcon, iconSize, cellSize, offsetX := "",
         initializeScaler := NumGet(scalerVtable, 8 * A_PtrSize, "Ptr")
         scaledWidth := iconSize
         scaledHeight := iconSize
+        interpolationMode := (scaledWidth < sourceWidth
+            || scaledHeight < sourceHeight) ? 3 : 2
         if DllCall(initializeScaler, "Ptr", wicScaler, "Ptr", wicSource,
-            "UInt", scaledWidth, "UInt", scaledHeight, "Int", 3, "Int") < 0
+            "UInt", scaledWidth, "UInt", scaledHeight,
+            "Int", interpolationMode, "Int") < 0
             return 0
         scaledPixels := Buffer(scaledWidth * scaledHeight * 4, 0)
         copyPixels := NumGet(scalerVtable, 7 * A_PtrSize, "Ptr")

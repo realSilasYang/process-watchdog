@@ -7,6 +7,31 @@
 
 ## 🚧 [未发布]
 
+## 🎉 版本 [2.0.8] - 2026-08-03
+
+### 📦 发布物说明
+
+- **`fonts.zip`（可选字体包）**：提供首选字体和回退字体，需先安装到 Windows；它不是程序运行必需。
+- **`process-watchdog-2.0.8-source.zip`（完整源码版）**：包含 AHK 源码、模块、测试和文档，不含字体，适合审阅、开发或从源码运行；本机需要 AutoHotkey v2 x64。
+- **`process-watchdog-2.0.8-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证和运行所需资源，不含字体；无需安装 AutoHotkey，适合完整解压后长期使用。
+- **Everything（[官方最新版](https://www.voidtools.com/downloads/)）**：为程序搜索提供索引和后台服务；随包 `Everything64.dll` 只是 IPC 客户端，不能替代 Everything 本体。
+
+---
+
+### ✨ 新增
+
+- **手动重新启动守护对象**：右键菜单新增“重新启动”，会按停止策略关闭当前目标后重新拉起；暂停项会随操作恢复守护，升级保护或进程身份无法可靠确认时不会冒险终止目标。
+
+---
+
+### 🚀 优化
+
+- **右键操作顺序更贴合工作流**：重新启动、结束运行、编辑完整路径和打开所在位置依次排列，进程识别与启动设置也移到管理员运行选项之前，常用操作更容易定位。
+- **应用图标渲染更清晰**：优先从 ICO、EXE、DLL 和 CPL 中提取真实存在且尺寸合适的原生图标帧，再通过高质量缩放绘制到主列表，减少系统预缩放造成的模糊和边缘失真。
+- **关于与支持入口更集中**：主窗口以“关于”替代原打赏按钮，版本、运行环境、检查更新、打赏和开源地址集中到独立窗口；帮助与打赏命名、反馈和项目入口的悬浮提示同步精简。
+- **字体列表浏览更稳定**：界面内容字体下拉列表固定显示 12 行，刷新已安装字体后保留用户当前的滚动位置，不再自动跳回选中项。
+- **检查更新图标更易辨认**：刷新图标改用与更新语义一致的蓝紫色，同时保留普通工具按钮的背景和文字样式。
+
 ## 🎉 版本 [2.0.7] - 2026-08-01
 
 ### 📦 发布物说明
@@ -356,7 +381,8 @@
 - 后台文件扫描使用 `DirExist` 明确区分目录边界，临时文件遇到瞬时占用时执行
   短时有界重试；测试分别报告结果协议、实际文件集合和清理失败。
 
-[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.7...HEAD
+[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.8...HEAD
+[2.0.8]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.7...v2.0.8
 [2.0.7]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.6...v2.0.7
 [2.0.6]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.5...v2.0.6
 [2.0.5]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.4...v2.0.5

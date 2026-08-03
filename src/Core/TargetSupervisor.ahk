@@ -104,6 +104,8 @@ class TargetSupervisor {
         this.RestartTask := ""
         this.VerifyTask := ""
         this.IsRestarting := false
+        this.ManualRestartRequested := false
+        this.ManualRestartGeneration := 0
         this.ManualStopRequested := false
         this.StoppedEvidenceTicks := 0
 
@@ -158,6 +160,8 @@ class TargetSupervisor {
         this.VerifyAttempts := 0
         this.UncertainObservationCount := 0
         this.IsRestarting := false
+        this.ManualRestartRequested := false
+        this.ManualRestartGeneration := 0
         this.ManualStopRequested := false
         this.StoppedEvidenceTicks := 0
     }

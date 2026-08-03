@@ -150,6 +150,8 @@ RunTargetSupervisorTests() {
     pausedSupervisor.VerifyAttempts := 3
     pausedSupervisor.UncertainObservationCount := 2
     pausedSupervisor.IsRestarting := true
+    pausedSupervisor.ManualRestartRequested := true
+    pausedSupervisor.ManualRestartGeneration := 7
     pausedSupervisor.ManualStopRequested := true
     pausedSupervisor.StoppedEvidenceTicks := 8000
     pausedSupervisor.ResetGuardAttemptState()
@@ -159,6 +161,8 @@ RunTargetSupervisorTests() {
         && pausedSupervisor.VerifyAttempts == 0
         && pausedSupervisor.UncertainObservationCount == 0
         && !pausedSupervisor.IsRestarting
+        && !pausedSupervisor.ManualRestartRequested
+        && pausedSupervisor.ManualRestartGeneration == 0
         && !pausedSupervisor.ManualStopRequested
         && pausedSupervisor.StoppedEvidenceTicks == 0,
         "新守护轮次仍继承了上一轮的瞬态状态")

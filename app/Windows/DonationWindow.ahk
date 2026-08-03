@@ -1,4 +1,4 @@
-; 开源项目捐赠窗口。
+; 开源项目打赏窗口。
 ; 二维码直接读取发行包内的 PNG 资源，不创建临时文件或外部渲染进程；
 ; 缺少单张资源时仍显示另一张二维码，并在原位置给出明确提示。
 
@@ -10,11 +10,12 @@ class DonationWindow extends ManagedWindow {
         this.qrPictures := []
     }
 
-    Show(*) {
+    Show(ownerGui := "", *) {
         if this.ShowExisting()
             return
 
-        if !this.CreateOwnedGui(this.owner, "", Tr("支持开源项目"))
+        actualOwner := Type(ownerGui) == "Gui" ? ownerGui : this.owner
+        if !this.CreateOwnedGui(actualOwner, "", Tr("支持开源项目"))
             return
         try {
             this.gui.OnEvent("Escape", ObjBindMethod(this, "Close"))
