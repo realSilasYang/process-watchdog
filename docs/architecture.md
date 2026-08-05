@@ -153,6 +153,13 @@ WIC、SVG 渲染器和 DPI 重建任务；旧图标列表在占用归零后销�
 TIF、TIFF、WebP、SVG 和 ANI。SVG 优先由锁定版本的 resvg 在内存中栅格化；位图由
 WIC 解码为预乘 Alpha 后高质量缩放并居中。GIF 和 ANI 只显示静态代表帧。
 
+可见窗口的同级控件缩放使用 `AtomicControlLayout` 原子布局事务：调用方只提供逻辑
+坐标，模块一次性完成 DPI 转换、批量 `DeferWindowPos`、移动子控件的
+`WM_ERASEBKGND` 保护、旧位置背景回填和旧/新区并集重绘。父窗口不暂停重绘，稳定的
+左侧控件因此不会被整窗刷新牵连；未变化的布局直接返回 `Unchanged`，不可用的原生
+事务返回明确的 `Mode: "Fallback"` 或 `Status: "Failed"`。完整不变量、失败语义和可
+复用示例见[局部布局事务规范](ui-layout-transactions.md)。
+
 ## 显示设置热切换
 
 `LocalizationService` 保存请求语言、实际语言、请求内容字体和实际内容字体。设置保存后，

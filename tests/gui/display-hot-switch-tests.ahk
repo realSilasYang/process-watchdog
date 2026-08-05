@@ -68,6 +68,94 @@ class DisplayHotSwitchStatusPaintProbe {
     }
 }
 
+class DisplayHotSwitchResizeIsolationProbe {
+    static SubclassId := 0x44524950 ; 主窗口局部缩放探针标识
+    static RootHwnd := 0
+    static LeftButtonHwnd := 0
+    static ListHwnd := 0
+    static MovingHwnds := []
+    static RootSuspendCount := 0
+    static LeftButtonPaintCount := 0
+    static ListSuspendCount := 0
+    static MovingEraseCount := 0
+    static CallbackPointer := 0
+
+    static Install(rootHwnd, leftButtonHwnd, listHwnd, movingHwnds) {
+        this.Uninstall()
+        this.RootHwnd := rootHwnd
+        this.LeftButtonHwnd := leftButtonHwnd
+        this.ListHwnd := listHwnd
+        this.MovingHwnds := movingHwnds
+        this.CallbackPointer := CallbackCreate(ObjBindMethod(this,
+            "WindowProc"),, 6)
+        try {
+            hwnds := [rootHwnd, leftButtonHwnd, listHwnd]
+            for movingHwnd in movingHwnds
+                hwnds.Push(movingHwnd)
+            for hwnd in hwnds {
+                if !DllCall("comctl32\SetWindowSubclass", "Ptr", hwnd,
+                        "Ptr", this.CallbackPointer, "UPtr", this.SubclassId,
+                        "UPtr", 0, "Int")
+                    throw Error("无法安装主窗口局部缩放探针")
+            }
+        } catch as installError {
+            this.Uninstall()
+            throw installError
+        }
+        this.Reset()
+    }
+
+    static Reset() {
+        this.RootSuspendCount := 0
+        this.LeftButtonPaintCount := 0
+        this.ListSuspendCount := 0
+        this.MovingEraseCount := 0
+    }
+
+    static Uninstall() {
+        if this.CallbackPointer {
+            hwnds := [this.RootHwnd, this.LeftButtonHwnd, this.ListHwnd]
+            for movingHwnd in this.MovingHwnds
+                hwnds.Push(movingHwnd)
+            for hwnd in hwnds {
+                if hwnd && DllCall("user32\IsWindow", "Ptr", hwnd, "Int")
+                    DllCall("comctl32\RemoveWindowSubclass", "Ptr", hwnd,
+                        "Ptr", this.CallbackPointer, "UPtr", this.SubclassId,
+                        "Int")
+            }
+            CallbackFree(this.CallbackPointer)
+        }
+        this.CallbackPointer := 0
+        this.RootHwnd := 0
+        this.LeftButtonHwnd := 0
+        this.ListHwnd := 0
+        this.MovingHwnds := []
+    }
+
+    static WindowProc(hwnd, message, wParam, lParam, subclassId,
+        referenceData) {
+        if message == Win32.WM_SETREDRAW && !wParam {
+            if hwnd == this.RootHwnd
+                this.RootSuspendCount++
+            else if hwnd == this.ListHwnd
+                this.ListSuspendCount++
+        }
+        if message == 0x0014 { ; 背景擦除消息
+            for movingHwnd in this.MovingHwnds {
+                if hwnd == movingHwnd {
+                    this.MovingEraseCount++
+                    break
+                }
+            }
+        }
+        if hwnd == this.LeftButtonHwnd
+                && (message == 0x000F || message == 0x0014) ; 捕获 WM_PAINT / WM_ERASEBKGND
+            this.LeftButtonPaintCount++
+        return DllCall("comctl32\DefSubclassProc", "Ptr", hwnd,
+            "UInt", message, "UPtr", wParam, "Ptr", lParam, "Ptr")
+    }
+}
+
 GetDisplayHotSwitchWindowText(hwnd) {
     length := DllCall("user32\GetWindowTextLengthW", "Ptr", hwnd, "Int")
     if length <= 0
@@ -841,6 +929,95 @@ AssertMainStatusResizeRecovery() {
     Main.gui.Hide()
 }
 
+ReadDisplayHotSwitchPixel(hwnd, x, y) {
+    windowDc := DllCall("user32\GetDC", "Ptr", hwnd, "Ptr")
+    if !windowDc
+        throw Error("无法读取主窗口缩放后的像素")
+    try return DllCall("gdi32\GetPixel", "Ptr", windowDc,
+        "Int", x, "Int", y, "UInt")
+    finally DllCall("user32\ReleaseDC", "Ptr", hwnd, "Ptr", windowDc)
+}
+
+AssertMainResizeRedrawIsolation() {
+    rootHwnd := Main.gui.Hwnd
+    if !FirstVisibleWindowPresenter.SetCloaked(rootHwnd, true)
+        throw Error("无法为主窗口局部缩放测试启用 DWM 遮蔽")
+    probeInstalled := false
+    try {
+        Main.gui.Show("NoActivate w730 h520")
+        GuiResized(Main.gui, 0, 730, 520)
+        oldSettingsRect := AtomicControlLayout.GetControlBounds(Main.btnSet,
+            rootHwnd)
+        AssertDisplayHotSwitch(IsObject(oldSettingsRect),
+            "无法读取缩放前设置按钮位置")
+
+        movingHwnds := [
+            Main.btnSet.Hwnd, Main.btnSupport.Hwnd, Main.btnAbout.Hwnd
+        ]
+        DisplayHotSwitchResizeIsolationProbe.Install(rootHwnd,
+            Main.btnAdd.Hwnd, Main.lv.Hwnd, movingHwnds)
+        probeInstalled := true
+        Main.gui.Show("NoActivate w930 h620")
+        Sleep(50) ; 先排空 Show 触发的系统尺寸／背景消息，只观测显式布局调用。
+        DisplayHotSwitchResizeIsolationProbe.Reset()
+        blockedEraseCount := AtomicControlLayoutEraseGuard.BlockedEraseCount
+        GuiResized(Main.gui, 0, 930, 620)
+
+        AssertDisplayHotSwitch(
+            DisplayHotSwitchResizeIsolationProbe.RootSuspendCount == 0,
+            "主窗口缩放错误暂停了整个父窗口重绘")
+        AssertDisplayHotSwitch(
+            DisplayHotSwitchResizeIsolationProbe.LeftButtonPaintCount == 0,
+            "主窗口缩放错误重绘了稳定的左侧按钮："
+                DisplayHotSwitchResizeIsolationProbe.LeftButtonPaintCount)
+        AssertDisplayHotSwitch(
+            DisplayHotSwitchResizeIsolationProbe.ListSuspendCount == 1,
+            "主列表没有在尺寸与列宽变更期间执行一次局部重绘暂停："
+                DisplayHotSwitchResizeIsolationProbe.ListSuspendCount)
+        AssertDisplayHotSwitch(
+            AtomicControlLayoutEraseGuard.BlockedEraseCount
+                - blockedEraseCount > 0
+                && AtomicControlLayoutEraseGuard.BlockedEraseCount
+                    - blockedEraseCount
+                    >= DisplayHotSwitchResizeIsolationProbe.MovingEraseCount,
+            "右侧按钮缩放时存在未被拦截的背景擦除：observed="
+                DisplayHotSwitchResizeIsolationProbe.MovingEraseCount
+                " blocked=" (AtomicControlLayoutEraseGuard.BlockedEraseCount
+                    - blockedEraseCount))
+
+        Loop 24 {
+            repeatedWidth := Mod(A_Index, 2) ? 760 : 930
+            GuiResized(Main.gui, 0, repeatedWidth, 620)
+            AssertDisplayHotSwitch(
+                AtomicControlLayoutEraseGuard.ActiveHwndCounts.Count == 0,
+                "连续缩放后仍有子控件背景擦除保护处于活动状态")
+        }
+        AssertDisplayHotSwitch(
+            DisplayHotSwitchResizeIsolationProbe.RootSuspendCount == 0
+                && DisplayHotSwitchResizeIsolationProbe.LeftButtonPaintCount
+                    == 0,
+            "连续缩放错误影响了父窗口或稳定的左侧按钮")
+
+        oldButtonX := Floor((oldSettingsRect.Left + oldSettingsRect.Right) / 2)
+        oldButtonY := Floor((oldSettingsRect.Top + oldSettingsRect.Bottom) / 2)
+        actualBackground := ReadDisplayHotSwitchPixel(rootHwnd,
+            oldButtonX, oldButtonY)
+        expectedBackground := RoundedButtonRenderer.ColorToBgr(
+            UiThemeService.Color("Window"))
+        AssertDisplayHotSwitch(actualBackground == expectedBackground,
+            "右侧按钮批量移动后旧位置残留拖影：actual="
+                Format("0x{:06X}", actualBackground) " expected="
+                Format("0x{:06X}", expectedBackground))
+    } finally {
+        if probeInstalled
+            DisplayHotSwitchResizeIsolationProbe.Uninstall()
+        Main.gui.Hide()
+        FirstVisibleWindowPresenter.SetCloaked(rootHwnd, false)
+        Main.gui.Show("Hide w730 h520")
+        GuiResized(Main.gui, 0, 730, 520)
+    }
+}
+
 CreateDisplayHotSwitchState(path) {
     stateObj := TargetSupervisor({
         State: Tr("⏳ 重试倒计时 {1} 秒", 7),
@@ -937,6 +1114,7 @@ RunDisplayHotSwitchTests() {
     ConfigureTrayMenu()
     UpdateStatsUI()
     AssertMainStatusResizeRecovery()
+    AssertMainResizeRedrawIsolation()
 
     expected := {
         App: App,

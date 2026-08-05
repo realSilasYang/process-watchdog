@@ -97,32 +97,73 @@ ClearMainListTemporarySort() {
         Main.listHeader.ClearSort()
 }
 
+PositionMainCommandButtons(clientWidth) {
+    positions := GetMainCommandButtonPositions(clientWidth)
+    result := AtomicControlLayout.Apply(Main.gui, [
+        {Control: Main.btnSet, X: positions.Settings, Y: 15,
+            Width: Main.settingsButtonWidth, Height: 30},
+        {Control: Main.btnSupport, X: positions.Support, Y: 15,
+            Width: Main.supportButtonWidth, Height: 30},
+        {Control: Main.btnAbout, X: positions.About, Y: 15,
+            Width: Main.aboutButtonWidth, Height: 30}
+    ], {ParentColor: UiThemeService.Color("Window"), ClearMargin: 2})
+    return result.Status == AtomicControlLayout.Applied
+        || result.Status == AtomicControlLayout.Unchanged
+}
+
+SuspendMainListResizeRedraw() {
+    hwnd := Main.lv.Hwnd
+    if !hwnd || !DllCall("user32\IsWindow", "Ptr", hwnd, "Int")
+        || !DllCall("user32\IsWindowVisible", "Ptr", hwnd, "Int")
+        return false
+    DllCall("user32\SendMessageW", "Ptr", hwnd,
+        "UInt", Win32.WM_SETREDRAW, "Ptr", false, "Ptr", 0, "Ptr")
+    return true
+}
+
+ResumeMainListResizeRedraw(suspended) {
+    if !suspended
+        return false
+    hwnd := Main.lv.Hwnd
+    if !hwnd || !DllCall("user32\IsWindow", "Ptr", hwnd, "Int")
+        return false
+    DllCall("user32\SendMessageW", "Ptr", hwnd,
+        "UInt", Win32.WM_SETREDRAW, "Ptr", true, "Ptr", 0, "Ptr")
+    ; ListView 已启用 LVS_EX_DOUBLEBUFFER；一次同步刷新只会提交最终列布局。
+    return DllCall("user32\RedrawWindow", "Ptr", hwnd, "Ptr", 0,
+        "Ptr", 0, "UInt", Win32.RDW_CONTROL_REFRESH, "Int") != 0
+}
+
 ; 缩放只调整命令栏、列表和可见列，不改变图标逻辑尺寸或隐藏身份列。
 GuiResized(GuiObj, MinMax, Width, Height) {
     if (MinMax == -1)
         return
     PositionMainCommandButtons(Width)
-
-    Main.lv.Move(10, 88, Width - 20, Height - 113)
     MoveAndRefreshResizableText(Main.statsText, 10, Height - 20,
         Width - 20, 20)
     if IsSet(GuiModules)
         try GuiModules.historyToast.Reposition()
 
-    ; 名称列吸收剩余宽度，状态列保持可读下限，路径身份列始终隐藏。
-    rc := Buffer(16)
-    DllCall("GetClientRect", "Ptr", Main.lv.Hwnd, "Ptr", rc)
-    clientW := NumGet(rc, 8, "Int")
+    listRedrawSuspended := SuspendMainListResizeRedraw()
+    try {
+        Main.lv.Move(10, 88, Width - 20, Height - 113)
 
-    col2W := SendMessage(Win32.LVM_GETCOLUMNWIDTH, 1, 0, Main.lv.Hwnd)
-    sequenceW := SendMessage(Win32.LVM_GETCOLUMNWIDTH, 3, 0, Main.lv.Hwnd)
+        ; 名称列吸收剩余宽度，状态列保持可读下限，路径身份列始终隐藏。
+        rc := Buffer(16)
+        DllCall("GetClientRect", "Ptr", Main.lv.Hwnd, "Ptr", rc)
+        clientW := NumGet(rc, 8, "Int")
 
-    if (clientW > col2W + sequenceW) {
-        SendMessage(0x101E, 0, clientW - col2W - sequenceW,
-            Main.lv.Hwnd) ; 自动拉伸守护对象列（内部索引 0）
-    }
-    SendMessage(0x101E, 2, 0, Main.lv.Hwnd) ; 隐藏完整路径列（内部索引 2）
-    LayoutMainListHeader(Width)
+        col2W := SendMessage(Win32.LVM_GETCOLUMNWIDTH, 1, 0, Main.lv.Hwnd)
+        sequenceW := SendMessage(Win32.LVM_GETCOLUMNWIDTH, 3, 0,
+            Main.lv.Hwnd)
+
+        if (clientW > col2W + sequenceW) {
+            SendMessage(0x101E, 0, clientW - col2W - sequenceW,
+                Main.lv.Hwnd) ; 自动拉伸守护对象列（内部索引 0）
+        }
+        SendMessage(0x101E, 2, 0, Main.lv.Hwnd) ; 隐藏完整路径列（内部索引 2）
+        LayoutMainListHeader(Width)
+    } finally ResumeMainListResizeRedraw(listRedrawSuspended)
 }
 
 ShowContextMenu(GuiCtrlObj, Item, IsRightClick, X, Y) {

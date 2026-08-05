@@ -7,6 +7,29 @@
 
 ## 🚧 [未发布]
 
+## 🎉 版本 [2.0.9] - 2026-08-05
+
+### 📦 发布物说明
+
+- **`fonts.zip`（可选字体包）**：提供首选字体和回退字体，需先安装到 Windows；它不是程序运行必需。
+- **`process-watchdog-2.0.9-source.zip`（完整源码版）**：包含 AHK 源码、模块、测试和文档，不含字体，适合审阅、开发或从源码运行；本机需要 AutoHotkey v2 x64。
+- **`process-watchdog-2.0.9-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证和运行所需资源，不含字体；无需安装 AutoHotkey，适合完整解压后长期使用。
+- **Everything（[官方最新版](https://www.voidtools.com/downloads/)）**：为程序搜索提供索引和后台服务；随包 `Everything64.dll` 只是 IPC 客户端，不能替代 Everything 本体。
+
+---
+
+### 🐛 修复
+
+- **主窗口连续调整尺寸更稳定**：右侧按钮、列表和伪表头现在只批量移动并刷新受影响区域，稳定的左侧控件和父窗口不再暂停整窗重绘，避免拖拽时闪烁与旧位置残留拖影。
+
+---
+
+### 🚀 优化
+
+- **子窗口标题使用完整产品名**：设置窗口以及更新确认和错误窗口统一以“进程守护小助手”开头，并同步适配全部界面语言。
+
+---
+
 ## 🎉 版本 [2.0.8] - 2026-08-03
 
 ### 📦 发布物说明
@@ -381,7 +404,8 @@
 - 后台文件扫描使用 `DirExist` 明确区分目录边界，临时文件遇到瞬时占用时执行
   短时有界重试；测试分别报告结果协议、实际文件集合和清理失败。
 
-[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.8...HEAD
+[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.9...HEAD
+[2.0.9]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.8...v2.0.9
 [2.0.8]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.7...v2.0.8
 [2.0.7]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.6...v2.0.7
 [2.0.6]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.5...v2.0.6

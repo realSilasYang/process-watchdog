@@ -13,7 +13,7 @@
 
 ;@Ahk2Exe-SetName 进程守护小助手
 ;@Ahk2Exe-SetDescription 进程、脚本和快捷方式守护工具
-;@Ahk2Exe-SetVersion 2.0.8.0
+;@Ahk2Exe-SetVersion 2.0.9.0
 ;@Ahk2Exe-SetCopyright Copyright (c) 2026 进程守护小助手 contributors
 ;@Ahk2Exe-SetMainIcon assets\app\watchdog.ico
 
@@ -81,6 +81,7 @@
 #Include src\UI\ControlAccessibilityService.ahk
 #Include src\UI\MainListProjection.ahk
 #Include src\UI\ListViewFocusService.ahk
+#Include src\UI\AtomicControlLayout.ahk
 #Include src\UI\ListViewPseudoHeader.ahk
 #Include src\UI\WindowHierarchy.ahk
 #Include src\UI\ManagedWindow.ahk
@@ -305,75 +306,6 @@ GetMainCommandButtonPositions(clientWidth) {
     settingsX := supportX - Main.commandButtonGap
         - Main.settingsButtonWidth
     return {Settings: settingsX, Support: supportX, About: aboutX}
-}
-
-GetControlRectInParentClient(control, parentHwnd) {
-    try controlHwnd := control.Hwnd
-    catch
-        return false
-    if !controlHwnd || !DllCall("user32\IsWindow", "Ptr", controlHwnd, "Int")
-        return false
-    rect := Buffer(16, 0)
-    if !DllCall("user32\GetWindowRect", "Ptr", controlHwnd, "Ptr", rect, "Int")
-        return false
-    DllCall("user32\MapWindowPoints", "Ptr", 0, "Ptr", parentHwnd,
-        "Ptr", rect, "UInt", 2, "Int")
-    return {
-        Left: NumGet(rect, 0, "Int"),
-        Top: NumGet(rect, 4, "Int"),
-        Right: NumGet(rect, 8, "Int"),
-        Bottom: NumGet(rect, 12, "Int")
-    }
-}
-
-GetMainCommandButtonBounds() {
-    bounds := false
-    for button in [Main.btnSet, Main.btnSupport, Main.btnAbout] {
-        rect := GetControlRectInParentClient(button, Main.gui.Hwnd)
-        if !rect
-            continue
-        if !bounds {
-            bounds := rect
-            continue
-        }
-        bounds.Left := Min(bounds.Left, rect.Left)
-        bounds.Top := Min(bounds.Top, rect.Top)
-        bounds.Right := Max(bounds.Right, rect.Right)
-        bounds.Bottom := Max(bounds.Bottom, rect.Bottom)
-    }
-    return bounds
-}
-
-RedrawMainCommandButtonLayout(oldBounds, newBounds) {
-    if !oldBounds && !newBounds
-        return
-    bounds := oldBounds ? oldBounds : newBounds
-    if oldBounds && newBounds {
-        bounds.Left := Min(bounds.Left, newBounds.Left)
-        bounds.Top := Min(bounds.Top, newBounds.Top)
-        bounds.Right := Max(bounds.Right, newBounds.Right)
-        bounds.Bottom := Max(bounds.Bottom, newBounds.Bottom)
-    }
-    ; 扩大两个物理像素，完整擦除圆角抗锯齿边缘，再只重绘命令栏受影响区域。
-    redrawRect := Buffer(16, 0)
-    NumPut("Int", Max(0, bounds.Left - 2), redrawRect, 0)
-    NumPut("Int", Max(0, bounds.Top - 2), redrawRect, 4)
-    NumPut("Int", bounds.Right + 2, redrawRect, 8)
-    NumPut("Int", bounds.Bottom + 2, redrawRect, 12)
-    DllCall("user32\RedrawWindow", "Ptr", Main.gui.Hwnd, "Ptr", redrawRect,
-        "Ptr", 0, "UInt", Win32.RDW_LAYOUT_REFRESH, "Int")
-}
-
-PositionMainCommandButtons(clientWidth) {
-    oldBounds := GetMainCommandButtonBounds()
-    positions := GetMainCommandButtonPositions(clientWidth)
-    Main.btnSet.Move(positions.Settings, 15,
-        Main.settingsButtonWidth, 30)
-    Main.btnSupport.Move(positions.Support, 15,
-        Main.supportButtonWidth, 30)
-    Main.btnAbout.Move(positions.About, 15,
-        Main.aboutButtonWidth, 30)
-    RedrawMainCommandButtonLayout(oldBounds, GetMainCommandButtonBounds())
 }
 
 ; 主界面使用可多选、可拖动排序且支持标签编辑的 ListView 展示守护对象。

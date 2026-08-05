@@ -409,8 +409,8 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             && settingsDialog.tabControls[4].Length == 0,
             language " 设置窗口首开没有只构建当前可见的通用页")
         WinHide("ahk_id " settingsDialog.gui.Hwnd)
-        AssertWindowTitle(settingsDialog.gui, Tr("小助手设置"), language,
-            "SettingsWindow")
+        AssertWindowTitle(settingsDialog.gui, Tr("进程守护小助手设置"),
+            language, "SettingsWindow")
         AssertProductionWindowLayout(settingsDialog.gui, language,
             "SettingsWindow")
         AssertLocalizedWindow(settingsDialog.tabButtons[1].Text == Tr("通用"),

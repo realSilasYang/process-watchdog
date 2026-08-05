@@ -622,6 +622,12 @@ class VietnameseStrings {
             "小助手设置",
                 "Cài đặt trợ lý")
         catalog.Set(
+            "进程守护小助手更新",
+                "Cập nhật Trợ lý giám sát tiến trình")
+        catalog.Set(
+            "进程守护小助手设置",
+                "Cài đặt Trợ lý giám sát tiến trình")
+        catalog.Set(
             "尚未从真实升级过程学习到更新程序特征。",
                 "Chưa học được dấu hiệu nhận dạng trình cập nhật nào từ một lần cập nhật thực tế.")
         catalog.Set(

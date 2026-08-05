@@ -622,6 +622,12 @@ class TraditionalTaiwanStrings {
             "小助手设置",
                 "小助手設定")
         catalog.Set(
+            "进程守护小助手更新",
+                "處理程序守護小助手更新")
+        catalog.Set(
+            "进程守护小助手设置",
+                "處理程序守護小助手設定")
+        catalog.Set(
             "尚未从真实升级过程学习到更新程序特征。",
                 "尚未從實際更新過程中學習到更新程式特徵。")
         catalog.Set(

@@ -244,7 +244,7 @@ HandleApplicationUpdateCheckResult(result, interactive := false,
             : Tr("将下载并校验源码发行包，保留个人配置后替换源码并自动重启。"))
     message := Tr("发现新版本 {1}，当前版本为 {2}。{3}{3}{4}{3}{3}是否立即更新？",
         result.Version, result.CurrentVersion, Chr(10), updateMethod)
-    if !ShowDarkConfirmBox(message, Tr("小助手更新"),
+    if !ShowDarkConfirmBox(message, Tr("进程守护小助手更新"),
             Tr("立即更新"), Tr("稍后"), activeOwner)
         return
     try {
@@ -256,7 +256,7 @@ HandleApplicationUpdateCheckResult(result, interactive := false,
         errorText := TrDiagnostic(installError.Message)
         LogMsg(Tr("无法启动小助手更新安装：{1}", errorText))
         ShowDarkMsgBox(Tr("无法开始更新：{1}", errorText),
-            Tr("小助手更新"), "Error", activeOwner)
+            Tr("进程守护小助手更新"), "Error", activeOwner)
     }
 }
 
