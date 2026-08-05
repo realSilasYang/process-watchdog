@@ -127,13 +127,19 @@ class ListViewPseudoHeader {
         catch
             return false
 
-        this.Background.Move(x, y, totalWidth, this.Height)
+        entries := [{Control: this.Background, X: x, Y: y,
+            Width: totalWidth, Height: this.Height}]
         cellX := x
         for displayColumn, cell in this.Cells {
-            cell.Move(cellX, y, widths[displayColumn], this.Height)
+            entries.Push({Control: cell, X: cellX, Y: y,
+                Width: widths[displayColumn], Height: this.Height})
             cellX += widths[displayColumn]
         }
-        return true
+        result := AtomicControlLayout.Apply(this.Gui, entries, {
+            ParentColor: this.Gui.BackColor
+        })
+        return result.Status == AtomicControlLayout.Applied
+            || result.Status == AtomicControlLayout.Unchanged
     }
 
     SetLabels(labels) {

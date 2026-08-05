@@ -19,6 +19,7 @@ replace.
 | Settings tabs and inputs are not clipped | Not tested | Not tested | Not tested | Not tested |
 | Every button hover, press, and release | Not tested | Not tested | Not tested | Not tested |
 | Log resize, maximize, and scrollbars | Not tested | Not tested | Not tested | Not tested |
+| Continuous main-window resizing keeps stable controls flicker-free and leaves no trails | Not tested | Not tested | Not tested | Not tested |
 | Support opens the guide or runtime log correctly | Not tested | Not tested | Not tested | Not tested |
 | Donation QR codes are sharp, complete, and scannable | Not tested | Not tested | Not tested | Not tested |
 | Minimizing a child does not minimize its parent | Not tested | Not tested | Not tested | Not tested |

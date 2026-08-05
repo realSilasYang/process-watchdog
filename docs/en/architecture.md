@@ -213,6 +213,16 @@ GIF, TIF, TIFF, WebP, SVG, and ANI. SVG is rasterized in memory by the pinned
 resvg version. Bitmap sources are decoded to premultiplied alpha by WIC, scaled
 at high quality, and centered. GIF and ANI show a static representative frame.
 
+Visible sibling controls use the `AtomicControlLayout` transaction. Callers provide
+logical coordinates; the module performs one DPI conversion, one batched
+`DeferWindowPos` commit, moving-child `WM_ERASEBKGND` protection, old-position
+background fill, and old/new-union repaint. The parent is never redraw-suspended, so
+stable left controls are not dragged into a whole-window refresh. Unchanged layouts
+return `Unchanged`, while an unavailable native commit is explicit through
+`Mode: "Fallback"` or `Status: "Failed"`. See the [local layout transaction
+specification](ui-layout-transactions.md) for invariants, failure semantics, and a
+reusable example.
+
 ## Display-setting hot switch
 
 `LocalizationService` retains the requested and resolved language plus the

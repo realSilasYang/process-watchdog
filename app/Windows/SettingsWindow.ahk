@@ -1,4 +1,4 @@
-; 小助手设置窗口。
+; 进程守护小助手设置窗口。
 ; 通用、监控与启动、停止策略和日志按选项卡组织；所有输入先完成范围校验，
 ; 再通过配置服务一次提交并应用，避免部分字段已经生效而其余字段仍保存失败。
 
@@ -55,7 +55,8 @@ class SettingsWindow extends ManagedWindow {
         if this.ShowExisting()
             return
 
-        if !this.CreateOwnedGui(this.owner, "-MinimizeBox -MaximizeBox", Tr("小助手设置"))
+        if !this.CreateOwnedGui(this.owner, "-MinimizeBox -MaximizeBox",
+                Tr("进程守护小助手设置"))
             return
         try {
         this.gui.OnEvent("Escape", ObjBindMethod(this, "Close"))

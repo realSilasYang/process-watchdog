@@ -89,6 +89,8 @@ $listViewFocusServiceSource = Get-Content -LiteralPath `
     -Raw -Encoding UTF8
 $listViewPseudoHeaderSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'src\UI\ListViewPseudoHeader.ahk') -Raw -Encoding UTF8
+$atomicControlLayoutSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'src\UI\AtomicControlLayout.ahk') -Raw -Encoding UTF8
 $windowHierarchySource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\UI\WindowHierarchy.ahk') -Raw -Encoding UTF8
 $managedWindowSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src\UI\ManagedWindow.ahk') -Raw -Encoding UTF8
 $uiThemeServiceSource = Get-Content -LiteralPath `
@@ -1227,6 +1229,7 @@ foreach ($elevationHook in @(
 }
 foreach ($architectureHook in @(
     '#Include src\Platform\Win32.ahk',
+    '#Include src\UI\AtomicControlLayout.ahk',
     '#Include src\Config\IniFieldCodec.ahk',
     '#Include src\Config\DisplayConfigCodec.ahk',
     '#Include src\Config\MaintenanceConfigCodec.ahk',
@@ -2316,6 +2319,15 @@ if ($mainSource -notmatch '#Include src\\UI\\ListViewPseudoHeader\.ahk' -or
     $source -notmatch 'LayoutMainListHeader\(clientWidth\)[\s\S]{0,900}GetDpiForWindow[\s\S]{0,500}LVM_GETCOLUMNWIDTH[\s\S]{0,120}/\s*dpiScale') {
     $failures.Add('Main ListView must use the reusable pseudo header with temporary native sorting')
 }
+if ($atomicControlLayoutSource -notmatch 'class\s+AtomicControlLayout' -or
+    $atomicControlLayoutSource -notmatch 'class\s+AtomicControlLayoutEraseGuard' -or
+    $atomicControlLayoutSource -notmatch 'BeginDeferWindowPos' -or
+    $atomicControlLayoutSource -notmatch 'DcxClipChildren' -or
+    $atomicControlLayoutSource -notmatch 'finally\s*\{[\s\S]{0,260}AtomicControlLayoutEraseGuard\.End' -or
+    $mainWindowControllerSource -match 'BeginDeferWindowPos|ChildEraseGuard|RedrawMainCommandButtonLayout' -or
+    $listViewPseudoHeaderSource -match 'BeginDeferWindowPos|ChildEraseGuard|PaintParentClientBackground') {
+    $failures.Add('Visible sibling layout must use the shared atomic control-layout transaction')
+}
 foreach ($statusSortHook in @(
     'GetMainStatusSemanticPriority\(statusKind\)',
     'GetMainStatusSortKey\(stateObj, sequence, descending := false\)',
@@ -2833,6 +2845,12 @@ if ($settingsWindowSource -notmatch 'Loop\s+4[\s\S]{0,280}Tr\("通用"\)[\s\S]{0
     $settingsWindowSource -notmatch 'this\.checkUpdatesOnStartupCheck\s*:=\s*this\.AddTabControl\(1,' -or
     $settingsWindowSource -match 'BuildAboutTab|Tr\("关于"\)|checkUpdateButton|projectButton|donationButton') {
     $failures.Add('Settings must keep four ordered editable pages and must not retain About controls')
+}
+if ($settingsWindowSource -notmatch 'CreateOwnedGui\([\s\S]{0,140}Tr\("进程守护小助手设置"\)' -or
+    ([regex]::Matches($source,
+        'Tr\("进程守护小助手更新"\)')).Count -lt 2 -or
+    $source -match 'Tr\("小助手更新"\)') {
+    $failures.Add('Settings and update child windows must use the full product name in their titles')
 }
 $alignedSettingLabels = @(
     '进程状态检查间隔（毫秒）：',

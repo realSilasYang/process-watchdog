@@ -622,6 +622,12 @@ class GermanStrings {
             "小助手设置",
                 "Assistenteneinstellungen")
         catalog.Set(
+            "进程守护小助手更新",
+                "Update des Prozessüberwachungs-Assistenten")
+        catalog.Set(
+            "进程守护小助手设置",
+                "Einstellungen des Prozessüberwachungs-Assistenten")
+        catalog.Set(
             "尚未从真实升级过程学习到更新程序特征。",
                 "Es wurden noch keine Merkmale eines Update-Programms aus einem echten Update-Vorgang erlernt.")
         catalog.Set(

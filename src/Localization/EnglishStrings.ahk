@@ -622,6 +622,12 @@ class EnglishStrings {
             "小助手设置",
                 "Assistant Settings")
         catalog.Set(
+            "进程守护小助手更新",
+                "Process Watchdog Assistant Update")
+        catalog.Set(
+            "进程守护小助手设置",
+                "Process Watchdog Assistant Settings")
+        catalog.Set(
             "尚未从真实升级过程学习到更新程序特征。",
                 "No updater signature has yet been learned from a real update.")
         catalog.Set(

@@ -8,6 +8,7 @@
 #Include ..\..\src\Platform\Win32.ahk
 #Include ..\..\src\UI\MainListProjection.ahk
 #Include ..\..\src\UI\ListViewFocusService.ahk
+#Include ..\..\src\UI\AtomicControlLayout.ahk
 #Include ..\..\src\UI\ListViewPseudoHeader.ahk
 #Include ..\..\src\UI\WindowHierarchy.ahk
 
@@ -156,6 +157,18 @@ SendGuiSmokeHeaderPointerClick(cell, downMessage) {
     SendMessage(downMessage, 1, point, cell.Hwnd)
     SendMessage(Win32.WM_LBUTTONUP, 0, point, cell.Hwnd)
     Sleep(20)
+}
+
+GetGuiSmokeControlRectInParent(control, parentHwnd) {
+    rect := Buffer(16, 0)
+    AssertGuiSmoke(DllCall("user32\GetWindowRect", "Ptr", control.Hwnd,
+        "Ptr", rect, "Int"), "Visible control bounds were not readable")
+    DllCall("user32\MapWindowPoints", "Ptr", 0, "Ptr", parentHwnd,
+        "Ptr", rect, "UInt", 2, "Int")
+    return {
+        Left: NumGet(rect, 0, "Int"), Top: NumGet(rect, 4, "Int"),
+        Right: NumGet(rect, 8, "Int"), Bottom: NumGet(rect, 12, "Int")
+    }
 }
 
 owner := ""
@@ -377,6 +390,50 @@ try {
             "Str", "DarkMode_Explorer", "Ptr", 0)
     }
     owner.Show("w430 h270")
+    visibleDpi := DllCall("user32\GetDpiForWindow", "Ptr", owner.Hwnd,
+        "UInt")
+    visibleScale := visibleDpi / 96
+    visibleHeaderWidths := [52, 216, 104]
+    AssertGuiSmoke(pseudoHeader.SetBounds(20, 54,
+        visibleHeaderWidths, 372),
+        "Visible pseudo header bounds were not applied")
+    expectedCellX := Round(20 * visibleScale)
+    for visibleIndex, headerCell in pseudoHeader.Cells {
+        headerRect := GetGuiSmokeControlRectInParent(headerCell, owner.Hwnd)
+        expectedWidth := Round(visibleHeaderWidths[visibleIndex]
+            * visibleScale)
+        AssertGuiSmoke(headerRect.Left == expectedCellX
+            && headerRect.Top == Round(54 * visibleScale)
+            && headerRect.Right - headerRect.Left == expectedWidth
+            && headerRect.Bottom - headerRect.Top == Round(28 * visibleScale),
+            "Visible pseudo header deferred layout produced incorrect bounds")
+        expectedCellX += expectedWidth
+    }
+    AssertGuiSmoke(pseudoHeader.SetBounds(16, 54,
+        [48, 220, 110], 380),
+        "Visible pseudo header bounds were not restored")
+    atomicNoopResult := AtomicControlLayout.Apply(owner, [
+        {Control: pseudoHeader.Background, X: 16, Y: 54,
+            Width: 380, Height: 28},
+        {Control: pseudoHeader.Cells[1], X: 16, Y: 54,
+            Width: 48, Height: 28},
+        {Control: pseudoHeader.Cells[2], X: 64, Y: 54,
+            Width: 220, Height: 28},
+        {Control: pseudoHeader.Cells[3], X: 284, Y: 54,
+            Width: 110, Height: 28}
+    ], {ParentColor: "333333"})
+    AssertGuiSmoke(atomicNoopResult.Status == AtomicControlLayout.Unchanged,
+        "Unchanged atomic layout did not take its no-paint fast path")
+    headerDc := DllCall("user32\GetDC", "Ptr", owner.Hwnd, "Ptr")
+    AssertGuiSmoke(headerDc, "Visible pseudo header surface was not readable")
+    try {
+        AssertGuiSmoke(DllCall("gdi32\GetPixel", "Ptr", headerDc,
+                "Int", Round(392 * visibleScale),
+                "Int", Round(68 * visibleScale), "UInt")
+                == RoundedButtonRenderer.ColorToBgr("333333"),
+            "Visible pseudo header did not repaint its restored right edge")
+    } finally DllCall("user32\ReleaseDC", "Ptr", owner.Hwnd, "Ptr", headerDc)
+    ReportGuiSmokeStage("visible-header-layout")
     ; 焦点重定向必须在真实可见窗口中验证。隐藏父窗口时，Windows 可以合法
     ; 拒绝把焦点交给其子控件，不能据此判断伪表头输入保护失效。
     DllCall("user32\SetFocus", "Ptr", list.Hwnd, "Ptr")

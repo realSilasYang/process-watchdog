@@ -7,6 +7,29 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.0.9] - 2026-08-05
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides the preferred and fallback fonts for installation into Windows; it is not required to run the application.
+- **`process-watchdog-2.0.9-source.zip` (complete source package):** Includes the AHK source, modules, tests, and documentation without fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+- **`process-watchdog-2.0.9-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, and runtime resources without fonts; no AutoHotkey installation is required, and it is intended for long-term use after full extraction.
+- **Everything ([latest official version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application searches. The bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### 🐛 Fixed
+
+- **More stable continuous main-window resizing:** Right-side buttons, the list, and the pseudo-header now move and refresh only their affected regions, while the parent window and stable left-side controls avoid whole-window redraw suspension, preventing flicker and stale trails during dragging.
+
+---
+
+### 🚀 Improved
+
+- **Full product name in child-window titles:** Settings plus update confirmation and error windows now begin with the full Process Watchdog Assistant name in every interface language.
+
+---
+
 ## 🎉 Version [2.0.8] - 2026-08-03
 
 ### 📦 Release Assets
@@ -433,7 +456,8 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.8...HEAD
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.9...HEAD
+[2.0.9]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.8...v2.0.9
 [2.0.8]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.7...v2.0.8
 [2.0.7]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.6...v2.0.7
 [2.0.6]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.5...v2.0.6
