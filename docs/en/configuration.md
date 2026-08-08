@@ -17,7 +17,7 @@ The repository example keeps the default Chinese comments while every language
 uses the same stable keys. Saving a language change immediately replaces
 generated comments from the previous language instead of stacking duplicates.
 
-`UiLanguage=auto` follows the Windows UI language. The General page
+`UiLanguage=auto` follows the Windows UI language. The Display page
 can select a language manually, or the setting can contain one of `zh-CN`,
 `zh-HK`, `zh-TW`, `en-US`, `ja-JP`, `vi-VN`, `ko-KR`, `es-ES`, `fr-FR`,
 `pt-BR`, `ru-RU`, `de-DE`, and `it-IT`. Auto mode
@@ -51,7 +51,7 @@ resource retains variable weight and width axes, while the CJK collection retain
 all 45 faces and regional families. The font package records the separate OFL and
 commercial authorization boundaries.
 
-The General page can also select any font installed on the current computer.
+The Display page can also select any font installed on the current computer.
 Saving applies the font immediately in the same process along with the language.
 This setting affects body text, inputs, lists, the About title and metadata, and
 other content controls. Buttons, Settings tabs, and the main-window footer ignore

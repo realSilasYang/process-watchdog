@@ -16,6 +16,7 @@ class Win32 {
     static WM_DRAWITEM := 0x002B
     static WM_MEASUREITEM := 0x002C
     static WM_NCDESTROY := 0x0082
+    static WM_NCHITTEST := 0x0084
     static WM_SETREDRAW := 0x000B
     static WM_GETFONT := 0x0031
     static WM_SETFOCUS := 0x0007
@@ -129,6 +130,9 @@ class Win32 {
     static GWLP_HWNDPARENT := -8
     static GWL_STYLE := -16
     static GWL_EXSTYLE := -20
+    static GW_HWNDNEXT := 2
+    static HTTRANSPARENT := -1
+    static WS_CLIPSIBLINGS := 0x04000000
     static WS_EX_TOOLWINDOW := 0x80
     static WS_EX_APPWINDOW := 0x40000
     static SW_HIDE := 0

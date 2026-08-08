@@ -28,6 +28,9 @@ $applicationTelemetrySource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\ApplicationTelemetry.ahk') -Raw -Encoding UTF8
 $mainVisualPipelineSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\UI\MainVisualPipeline.ahk') -Raw -Encoding UTF8
+$interactionPresenterSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\UI\InteractionPresenter.ahk') `
+    -Raw -Encoding UTF8
 $darkInlineEditThemeRegistrySource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\UI\DarkInlineEditThemeRegistry.ahk') `
     -Raw -Encoding UTF8
@@ -2298,6 +2301,10 @@ if ($mainSource -notmatch '#Include src\\UI\\ListViewPseudoHeader\.ahk' -or
     $listViewPseudoHeaderSource -notmatch 'AttachInputGuard\(cellHwnd, listHwnd\)' -or
     $listViewPseudoHeaderSource -notmatch 'SetWindowSubclass' -or
     $listViewPseudoHeaderSource -notmatch '" -Tabstop"' -or
+    $listViewPseudoHeaderSource -notmatch 'headerAlignment\s*:=\s*columnSpec\.HasOwnProp\("HeaderAlign"\)[\s\S]{0,120}:\s*"Center"' -or
+    $listViewPseudoHeaderSource -notmatch 'HeaderAlign:\s*headerAlignment' -or
+    $listViewPseudoHeaderSource -notmatch 'alignOption\s*:=\s*StrLower\(headerAlignment\)\s*==\s*"center"' -or
+    $listViewPseudoHeaderSource -notmatch 'padding\s*:=\s*columnSpec\.HasOwnProp\("Padding"\)[\s\S]{0,100}:\s*""' -or
     $listViewPseudoHeaderSource -notmatch 'case\s+0x0007:[\s\S]{0,220}SetFocus' -or
     $listViewPseudoHeaderSource -notmatch 'case\s+0x0301:[\s\S]{0,60}return 0' -or
     $listViewPseudoHeaderSource -notmatch 'case\s+0x007B:[\s\S]{0,60}return 0' -or
@@ -2596,7 +2603,6 @@ if ($source -notmatch 'if\s+!settingsChanged\s*\{[\s\S]{0,560}this\.Close\(\)[\s
     $failures.Add('Unchanged runtime settings must close without creating an undo entry')
 }
 $allowedDirectClickBindings = @(
-    'backgroundControl.OnEvent("Click", PlaceTextCaretAtPointer.Bind(inputControl))',
     'ctrl.OnEvent("Click", HandleRegisteredButtonClick)',
     'this.autoResolveRadio.OnEvent("Click",',
     'this.manualResolveRadio.OnEvent("Click",'
@@ -2838,13 +2844,27 @@ if ($localizationServiceSource -notmatch 'RefreshInstalledUiFontNames\(\)[\s\S]{
     $failures.Add('The font picker must use a fixed 12-row list, preserve manual scroll position across refreshes, and unregister its message hook on close')
 }
 
-# 设置窗口只保留四页可编辑配置；产品信息、更新、开源与打赏在独立关于窗口。
-if ($settingsWindowSource -notmatch 'Loop\s+4[\s\S]{0,280}Tr\("通用"\)[\s\S]{0,80}Tr\("监控与启动"\)[\s\S]{0,80}Tr\("停止策略"\)[\s\S]{0,80}Tr\("日志"\)' -or
+# 设置窗口只保留五页可编辑配置；启动入口与监控参数各自独立成页。
+if ($settingsWindowSource -notmatch 'Loop\s+5[\s\S]{0,280}Tr\("显示"\)[\s\S]{0,80}Tr\("启动"\)[\s\S]{0,80}Tr\("监控"\)[\s\S]{0,80}Tr\("停止策略"\)[\s\S]{0,80}Tr\("日志"\)' -or
+    $settingsWindowSource -notmatch 'tabIconNames\s*:=\s*\["monitor\.svg",\s*"rocket\.svg",\s*"activity\.svg"' -or
     $settingsWindowSource -notmatch 'this\.SwitchTab\(1\)' -or
-    $settingsWindowSource -notmatch 'this\.showAtStartupCheck\s*:=\s*this\.AddTabControl\(1,' -or
-    $settingsWindowSource -notmatch 'this\.checkUpdatesOnStartupCheck\s*:=\s*this\.AddTabControl\(1,' -or
+    $settingsWindowSource -notmatch 'this\.showAtStartupCheck\s*:=\s*this\.AddTabControl\(2,' -or
+    $settingsWindowSource -notmatch 'this\.checkUpdatesOnStartupCheck\s*:=\s*this\.AddTabControl\(2,' -or
+    $settingsWindowSource -notmatch 'this\.intervalEdit\s*:=\s*this\.AddSettingsEdit\(3,' -or
+    $settingsWindowSource -notmatch 'this\.recursiveImportCheck\s*:=\s*this\.AddTabControl\(3,' -or
     $settingsWindowSource -match 'BuildAboutTab|Tr\("关于"\)|checkUpdateButton|projectButton|donationButton') {
-    $failures.Add('Settings must keep four ordered editable pages and must not retain About controls')
+    $failures.Add('Settings must keep five ordered Display, Startup, Monitoring, Stop Policy, and Log pages without About controls')
+}
+if ($interactionPresenterSource -match 'PlaceTextCaretAtPointer|RegisterTextInputHitTarget' -or
+    $interactionPresenterSource -match 'RegisterTextInput\(backgroundHwnd' -or
+    $interactionPresenterSource -notmatch 'class\s+TextInputDecorationRouter' -or
+    $interactionPresenterSource -notmatch 'if\s+message\s*==\s*Win32\.WM_NCHITTEST\s*\r?\n\s*return\s+Win32\.HTTRANSPARENT' -or
+    $interactionPresenterSource -notmatch 'EnableSiblingClipping\(backgroundHwnd\)[\s\S]{0,100}EnableSiblingClipping\(editHwnd\)' -or
+    $interactionPresenterSource -notmatch 'SetWindowPos[\s\S]{0,160}"Ptr",\s*editHwnd' -or
+    $interactionPresenterSource -notmatch 'TextInputDecorationRouter\.DetachGui\(guiHwnd\)' -or
+    $interactionPresenterSource -notmatch 'TextInputDecorationRouter\.Shutdown\(\)' -or
+    $mainVisualPipelineSource -notmatch 'RegisterTextInputDecoration\(background,\s*inputEditControl\)') {
+    $failures.Add('Text input decoration must stay behind Edit, clip sibling painting, remain hit-test transparent, and clean up with its GUI')
 }
 if ($settingsWindowSource -notmatch 'CreateOwnedGui\([\s\S]{0,140}Tr\("进程守护小助手设置"\)' -or
     ([regex]::Matches($source,
@@ -2852,7 +2872,7 @@ if ($settingsWindowSource -notmatch 'CreateOwnedGui\([\s\S]{0,140}Tr\("进程守
     $source -match 'Tr\("小助手更新"\)') {
     $failures.Add('Settings and update child windows must use the full product name in their titles')
 }
-$alignedSettingLabels = @(
+$stackedSettingLabels = @(
     '进程状态检查间隔（毫秒）：',
     '崩溃自动重启延迟序列（秒）：',
     'GUI 程序关闭超时（秒）：',
@@ -2861,13 +2881,23 @@ $alignedSettingLabels = @(
     '批处理日志保留天数：',
     '批处理日志保存路径：'
 )
-foreach ($alignedSettingLabel in $alignedSettingLabels) {
-    $escapedLabel = [regex]::Escape($alignedSettingLabel)
-    $alignedLabelPattern = 'labelWidth\s+" h26 Right 0x200 BackgroundTrans",\s*\r?\n\s*Tr\("' `
-        + $escapedLabel + '"\)\)'
-    if ($settingsWindowSource -notmatch $alignedLabelPattern) {
-        $failures.Add("Settings input label must remain right-aligned: $alignedSettingLabel")
+foreach ($stackedSettingLabel in $stackedSettingLabels) {
+    $escapedLabel = [regex]::Escape($stackedSettingLabel)
+    $stackedLabelPattern = 'AddSettingsFieldLabel\(\d,\s*\d+,\s*\r?\n\s*Tr\("' `
+        + $escapedLabel + '"\),\s*fieldControls\)'
+    if ($settingsWindowSource -notmatch $stackedLabelPattern) {
+        $failures.Add("Settings field must use the shared stacked label layout: $stackedSettingLabel")
     }
+}
+if ($settingsWindowSource -notmatch 'displayFieldWidth\s*:=\s*Min\(isCompact\s*\?\s*240\s*:\s*294,[\s\S]{0,100}displayFieldX\s*:=\s*Floor\(\(windowWidth\s*-\s*displayFieldWidth\)\s*/\s*2\)' -or
+    $settingsWindowSource -notmatch 'SplitFieldCaption\(caption\)[\s\S]{0,260}\(\[：:\]\)\$' -or
+    $settingsWindowSource -notmatch 'AddSettingsFieldLabel\(index, y, caption, groupControls\s*:=\s*""\)[\s\S]{0,260}SplitFieldCaption\(caption\)\.Label[\s\S]{0,120}groupControls\.Push\(labelControl\)' -or
+    $settingsWindowSource -notmatch 'CenterSettingsControlGroup\(controls\)[\s\S]{0,420}Floor\(\(this\.layout\.WindowWidth\s*-\s*groupWidth\)\s*/\s*2\)[\s\S]{0,120}control\.Move\(groupX\)' -or
+    $settingsWindowSource -notmatch 'AddDisplayFieldHeader\(70,[\s\S]{0,80}Tr\("界面语言："\),\s*"languages\.svg"\)' -or
+    $settingsWindowSource -notmatch 'AddDisplayFieldHeader\(153,[\s\S]{0,80}Tr\("界面内容字体："\),\s*"type\.svg"\)' -or
+    $settingsWindowSource -notmatch 'AddDisplayFieldHeader\(236,[\s\S]{0,80}Tr\("主题："\),\s*"palette\.svg"\)' -or
+    $settingsWindowSource -notmatch 'logFieldAnchorWidth\s*:=\s*layout\.IsCompact\s*\?\s*240\s*:\s*294[\s\S]{0,180}logFieldX\s*:=\s*Floor\(\(layout\.WindowWidth\s*-\s*logFieldAnchorWidth\)\s*/\s*2\)[\s\S]{0,120}logPathWidth\s*:=\s*Round\(logFieldAnchorWidth\s*\*\s*1\.5\)') {
+    $failures.Add('Settings fields must use compact per-page widths, strip trailing colons, stack values below labels, and center each page by its longest control')
 }
 if (-not $aboutWindowSource.Contains(
         'https://github.com/realSilasYang/process-watchdog') -or
@@ -2889,21 +2919,21 @@ if (-not $settingsWindowSource.Contains(
         'this.taskLabel.Move(integrationGroupX)') -or
     -not $settingsWindowSource.Contains(
         'integrationGroupWidth := integrationLabelWidth + integrationGap') -or
-    -not $settingsWindowSource.Contains(
-        'CenterControlHorizontally(this.recursiveImportCheck,') -or
-    -not $settingsWindowSource.Contains(
-        'CenterControlHorizontally(this.forceTerminateCheck,') -or
-    -not $settingsWindowSource.Contains(
-        'CenterControlHorizontally(this.clearLogsOnStartupCheck,')) {
-    $failures.Add('Settings integration groups and standalone checkboxes must be centered from measured control widths')
+    $settingsWindowSource -notmatch 'this\.tabDivider\s*:=\s*this\.gui\.Add\("Text",\s*"x15 y46 w"[\s\S]{0,100}\(windowWidth\s*-\s*30\)' -or
+    $settingsWindowSource -notmatch 'startupChecks\.Push\(this\.checkUpdatesOnStartupCheck\)[\s\S]{0,500}startupChecks\.Push\(this\.showAtStartupCheck\)[\s\S]{0,180}layout\.StartupChecks\s*:=\s*this\.CenterSettingsControlGroup' -or
+    $settingsWindowSource -notmatch 'fieldControls\.Push\(this\.recursiveImportCheck\)[\s\S]{0,120}layout\.MonitoringField\s*:=\s*this\.CenterSettingsControlGroup' -or
+    $settingsWindowSource -notmatch 'fieldControls\.Push\(this\.forceTerminateCheck\)[\s\S]{0,120}layout\.StopPolicyField\s*:=\s*this\.CenterSettingsControlGroup' -or
+    $settingsWindowSource -notmatch 'fieldControls\.Push\(this\.clearLogsOnStartupCheck\)[\s\S]{0,420}fieldControl\.Move\(logFieldX\)[\s\S]{0,180}layout\.LogField\s*:=\s*\{X:\s*logFieldX') {
+    $failures.Add('Settings integration, stacked startup checks, measured page groups, and anchored log fields must preserve their layout contracts')
 }
 if ($settingsWindowSource -notmatch 'this\.tabBuilt\[1\]\s*:=\s*true' -or
     $settingsWindowSource -notmatch 'EnsureTabBuilt\(index\)' -or
     $settingsWindowSource -notmatch 'SwitchTab\(index,[\s\S]{0,520}EnsureTabBuilt\(index\)' -or
-    $settingsWindowSource -notmatch 'case 2: this\.BuildMonitoringTab\(\)' -or
-    $settingsWindowSource -notmatch 'case 3: this\.BuildStopPolicyTab\(\)' -or
-    $settingsWindowSource -notmatch 'case 4: this\.BuildLogTab\(\)') {
-    $failures.Add('Settings must build only the visible general tab initially and create other pages on first selection')
+    $settingsWindowSource -notmatch 'case 2: this\.BuildStartupTab\(\)' -or
+    $settingsWindowSource -notmatch 'case 3: this\.BuildMonitoringTab\(\)' -or
+    $settingsWindowSource -notmatch 'case 4: this\.BuildStopPolicyTab\(\)' -or
+    $settingsWindowSource -notmatch 'case 5: this\.BuildLogTab\(\)') {
+    $failures.Add('Settings must build only the visible Display tab initially and create other pages on first selection')
 }
 $settingsTabSwitchSource = [regex]::Match($settingsWindowSource,
     '(?ms)^    SuspendTabRedraw\(\)\s*\{.*?(?=^    BrowseLogDirectory\()').Value
@@ -2917,14 +2947,18 @@ if ([string]::IsNullOrWhiteSpace($settingsTabSwitchSource) -or
 }
 $settingsShowSource = [regex]::Match($settingsWindowSource,
     '(?ms)^    Show\(\*\)\s*\{.*?(?=^    GetTabButtonWidths\()').Value
+$settingsStartupSource = [regex]::Match($settingsWindowSource,
+    '(?ms)^    BuildStartupTab\(\)\s*\{.*?(?=^    BuildMonitoringTab\()').Value
 if (-not $settingsShowSource -or
-    $settingsShowSource -notmatch 'SetButtonLucideIcon\(this\.taskButton, "loader-circle\.svg"[\s\S]{0,120}SetRegisteredButtonEnabled\(this\.taskButton, false\)' -or
-    $settingsShowSource -notmatch 'ShowApplicationWindow\(this\.gui,[\s\S]{0,100}\)[\s\S]{0,180}SetTimer\(this\.taskStatusTimer, -1\)' -or
+    -not $settingsStartupSource -or
+    $settingsStartupSource -notmatch 'SetButtonLucideIcon\(this\.taskButton, "loader-circle\.svg"[\s\S]{0,120}SetRegisteredButtonEnabled\(this\.taskButton, false\)' -or
+    $settingsShowSource -match 'SetTimer\(this\.taskStatusTimer, -1\)' -or
+    $settingsWindowSource -notmatch 'SwitchTab\(index,[\s\S]{0,2200}if index == 2 && this\.taskButton[\s\S]{0,100}SetTimer\(this\.taskStatusTimer, -1\)' -or
     $settingsShowSource -match 'UpdateTaskButtonStatus\(\)[\s\S]{0,180}ShowApplicationWindow\(' -or
-    $settingsWindowSource -notmatch 'RefreshTaskStatusAfterShow\(\*\)[\s\S]{0,160}this\.UpdateTaskButtonStatus\(\)' -or
+    $settingsWindowSource -notmatch 'RefreshTaskStatusAfterTabShow\(\*\)[\s\S]{0,180}this\.UpdateTaskButtonStatus\(\)' -or
     $settingsWindowSource -notmatch 'UpdateTaskButtonStatus\(\)[\s\S]{0,900}SetRegisteredButtonEnabled\(this\.taskButton, true\)' -or
     $settingsWindowSource -notmatch 'Close\(\*\)[\s\S]{0,120}SetTimer\(this\.taskStatusTimer, 0\)') {
-    $failures.Add('Settings must show its first frame before querying Task Scheduler and cancel the deferred query on close')
+    $failures.Add('Settings must query Task Scheduler only after the Startup tab is shown and cancel the deferred query on close')
 }
 foreach ($retiredSettingsLabel in @(
         '启动后显示主窗口', '内容字体：', '状态检查间隔（毫秒）：',
@@ -3030,6 +3064,23 @@ if ($fileScanServiceSource -notmatch 'StartPreparedWorker\(command, outputPath,[
 }
 if ($batchPollSource -notmatch 'currentWorkerIdentity\s*!=\s*""[\s\S]{0,100}currentWorkerIdentity\s*!=\s*workerCreationIdentity') {
     $failures.Add('File-scan polling must treat an unreadable creation identity as unknown rather than PID replacement')
+}
+
+$saveColorEntries = [regex]::Matches($uiThemeServiceSource,
+    '\["Save",\s*"3F6B5B"\]')
+if ($saveColorEntries.Count -ne 2) {
+    $failures.Add('The semantic Save color must be #3F6B5B in both light and dark palettes')
+}
+foreach ($saveWindow in @(
+        @{Source = $settingsWindowSource; Name = 'SettingsWindow'},
+        @{Source = $customDisplayDialogSource; Name = 'CustomDisplayDialog'},
+        @{Source = $environmentSettingsDialogSource; Name = 'EnvironmentSettingsDialog'},
+        @{Source = $maintenanceSettingsDialogSource; Name = 'MaintenanceSettingsDialog'}
+    )) {
+    if ([regex]::Matches($saveWindow.Source,
+            'UiThemeService\.Color\("Save"\)').Count -lt 2) {
+        $failures.Add("$($saveWindow.Name) text-only Save action must use the semantic Save color for normal and hover registration")
+    }
 }
 
 foreach ($saveWindowSource in @($settingsWindowSource,

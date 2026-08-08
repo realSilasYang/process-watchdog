@@ -38,7 +38,7 @@ Das Projekt bietet eine helle und dunkle Oberfläche, automatische Wiederherstel
   <img src="images/process-watchdog-overview.png" alt="Hauptfenster von Process Watchdog Assistant" width="100%">
 </p>
 
-Das Hauptfenster zeigt Reihenfolge, Anwendungssymbol, Namen, Rechteanforderung und aktuellen Status aller überwachten Ziele. Über die obere Leiste können Ziele hinzugefügt, gelöscht und pausiert sowie Einstellungen, Hilfe und Spenden geöffnet werden; in der Hilfe stehen Handbuch und Laufzeitprotokoll bereit. Die untere Leiste fasst laufende, wiederherzustellende, aktualisierte, pausierte und fehlgeschlagene Ziele zusammen. Das Protokoll erläutert die Belege hinter ungewöhnlichen Zuständen.
+Das Hauptfenster zeigt Reihenfolge, Anwendungssymbol, Namen, Rechteanforderung und aktuellen Status aller überwachten Ziele. Die Befehlsleiste bietet Hinzufügen, Löschen, Pausieren, Einstellungen, Hilfe und Info; Hilfe führt zu Handbuch, Laufzeitprotokoll oder Feedback, während Info Version, Laufzeit, Updates, Projekt und Spenden bündelt. Die untere Leiste fasst laufende, wiederherzustellende, aktualisierte, pausierte und fehlgeschlagene Ziele zusammen. Das Protokoll erläutert die Belege hinter ungewöhnlichen Zuständen.
 
 ## Wichtigste Funktionen
 
@@ -49,8 +49,8 @@ Das Hauptfenster zeigt Reihenfolge, Anwendungssymbol, Namen, Rechteanforderung u
 - Der Updateschutz ist standardmäßig aus. Nach Aktivierung verbindet er Updateprozesse, Eltern-Kind-Beziehungen, Aktivitäten im Installationsordner und Dateistabilität, bevor die Überwachung pausiert oder fortgesetzt wird.
 - Die Konfiguration wird atomar ersetzt. Nicht lesbare Datensätze werden nach `[Recovery]` verschoben, statt still verloren zu gehen.
 - Die Anwendungssuche verwendet ausschließlich den Everything-Dienst, ohne eingebaute Vollplattensuche und ohne Ergebnisgrenze. Große Ergebnismengen werden in kurzen Blöcken ergänzt, damit die Symbolgewinnung die Oberfläche nicht blockiert.
-- Unterstützt vereinfachtes Chinesisch, traditionelles Chinesisch für Hongkong, traditionelles Chinesisch für Taiwan, Englisch, Japanisch, Vietnamesisch, Koreanisch, Spanisch, Französisch, brasilianisches Portugiesisch, Russisch, Deutsch und Italienisch. Standardmäßig folgt die Oberfläche der Windows-Sprache, bei nicht unterstützten Sprachen wird Englisch verwendet; unter Allgemein ist eine manuelle Auswahl möglich. Sprache und Inhaltsschrift werden sofort im aktuellen Prozess angewendet, ohne Überwachungsaufgaben anzuhalten oder neu zu initialisieren.
-- „Sprachstandard verwenden“ bevorzugt PingFang, SF Pro Text, Harano Aji Gothic oder Apple SD Gothic Neo. Fehlt die Schrift, wird die mitgelieferte kommerziell lizenzierte oder unter OFL stehende Ressource prozessintern geladen, anschließend die passende Noto-Familie. Die Inhaltsschrift gilt für Text, Eingabefelder, Listen und Infoangaben; Schaltflächen, Registerkarten und die untere Statusleiste verwenden stets die fette Windows-UI-Schrift der aktuellen Sprache.
+- Unterstützt vereinfachtes Chinesisch, traditionelles Chinesisch für Hongkong, traditionelles Chinesisch für Taiwan, Englisch, Japanisch, Vietnamesisch, Koreanisch, Spanisch, Französisch, brasilianisches Portugiesisch, Russisch, Deutsch und Italienisch. Standardmäßig folgt die Oberfläche der Windows-Sprache, bei nicht unterstützten Sprachen wird Englisch verwendet; unter Anzeige ist eine manuelle Auswahl möglich. Sprache und Inhaltsschrift werden sofort im aktuellen Prozess angewendet, ohne Überwachungsaufgaben anzuhalten oder neu zu initialisieren.
+- „Sprachstandard verwenden“ nutzt nur in Windows installierte Schriften: zuerst PingFang, SF Pro Text, Harano Aji Gothic oder Apple SD Gothic Neo, danach die passende Noto-Familie und zuletzt eine Windows-Systemschrift. Optionale Schriften müssen zuvor in Windows installiert werden; der Assistent lädt keine Schriften privat aus seinem eigenen Verzeichnis. Die Inhaltsschrift gilt für Text, Eingabefelder, Listen und Infoangaben; Schaltflächen, Registerkarten und die untere Statusleiste verwenden stets die fette Windows-UI-Schrift der aktuellen Sprache.
 - Helles und dunkles Design unterstützen unabhängig minimierbare Unterfenster, DPI-abhängigen Symbolneuaufbau, abgerundete Schaltflächen und benutzerdefinierte Symbole.
 - Diagnosepakete entstehen ausschließlich lokal und werden nicht automatisch hochgeladen; offizielle Artefakte sind unabhängig überprüfbar.
 
@@ -114,9 +114,9 @@ Das Schließen des Hauptfensters blendet es nur im Infobereich aus; die Überwac
 | Hinzufügen | Ziel wählen, installierte Anwendungen suchen oder Ordner importieren; Unterordner sind standardmäßig eingeschlossen |
 | Löschen | Ausgewählte Ziele entfernen; Mehrfachauswahl und Rückgängig werden unterstützt |
 | Pausieren / Fortsetzen | Nur automatische Überwachung ändern, ohne das laufende Ziel zu schließen; gemischte Auswahl wird einzeln umgeschaltet |
-| Einstellungen | Allgemein, Überwachung und Start, Stopprichtlinie, Protokolle und Info konfigurieren |
+| Einstellungen | Anzeige, Start, Überwachung, Beendigungsrichtlinie und Protokolle konfigurieren |
 | Hilfe | Eingebautes Handbuch, Laufzeitprotokoll oder GitHub-Feedbackseite auswählen |
-| Spenden | QR-Codes von WeChat Pay und Alipay zur Unterstützung der Wartung anzeigen |
+| Info | Versions- und Laufzeitinformationen anzeigen, nach Updates suchen, das Projekt öffnen oder Spenden aufrufen |
 
 Ein Eintrag kann Einstiegspunkt, Arbeitsordner, Argumente und Administratoranforderung festlegen. Die LNK-Datei bleibt Startpunkt, während der tatsächliche Programmpfad getrennt zur Prozessidentifikation gespeichert wird. Eine vom Installationsprogramm angelegte indirekte Verknüpfung muss deshalb nicht manuell durch eine wechselnde interne EXE ersetzt werden.
 
@@ -159,11 +159,11 @@ Die Funktion ist weder universelles Installationsprogramm noch Windows-Dienstver
 
 | Bereich | Optionen |
 | --- | --- |
-| Allgemein | Desktop- und Startmenüverknüpfungen, geplanter Autostart, zwei Startverhalten, Sprache, Inhaltsschrift und Design |
-| Überwachung und Start | Prozessprüfintervall, Verzögerungsfolge nach Absturz und Einbeziehung von Unterordnern beim Import |
-| Stopprichtlinie | Zeitlimits zum Schließen von GUI-/CLI-Anwendungen und Erlaubnis zum erzwungenen Beenden nach Ablauf |
+| Anzeige | Oberflächensprache, Inhaltsschrift und Design |
+| Start | Desktop- und Startmenüverknüpfungen, geplanter Autostart und zwei Startverhalten |
+| Überwachung | Prozessprüfintervall, Verzögerungsfolge nach Absturz und Einbeziehung von Unterordnern beim Import |
+| Beendigungsrichtlinie | Zeitlimits zum Schließen von GUI-/CLI-Anwendungen und Erlaubnis zum erzwungenen Beenden nach Ablauf |
 | Protokolle | Löschen beim Start, Anzeigegrenze, Aufbewahrungstage für Stapelprotokolle und Speicherpfad |
-| Info | Versionen von Anwendung und Umgebung, sofortige Updateprüfung und Link zum Open-Source-Projekt |
 
 Das Fenster prüft Zahlenbereiche. Kommentare in `watchdog.ini` stehen neben den passenden Abschnitten und Einstellungen; verwenden Sie bevorzugt die Oberfläche, damit codierte Felder unbeschädigt bleiben. Siehe [Konfiguration, Sicherung und Wiederherstellung](en/configuration.md).
 

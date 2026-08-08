@@ -212,13 +212,19 @@ try {
     for headerCell in pseudoHeader.Cells {
         headerStyle := DllCall("user32\GetWindowLongPtrW", "Ptr",
             headerCell.Hwnd, "Int", -16, "Ptr")
-        AssertGuiSmoke(!(headerStyle & 0x00010000),
-            "Pseudo header field remained keyboard-selectable through Tab")
+        AssertGuiSmoke(!(headerStyle & 0x00010000)
+                && (headerStyle & 0x3) == 0x1,
+            "Pseudo header field was not centered or remained keyboard-selectable through Tab")
         AssertGuiSmoke(SendMessage(0x0301, 0, 0, headerCell.Hwnd) == 0,
             "Pseudo header field did not reject native copy requests")
         AssertGuiSmoke(!pseudoHeader.SetCellTextNoErase(headerCell,
             headerCell.Text),
             "Unchanged pseudo header text still requested a redraw")
+    }
+    for headerColumn in pseudoHeader.Columns {
+        AssertGuiSmoke(StrLower(headerColumn.HeaderAlign) == "center"
+                && headerColumn.Padding == "",
+            "Pseudo header content retained left alignment or padding")
     }
     ReportGuiSmokeStage("header-structure")
     list.Add("", "Smoke target B", "Paused", "C:\SmokeB.exe", "1", "20")
@@ -542,12 +548,20 @@ try {
     ; 模拟同一轮内的两次状态更新。第二次调度必须替换第一次的单次计时器，
     ; 最终只执行一次生产级整控件重绘。
     list.Modify(2, "Col2", "Updated")
-    AssertGuiSmoke(listSelectionPresenter.ScheduleNativeSurfaceRefresh(1),
+    refreshDelayMs := 25
+    AssertGuiSmoke(listSelectionPresenter.ScheduleNativeSurfaceRefresh(
+            refreshDelayMs),
         "Native ListView surface refresh was not scheduled")
-    AssertGuiSmoke(listSelectionPresenter.ScheduleNativeSurfaceRefresh(1),
+    AssertGuiSmoke(listSelectionPresenter.ScheduleNativeSurfaceRefresh(
+            refreshDelayMs),
         "Repeated native ListView surface refresh was not coalesced")
     ReportGuiSmokeStage("divider-refresh-scheduled")
-    Sleep(30)
+    refreshDeadline := A_TickCount + 1000
+    while listSelectionPresenter.nativeRefreshCount < 1
+            && A_TickCount < refreshDeadline
+        Sleep(10)
+    ; 首次回调完成后再越过一个合并窗口；若旧计时器没有被替换，计数会变成 2。
+    Sleep(refreshDelayMs * 2)
     ReportGuiSmokeStage("divider-refresh-ready")
     AssertGuiSmoke(listSelectionPresenter.nativeRefreshCount == 1
         && listSelectionPresenter.lastNativeRefreshSucceeded,

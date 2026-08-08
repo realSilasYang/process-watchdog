@@ -63,6 +63,12 @@ RunHistoryToastTests() {
         historyToast := HistoryToastWindow()
         AssertHistoryToast(historyToast.Show(
             "已撤销：添加守护对象：Smoke target"), "历史气泡无法显示")
+        toastExtendedStyle := DllCall("user32\GetWindowLongPtrW", "Ptr",
+            historyToast.gui.Hwnd, "Int", Win32.GWL_EXSTYLE, "Ptr")
+        AssertHistoryToast((toastExtendedStyle & 0x08000000) != 0
+                && DllCall("user32\GetForegroundWindow", "Ptr")
+                    != historyToast.gui.Hwnd,
+            "历史气泡缺少禁止激活样式或成为了前台窗口")
         AssertHistoryToast(historyToast.animationPhase == "show",
             "历史气泡没有开始进入动画")
         initialToastRect := Buffer(16, 0)
@@ -81,8 +87,13 @@ RunHistoryToastTests() {
         AssertHistoryToast(historyToast.animationPhase == "idle"
             && historyToast.currentAlpha == 255,
             "历史气泡没有以完全不透明状态结束进入动画")
-        AssertHistoryToast(DllCall("user32\GetFocus", "Ptr")
-                == focusBeforeToast, "历史气泡抢走了键盘焦点")
+        foregroundAfterToast := DllCall("user32\GetForegroundWindow", "Ptr")
+        AssertHistoryToast(foregroundAfterToast != historyToast.gui.Hwnd,
+            "历史气泡抢走了前台窗口")
+        if foregroundAfterToast == owner.Hwnd {
+            AssertHistoryToast(DllCall("user32\GetFocus", "Ptr")
+                    == focusBeforeToast, "历史气泡改变了所有者窗口的键盘焦点")
+        }
         AssertHistoryToast(historyToast.textControl.Text
                 == "已撤销：添加守护对象：Smoke target",
             "历史气泡没有保留具体操作文字")

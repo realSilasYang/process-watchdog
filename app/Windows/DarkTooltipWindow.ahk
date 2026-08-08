@@ -64,7 +64,7 @@ class DarkTooltipWindow extends ManagedWindow {
                 } else if (control == Main.btnPause) {
                     text := Tr("暂停或恢复选中守护对象，不会退出目标`n支持多选；混合状态时逐项反转`n快捷键：Space")
                 } else if (control == Main.btnSet) {
-                    text := Tr("配置通用、监控与启动、停止策略与日志")
+                    text := Tr("配置显示、启动、监控、停止策略与日志")
                 } else if (control == Main.btnSupport) {
                     text := Tr("打开帮助`n可选择查看使用说明、运行日志或提交反馈")
                 } else if (control == Main.btnAbout) {

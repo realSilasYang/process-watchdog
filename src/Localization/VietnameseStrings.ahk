@@ -154,9 +154,6 @@ class VietnameseStrings {
             "• EXE 版更新完整编译包；Git 源码版仅在受跟踪文件无修改且可快速前进时更新；其他源码版使用源码发行包。",
                 "• Phiên bản EXE cập nhật bằng gói đã biên dịch đầy đủ. Bản mã nguồn Git chỉ cập nhật khi các tệp được theo dõi không có thay đổi và có thể fast-forward đến thẻ phát hành. Các bản mã nguồn khác dùng gói phát hành mã nguồn.")
         catalog.Set(
-            "• “监控与启动”可控制是否在启动时后台检查新版；“通用”可随时手动检查。检查过程不会阻塞主界面。",
-                "• “Giám sát và khởi động” điều khiển việc kiểm tra phiên bản mới trong nền khi khởi động`; “Chung” cho phép kiểm tra thủ công bất cứ lúc nào. Quá trình kiểm tra không làm cửa sổ chính bị treo.")
-        catalog.Set(
             "• 主界面的“日志”显示本次运行中的监控、重启、升级保护和操作记录，并会自动更新。",
                 "• “Nhật ký” trên cửa sổ chính hiển thị các bản ghi giám sát, khởi động lại, bảo vệ khi cập nhật và thao tác trong phiên chạy hiện tại, đồng thời tự động cập nhật.")
         catalog.Set(
@@ -220,8 +217,8 @@ class VietnameseStrings {
             "• 界面语言和字体可在“通用”中手动切换；保存后立即更新主窗口、菜单和托盘，无需重新启动。",
                 "• Có thể đổi ngôn ngữ và phông chữ giao diện trong mục “Chung”. Khi lưu, cửa sổ chính, menu và khay hệ thống được cập nhật ngay mà không cần khởi động lại.")
         catalog.Set(
-            "• 监控与启动：设置状态检查间隔、重启等待序列、启动后是否显示主窗口、是否检查小助手更新，以及文件夹批量导入是否递归。",
-                "• Giám sát và khởi động: đặt khoảng thời gian kiểm tra trạng thái, chuỗi thời gian chờ khởi động lại, có hiển thị cửa sổ chính và kiểm tra bản cập nhật trợ lý sau khi khởi động hay không, cùng việc nhập thư mục có quét đệ quy hay không.")
+            "• 启动 / 监控：设置状态检查间隔、重启等待序列、启动后是否显示主窗口、是否检查小助手更新，以及文件夹批量导入是否递归。",
+                "• Khởi động / Giám sát: đặt khoảng thời gian kiểm tra trạng thái, chuỗi thời gian chờ khởi động lại, có hiển thị cửa sổ chính và kiểm tra bản cập nhật trợ lý sau khi khởi động hay không, cùng việc nhập thư mục có quét đệ quy hay không.")
         catalog.Set(
             "• 确认升级后会暂缓自动拉起；相关活动结束且目标文件稳定后，会自动恢复守护。真实升级过程中识别到的更新程序特征会自动记录。",
                 "• Sau khi xác nhận cập nhật, tính năng tự khởi chạy sẽ tạm dừng. Khi hoạt động liên quan kết thúc và tệp đích ổn định, giám sát sẽ tự động tiếp tục. Dấu hiệu nhận dạng trình cập nhật phát hiện trong quá trình cập nhật thực tế sẽ được tự động ghi nhớ.")
@@ -241,8 +238,8 @@ class VietnameseStrings {
             "• 选中守护对象后可暂停、恢复或删除。暂停只停止守护，不会关闭当前正在运行的目标。",
                 "• Sau khi chọn mục, bạn có thể tạm dừng, tiếp tục hoặc xóa. Tạm dừng chỉ dừng giám sát, không đóng đích đang chạy.")
         catalog.Set(
-            "• 选择文件夹会批量导入其中支持的文件；是否扫描子目录由“设置”中的“监控与启动”控制。",
-                "• Chọn một thư mục sẽ nhập hàng loạt các tệp được hỗ trợ trong đó`; việc có quét thư mục con hay không được điều khiển trong “Giám sát và khởi động” thuộc “Cài đặt”.")
+            "• 选择文件夹会批量导入其中支持的文件；是否扫描子目录由“设置”中的“监控”控制。",
+                "• Chọn một thư mục sẽ nhập hàng loạt các tệp được hỗ trợ trong đó`; việc có quét thư mục con hay không được điều khiển trong “Giám sát” thuộc “Cài đặt”.")
         catalog.Set(
             "• 守护对象右键菜单中的“查看运行日志”用于打开 BAT/CMD 目标生成的输出日志；其他类型或尚未生成时会提示文件不存在。",
                 "• “Xem nhật ký hoạt động” trong menu chuột phải của mục dùng để mở nhật ký đầu ra do đích BAT/CMD tạo. Với loại khác hoặc khi nhật ký chưa được tạo, trợ lý sẽ báo không tìm thấy tệp.")
@@ -1168,9 +1165,8 @@ class VietnameseStrings {
         catalog.Set(
             "界面资源",
                 "Tài nguyên giao diện")
-        catalog.Set(
-            "监控与启动",
-                "Giám sát và khởi động")
+        catalog.Set("启动", "Khởi động")
+        catalog.Set("监控", "Giám sát")
         catalog.Set(
             "守护对象重复",
                 "Đích giám sát bị trùng")
@@ -1273,6 +1269,9 @@ class VietnameseStrings {
         catalog.Set(
             "通用",
                 "Chung")
+        catalog.Set(
+            "显示",
+                "Hiển thị")
         catalog.Set(
             "结束升级等待并恢复守护",
                 "Kết thúc chờ cập nhật và tiếp tục giám sát")
@@ -1475,9 +1474,6 @@ class VietnameseStrings {
             "配置文件写入事务正在进行",
                 "Giao dịch ghi tệp cấu hình đang được thực hiện")
         catalog.Set(
-            "配置通用、监控与启动、停止`n以及日志选项",
-                "Cấu hình Chung, Giám sát và khởi động, Dừng`ncùng các tùy chọn Nhật ký")
-        catalog.Set(
             "重新加载",
                 "Tải lại")
         catalog.Set(
@@ -1610,9 +1606,6 @@ class VietnameseStrings {
             "• 关于：查看软件版本和 AutoHotkey 运行环境，手动检查更新或打开开源地址。",
                 "• Giới thiệu: xem phiên bản ứng dụng và môi trường chạy AutoHotkey, kiểm tra cập nhật thủ công hoặc mở dự án mã nguồn mở.")
         catalog.Set(
-            "• 监控与启动：设置进程状态检查间隔、崩溃自动重启延迟序列，以及导入文件夹时是否包含子目录。",
-                "• Theo dõi và khởi chạy: đặt khoảng kiểm tra trạng thái tiến trình, chuỗi trì hoãn tự động khởi động lại sau sự cố và việc có bao gồm thư mục con khi nhập thư mục hay không.")
-        catalog.Set(
             "• 检测到目标停止后，会先确认状态，再按“崩溃自动重启延迟序列”依次重试；连续失败时采用后续延迟，避免频繁拉起。",
                 "• Khi phát hiện ứng dụng đích đã dừng, trợ lý sẽ xác nhận lại trạng thái rồi thử theo “Chuỗi trì hoãn tự động khởi động lại sau sự cố”. Nếu liên tiếp thất bại, các mức trì hoãn tiếp theo sẽ được dùng để tránh khởi động lại quá dày.")
         catalog.Set(
@@ -1670,8 +1663,8 @@ class VietnameseStrings {
             "扩展设置包含无效数值。`n`nGUI 程序关闭超时：1-300 秒`nCLI 程序关闭超时：1-60 秒`n运行日志显示上限：50-10000 条`n批处理日志保留天数：1-3650 天",
                 "Cài đặt nâng cao có giá trị không hợp lệ.`n`nThời gian chờ đóng ứng dụng GUI: 1-300 giây`nThời gian chờ đóng ứng dụng CLI: 1-60 giây`nGiới hạn hiển thị nhật ký hoạt động: 50-10000 mục`nSố ngày giữ nhật ký đầu ra lô: 1-3650 ngày")
         catalog.Set(
-            "配置通用、监控与启动、停止策略与日志",
-                "Cấu hình Chung, Giám sát và khởi động, Chính sách dừng và Nhật ký")
+            "配置显示、启动、监控、停止策略与日志",
+                "Cấu hình Hiển thị, Khởi động, Giám sát, Chính sách dừng và Nhật ký")
         catalog.Set(
             "批处理日志保存路径：",
                 "Đường dẫn lưu nhật ký đầu ra lô:")
@@ -1702,7 +1695,7 @@ class VietnameseStrings {
         catalog.Set("无法即时切换界面语言、字体或主题，原显示设置已恢复。`n`n{1}", "Không thể đổi ngay ngôn ngữ, phông chữ hoặc chủ đề giao diện. Thiết lập hiển thị trước đó đã được khôi phục.`n`n{1}")
         catalog.Set("界面语言、字体和主题已即时更新，无需重新启动小助手。", "Ngôn ngữ, phông chữ và chủ đề giao diện đã được cập nhật ngay; không cần khởi động lại trợ lý.")
         catalog.Set("• 通用：创建桌面与开始菜单快捷方式，开启或关闭计划任务自启，设置启动时显示主窗口和启动时检查小助手更新，以及界面语言、内容字体和主题。", "• Chung: tạo lối tắt trên màn hình nền và menu Bắt đầu, bật hoặc tắt tự khởi động bằng tác vụ đã lên lịch, chọn hiển thị cửa sổ chính và kiểm tra cập nhật khi khởi động, đồng thời đặt ngôn ngữ, phông chữ nội dung và chủ đề giao diện.")
-        catalog.Set("• 界面语言、内容字体和主题保存后会立即更新主窗口、菜单和托盘，无需重新启动。", "• Sau khi lưu ngôn ngữ, phông chữ nội dung hoặc chủ đề giao diện, cửa sổ chính, menu và khay hệ thống sẽ cập nhật ngay mà không cần khởi động lại.")
+        catalog.Set("• 显示：界面语言、内容字体和主题保存后会立即更新主窗口、菜单和托盘，无需重新启动。", "• Hiển thị: sau khi lưu ngôn ngữ, phông chữ nội dung hoặc chủ đề giao diện, cửa sổ chính, menu và khay hệ thống sẽ cập nhật ngay mà không cần khởi động lại.")
         catalog.Set("打开帮助`n可选择查看使用说明、运行日志或提交反馈", "Mở Trợ giúp`nChọn hướng dẫn sử dụng, nhật ký chạy hoặc gửi phản hồi")
         catalog.Set("快揭不开锅了（≥Д≤）", "Sắp cạn kinh phí rồi（≥Д≤）")
         catalog.Set("帮助", "Trợ giúp")

@@ -64,9 +64,10 @@ class ListViewPseudoHeader {
                 throw ValueError("伪表头列索引无效")
             alignment := columnSpec.HasOwnProp("Align")
                 ? String(columnSpec.Align) : "Left"
+            headerAlignment := columnSpec.HasOwnProp("HeaderAlign")
+                ? String(columnSpec.HeaderAlign) : "Center"
             padding := columnSpec.HasOwnProp("Padding")
-                ? String(columnSpec.Padding)
-                : (StrLower(alignment) == "left" ? "  " : "")
+                ? String(columnSpec.Padding) : ""
             sortOptions := columnSpec.HasOwnProp("SortOptions")
                 ? Trim(String(columnSpec.SortOptions)) : ""
             skipAscending := columnSpec.HasOwnProp("SkipAscending")
@@ -76,12 +77,13 @@ class ListViewPseudoHeader {
                 Label: columnSpec.HasOwnProp("Label")
                     ? String(columnSpec.Label) : "",
                 Align: alignment,
+                HeaderAlign: headerAlignment,
                 Padding: padding,
                 SortOptions: sortOptions,
                 SkipAscending: skipAscending
             })
-            alignOption := StrLower(alignment) == "center" ? " Center"
-                : (StrLower(alignment) == "right" ? " Right" : "")
+            alignOption := StrLower(headerAlignment) == "center" ? " Center"
+                : (StrLower(headerAlignment) == "right" ? " Right" : "")
             cell := guiObj.Add("Text", "x0 y0 w1 h" this.Height
                 " -Tabstop"
                 " 0x200" alignOption " Background" this.BackgroundColor
@@ -208,8 +210,8 @@ class ListViewPseudoHeader {
             return false
         columnSpec := this.Columns[this.SortDisplayColumn]
         direction := this.SortDescending ? "SortDesc" : "Sort"
-        ; Integer 会默认把原生列改为右对齐；每次排序都同时重申伪表头定义的
-        ; 对齐方式，保证序号和扩展名单元格不会在点击后跳动。
+        ; Integer 会默认把原生数据列改为右对齐；每次排序都重申数据列定义的
+        ; 对齐方式。表头拥有独立 HeaderAlign，排序不会把数据对齐改成表头对齐。
         options := Trim(columnSpec.SortOptions " " columnSpec.Align
             " " direction)
         this.List.ModifyCol(columnSpec.Column, options)

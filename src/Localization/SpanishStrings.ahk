@@ -154,9 +154,6 @@ class SpanishStrings {
             "• EXE 版更新完整编译包；Git 源码版仅在受跟踪文件无修改且可快速前进时更新；其他源码版使用源码发行包。",
                 "• La edición EXE actualiza el paquete compilado completo. La edición desde código fuente de Git solo se actualiza si los archivos seguidos no tienen cambios y se puede avanzar directamente`; las demás instalaciones desde código fuente usan el paquete de código fuente.")
         catalog.Set(
-            "• “监控与启动”可控制是否在启动时后台检查新版；“通用”可随时手动检查。检查过程不会阻塞主界面。",
-                "• En “Supervisión e inicio” puede elegir si se buscan nuevas versiones en segundo plano al iniciar`; en “General” puede iniciar una búsqueda manual en cualquier momento. La comprobación no bloquea la ventana principal.")
-        catalog.Set(
             "• 主界面的“日志”显示本次运行中的监控、重启、升级保护和操作记录，并会自动更新。",
                 "• “Registro” en la ventana principal muestra y actualiza automáticamente los eventos de supervisión, reinicio, protección de actualizaciones y operaciones de la sesión actual.")
         catalog.Set(
@@ -220,8 +217,8 @@ class SpanishStrings {
             "• 界面语言和字体可在“通用”中手动切换；保存后立即更新主窗口、菜单和托盘，无需重新启动。",
                 "• El idioma y la fuente de la interfaz se pueden cambiar en “General”. Al guardar, la ventana principal, los menús y la bandeja se actualizan de inmediato, sin reiniciar.")
         catalog.Set(
-            "• 监控与启动：设置状态检查间隔、重启等待序列、启动后是否显示主窗口、是否检查小助手更新，以及文件夹批量导入是否递归。",
-                "• Supervisión e inicio: configure el intervalo de comprobación, la secuencia de espera para reiniciar, si se muestra la ventana principal y se buscan actualizaciones al iniciar, y si la importación de carpetas recorre las subcarpetas.")
+            "• 启动 / 监控：设置状态检查间隔、重启等待序列、启动后是否显示主窗口、是否检查小助手更新，以及文件夹批量导入是否递归。",
+                "• Inicio / Supervisión: configure el intervalo de comprobación, la secuencia de espera para reiniciar, si se muestra la ventana principal y se buscan actualizaciones al iniciar, y si la importación de carpetas recorre las subcarpetas.")
         catalog.Set(
             "• 确认升级后会暂缓自动拉起；相关活动结束且目标文件稳定后，会自动恢复守护。真实升级过程中识别到的更新程序特征会自动记录。",
                 "• Tras confirmar una actualización se suspenden los inicios automáticos. Cuando termina la actividad relacionada y el archivo de destino se estabiliza, la supervisión se reanuda automáticamente. Las características del actualizador detectadas durante una actualización real se guardan de forma automática.")
@@ -241,8 +238,8 @@ class SpanishStrings {
             "• 选中守护对象后可暂停、恢复或删除。暂停只停止守护，不会关闭当前正在运行的目标。",
                 "• Después de seleccionar elementos puede pausarlos, reanudarlos o eliminarlos. La pausa solo detiene la supervisión`; no cierra los destinos que se estén ejecutando.")
         catalog.Set(
-            "• 选择文件夹会批量导入其中支持的文件；是否扫描子目录由“设置”中的“监控与启动”控制。",
-                "• Al seleccionar una carpeta se importan por lotes los archivos compatibles que contiene. La opción “Supervisión e inicio” de “Configuración” determina si también se recorren las subcarpetas.")
+            "• 选择文件夹会批量导入其中支持的文件；是否扫描子目录由“设置”中的“监控”控制。",
+                "• Al seleccionar una carpeta se importan por lotes los archivos compatibles que contiene. La opción “Supervisión” de “Configuración” determina si también se recorren las subcarpetas.")
         catalog.Set(
             "• 守护对象右键菜单中的“查看运行日志”用于打开 BAT/CMD 目标生成的输出日志；其他类型或尚未生成时会提示文件不存在。",
                 "• “Ver registro de ejecución” en el menú contextual abre el registro de salida generado por destinos BAT/CMD. Para otros tipos o si aún no existe, se indicará que el archivo no está disponible.")
@@ -1168,9 +1165,8 @@ class SpanishStrings {
         catalog.Set(
             "界面资源",
                 "Recursos de la interfaz")
-        catalog.Set(
-            "监控与启动",
-                "Supervisión e inicio")
+        catalog.Set("启动", "Inicio")
+        catalog.Set("监控", "Supervisión")
         catalog.Set(
             "守护对象重复",
                 "Destino de supervisión duplicado")
@@ -1273,6 +1269,9 @@ class SpanishStrings {
         catalog.Set(
             "通用",
                 "General")
+        catalog.Set(
+            "显示",
+                "Pantalla")
         catalog.Set(
             "结束升级等待并恢复守护",
                 "Finalizar la espera de actualización y reanudar la supervisión")
@@ -1475,9 +1474,6 @@ class SpanishStrings {
             "配置文件写入事务正在进行",
                 "Hay una transacción de escritura del archivo de configuración en curso")
         catalog.Set(
-            "配置通用、监控与启动、停止`n以及日志选项",
-                "Configure General, Supervisión e inicio, Detención`ny Registro")
-        catalog.Set(
             "重新加载",
                 "Recargar")
         catalog.Set(
@@ -1601,7 +1597,6 @@ class SpanishStrings {
         catalog.Set("{1}（源码版）", "{1}（versión de código fuente）")
         catalog.Set("• “结束运行”会先请求目标正常退出；超过设置时间后，是否强制终止由“停止策略”中的选项决定。", "• «Detener ejecución» solicita primero al destino que se cierre normalmente. Si vence el tiempo de espera, la opción de «Política de detención» determina si se fuerza su cierre.")
         catalog.Set("• 关于：查看软件版本和 AutoHotkey 运行环境，手动检查更新或打开开源地址。", "• Acerca de: consulta la versión de la aplicación y el entorno de ejecución de AutoHotkey, busca actualizaciones manualmente o abre el proyecto de código abierto.")
-        catalog.Set("• 监控与启动：设置进程状态检查间隔、崩溃自动重启延迟序列，以及导入文件夹时是否包含子目录。", "• Supervisión e inicio: configura el intervalo de comprobación de procesos, la secuencia de demoras del reinicio automático tras un fallo y si se incluyen las subcarpetas al importar una carpeta.")
         catalog.Set("• 检测到目标停止后，会先确认状态，再按“崩溃自动重启延迟序列”依次重试；连续失败时采用后续延迟，避免频繁拉起。", "• Cuando detecta que un destino se ha detenido, el asistente confirma su estado y vuelve a intentarlo según la «Secuencia de demoras del reinicio automático tras un fallo». Si los fallos continúan, usa las demoras siguientes para evitar reinicios demasiado frecuentes.")
         catalog.Set("• 界面语言和内容字体保存后会立即更新主窗口、菜单和托盘，无需重新启动。", "• Al guardar el idioma de la interfaz o la fuente del contenido, la ventana principal, los menús y la bandeja se actualizan de inmediato sin reiniciar.")
         catalog.Set("• 日志：设置运行日志显示上限、批处理日志保存路径、保留天数和启动时清理策略。", "• Registros: configura el límite de visualización del registro de ejecución, la ruta y los días de conservación de los registros de salida por lotes y su limpieza al iniciar.")
@@ -1621,7 +1616,7 @@ class SpanishStrings {
         catalog.Set("进程状态检查间隔（毫秒）：", "Intervalo de comprobación de procesos（milisegundos）:")
         catalog.Set("进程状态检查间隔必须为 500-86400000 毫秒的正整数！", "El intervalo de comprobación de procesos debe ser un entero positivo entre 500 y 86400000 milisegundos.")
         catalog.Set("扩展设置包含无效数值。`n`nGUI 程序关闭超时：1-300 秒`nCLI 程序关闭超时：1-60 秒`n运行日志显示上限：50-10000 条`n批处理日志保留天数：1-3650 天", "Hay valores no válidos en la configuración avanzada.`n`nTiempo de espera al cerrar aplicaciones GUI: 1-300 segundos`nTiempo de espera al cerrar aplicaciones CLI: 1-60 segundos`nLímite de visualización del registro de ejecución: 50-10000 entradas`nConservación de registros de salida por lotes: 1-3650 días")
-        catalog.Set("配置通用、监控与启动、停止策略与日志", "Configura General, Supervisión e inicio, Política de detención y Registros")
+        catalog.Set("配置显示、启动、监控、停止策略与日志", "Configura Pantalla, Inicio, Supervisión, Política de detención y Registros")
         catalog.Set("批处理日志保存路径：", "Ruta de los registros de salida por lotes:")
         catalog.Set("批处理日志保留天数：", "Días de conservación de los registros de salida por lotes:")
         catalog.Set("启动时显示主窗口", "Mostrar la ventana principal al iniciar")
@@ -1638,7 +1633,7 @@ class SpanishStrings {
         catalog.Set("无法即时切换界面语言、字体或主题，原显示设置已恢复。`n`n{1}", "No se pudo cambiar de inmediato el idioma, la fuente o el tema de la interfaz. Se restauraron los ajustes de visualización anteriores.`n`n{1}")
         catalog.Set("界面语言、字体和主题已即时更新，无需重新启动小助手。", "El idioma, la fuente y el tema de la interfaz se actualizaron de inmediato; no es necesario reiniciar el asistente.")
         catalog.Set("• 通用：创建桌面与开始菜单快捷方式，开启或关闭计划任务自启，设置启动时显示主窗口和启动时检查小助手更新，以及界面语言、内容字体和主题。", "• General: crea accesos directos en el escritorio y el menú Inicio, activa o desactiva el inicio mediante una tarea programada, configura la ventana principal y la búsqueda de actualizaciones al iniciar, y elige el idioma, la fuente del contenido y el tema.")
-        catalog.Set("• 界面语言、内容字体和主题保存后会立即更新主窗口、菜单和托盘，无需重新启动。", "• Al guardar el idioma, la fuente del contenido o el tema, la ventana principal, los menús y la bandeja se actualizan de inmediato sin reiniciar.")
+        catalog.Set("• 显示：界面语言、内容字体和主题保存后会立即更新主窗口、菜单和托盘，无需重新启动。", "• Pantalla: al guardar el idioma, la fuente del contenido o el tema, la ventana principal, los menús y la bandeja se actualizan de inmediato sin reiniciar.")
         catalog.Set("打开帮助`n可选择查看使用说明、运行日志或提交反馈", "Abrir Ayuda`nElige la guía de uso, el registro de ejecución o el envío de comentarios")
         catalog.Set("快揭不开锅了（≥Д≤）", "Ya casi no queda presupuesto（≥Д≤）")
         catalog.Set("帮助", "Ayuda")

@@ -154,9 +154,6 @@ class EnglishStrings {
             "• EXE 版更新完整编译包；Git 源码版仅在受跟踪文件无修改且可快速前进时更新；其他源码版使用源码发行包。",
                 "• The EXE edition updates from the complete compiled package. A Git source checkout updates only when its tracked files are unchanged and it can fast-forward to the release tag. Other source installations use the source release package.")
         catalog.Set(
-            "• “监控与启动”可控制是否在启动时后台检查新版；“通用”可随时手动检查。检查过程不会阻塞主界面。",
-                "• Monitoring & Startup controls whether a background update check runs at startup. General also lets you check manually at any time. Update checks never block the main window.")
-        catalog.Set(
             "• 主界面的“日志”显示本次运行中的监控、重启、升级保护和操作记录，并会自动更新。",
                 "• Logs on the main window shows monitoring, restart, update-protection, and user-action records from the current session, and updates automatically.")
         catalog.Set(
@@ -220,8 +217,8 @@ class EnglishStrings {
             "• 界面语言和字体可在“通用”中手动切换；保存后立即更新主窗口、菜单和托盘，无需重新启动。",
                 "• The interface language and font can be changed under General. Saving updates the main window, menus, and tray immediately, without restarting.")
         catalog.Set(
-            "• 监控与启动：设置状态检查间隔、重启等待序列、启动后是否显示主窗口、是否检查小助手更新，以及文件夹批量导入是否递归。",
-                "• Monitoring & Startup: configure the status-check interval, restart delay sequence, whether to show the main window and check for assistant updates after startup, and whether folder batch import is recursive.")
+            "• 启动 / 监控：设置状态检查间隔、重启等待序列、启动后是否显示主窗口、是否检查小助手更新，以及文件夹批量导入是否递归。",
+                "• Startup / Monitoring: configure the status-check interval, restart delay sequence, whether to show the main window and check for assistant updates after startup, and whether folder batch import is recursive.")
         catalog.Set(
             "• 确认升级后会暂缓自动拉起；相关活动结束且目标文件稳定后，会自动恢复守护。真实升级过程中识别到的更新程序特征会自动记录。",
                 "• After an update is confirmed, automatic restart is suspended. Monitoring resumes automatically after the related activity ends and the target files become stable. Updater signatures observed during real updates are learned automatically.")
@@ -241,8 +238,8 @@ class EnglishStrings {
             "• 选中守护对象后可暂停、恢复或删除。暂停只停止守护，不会关闭当前正在运行的目标。",
                 "• After selecting items, you can pause, resume, or delete them. Pausing stops only monitoring and does not close a target that is already running.")
         catalog.Set(
-            "• 选择文件夹会批量导入其中支持的文件；是否扫描子目录由“设置”中的“监控与启动”控制。",
-                "• Selecting a folder batch-imports the supported files it contains. Whether subfolders are scanned is controlled under Monitoring & Startup in Settings.")
+            "• 选择文件夹会批量导入其中支持的文件；是否扫描子目录由“设置”中的“监控”控制。",
+                "• Selecting a folder batch-imports the supported files it contains. Whether subfolders are scanned is controlled under Monitoring in Settings.")
         catalog.Set(
             "• 守护对象右键菜单中的“查看运行日志”用于打开 BAT/CMD 目标生成的输出日志；其他类型或尚未生成时会提示文件不存在。",
                 "• View Runtime Log in an item's context menu opens the output log generated for a BAT or CMD target. For other target types, or before a log has been generated, a file-not-found message appears.")
@@ -1168,9 +1165,8 @@ class EnglishStrings {
         catalog.Set(
             "界面资源",
                 "UI resources")
-        catalog.Set(
-            "监控与启动",
-                "Monitoring & Startup")
+        catalog.Set("启动", "Startup")
+        catalog.Set("监控", "Monitoring")
         catalog.Set(
             "守护对象重复",
                 "Duplicate monitored target")
@@ -1273,6 +1269,9 @@ class EnglishStrings {
         catalog.Set(
             "通用",
                 "General")
+        catalog.Set(
+            "显示",
+                "Display")
         catalog.Set(
             "结束升级等待并恢复守护",
                 "End Update Wait and Resume Monitoring")
@@ -1475,9 +1474,6 @@ class EnglishStrings {
             "配置文件写入事务正在进行",
                 "A configuration-file write transaction is already in progress")
         catalog.Set(
-            "配置通用、监控与启动、停止`n以及日志选项",
-                "Configure General, Monitoring & Startup, Stopping,`nand Log settings")
-        catalog.Set(
             "重新加载",
                 "Reload")
         catalog.Set(
@@ -1610,9 +1606,6 @@ class EnglishStrings {
             "• 关于：查看软件版本和 AutoHotkey 运行环境，手动检查更新或打开开源地址。",
                 "• About: view the application version and AutoHotkey runtime, check for updates manually, or open the open-source project.")
         catalog.Set(
-            "• 监控与启动：设置进程状态检查间隔、崩溃自动重启延迟序列，以及导入文件夹时是否包含子目录。",
-                "• Monitoring & Startup: set the process status check interval, automatic restart delay sequence after a crash, and whether folder imports include subfolders.")
-        catalog.Set(
             "• 检测到目标停止后，会先确认状态，再按“崩溃自动重启延迟序列”依次重试；连续失败时采用后续延迟，避免频繁拉起。",
                 "• After detecting that a target has stopped, the assistant confirms its status, then retries according to the “Automatic restart delay sequence after crash”. Later delays are used after repeated failures to prevent rapid restart loops.")
         catalog.Set(
@@ -1670,8 +1663,8 @@ class EnglishStrings {
             "扩展设置包含无效数值。`n`nGUI 程序关闭超时：1-300 秒`nCLI 程序关闭超时：1-60 秒`n运行日志显示上限：50-10000 条`n批处理日志保留天数：1-3650 天",
                 "Some advanced settings contain invalid values.`n`nGUI application shutdown timeout: 1-300 seconds`nCLI application shutdown timeout: 1-60 seconds`nRuntime log display limit: 50-10000 entries`nBatch-output log retention: 1-3650 days")
         catalog.Set(
-            "配置通用、监控与启动、停止策略与日志",
-                "Configure General, Monitoring & Startup, Stop Policy, and Logs")
+            "配置显示、启动、监控、停止策略与日志",
+                "Configure Display, Startup, Monitoring, Stop Policy, and Logs")
         catalog.Set(
             "批处理日志保存路径：",
                 "Batch-output log save path:")
@@ -1721,8 +1714,8 @@ class EnglishStrings {
             "• 通用：创建桌面与开始菜单快捷方式，开启或关闭计划任务自启，设置启动时显示主窗口和启动时检查小助手更新，以及界面语言、内容字体和主题。",
                 "• General: create desktop and Start menu shortcuts, enable or disable scheduled startup, choose whether to show the main window and check for assistant updates at startup, and set the interface language, content font, and theme.")
         catalog.Set(
-            "• 界面语言、内容字体和主题保存后会立即更新主窗口、菜单和托盘，无需重新启动。",
-                "• Saving the interface language, content font, or theme immediately updates the main window, menus, and tray without restarting.")
+            "• 显示：界面语言、内容字体和主题保存后会立即更新主窗口、菜单和托盘，无需重新启动。",
+                "• Display: saving the interface language, content font, or theme immediately updates the main window, menus, and tray without restarting.")
         catalog.Set("打开帮助`n可选择查看使用说明、运行日志或提交反馈", "Open Help`nChoose the user guide, runtime log, or feedback page")
         catalog.Set("快揭不开锅了（≥Д≤）", "The budget's almost gone（≥Д≤）")
         catalog.Set("帮助", "Help")

@@ -38,7 +38,7 @@ Incluye interfaz clara y oscura, recuperación automática, protección durante 
   <img src="images/process-watchdog-overview.png" alt="Ventana principal de Process Watchdog Assistant" width="100%">
 </p>
 
-La ventana principal reúne el orden de los objetivos supervisados, el icono, el nombre, los requisitos de privilegios y el estado actual. La barra superior permite añadir, eliminar, pausar, abrir los ajustes, consultar la ayuda o realizar una donación; desde Ayuda se accede al manual y al registro de ejecución. La barra inferior resume los destinos en ejecución, recuperación, actualización, pausa y error, y el registro muestra las pruebas que justifican cada estado anómalo.
+La ventana principal reúne el orden de los objetivos supervisados, el icono, el nombre, los requisitos de privilegios y el estado actual. La barra de comandos ofrece Añadir, Eliminar, Pausar, Ajustes, Ayuda y Acerca de; Ayuda permite abrir el manual, el registro de ejecución o la página de comentarios, mientras que Acerca de reúne versión, entorno, actualizaciones, proyecto y Donar. La barra inferior resume los destinos en ejecución, recuperación, actualización, pausa y error, y el registro muestra las pruebas que justifican cada estado anómalo.
 
 ## Funciones principales
 
@@ -49,8 +49,8 @@ La ventana principal reúne el orden de los objetivos supervisados, el icono, el
 - La protección durante actualizaciones está desactivada de forma predeterminada. Al activarla, combina procesos de actualización, relaciones padre-hijo, actividad del directorio de instalación y estabilidad de archivos para pausar o reanudar la supervisión.
 - Sustituye la configuración de manera atómica. Los registros que no puedan analizarse se trasladan a `[Recovery]` en lugar de descartarse en silencio.
 - La búsqueda de aplicaciones usa exclusivamente el servicio Everything, sin análisis local de todo el disco ni límite impuesto al número de resultados. Los conjuntos grandes se añaden en lotes breves para que la extracción de iconos no bloquee la interfaz.
-- Admite chino simplificado, chino tradicional de Hong Kong, chino tradicional de Taiwán, inglés, japonés, vietnamita, coreano, español, francés, portugués de Brasil, ruso, alemán e italiano. De forma predeterminada sigue el idioma de Windows; los idiomas no admitidos vuelven al inglés y también puede elegirse manualmente en General. Los cambios de idioma y fuente de contenido se aplican de inmediato en el proceso actual sin detener ni reinicializar las tareas de supervisión.
-- Con «Seguir el valor predeterminado del idioma» se priorizan PingFang, SF Pro Text, Harano Aji Gothic o Apple SD Gothic Neo. Si no están instaladas, se carga de forma privada el recurso incluido con licencia comercial u OFL y, después, la familia Noto correspondiente. La fuente de contenido se aplica al texto, campos, listas e información de Acerca de; botones, pestañas y barra inferior usan siempre la fuente de interfaz de Windows en negrita correspondiente al idioma.
+- Admite chino simplificado, chino tradicional de Hong Kong, chino tradicional de Taiwán, inglés, japonés, vietnamita, coreano, español, francés, portugués de Brasil, ruso, alemán e italiano. De forma predeterminada sigue el idioma de Windows; los idiomas no admitidos vuelven al inglés y también puede elegirse manualmente en Pantalla. Los cambios de idioma y fuente de contenido se aplican de inmediato en el proceso actual sin detener ni reinicializar las tareas de supervisión.
+- Con «Seguir el valor predeterminado del idioma» solo se usan fuentes instaladas en Windows: primero PingFang, SF Pro Text, Harano Aji Gothic o Apple SD Gothic Neo, después la familia Noto correspondiente y, por último, una fuente del sistema Windows. Las fuentes opcionales deben instalarse primero en Windows; el asistente nunca las carga de forma privada desde su propio directorio. La fuente de contenido se aplica al texto, campos, listas e información de Acerca de; botones, pestañas y barra inferior usan siempre la fuente de interfaz de Windows en negrita correspondiente al idioma.
 - La interfaz clara y oscura permite minimizar ventanas secundarias de forma independiente, reconstruir iconos según el DPI, usar botones redondeados e iconos personalizados.
 - Los diagnósticos se generan únicamente en local y no se suben automáticamente; los artefactos oficiales pueden verificarse de forma independiente.
 
@@ -114,9 +114,9 @@ Cerrar la ventana principal solo la oculta en la bandeja y la supervisión conti
 | Añadir | Elegir un destino, buscar aplicaciones instaladas o importar una carpeta; incluye subcarpetas de forma predeterminada |
 | Eliminar | Eliminar los elementos seleccionados; admite selección múltiple y deshacer |
 | Pausar / Reanudar | Cambiar solo la supervisión automática sin cerrar el destino activo; una selección mixta se invierte elemento por elemento |
-| Ajustes | Configurar General, Supervisión e inicio, Política de detención, Registros y Acerca de |
+| Ajustes | Configurar Pantalla, Inicio, Supervisión, Política de detención y Registros |
 | Ayuda | Elegir el manual integrado, el registro de ejecución o la página de comentarios de GitHub |
-| Donar | Mostrar códigos QR de WeChat Pay y Alipay para apoyar el mantenimiento |
+| Acerca de | Ver la versión y el entorno de ejecución, buscar actualizaciones, abrir el proyecto o acceder a Donar |
 
 Cada elemento puede definir el punto de entrada, el directorio de trabajo, los argumentos y si necesita privilegios de administrador. El LNK se conserva como punto de entrada y la ruta real del programa se guarda por separado para identificar el proceso; por ello no es necesario sustituir accesos indirectos del instalador por un EXE interno que puede cambiar.
 
@@ -159,11 +159,11 @@ No es un instalador universal ni un administrador de servicios de Windows. Para 
 
 | Categoría | Opciones |
 | --- | --- |
-| General | Accesos directos de Escritorio y menú Inicio, inicio programado, dos comportamientos al iniciar, idioma, fuente de contenido y tema |
-| Supervisión e inicio | Intervalo de estado del proceso, secuencia de retrasos tras un fallo e inclusión de subcarpetas al importar |
+| Pantalla | Idioma de la interfaz, fuente del contenido y tema |
+| Inicio | Accesos directos de Escritorio y menú Inicio, inicio programado y dos comportamientos al iniciar |
+| Supervisión | Intervalo de estado del proceso, secuencia de retrasos tras un fallo e inclusión de subcarpetas al importar |
 | Política de detención | Tiempos de cierre para aplicaciones GUI/CLI y permiso de terminación forzada al agotarse |
 | Registros | Borrado al iniciar, límite visible, días de conservación del registro por lotes y ruta de guardado |
-| Acerca de | Versiones de aplicación y entorno, comprobación inmediata y enlace al proyecto abierto |
 
 La ventana valida los intervalos numéricos. Los comentarios de `watchdog.ini` están junto a sus secciones y opciones; es preferible usar la interfaz para no dañar campos codificados. Consulta [Configuración, copia de seguridad y recuperación](en/configuration.md).
 

@@ -38,7 +38,7 @@ O projeto oferece interface clara e escura, recuperação automática, proteçã
   <img src="images/process-watchdog-overview.png" alt="Janela principal do Process Watchdog Assistant" width="100%">
 </p>
 
-A janela principal reúne a ordem dos alvos monitorados, o ícone do aplicativo, o nome, os requisitos de privilégio e o estado atual. A barra superior permite adicionar, excluir, pausar, abrir as configurações, consultar a ajuda ou fazer uma doação; pela Ajuda é possível abrir o manual ou o log de execução. A barra inferior resume os alvos em execução, recuperação, atualização, pausa e falha, enquanto o log mostra as evidências por trás de cada estado anormal.
+A janela principal reúne a ordem dos alvos monitorados, o ícone do aplicativo, o nome, os requisitos de privilégio e o estado atual. A barra de comandos oferece Adicionar, Excluir, Pausar, Configurações, Ajuda e Sobre; Ajuda abre o manual, o log de execução ou a página de comentários, enquanto Sobre reúne versão, ambiente, atualizações, projeto e Doar. A barra inferior resume os alvos em execução, recuperação, atualização, pausa e falha, enquanto o log mostra as evidências por trás de cada estado anormal.
 
 ## Principais recursos
 
@@ -49,8 +49,8 @@ A janela principal reúne a ordem dos alvos monitorados, o ícone do aplicativo,
 - A proteção de atualização fica desativada por padrão. Quando ativada, combina processos de atualização, relações pai-filho, atividade da pasta de instalação e estabilidade dos arquivos antes de pausar ou retomar o monitoramento.
 - Substitui a configuração de forma atômica. Registros que não podem ser analisados vão para `[Recovery]` em vez de desaparecer silenciosamente.
 - A busca de aplicativos usa exclusivamente o serviço Everything, sem varredura local de todo o disco nem limite de resultados imposto pelo aplicativo. Conjuntos grandes são adicionados em lotes curtos para que a extração de ícones não bloqueie a interface.
-- Oferece chinês simplificado, chinês tradicional de Hong Kong, chinês tradicional de Taiwan, inglês, japonês, vietnamita, coreano, espanhol, francês, português do Brasil, russo, alemão e italiano. A interface segue o idioma do Windows por padrão, usa inglês quando o idioma não é compatível e também pode ser escolhida em Geral. Alterações de idioma e fonte de conteúdo entram em vigor imediatamente no processo atual sem interromper nem reinicializar as tarefas de monitoramento.
-- Em “Seguir o padrão do idioma”, prioriza PingFang, SF Pro Text, Harano Aji Gothic ou Apple SD Gothic Neo. Quando ausentes, carrega de forma privada o recurso incluído com licença comercial ou OFL e depois recorre à família Noto correspondente. A fonte de conteúdo vale para texto, campos, listas e informações Sobre; botões, abas e a barra inferior sempre usam a fonte de interface do Windows em negrito adequada ao idioma.
+- Oferece chinês simplificado, chinês tradicional de Hong Kong, chinês tradicional de Taiwan, inglês, japonês, vietnamita, coreano, espanhol, francês, português do Brasil, russo, alemão e italiano. A interface segue o idioma do Windows por padrão, usa inglês quando o idioma não é compatível e também pode ser escolhida em Exibição. Alterações de idioma e fonte de conteúdo entram em vigor imediatamente no processo atual sem interromper nem reinicializar as tarefas de monitoramento.
+- Em “Seguir o padrão do idioma”, usa apenas fontes instaladas no Windows: primeiro PingFang, SF Pro Text, Harano Aji Gothic ou Apple SD Gothic Neo, depois a família Noto correspondente e, por fim, uma fonte do sistema Windows. As fontes opcionais devem ser instaladas no Windows primeiro; o assistente nunca as carrega de forma privada a partir de sua própria pasta. A fonte de conteúdo vale para texto, campos, listas e informações Sobre; botões, abas e a barra inferior sempre usam a fonte de interface do Windows em negrito adequada ao idioma.
 - Os temas claro e escuro oferecem minimização independente das janelas secundárias, reconstrução de ícones conforme o DPI, botões arredondados e ícones personalizados.
 - O pacote de diagnóstico é gerado apenas localmente e não é enviado de forma automática; os artefatos oficiais podem ser verificados de maneira independente.
 
@@ -114,9 +114,9 @@ Fechar a janela principal apenas a oculta na área de notificação; o monitoram
 | Adicionar | Escolher um alvo, buscar aplicativos instalados ou importar uma pasta; inclui subpastas por padrão |
 | Excluir | Remover os itens selecionados; aceita seleção múltipla e desfazer |
 | Pausar / Retomar | Alterar apenas o monitoramento automático sem fechar o alvo ativo; uma seleção mista é invertida item a item |
-| Configurações | Configurar Geral, Monitoramento e inicialização, Política de parada, Logs e Sobre |
+| Configurações | Configurar Exibição, Inicialização, Monitoramento, Política de encerramento e Logs |
 | Ajuda | Escolher o manual integrado, o log de execução ou a página de comentários no GitHub |
-| Doar | Mostrar os códigos QR do WeChat Pay e do Alipay que apoiam a manutenção |
+| Sobre | Ver versão e ambiente de execução, buscar atualizações, abrir o projeto ou acessar Doar |
 
 Um item pode definir seu ponto de entrada, pasta de trabalho, argumentos e exigência de administrador. O LNK permanece como ponto de entrada e o caminho real do programa é armazenado separadamente para identificar o processo. Assim, um atalho indireto criado pelo instalador não precisa ser substituído manualmente por um EXE interno que pode mudar.
 
@@ -159,11 +159,11 @@ O recurso não é um instalador universal nem um gerenciador de serviços do Win
 
 | Categoria | Opções |
 | --- | --- |
-| Geral | Atalhos na Área de Trabalho e no menu Iniciar, inicialização agendada, dois comportamentos ao iniciar, idioma, fonte do conteúdo e tema |
-| Monitoramento e inicialização | Intervalo de estado do processo, sequência de atrasos após falha e inclusão de subpastas na importação |
-| Política de parada | Tempos para fechar aplicativos GUI/CLI e permissão para encerramento forçado após o limite |
+| Exibição | Idioma da interface, fonte do conteúdo e tema |
+| Inicialização | Atalhos na Área de Trabalho e no menu Iniciar, inicialização agendada e dois comportamentos ao iniciar |
+| Monitoramento | Intervalo de estado do processo, sequência de atrasos após falha e inclusão de subpastas na importação |
+| Política de encerramento | Tempos para fechar aplicativos GUI/CLI e permissão para encerramento forçado após o limite |
 | Logs | Limpeza ao iniciar, limite de exibição, dias de retenção do log em lote e pasta de salvamento |
-| Sobre | Versões do aplicativo e ambiente, verificação imediata e link do projeto aberto |
 
 A janela valida os intervalos numéricos. Os comentários de `watchdog.ini` ficam junto das seções e opções correspondentes; prefira a interface para não danificar campos codificados. Consulte [Configuração, backup e recuperação](en/configuration.md).
 

@@ -73,7 +73,7 @@ class CustomDisplayDialog extends ManagedWindow {
             actionStartX := Round((windowWidth - 170) / 2)
             btnSave := this.gui.Add("Text",
                 "x" actionStartX " y212 w80 h28 Center 0x200 Background"
-                    UiThemeService.Color("Primary") " c"
+                    UiThemeService.Color("Save") " c"
                     UiThemeService.Color("ButtonText"),
                 Tr("保存"))
             btnCancel := this.gui.Add("Text",
@@ -87,7 +87,7 @@ class CustomDisplayDialog extends ManagedWindow {
             for button in [this.defaultNameButton, btnBrowse,
                 this.defaultIconButton, btnCancel]
                 RegisterHoverButton(button, UiThemeService.Color("Toolbar"))
-            RegisterHoverButton(btnSave, UiThemeService.Color("Primary"))
+            RegisterHoverButton(btnSave, UiThemeService.Color("Save"))
             SetButtonLucideIcon(btnBrowse, "folder-open.svg", 14, 6)
             RegisterButtonClick(this.defaultNameButton,
                 ObjBindMethod(this, "UseDefaultName"))
