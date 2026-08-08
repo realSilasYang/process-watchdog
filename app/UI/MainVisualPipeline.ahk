@@ -2553,7 +2553,7 @@ AddCenteredSingleLineEdit(guiObj, x, y, width, outerHeight, value := "", extraOp
     inputEditControl := guiObj.Add("Edit", editOptions, value)
     SetSingleLineEditHorizontalMargins(inputEditControl.Hwnd)
     RegisterTextInputControl(inputEditControl)
-    RegisterTextInputHitTarget(background, inputEditControl)
+    RegisterTextInputDecoration(background, inputEditControl)
     return {Background: background, Edit: inputEditControl}
 }
 

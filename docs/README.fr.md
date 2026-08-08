@@ -38,7 +38,7 @@ Le projet propose une interface claire ou sombre, le rétablissement automatique
   <img src="images/process-watchdog-overview.png" alt="Fenêtre principale de Process Watchdog Assistant" width="100%">
 </p>
 
-La fenêtre principale réunit l’ordre des cibles surveillées, l’icône, le nom, les privilèges requis et l’état courant. La barre de commandes permet d’ajouter, supprimer, suspendre, ouvrir les réglages, consulter l’aide ou faire un don ; l’aide donne ensuite accès au mode d’emploi et au journal d’exécution. La barre inférieure récapitule les cibles actives, en rétablissement, en mise à jour, suspendues ou en échec, tandis que le journal expose les indices à l’origine de chaque état anormal.
+La fenêtre principale réunit l’ordre des cibles surveillées, l’icône, le nom, les privilèges requis et l’état courant. La barre de commandes propose Ajouter, Supprimer, Suspendre, Réglages, Aide et À propos ; Aide ouvre le mode d’emploi, le journal d’exécution ou la page de retours, tandis qu’À propos regroupe version, environnement, mises à jour, projet et Donner. La barre inférieure récapitule les cibles actives, en rétablissement, en mise à jour, suspendues ou en échec, tandis que le journal expose les indices à l’origine de chaque état anormal.
 
 ## Points forts
 
@@ -49,8 +49,8 @@ La fenêtre principale réunit l’ordre des cibles surveillées, l’icône, le
 - La protection des mises à jour est désactivée par défaut. Une fois activée, elle combine processus de mise à jour, relations parent-enfant, activité du dossier d’installation et stabilité des fichiers avant de suspendre ou reprendre la surveillance.
 - Remplace la configuration de manière atomique. Les enregistrements impossibles à analyser sont déplacés vers `[Recovery]` plutôt que perdus silencieusement.
 - La recherche d’applications utilise exclusivement le service Everything, sans analyse locale de tout le disque ni limite de résultats imposée par l’application. Les grands ensembles sont ajoutés par petits lots pour éviter que l’extraction d’icônes ne monopolise l’interface.
-- Prend en charge le chinois simplifié, le chinois traditionnel de Hong Kong, le chinois traditionnel de Taïwan, l’anglais, le japonais, le vietnamien, le coréen, l’espagnol, le français, le portugais du Brésil, le russe, l’allemand et l’italien. L’interface suit par défaut la langue de Windows, revient à l’anglais pour une langue non prise en charge et peut être choisie dans Général. La langue et la police du contenu sont appliquées immédiatement au processus courant sans arrêter ni réinitialiser la surveillance.
-- Avec « Suivre la valeur par défaut de la langue », PingFang, SF Pro Text, Harano Aji Gothic ou Apple SD Gothic Neo sont privilégiées. Si elles sont absentes, la ressource fournie sous autorisation commerciale ou OFL est chargée uniquement dans le processus, puis la famille Noto correspondante sert de dernier recours. La police de contenu couvre le corps du texte, les champs, les listes et les informations À propos ; les boutons, onglets et la barre inférieure utilisent toujours la police d’interface Windows en gras adaptée à la langue.
+- Prend en charge le chinois simplifié, le chinois traditionnel de Hong Kong, le chinois traditionnel de Taïwan, l’anglais, le japonais, le vietnamien, le coréen, l’espagnol, le français, le portugais du Brésil, le russe, l’allemand et l’italien. L’interface suit par défaut la langue de Windows, revient à l’anglais pour une langue non prise en charge et peut être choisie dans Affichage. La langue et la police du contenu sont appliquées immédiatement au processus courant sans arrêter ni réinitialiser la surveillance.
+- Avec « Suivre la valeur par défaut de la langue », seules les polices installées dans Windows sont utilisées : d’abord PingFang, SF Pro Text, Harano Aji Gothic ou Apple SD Gothic Neo, puis la famille Noto correspondante et enfin une police système Windows. Les polices facultatives doivent d’abord être installées dans Windows ; l’assistant ne les charge jamais depuis son propre dossier. La police de contenu couvre le corps du texte, les champs, les listes et les informations À propos ; les boutons, onglets et la barre inférieure utilisent toujours la police d’interface Windows en gras adaptée à la langue.
 - Les thèmes clair et sombre prennent en charge la réduction indépendante des fenêtres secondaires, la reconstruction des icônes selon le DPI, les boutons arrondis et les icônes personnalisées.
 - Le diagnostic est produit localement et n’est jamais envoyé automatiquement ; les artefacts officiels peuvent être vérifiés indépendamment.
 
@@ -114,9 +114,9 @@ Fermer la fenêtre principale ne fait que la masquer dans la zone de notificatio
 | Ajouter | Choisir une cible, rechercher une application installée ou importer un dossier ; les sous-dossiers sont inclus par défaut |
 | Supprimer | Supprimer les éléments sélectionnés ; sélection multiple et annulation prises en charge |
 | Suspendre / Reprendre | Modifier seulement la surveillance automatique sans fermer la cible active ; une sélection mixte est inversée élément par élément |
-| Réglages | Configurer Général, Surveillance et démarrage, Politique d’arrêt, Journaux et À propos |
+| Réglages | Configurer Affichage, Démarrage, Surveillance, Politique d’arrêt et Journaux |
 | Aide | Choisir le mode d’emploi intégré, le journal d’exécution ou la page de retours GitHub |
-| Faire un don | Afficher les codes QR WeChat Pay et Alipay qui soutiennent la maintenance |
+| À propos | Voir la version et l’environnement d’exécution, rechercher les mises à jour, ouvrir le projet ou accéder à Donner |
 
 Un élément peut définir son point d’entrée, son dossier de travail, ses arguments et l’exigence de droits administrateur. Le LNK reste le point d’entrée, tandis que le chemin réel du programme est conservé séparément pour identifier le processus. Un raccourci indirect créé par un installateur n’a donc pas à être remplacé manuellement par un EXE interne susceptible de changer.
 
@@ -159,11 +159,11 @@ Cette fonction n’est ni un installateur universel ni un gestionnaire de servic
 
 | Catégorie | Options |
 | --- | --- |
-| Général | Raccourcis Bureau et menu Démarrer, démarrage planifié, deux comportements au démarrage, langue, police du contenu et thème |
-| Surveillance et démarrage | Intervalle de contrôle du processus, séquence de délais après plantage, inclusion des sous-dossiers à l’importation |
+| Affichage | Langue de l’interface, police du contenu et thème |
+| Démarrage | Raccourcis Bureau et menu Démarrer, démarrage planifié et deux comportements au démarrage |
+| Surveillance | Intervalle de contrôle du processus, séquence de délais après plantage et inclusion des sous-dossiers à l’importation |
 | Politique d’arrêt | Délais de fermeture des applications GUI/CLI et autorisation de forcer l’arrêt après expiration |
 | Journaux | Effacement au démarrage, limite d’affichage, durée de conservation des journaux par lot et chemin de sauvegarde |
-| À propos | Versions de l’application et de l’environnement, vérification immédiate et lien du projet libre |
 
 La fenêtre valide les plages numériques. Les commentaires de `watchdog.ini` sont placés près des sections et réglages concernés ; utilisez de préférence l’interface pour ne pas endommager les champs encodés. Consultez [Configuration, sauvegarde et récupération](en/configuration.md).
 

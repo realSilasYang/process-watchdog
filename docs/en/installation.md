@@ -48,12 +48,12 @@ update keeps using the same local interpreter and does not install or upgrade it
 Ahk2Exe exists only during the official release build. See
 [Versions, runtime forms, and update responsibility](versioning.md).
 
-## General settings
+## Startup settings
 
-Open General in Assistant Settings to create Desktop and Start menu
-shortcuts or an elevated logon scheduled task, and to configure startup behavior,
-language, content font, and theme. About shows the current assistant version,
-runtime form, actual AutoHotkey version, and manual update check. Disabling
+Open Startup in Assistant Settings to create Desktop and Start
+menu shortcuts or an elevated logon scheduled task, and to configure startup
+behavior. Language, content font, and theme are on Display. About shows the
+current assistant version, runtime form, actual AutoHotkey version, and manual update check. Disabling
 automatic startup removes only a task created by this application whose ownership
 identity still matches.
 
@@ -64,7 +64,7 @@ form in the same way. Desktop, Start menu, and scheduled-task entries use one
 product name, so only one form is integrated at a time:
 
 - Creating shortcuts from the other form updates the entries with the same names.
-- If General finds a project-owned task for the other form, it shows
+- If Startup finds a project-owned task for the other form, it shows
   Switch and updates the task to the current form. An unrelated same-name task
   remains a conflict.
 - Existing shortcuts and tasks need no rebuild when an automatic update keeps
@@ -74,7 +74,7 @@ If a portable EXE and source entry temporarily share one directory, they share c
 but also share release resources and the update manifest. Do not independently
 auto-update both forms in that layout. Keep long-lived, independently updated
 installations in separate directories, then recreate or switch the shortcuts and
-scheduled task under General for the chosen everyday entry.
+scheduled task under Startup for the chosen everyday entry.
 
 ## Upgrade
 
@@ -110,7 +110,7 @@ moved to `[Recovery]` instead of being silently deleted.
 
 ## Remove
 
-Disable automatic startup from General and exit the application. Delete the selected
+Disable automatic startup from Startup and exit the application. Delete the selected
 portable or source directory. Remove optional fonts through Windows Settings →
 Personalization → Fonts when they are no longer needed.
 Desktop and Start menu shortcuts can be deleted normally. The monitoring list is

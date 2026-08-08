@@ -38,7 +38,7 @@ Dự án có giao diện sáng và tối, khôi phục tự động, bảo vệ 
   <img src="images/process-watchdog-overview.png" alt="Cửa sổ chính của Process Watchdog Assistant" width="100%">
 </p>
 
-Cửa sổ chính hiển thị thứ tự đối tượng giám sát, biểu tượng ứng dụng, tên, yêu cầu đặc quyền và trạng thái hiện tại. Thanh lệnh có các thao tác Thêm, Xóa, Tạm dừng, Cài đặt, Thông tin trợ giúp và Ủng hộ; từ Thông tin trợ giúp có thể mở hướng dẫn hoặc nhật ký chạy. Thanh dưới cùng tổng hợp số đối tượng đang chạy, đang khôi phục, đang cập nhật, tạm dừng và thất bại; nhật ký giải thích bằng chứng đứng sau từng trạng thái bất thường.
+Cửa sổ chính hiển thị thứ tự đối tượng giám sát, biểu tượng ứng dụng, tên, yêu cầu đặc quyền và trạng thái hiện tại. Thanh lệnh có Thêm, Xóa, Tạm dừng, Cài đặt, Trợ giúp và Giới thiệu; Trợ giúp mở hướng dẫn, nhật ký chạy hoặc trang phản hồi, còn Giới thiệu tập hợp phiên bản, môi trường chạy, cập nhật, dự án và Ủng hộ. Thanh dưới cùng tổng hợp số đối tượng đang chạy, đang khôi phục, đang cập nhật, tạm dừng và thất bại; nhật ký giải thích bằng chứng đứng sau từng trạng thái bất thường.
 
 ## Điểm nổi bật
 
@@ -49,8 +49,8 @@ Cửa sổ chính hiển thị thứ tự đối tượng giám sát, biểu tư
 - Bảo vệ khi cập nhật mặc định tắt. Khi bật, trợ lý kết hợp tiến trình cập nhật, quan hệ cha con, hoạt động thư mục cài đặt và độ ổn định của tệp trước khi tạm dừng hoặc tiếp tục giám sát.
 - Thay thế cấu hình theo giao dịch nguyên tử. Bản ghi không phân tích được sẽ chuyển vào `[Recovery]` thay vì bị bỏ mất.
 - Tìm ứng dụng chỉ qua dịch vụ Everything, không quét toàn bộ ổ đĩa bằng cơ chế tích hợp và không giới hạn số kết quả. Tập kết quả lớn được thêm theo từng đợt ngắn để việc lấy biểu tượng không làm treo giao diện.
-- Hỗ trợ tiếng Trung giản thể, tiếng Trung phồn thể Hồng Kông, tiếng Trung phồn thể Đài Loan, tiếng Anh, tiếng Nhật, tiếng Việt, tiếng Hàn, tiếng Tây Ban Nha, tiếng Pháp, tiếng Bồ Đào Nha Brazil, tiếng Nga, tiếng Đức và tiếng Ý. Mặc định giao diện theo ngôn ngữ Windows, ngôn ngữ chưa hỗ trợ sẽ dùng tiếng Anh; người dùng cũng có thể chọn trong mục Chung. Thay đổi ngôn ngữ và phông nội dung có hiệu lực ngay trong tiến trình hiện tại, không dừng hay khởi tạo lại tác vụ giám sát.
-- Ở chế độ “Theo mặc định của ngôn ngữ”, trợ lý ưu tiên PingFang, SF Pro Text, Harano Aji Gothic hoặc Apple SD Gothic Neo. Nếu máy chưa cài, tài nguyên đi kèm có giấy phép thương mại hoặc OFL được nạp riêng cho tiến trình, sau đó mới lui về họ Noto tương ứng. Phông nội dung áp dụng cho phần thân, ô nhập, danh sách và thông tin Giới thiệu; nút, thẻ Cài đặt và thanh trạng thái cửa sổ chính luôn dùng phông UI Windows in đậm tương ứng với ngôn ngữ hiện tại.
+- Hỗ trợ tiếng Trung giản thể, tiếng Trung phồn thể Hồng Kông, tiếng Trung phồn thể Đài Loan, tiếng Anh, tiếng Nhật, tiếng Việt, tiếng Hàn, tiếng Tây Ban Nha, tiếng Pháp, tiếng Bồ Đào Nha Brazil, tiếng Nga, tiếng Đức và tiếng Ý. Mặc định giao diện theo ngôn ngữ Windows, ngôn ngữ chưa hỗ trợ sẽ dùng tiếng Anh; người dùng cũng có thể chọn trong mục Hiển thị. Thay đổi ngôn ngữ và phông nội dung có hiệu lực ngay trong tiến trình hiện tại, không dừng hay khởi tạo lại tác vụ giám sát.
+- Ở chế độ “Theo mặc định của ngôn ngữ”, trợ lý chỉ dùng phông đã cài trong Windows: thử PingFang, SF Pro Text, Harano Aji Gothic hoặc Apple SD Gothic Neo trước, rồi đến họ Noto tương ứng và cuối cùng là phông hệ thống Windows. Phông tùy chọn phải được cài vào Windows trước; trợ lý không nạp riêng phông từ thư mục của mình. Phông nội dung áp dụng cho phần thân, ô nhập, danh sách và thông tin Giới thiệu; nút, thẻ Cài đặt và thanh trạng thái cửa sổ chính luôn dùng phông UI Windows in đậm tương ứng với ngôn ngữ hiện tại.
 - Giao diện sáng/tối hỗ trợ thu nhỏ cửa sổ con độc lập, dựng lại biểu tượng theo DPI, nút bo góc và biểu tượng tùy chỉnh.
 - Gói chẩn đoán chỉ được tạo trên máy và không tự tải lên; hiện vật phát hành chính thức có thể được xác minh độc lập.
 
@@ -114,9 +114,9 @@ Nếu trợ lý đã giúp bạn tiết kiệm thời gian tìm lỗi hoặc kh�
 | Thêm | Chọn đích, tìm ứng dụng đã cài hoặc nhập thư mục; mặc định bao gồm thư mục con |
 | Xóa | Xóa các mục đã chọn; hỗ trợ chọn nhiều và hoàn tác |
 | Tạm dừng / Tiếp tục | Chỉ đổi trạng thái giám sát tự động, không đóng đích đang chạy; lựa chọn hỗn hợp được đảo từng mục |
-| Cài đặt | Cấu hình Chung, Giám sát & khởi chạy, Chính sách dừng, Nhật ký và Giới thiệu |
-| Thông tin trợ giúp | Chọn hướng dẫn tích hợp, nhật ký chạy hoặc trang phản hồi GitHub |
-| Ủng hộ | Hiện mã QR WeChat Pay và Alipay để hỗ trợ bảo trì |
+| Cài đặt | Cấu hình Hiển thị, Khởi động, Giám sát, Chính sách dừng và Nhật ký |
+| Trợ giúp | Chọn hướng dẫn tích hợp, nhật ký chạy hoặc trang phản hồi GitHub |
+| Giới thiệu | Xem phiên bản và môi trường chạy, kiểm tra cập nhật, mở dự án hoặc chuyển đến Ủng hộ |
 
 Mỗi mục có thể đặt tệp vào để khởi chạy, thư mục làm việc, đối số và yêu cầu quyền quản trị. LNK vẫn là tệp khởi chạy, còn đường dẫn chương trình thật được lưu riêng để nhận diện tiến trình; vì vậy không cần thay lối tắt gián tiếp do trình cài đặt tạo bằng một EXE nội bộ dễ thay đổi.
 
@@ -159,11 +159,11 @@ Sau khi xác nhận cập nhật, tự động khởi chạy được tạm gi�
 
 | Nhóm | Tùy chọn |
 | --- | --- |
-| Chung | Lối tắt Màn hình nền và menu Bắt đầu, tác vụ tự khởi động, hai hành vi khi khởi động, ngôn ngữ, phông nội dung và chủ đề |
-| Giám sát & khởi chạy | Khoảng kiểm tra tiến trình, chuỗi độ trễ tự khởi động lại sau sự cố và việc bao gồm thư mục con khi nhập |
+| Hiển thị | Ngôn ngữ giao diện, phông nội dung và chủ đề |
+| Khởi động | Lối tắt Màn hình nền và menu Bắt đầu, tác vụ tự khởi động và hai hành vi khi khởi động |
+| Giám sát | Khoảng kiểm tra tiến trình, chuỗi độ trễ tự khởi động lại sau sự cố và việc bao gồm thư mục con khi nhập |
 | Chính sách dừng | Thời gian chờ đóng ứng dụng GUI/CLI và quyền buộc kết thúc sau khi hết thời gian |
 | Nhật ký | Xóa khi khởi động, giới hạn mục hiển thị, số ngày giữ nhật ký hàng loạt và đường dẫn lưu |
-| Giới thiệu | Phiên bản ứng dụng/môi trường, kiểm tra cập nhật ngay và liên kết dự án nguồn mở |
 
 Cửa sổ cài đặt kiểm tra phạm vi số. Chú thích trong `watchdog.ini` nằm bên cạnh đúng phần và mục tương ứng; nên dùng giao diện để tránh làm hỏng trường đã mã hóa. Xem [Cấu hình, sao lưu và khôi phục](en/configuration.md).
 

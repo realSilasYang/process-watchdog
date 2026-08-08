@@ -50,7 +50,7 @@ The main window keeps each target's order, application icon, display name, privi
 - Keep update protection off by default. When enabled, combine updater processes, parent-child relationships, installation-directory activity, and file stability before pausing or resuming monitoring.
 - Replace configuration atomically. Records that cannot be parsed are moved to `[Recovery]` instead of being silently discarded.
 - Use the Everything service exclusively for application search, without a local full-disk fallback or an application-imposed result limit. Large result sets are appended in short batches so icon extraction does not monopolize the UI.
-- Support Simplified Chinese, Traditional Chinese (Hong Kong), Traditional Chinese (Taiwan), English, Japanese, Vietnamese, Korean, Spanish, French, Brazilian Portuguese, Russian, German, and Italian. The interface follows the Windows UI language by default, falls back to English for unsupported languages, and can be selected manually under General. Language and content-font changes take effect immediately in the current process without stopping or reinitializing guard tasks.
+- Support Simplified Chinese, Traditional Chinese (Hong Kong), Traditional Chinese (Taiwan), English, Japanese, Vietnamese, Korean, Spanish, French, Brazilian Portuguese, Russian, German, and Italian. The interface follows the Windows UI language by default, falls back to English for unsupported languages, and can be selected manually under Display. Language and content-font changes take effect immediately in the current process without stopping or reinitializing guard tasks.
 - In language-default mode, use only Windows-installed fonts: try PingFang, SF Pro Text, Harano Aji Gothic, or Apple SD Gothic Neo first, then the matching Noto family, then a Windows system font. Optional fonts must be installed into Windows first; the assistant never loads fonts privately from its own directory. The content font controls body text, inputs, lists, and About information; buttons, Settings tabs, and the main-window footer always use the current language's Windows UI font in bold.
 - Provide light and dark GUIs with independently minimizable child windows, DPI-aware icon rebuilding, rounded buttons, and custom icons.
 - Generate diagnostics locally without automatic upload, and make official artifacts independently verifiable.
@@ -129,7 +129,7 @@ The six main-window buttons have the following roles:
 | Add | Select one target, search installed applications, or import a folder; folder import scans subdirectories by default |
 | Delete | Remove selected watched targets; multiple selections are supported and deletion can be undone |
 | Pause / Resume | Change automatic monitoring only; the currently running target is not closed, and a mixed selection is toggled item by item |
-| Settings | Configure General, Monitoring & startup, Stop Policy, and Logs |
+| Settings | Configure Display, Startup, Monitoring, Stop Policy, and Logs |
 | Help | Choose the built-in user guide, this session's runtime log, or the GitHub feedback page |
 | About | View version and runtime information, check for updates, open the project, or enter Donate |
 
@@ -188,8 +188,9 @@ Assistant Settings is divided by responsibility:
 
 | Category | Options |
 | --- | --- |
-| General | Desktop and Start menu shortcuts, scheduled automatic startup, both startup behaviors, interface language, interface content font, and theme |
-| Monitoring & startup | Process status interval, automatic restart delay sequence after a crash, and subfolder inclusion during folder import |
+| Display | Interface language, interface content font, and theme |
+| Startup | Desktop and Start menu shortcuts, scheduled automatic startup, and both startup behaviors |
+| Monitoring | Process status interval, automatic restart delay sequence after a crash, and subfolder inclusion during folder import |
 | Stop Policy | GUI and CLI shutdown timeouts and whether force termination is allowed after timeout |
 | Logs | Startup clearing, runtime-log display limit, batch-log retention days, and save path |
 

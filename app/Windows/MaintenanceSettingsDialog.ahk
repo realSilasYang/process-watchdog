@@ -148,7 +148,7 @@ class MaintenanceSettingsDialog extends ManagedWindow {
             }
             btnSave := this.gui.Add("Text", "x" btnSaveX
                 " y390 w80 h28 Center 0x200 Background"
-                    UiThemeService.Color("Primary") " c"
+                    UiThemeService.Color("Save") " c"
                     UiThemeService.Color("ButtonText"), Tr("保存"))
             btnCancel := this.gui.Add("Text", "x" btnCancelX
                 " y390 w80 h28 Center 0x200 Background"
@@ -160,7 +160,7 @@ class MaintenanceSettingsDialog extends ManagedWindow {
             RegisterHoverButton(btnBrowse, UiThemeService.Color("Toolbar"))
             RegisterHoverButton(btnAutoRoot, UiThemeService.Color("Toolbar"))
             RegisterHoverButton(btnClearLearned, UiThemeService.Color("Toolbar"))
-            RegisterHoverButton(btnSave, UiThemeService.Color("Primary"))
+            RegisterHoverButton(btnSave, UiThemeService.Color("Save"))
             RegisterHoverButton(btnCancel, UiThemeService.Color("Toolbar"))
             SetButtonLucideIcon(btnBrowse, "folder-open.svg", 14, 6)
             SetButtonLucideIcon(btnAutoRoot, "wand-sparkles.svg", 14, 6)

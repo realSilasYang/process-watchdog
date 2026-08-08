@@ -7,6 +7,32 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.0.10] - 2026-08-08
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides the preferred and fallback fonts for installation into Windows; it is not required to run the application.
+- **`process-watchdog-2.0.10-source.zip` (complete source package):** Includes the AHK source, modules, tests, and documentation without fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+- **`process-watchdog-2.0.10-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, and runtime resources without fonts; no AutoHotkey installation is required, and it is intended for long-term use after full extraction.
+- **Everything ([latest official version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application searches. The bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### 🚀 Improved
+
+- **Clearer settings categories:** The former General and Monitoring & Startup pages are reorganized into separate Display, Startup, and Monitoring pages, forming five responsibility-focused tabs together with Stop Policy and Logs. Scheduled-task status is queried only after opening Startup, so the initial Settings window no longer waits for that check.
+- **More compact settings forms:** Descriptive fields now place their labels above their values, align each page to a shared left edge, and center the group by its longest control. Startup options are stacked vertically, while path fields and dividers use the space their content needs with less unused spacing.
+- **More consistent visual hierarchy:** Display adds semantically colored icons for display, language, font, and theme; text-only Save buttons share a deep-green background; and the main-list pseudo-header centers its labels without changing the alignment of underlying data columns.
+- **Updated interface overview:** Every localized README continues to share one main-window preview, now showing the current interface with common watched-target types and distinct runtime states.
+
+---
+
+### 🐛 Fixed
+
+- **Selectable text and stable first paint:** Every editable and read-only text box now supports direct text selection. Decorative backgrounds no longer intercept mouse drags or repaint over inputs later, so text is complete as soon as a window opens instead of appearing only after hover.
+
+---
+
 ## 🎉 Version [2.0.9] - 2026-08-05
 
 ### 📦 Release Assets
@@ -456,7 +482,8 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.9...HEAD
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.10...HEAD
+[2.0.10]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.9...v2.0.10
 [2.0.9]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.8...v2.0.9
 [2.0.8]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.7...v2.0.8
 [2.0.7]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.6...v2.0.7

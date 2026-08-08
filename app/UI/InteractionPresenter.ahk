@@ -985,6 +985,103 @@ class RoundedButtonInputRouter {
     }
 }
 
+; 单行输入框的外层底色只负责装饰。它必须始终位于真实 Edit 后方且不参与
+; 命中测试，否则背景的鼠标消息或延迟重绘会打断原生拖选并覆盖输入框像素。
+class TextInputDecorationRouter {
+    static SubclassId := 0x544944 ; "TID"
+    static callbackPtr := 0
+    static Decorations := Map()
+
+    static EnsureCallback() {
+        if this.callbackPtr
+            return true
+        try this.callbackPtr := CallbackCreate(
+            TextInputDecorationSubclassProc, "", 6)
+        catch
+            this.callbackPtr := 0
+        return this.callbackPtr != 0
+    }
+
+    static EnableSiblingClipping(hWnd) {
+        if !hWnd || !DllCall("user32\IsWindow", "Ptr", hWnd, "Int")
+            return false
+        style := DllCall("user32\GetWindowLongPtrW", "Ptr", hWnd,
+            "Int", Win32.GWL_STYLE, "Ptr")
+        if !(style & Win32.WS_CLIPSIBLINGS) {
+            DllCall("user32\SetWindowLongPtrW", "Ptr", hWnd,
+                "Int", Win32.GWL_STYLE,
+                "Ptr", style | Win32.WS_CLIPSIBLINGS, "Ptr")
+        }
+        currentStyle := DllCall("user32\GetWindowLongPtrW", "Ptr", hWnd,
+            "Int", Win32.GWL_STYLE, "Ptr")
+        return !!(currentStyle & Win32.WS_CLIPSIBLINGS)
+    }
+
+    static Attach(backgroundHwnd, editHwnd) {
+        if !backgroundHwnd || !editHwnd
+            || !DllCall("user32\IsWindow", "Ptr", backgroundHwnd, "Int")
+            || !DllCall("user32\IsWindow", "Ptr", editHwnd, "Int")
+            || DllCall("user32\GetParent", "Ptr", backgroundHwnd, "Ptr")
+                != DllCall("user32\GetParent", "Ptr", editHwnd, "Ptr")
+            || !this.EnsureCallback()
+            return false
+
+        this.Detach(backgroundHwnd)
+        if !this.EnableSiblingClipping(backgroundHwnd)
+            || !this.EnableSiblingClipping(editHwnd)
+            return false
+        if !DllCall("comctl32\SetWindowSubclass", "Ptr", backgroundHwnd,
+                "Ptr", this.callbackPtr, "UPtr", this.SubclassId,
+                "UPtr", editHwnd, "Int")
+            return false
+
+        this.Decorations[backgroundHwnd] := editHwnd
+        ; hWndInsertAfter=editHwnd：背景紧邻输入框并位于其后方。
+        if !DllCall("user32\SetWindowPos", "Ptr", backgroundHwnd,
+                "Ptr", editHwnd, "Int", 0, "Int", 0, "Int", 0, "Int", 0,
+                "UInt", 0x0013, "Int") { ; 保持尺寸、位置和激活状态不变。
+            this.Detach(backgroundHwnd)
+            return false
+        }
+        return true
+    }
+
+    static Detach(backgroundHwnd) {
+        if this.Decorations.Has(backgroundHwnd)
+            this.Decorations.Delete(backgroundHwnd)
+        if backgroundHwnd && this.callbackPtr
+            && DllCall("user32\IsWindow", "Ptr", backgroundHwnd, "Int") {
+            DllCall("comctl32\RemoveWindowSubclass", "Ptr", backgroundHwnd,
+                "Ptr", this.callbackPtr, "UPtr", this.SubclassId, "Int")
+        }
+    }
+
+    static DetachGui(guiHwnd) {
+        handles := []
+        for backgroundHwnd, editHwnd in this.Decorations {
+            if !DllCall("user32\IsWindow", "Ptr", backgroundHwnd, "Int")
+                || !DllCall("user32\IsWindow", "Ptr", editHwnd, "Int")
+                || DllCall("user32\GetAncestor", "Ptr", backgroundHwnd,
+                    "UInt", 2, "Ptr") == guiHwnd
+                handles.Push(backgroundHwnd)
+        }
+        for backgroundHwnd in handles
+            this.Detach(backgroundHwnd)
+    }
+
+    static Shutdown() {
+        handles := []
+        for backgroundHwnd, _ in this.Decorations
+            handles.Push(backgroundHwnd)
+        for backgroundHwnd in handles
+            this.Detach(backgroundHwnd)
+        if this.callbackPtr {
+            CallbackFree(this.callbackPtr)
+            this.callbackPtr := 0
+        }
+    }
+}
+
 ; 指针命中、悬浮提示和输入光标根据原生子控件句柄统一分发。
 IsRoundedButtonInputRouted(hwnd) {
     if !App.uiInteractions.HasButton(hwnd)
@@ -1233,7 +1330,7 @@ RegisterTextInputHwnd(textEditHwnd, hideCaret := false, useArrowCursor := false)
     })
 }
 
-RegisterTextInputHitTarget(backgroundControl, inputControl) {
+RegisterTextInputDecoration(backgroundControl, inputControl) {
     try backgroundHwnd := backgroundControl.Hwnd
     catch
         return
@@ -1241,16 +1338,14 @@ RegisterTextInputHitTarget(backgroundControl, inputControl) {
     catch
         return
     if !backgroundHwnd || !textEditHwnd
-        return
-    PruneTextInputCursorStates()
-    App.uiInteractions.RegisterTextInput(backgroundHwnd,
-        {editHwnd: textEditHwnd})
-    backgroundControl.OnEvent("Click", PlaceTextCaretAtPointer.Bind(inputControl))
+        return false
+    return TextInputDecorationRouter.Attach(backgroundHwnd, textEditHwnd)
 }
 
 UnregisterGuiControls(guiHwnd) {
     if !guiHwnd
         return
+    TextInputDecorationRouter.DetachGui(guiHwnd)
     hoverHandles := []
     for controlHwnd, _ in App.uiInteractions.Buttons {
         if (!DllCall("user32\IsWindow", "Ptr", controlHwnd, "Int")
@@ -1287,35 +1382,6 @@ PruneTextInputCursorStates() {
     }
     for targetHwnd in staleTextTargets
         App.uiInteractions.RemoveTextInput(targetHwnd)
-}
-
-PlaceTextCaretAtPointer(inputControl, *) {
-    try textEditHwnd := inputControl.Hwnd
-    catch
-        return
-    if !IsControlEffectivelyEnabled(textEditHwnd)
-        return
-
-    cursorPoint := Buffer(8, 0)
-    editRect := Buffer(16, 0)
-    if !DllCall("user32\GetCursorPos", "Ptr", cursorPoint, "Int")
-        return
-    if !DllCall("user32\ScreenToClient", "Ptr", textEditHwnd, "Ptr", cursorPoint, "Int")
-        return
-    if !DllCall("user32\GetClientRect", "Ptr", textEditHwnd, "Ptr", editRect, "Int")
-        return
-
-    clientWidth := NumGet(editRect, 8, "Int")
-    clientHeight := NumGet(editRect, 12, "Int")
-    if (clientWidth <= 0 || clientHeight <= 0)
-        return
-    pointerX := Max(0, Min(NumGet(cursorPoint, 0, "Int"), clientWidth - 1))
-    pointerY := Floor(clientHeight / 2)
-    packedPoint := (pointerX & 0xFFFF) | ((pointerY & 0xFFFF) << 16)
-
-    ControlFocus(inputControl)
-    characterIndex := SendMessage(Win32.EM_CHARFROMPOS, 0, packedPoint, textEditHwnd) & 0xFFFF
-    SendMessage(Win32.EM_SETSEL, characterIndex, characterIndex, textEditHwnd)
 }
 
 ScheduleHideTextCaret(textEditHwnd) {
@@ -1453,6 +1519,20 @@ ButtonControlSubclassProc(hWnd, message, wParam, lParam, subclassId, referenceDa
         "Ptr", wParam, "Ptr", lParam, "Ptr")
 }
 
+TextInputDecorationSubclassProc(hWnd, message, wParam, lParam,
+    subclassId, referenceData) {
+    try {
+        if message == Win32.WM_NCHITTEST
+            return Win32.HTTRANSPARENT
+        if message == Win32.WM_NCDESTROY
+            TextInputDecorationRouter.Detach(hWnd)
+    } catch {
+        ; Win32 子类回调不能让 AHK 异常越过原生窗口过程边界。
+    }
+    return DllCall("comctl32\DefSubclassProc", "Ptr", hWnd,
+        "UInt", message, "UPtr", wParam, "Ptr", lParam, "Ptr")
+}
+
 EnableRoundedButtonRendering(ctrl) {
     try hWnd := ctrl.Hwnd
     catch
@@ -1544,6 +1624,7 @@ OnRoundedButtonFocusChanged(wParam, lParam, msg, hwnd) {
 }
 
 ShutdownRoundedButtonRenderer(*) {
+    TextInputDecorationRouter.Shutdown()
     RoundedButtonInputRouter.Shutdown()
     RoundedButtonRenderer.Shutdown()
     ControlAccessibilityService.Shutdown()

@@ -370,7 +370,7 @@ while GetTickCount64() < deadline {
                 " c" UiThemeService.Color("Text") " -E0x200",
             "iteration " iterations)
         RegisterTextInputControl(input)
-        RegisterTextInputHitTarget(inputBackground, input)
+        RegisterTextInputDecoration(inputBackground, input)
 
         actionButton := owner.Add("Text",
             "x210 y10 w88 h30 Center 0x200 Background"
@@ -489,6 +489,7 @@ while GetTickCount64() < deadline {
     owner := ""
     if App.uiInteractions.Buttons.Count
         || App.uiInteractions.TextInputs.Count
+        || TextInputDecorationRouter.Decorations.Count
         FailSoak("UI interaction registrations survived GUI destruction")
     currentGdi := GetGuiResourceCount(0)
     currentUser := GetGuiResourceCount(1)

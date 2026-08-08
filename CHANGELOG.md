@@ -7,6 +7,32 @@
 
 ## 🚧 [未发布]
 
+## 🎉 版本 [2.0.10] - 2026-08-08
+
+### 📦 发布物说明
+
+- **`fonts.zip`（可选字体包）**：提供首选字体和回退字体，需先安装到 Windows；它不是程序运行必需。
+- **`process-watchdog-2.0.10-source.zip`（完整源码版）**：包含 AHK 源码、模块、测试和文档，不含字体，适合审阅、开发或从源码运行；本机需要 AutoHotkey v2 x64。
+- **`process-watchdog-2.0.10-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证和运行所需资源，不含字体；无需安装 AutoHotkey，适合完整解压后长期使用。
+- **Everything（[官方最新版](https://www.voidtools.com/downloads/)）**：为程序搜索提供索引和后台服务；随包 `Everything64.dll` 只是 IPC 客户端，不能替代 Everything 本体。
+
+---
+
+### 🚀 优化
+
+- **设置分类更清晰**：原“通用”和“监控与启动”重新组织为“显示”“启动”“监控”三个独立页面，与停止策略和日志共同组成五个职责明确的选项卡；计划任务状态只在进入启动页时查询，打开设置窗口不再等待该检查。
+- **设置表单更紧凑**：带说明的字段改为标题和值分行显示，控件按每页最长内容整体居中并统一左边界；启动选项纵向排列，路径框和分隔线按内容需要调整，减少无效间距和空白。
+- **界面视觉层级更一致**：显示页加入带语义配色的显示、语言、字体和主题图标，无图标的保存按钮统一使用深绿色背景，主列表伪表头内容统一居中，同时保持数据列原有对齐方式。
+- **界面概览同步更新**：全部语言 README 继续共用唯一的主窗口预览图，并更新为包含常见守护对象类型和不同运行状态的当前界面。
+
+---
+
+### 🐛 修复
+
+- **文本框选择与首次绘制恢复正常**：所有输入框和只读文本框都可直接选择内容；装饰背景不再拦截鼠标拖选或延迟覆盖输入框，打开窗口即可看到完整文字，无需悬浮触发重绘。
+
+---
+
 ## 🎉 版本 [2.0.9] - 2026-08-05
 
 ### 📦 发布物说明
@@ -404,7 +430,8 @@
 - 后台文件扫描使用 `DirExist` 明确区分目录边界，临时文件遇到瞬时占用时执行
   短时有界重试；测试分别报告结果协议、实际文件集合和清理失败。
 
-[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.9...HEAD
+[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.10...HEAD
+[2.0.10]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.9...v2.0.10
 [2.0.9]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.8...v2.0.9
 [2.0.8]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.7...v2.0.8
 [2.0.7]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.6...v2.0.7

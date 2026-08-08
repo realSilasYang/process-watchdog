@@ -38,7 +38,7 @@ Il progetto offre interfaccia chiara e scura, ripristino automatico, protezione 
   <img src="images/process-watchdog-overview.png" alt="Finestra principale di Process Watchdog Assistant" width="100%">
 </p>
 
-La finestra principale riunisce l’ordine degli obiettivi monitorati, l’icona dell’app, il nome, i privilegi richiesti e lo stato corrente. La barra superiore consente di aggiungere, eliminare, sospendere, aprire le impostazioni, consultare l’aiuto o fare una donazione; da Aiuto si possono aprire il manuale e il registro di esecuzione. La barra inferiore riepiloga le destinazioni in esecuzione, ripristino, aggiornamento, pausa ed errore, mentre il registro espone le prove alla base di ciascuno stato anomalo.
+La finestra principale riunisce l’ordine degli obiettivi monitorati, l’icona dell’app, il nome, i privilegi richiesti e lo stato corrente. La barra dei comandi offre Aggiungi, Elimina, Sospendi, Impostazioni, Aiuto e Informazioni; Aiuto apre il manuale, il registro di esecuzione o la pagina dei commenti, mentre Informazioni riunisce versione, ambiente, aggiornamenti, progetto e Dona. La barra inferiore riepiloga le destinazioni in esecuzione, ripristino, aggiornamento, pausa ed errore, mentre il registro espone le prove alla base di ciascuno stato anomalo.
 
 ## Funzioni principali
 
@@ -49,8 +49,8 @@ La finestra principale riunisce l’ordine degli obiettivi monitorati, l’icona
 - La protezione degli aggiornamenti è disattivata per impostazione predefinita. Quando è attiva, combina processi di aggiornamento, relazioni padre-figlio, attività della cartella di installazione e stabilità dei file prima di sospendere o riprendere la sorveglianza.
 - Sostituisce la configurazione in modo atomico. I record non analizzabili vengono spostati in `[Recovery]` anziché scartati in silenzio.
 - La ricerca delle applicazioni usa esclusivamente il servizio Everything, senza scansione locale dell’intero disco né limite di risultati imposto dall’app. I gruppi grandi vengono aggiunti in piccoli lotti per evitare che l’estrazione delle icone blocchi l’interfaccia.
-- Supporta cinese semplificato, cinese tradizionale di Hong Kong, cinese tradizionale di Taiwan, inglese, giapponese, vietnamita, coreano, spagnolo, francese, portoghese brasiliano, russo, tedesco e italiano. Per impostazione predefinita segue la lingua di Windows, torna all’inglese per una lingua non supportata e può essere scelta in Generale. Le modifiche a lingua e carattere dei contenuti si applicano immediatamente al processo corrente senza arrestare o reinizializzare le attività di sorveglianza.
-- Con «Segui il valore predefinito della lingua» vengono preferiti PingFang, SF Pro Text, Harano Aji Gothic o Apple SD Gothic Neo. Se assenti, viene caricata privatamente la risorsa inclusa con licenza commerciale o OFL, poi la famiglia Noto corrispondente. Il carattere dei contenuti si applica a testo, campi, elenchi e informazioni; pulsanti, schede e barra inferiore usano sempre il carattere dell’interfaccia Windows in grassetto adatto alla lingua.
+- Supporta cinese semplificato, cinese tradizionale di Hong Kong, cinese tradizionale di Taiwan, inglese, giapponese, vietnamita, coreano, spagnolo, francese, portoghese brasiliano, russo, tedesco e italiano. Per impostazione predefinita segue la lingua di Windows, torna all’inglese per una lingua non supportata e può essere scelta in Visualizzazione. Le modifiche a lingua e carattere dei contenuti si applicano immediatamente al processo corrente senza arrestare o reinizializzare le attività di sorveglianza.
+- Con «Segui il valore predefinito della lingua» vengono usati solo caratteri installati in Windows: prima PingFang, SF Pro Text, Harano Aji Gothic o Apple SD Gothic Neo, poi la famiglia Noto corrispondente e infine un carattere di sistema Windows. I caratteri facoltativi devono essere prima installati in Windows; l’assistente non li carica mai privatamente dalla propria cartella. Il carattere dei contenuti si applica a testo, campi, elenchi e informazioni; pulsanti, schede e barra inferiore usano sempre il carattere dell’interfaccia Windows in grassetto adatto alla lingua.
 - I temi chiaro e scuro consentono la riduzione indipendente delle finestre secondarie, la ricostruzione delle icone in base al DPI, pulsanti arrotondati e icone personalizzate.
 - Il pacchetto diagnostico viene creato solo in locale e non è caricato automaticamente; gli artefatti ufficiali possono essere verificati in modo indipendente.
 
@@ -114,9 +114,9 @@ Chiudere la finestra principale la nasconde soltanto nell’area di notifica; la
 | Aggiungi | Scegliere una destinazione, cercare app installate o importare una cartella; le sottocartelle sono incluse per impostazione predefinita |
 | Elimina | Rimuovere gli elementi selezionati; supporta selezione multipla e annullamento |
 | Sospendi / Riprendi | Cambiare solo la sorveglianza automatica senza chiudere la destinazione attiva; una selezione mista viene invertita elemento per elemento |
-| Impostazioni | Configurare Generale, Sorveglianza e avvio, Criteri di arresto, Registri e Informazioni |
+| Impostazioni | Configurare Visualizzazione, Avvio, Monitoraggio, Criteri di arresto e Registri |
 | Aiuto | Scegliere il manuale integrato, il registro di esecuzione o la pagina dei commenti GitHub |
-| Dona | Mostrare i codici QR WeChat Pay e Alipay che sostengono la manutenzione |
+| Informazioni | Vedere versione e ambiente di esecuzione, controllare gli aggiornamenti, aprire il progetto o accedere a Dona |
 
 Un elemento può definire punto di ingresso, cartella di lavoro, argomenti e requisito di amministratore. Il file LNK resta il punto di ingresso e il percorso reale del programma viene memorizzato separatamente per identificare il processo. Non serve quindi sostituire manualmente un collegamento indiretto dell’installatore con un EXE interno soggetto a cambiamenti.
 
@@ -159,11 +159,11 @@ La funzione non è un installatore universale né un gestore di servizi Windows.
 
 | Categoria | Opzioni |
 | --- | --- |
-| Generale | Collegamenti Desktop e menu Start, avvio pianificato, due comportamenti all’avvio, lingua, carattere dei contenuti e tema |
-| Sorveglianza e avvio | Intervallo di stato del processo, sequenza di ritardi dopo un arresto anomalo e inclusione delle sottocartelle nell’importazione |
+| Visualizzazione | Lingua dell’interfaccia, carattere dei contenuti e tema |
+| Avvio | Collegamenti Desktop e menu Start, avvio pianificato e due comportamenti all’avvio |
+| Monitoraggio | Intervallo di stato del processo, sequenza di ritardi dopo un arresto anomalo e inclusione delle sottocartelle nell’importazione |
 | Criteri di arresto | Tempi per chiudere app GUI/CLI e autorizzazione alla terminazione forzata dopo la scadenza |
 | Registri | Pulizia all’avvio, limite di visualizzazione, giorni di conservazione dei registri in batch e percorso di salvataggio |
-| Informazioni | Versioni dell’app e dell’ambiente, controllo immediato e collegamento al progetto open source |
 
 La finestra convalida gli intervalli numerici. I commenti di `watchdog.ini` sono accanto alle sezioni e opzioni corrispondenti; preferisci l’interfaccia per non danneggiare i campi codificati. Consulta [Configurazione, backup e ripristino](en/configuration.md).
 

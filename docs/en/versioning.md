@@ -33,7 +33,7 @@ state is shared only when the real runtime directory is shared. A portable EXE a
 entry in one directory share personal state, release resources, and one update
 manifest. A global single-instance lock prevents concurrent forms. Keep long-lived
 installations under different runtime roots and recreate or switch shortcuts and
-the scheduled task from General for the form used every day.
+the scheduled task from Startup for the form used every day.
 
 Automatic update accepts only canonical `major.minor.patch` stable versions and
 requires the target to be newer. It verifies checksums, package form, entry version,

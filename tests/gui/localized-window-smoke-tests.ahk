@@ -6,7 +6,17 @@
 ; 全程不保存设置、不启动守护，也不读取或覆盖正式配置。
 
 try {
-    if A_Args.Length && A_Args[1] == "--about-preview"
+    if A_Args.Length && A_Args[1] == "--settings-preview"
+        RunSettingsPreview(1)
+    else if A_Args.Length && A_Args[1] == "--settings-startup-preview"
+        RunSettingsPreview(2)
+    else if A_Args.Length && A_Args[1] == "--settings-monitoring-preview"
+        RunSettingsPreview(3)
+    else if A_Args.Length && A_Args[1] == "--settings-stop-preview"
+        RunSettingsPreview(4)
+    else if A_Args.Length && A_Args[1] == "--settings-log-preview"
+        RunSettingsPreview(5)
+    else if A_Args.Length && A_Args[1] == "--about-preview"
         RunAboutSettingsPreview()
     else if A_Args.Length && A_Args[1] == "--environment-preview"
         RunEnvironmentSettingsPreview()
@@ -120,6 +130,8 @@ AssertProductionWindowLayout(guiObj, language, windowName) {
         className := WinGetClass("ahk_id " controlHwnd)
         text := GetNativeWindowText(controlHwnd)
         if className == "Edit" {
+            AssertSelectableTextInput(controlHwnd, language, windowName,
+                text)
             editStyle := DllCall("user32\GetWindowLongPtrW", "Ptr",
                 controlHwnd, "Int", -16, "Ptr")
             if !(editStyle & 0x4) {
@@ -152,6 +164,78 @@ AssertProductionWindowLayout(guiObj, language, windowName) {
         AssertLocalizedWindow(textWidth <= controlWidth - horizontalPadding + 3,
             language " " windowName " 的单行文本可能被截断：" text
                 "（文本=" textWidth "px，控件=" controlWidth "px）")
+    }
+    AssertTextInputDecorations(guiObj, language, windowName)
+}
+
+AssertSelectableTextInput(editHwnd, language, windowName, text) {
+    AssertLocalizedWindow(DllCall("user32\IsWindowEnabled", "Ptr",
+            editHwnd, "Int"),
+        language " " windowName " 的文本框被禁用，无法用鼠标选择：" text)
+    AssertLocalizedWindow(App.uiInteractions.HasTextInput(editHwnd)
+            && App.uiInteractions.GetTextInput(editHwnd).editHwnd == editHwnd,
+        language " " windowName " 的文本框没有注册为原生输入目标：" text)
+
+    previousStartBuffer := Buffer(4, 0)
+    previousEndBuffer := Buffer(4, 0)
+    SendMessage(Win32.EM_GETSEL, previousStartBuffer.Ptr,
+        previousEndBuffer.Ptr, editHwnd)
+    previousStart := NumGet(previousStartBuffer, 0, "UInt")
+    previousEnd := NumGet(previousEndBuffer, 0, "UInt")
+    textLength := DllCall("user32\GetWindowTextLengthW", "Ptr", editHwnd,
+        "Int")
+    try {
+        SendMessage(Win32.EM_SETSEL, 0, -1, editHwnd)
+        selectedStartBuffer := Buffer(4, 0)
+        selectedEndBuffer := Buffer(4, 0)
+        SendMessage(Win32.EM_GETSEL, selectedStartBuffer.Ptr,
+            selectedEndBuffer.Ptr, editHwnd)
+        selectedStart := NumGet(selectedStartBuffer, 0, "UInt")
+        selectedEnd := NumGet(selectedEndBuffer, 0, "UInt")
+        AssertLocalizedWindow(selectedStart == 0
+                && selectedEnd == textLength,
+            language " " windowName " 的文本框无法完整选择内容：" text)
+    } finally {
+        SendMessage(Win32.EM_SETSEL, previousStart, previousEnd, editHwnd)
+    }
+}
+
+AssertTextInputDecorations(guiObj, language, windowName) {
+    for backgroundHwnd, editHwnd in TextInputDecorationRouter.Decorations {
+        if DllCall("user32\GetAncestor", "Ptr", backgroundHwnd,
+                "UInt", 2, "Ptr") != guiObj.Hwnd
+            continue
+
+        backgroundStyle := DllCall("user32\GetWindowLongPtrW", "Ptr",
+            backgroundHwnd, "Int", Win32.GWL_STYLE, "Ptr")
+        editStyle := DllCall("user32\GetWindowLongPtrW", "Ptr", editHwnd,
+            "Int", Win32.GWL_STYLE, "Ptr")
+        AssertLocalizedWindow(WinGetClass("ahk_id " backgroundHwnd)
+                == "Static" && WinGetClass("ahk_id " editHwnd) == "Edit",
+            language " " windowName " 的输入框装饰层没有绑定真实 Edit")
+        AssertLocalizedWindow(backgroundStyle & Win32.WS_CLIPSIBLINGS
+                && editStyle & Win32.WS_CLIPSIBLINGS,
+            language " " windowName " 的输入框与装饰层缺少同级裁剪")
+        AssertLocalizedWindow(DllCall("user32\GetWindow", "Ptr", editHwnd,
+                "UInt", Win32.GW_HWNDNEXT, "Ptr") == backgroundHwnd,
+            language " " windowName " 的输入框装饰层不在 Edit 正下方")
+        AssertLocalizedWindow(!App.uiInteractions.HasTextInput(backgroundHwnd)
+                && App.uiInteractions.HasTextInput(editHwnd),
+            language " " windowName " 的装饰层仍被注册成文本输入目标")
+
+        backgroundRect := Buffer(16, 0)
+        DllCall("user32\GetWindowRect", "Ptr", backgroundHwnd,
+            "Ptr", backgroundRect)
+        screenX := NumGet(backgroundRect, 0, "Int") + 1
+        screenY := NumGet(backgroundRect, 4, "Int") + 1
+        screenPoint := (screenX & 0xFFFF) | ((screenY & 0xFFFF) << 16)
+        hitResult := DllCall("user32\SendMessageW", "Ptr", backgroundHwnd,
+            "UInt", Win32.WM_NCHITTEST, "UPtr", 0, "Ptr", screenPoint,
+            "Ptr")
+        AssertLocalizedWindow(hitResult == Win32.HTTRANSPARENT
+                || (hitResult & 0xFFFFFFFF) == 0xFFFFFFFF,
+            language " " windowName " 的输入框装饰层仍会拦截鼠标")
+
     }
 }
 
@@ -249,6 +333,25 @@ AssertSettingsPageContentInset(settingsDialog, language, pageName) {
         language " " pageName " 的正文没有与顶部选项卡留出足够距离")
 }
 
+AssertSettingsControlGroupCentered(settingsDialog, controls, language,
+        groupName, tolerance) {
+    groupLeft := ""
+    groupRight := ""
+    for control in controls {
+        controlRect := GetControlClientRect(control.Hwnd,
+            settingsDialog.gui.Hwnd)
+        if groupLeft == "" || controlRect.Left < groupLeft
+            groupLeft := controlRect.Left
+        if groupRight == "" || controlRect.Right > groupRight
+            groupRight := controlRect.Right
+    }
+    clientRect := GetWindowClientRect(settingsDialog.gui.Hwnd)
+    AssertLocalizedWindow(groupLeft != "" && groupRight != ""
+        && Abs((groupLeft + groupRight) / 2 - clientRect.Width / 2)
+            <= tolerance,
+        language " " groupName " 没有按最长控件宽度整体水平居中")
+}
+
 FindChildControlByText(parentHwnd, expectedText) {
     for controlHwnd in WinGetControlsHwnd("ahk_id " parentHwnd) {
         if GetNativeWindowText(controlHwnd) == expectedText
@@ -321,7 +424,8 @@ class LocalizedRelocationServiceStub {
 }
 
 RunOneLocalizedWindowPass(language, previewEnvironment := false,
-    previewAbout := false, previewDonation := false, requestedTheme := "") {
+    previewAbout := false, previewDonation := false, requestedTheme := "",
+    previewSettingsTab := 0) {
     global App
     LocalizationService.Configure(language)
     LocalizationService.ConfigureUiFont("auto")
@@ -358,6 +462,7 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         ; 使用与目标窗口相同的标题栏和客户区主题，避免浅色空白窗口闪现。
         InitializeApplicationWindow(owner)
         owner.Show((previewEnvironment || previewAbout || previewDonation
+                || previewSettingsTab
             ? "" : "Hide ")
             "w730 h520")
 
@@ -394,34 +499,51 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
 
         settingsDialog := SettingsWindow(owner)
         settingsDialog.Show()
+        if previewSettingsTab {
+            if previewSettingsTab != 1
+                settingsDialog.SwitchTab(previewSettingsTab)
+            DllCall("user32\SetWindowLongPtrW", "Ptr",
+                settingsDialog.gui.Hwnd, "Int", -8, "Ptr", 0, "Ptr")
+            DllCall("user32\EnableWindow", "Ptr", owner.Hwnd, "Int", true)
+            WinHide("ahk_id " owner.Hwnd)
+            settingsDialog.gui.Show("x100 y100")
+            DllCall("user32\SetFocus", "Ptr", 0)
+            WinSetAlwaysOnTop(1, "ahk_id " settingsDialog.gui.Hwnd)
+            WinActivate("ahk_id " settingsDialog.gui.Hwnd)
+            while settingsDialog.IsOpen()
+                Sleep(50)
+            return
+        }
         if ApplicationWindowPresenter.AutomationHidden
             AssertLocalizedWindow(!DllCall("user32\IsWindowVisible", "Ptr",
                 settingsDialog.gui.Hwnd, "Int"),
                 language " 自动化设置窗口意外映射到用户桌面")
-        AssertLocalizedWindow(settingsDialog.tabBuilt.Length == 4
+        AssertLocalizedWindow(settingsDialog.tabBuilt.Length == 5
             && settingsDialog.tabBuilt[1]
             && !settingsDialog.tabBuilt[2]
             && !settingsDialog.tabBuilt[3]
             && !settingsDialog.tabBuilt[4]
+            && !settingsDialog.tabBuilt[5]
             && settingsDialog.tabControls[1].Length > 0
             && settingsDialog.tabControls[2].Length == 0
             && settingsDialog.tabControls[3].Length == 0
-            && settingsDialog.tabControls[4].Length == 0,
-            language " 设置窗口首开没有只构建当前可见的通用页")
+            && settingsDialog.tabControls[4].Length == 0
+            && settingsDialog.tabControls[5].Length == 0,
+            language " 设置窗口首开没有只构建当前可见的显示页")
         WinHide("ahk_id " settingsDialog.gui.Hwnd)
         AssertWindowTitle(settingsDialog.gui, Tr("进程守护小助手设置"),
             language, "SettingsWindow")
         AssertProductionWindowLayout(settingsDialog.gui, language,
             "SettingsWindow")
-        AssertLocalizedWindow(settingsDialog.tabButtons[1].Text == Tr("通用"),
-            language " 设置窗口首个选项卡没有显示为通用")
-        expectedTabLabels := [Tr("通用"), Tr("监控与启动"),
+        AssertLocalizedWindow(settingsDialog.tabButtons[1].Text == Tr("显示"),
+            language " 设置窗口首个选项卡没有显示为显示")
+        expectedTabLabels := [Tr("显示"), Tr("启动"), Tr("监控"),
             Tr("停止策略"), Tr("日志")]
-        expectedTabIcons := ["sliders-horizontal.svg", "activity.svg",
+        expectedTabIcons := ["monitor.svg", "rocket.svg", "activity.svg",
             "octagon-x.svg", "logs.svg"]
-        AssertLocalizedWindow(settingsDialog.tabButtons.Length == 4
-            && settingsDialog.tabControls.Length == 4,
-            language " 设置窗口没有严格收敛为四个选项卡")
+        AssertLocalizedWindow(settingsDialog.tabButtons.Length == 5
+            && settingsDialog.tabControls.Length == 5,
+            language " 设置窗口没有严格收敛为五个选项卡")
         for tabIndex, expectedTabLabel in expectedTabLabels {
             AssertLocalizedWindow(settingsDialog.tabButtons[tabIndex].Text
                 == expectedTabLabel,
@@ -436,7 +558,7 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
                     tabIndex)
         }
         AssertLocalizedWindow(settingsDialog.activeTab == 1,
-            language " 设置窗口没有默认打开通用页")
+            language " 设置窗口没有默认打开显示页")
         activeTabState := App.uiInteractions.GetButton(
             settingsDialog.tabButtons[1].Hwnd)
         inactiveTabState := App.uiInteractions.GetButton(
@@ -452,8 +574,9 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             settingsDialog.gui.Hwnd, "搜索与导入"),
             language " 设置窗口仍显示已下线的搜索与导入选项卡")
         AssertLocalizedWindow(settingsDialog.fontLabel.Text
-            == Tr("界面内容字体："),
-            language " 设置窗口没有明确标示界面内容字体")
+            == settingsDialog.SplitFieldCaption(
+                Tr("界面内容字体：")).Label,
+            language " 设置窗口没有去除界面内容字体标题的冒号")
         expectedSystemFont := LocalizationService
             .GetLanguageSystemUiFontName()
         tabFont := GetLocalizedWindowFontSpec(
@@ -466,8 +589,6 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             && actionFont.Weight >= 700
             && Abs(tabFont.Height) <= Abs(actionFont.Height),
             language " 按钮或切换标签没有使用系统 UI 字体粗体")
-        labelCenterY := GetControlCenterY(settingsDialog.languageLabel.Hwnd)
-        comboCenterY := GetControlCenterY(settingsDialog.languageDropDown.Hwnd)
         windowDpi := DllCall("user32\GetDpiForWindow", "Ptr",
             settingsDialog.gui.Hwnd, "UInt")
         centerTolerance := Max(2, Round(2 * windowDpi / 96))
@@ -483,19 +604,70 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         cancelButtonRect := GetControlClientRect(cancelButtonHwnd,
             settingsDialog.gui.Hwnd)
         requiredBottomGap := Max(10, Round(10 * windowDpi / 96))
+        maximumSettingsHeight := Round(380 * windowDpi / 96)
         AssertLocalizedWindow(saveButtonRect.Top == cancelButtonRect.Top
             && settingsClientRect.Height - saveButtonRect.Bottom
-                >= requiredBottomGap,
-            language " 设置正文下移时连带改变了底部操作区位置")
-        AssertLocalizedWindow(Abs(labelCenterY - comboCenterY)
-            <= centerTolerance,
-            language " 界面语言标签与下拉框没有垂直居中对齐")
-        fontLabelCenterY := GetControlCenterY(settingsDialog.fontLabel.Hwnd)
-        fontComboCenterY := GetControlCenterY(
-            settingsDialog.fontDropDown.Hwnd)
-        AssertLocalizedWindow(Abs(fontLabelCenterY - fontComboCenterY)
-            <= centerTolerance,
-            language " 内容字体标签与下拉框没有垂直居中对齐")
+                >= requiredBottomGap
+            && settingsClientRect.Height <= maximumSettingsHeight,
+            language " 设置窗口未保持紧凑高度或底部操作区留白错误")
+        displayFields := [
+            {Caption: Tr("界面语言："), Label: settingsDialog.languageLabel,
+                Value: settingsDialog.languageDropDown},
+            {Caption: Tr("界面内容字体："), Label: settingsDialog.fontLabel,
+                Value: settingsDialog.fontDropDown},
+            {Caption: Tr("主题："), Label: settingsDialog.themeLabel,
+                Value: settingsDialog.themeDropDown}
+        ]
+        displayFieldLeft := ""
+        displayFieldWidth := ""
+        for displayField in displayFields {
+            expectedCaption := settingsDialog.SplitFieldCaption(
+                displayField.Caption).Label
+            displayLabelRect := GetControlClientRect(
+                displayField.Label.Hwnd, settingsDialog.gui.Hwnd)
+            displayValueRect := GetControlClientRect(
+                displayField.Value.Hwnd, settingsDialog.gui.Hwnd)
+            if displayFieldLeft == "" {
+                displayFieldLeft := displayValueRect.Left
+                displayFieldWidth := displayValueRect.Width
+            }
+            AssertLocalizedWindow(displayField.Label.Text == expectedCaption
+                && !RegExMatch(displayField.Label.Text, "[：:]$")
+                && displayLabelRect.Bottom <= displayValueRect.Top
+                && displayLabelRect.Left > displayValueRect.Left
+                && Abs(displayValueRect.Left - displayFieldLeft)
+                    <= centerTolerance
+                && Abs(displayValueRect.Width - displayFieldWidth)
+                    <= centerTolerance,
+                language " 显示设置没有按图标标题在上、等宽值控件在下排列："
+                    expectedCaption)
+        }
+        AssertSettingsControlGroupCentered(settingsDialog,
+            [settingsDialog.languageDropDown, settingsDialog.fontDropDown,
+                settingsDialog.themeDropDown], language,
+            "显示页字段组", centerTolerance)
+        settingsDialog.languageDropDown.GetPos(, , &displayControlWidth)
+        AssertLocalizedWindow(displayControlWidth
+                == settingsDialog.layout.DisplayField.Width
+            && displayControlWidth < settingsDialog.layout.ContentWidth,
+            language " 显示页值控件仍占用近乎完整的正文宽度")
+        displayIconPaths := Map()
+        for displayControl in settingsDialog.tabControls[1] {
+            if !App.uiInteractions.HasButton(displayControl.Hwnd)
+                continue
+            displayControlState := App.uiInteractions.GetButton(
+                displayControl.Hwnd)
+            if displayControlState.HasOwnProp("buttonImage")
+                displayIconPaths[displayControlState.buttonImage.sourcePath]
+                    := true
+        }
+        for displayIconName in ["languages.svg", "type.svg", "palette.svg"] {
+            AssertLocalizedWindow(displayIconPaths.Has(
+                GetApplicationAssetPath("ui-icons\lucide\"
+                    displayIconName)),
+                language " 显示设置缺少匹配语义的 SVG 图标："
+                    displayIconName)
+        }
         comboPadding := GetComboBoxDisplayPadding()
         for paddedDropDown in [settingsDialog.languageDropDown,
                 settingsDialog.fontDropDown, settingsDialog.themeDropDown] {
@@ -557,44 +729,68 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         ; 逐页验证所有设置项的归属；每次切页后同时执行边界与截断检查，
         ; 避免隐藏页中的问题被默认页掩盖。
         settingsDialog.SwitchTab(1)
+        AssertLocalizedWindow(settingsDialog.languageDropDown.Visible
+            && settingsDialog.fontDropDown.Visible
+            && settingsDialog.themeDropDown.Visible
+            && settingsDialog.showAtStartupCheck == ""
+            && settingsDialog.checkUpdatesOnStartupCheck == ""
+            && settingsDialog.intervalEdit == "",
+            language " 显示页的控件归属错误")
+        AssertProductionWindowLayout(settingsDialog.gui, language,
+            "SettingsWindow Display")
+        AssertSettingsPageContentInset(settingsDialog, language,
+            "SettingsWindow Display")
+
+        settingsDialog.SwitchTab(2)
+        AssertLocalizedWindow(settingsDialog.tabBuilt[2]
+            && settingsDialog.tabControls[2].Length > 0,
+            language " 启动页没有在首次切换时构建")
+        firstTabState := App.uiInteractions.GetButton(
+            settingsDialog.tabButtons[1].Hwnd)
+        secondTabState := App.uiInteractions.GetButton(
+            settingsDialog.tabButtons[2].Hwnd)
         AssertLocalizedWindow(settingsDialog.showAtStartupCheck.Visible
             && settingsDialog.checkUpdatesOnStartupCheck.Visible
-            && settingsDialog.languageDropDown.Visible
-            && settingsDialog.fontDropDown.Visible
-            && settingsDialog.intervalEdit == "",
-            language " 通用页的控件归属错误")
+            && settingsDialog.shortcutButton.Visible
+            && settingsDialog.taskButton.Visible
+            && settingsDialog.intervalEdit == ""
+            && settingsDialog.gracefulStopEdit == ""
+            && firstTabState.textColor == UiThemeService.Color("TabText")
+            && secondTabState.textColor
+                == UiThemeService.Color("TabActiveText"),
+            language " 启动页的控件归属错误")
+        AssertProductionWindowLayout(settingsDialog.gui, language,
+            "SettingsWindow Startup")
+        AssertSettingsPageContentInset(settingsDialog, language,
+            "SettingsWindow Startup")
         showAtStartupRect := GetControlClientRect(
             settingsDialog.showAtStartupCheck.Hwnd,
             settingsDialog.gui.Hwnd)
         checkUpdatesAtStartupRect := GetControlClientRect(
             settingsDialog.checkUpdatesOnStartupCheck.Hwnd,
             settingsDialog.gui.Hwnd)
-        AssertLocalizedWindow(Abs(showAtStartupRect.Top
-                - checkUpdatesAtStartupRect.Top) <= centerTolerance
-            && showAtStartupRect.Left > checkUpdatesAtStartupRect.Right,
-            language " 两个启动时行为选项没有按更新在左、主窗口在右排列")
-        AssertProductionWindowLayout(settingsDialog.gui, language,
-            "SettingsWindow General")
-        AssertSettingsPageContentInset(settingsDialog, language,
-            "SettingsWindow General")
+        startupCheckRowGap := Max(6, Round(6 * windowDpi / 96))
+        AssertLocalizedWindow(showAtStartupRect.Top
+                >= checkUpdatesAtStartupRect.Bottom + startupCheckRowGap
+            && Abs(showAtStartupRect.Left
+                - checkUpdatesAtStartupRect.Left) <= centerTolerance,
+            language " 两个启动时行为选项没有分行并共享左边界")
+        AssertSettingsControlGroupCentered(settingsDialog,
+            [settingsDialog.checkUpdatesOnStartupCheck,
+                settingsDialog.showAtStartupCheck], language,
+            "启动行为选项组", centerTolerance)
 
-        settingsDialog.SwitchTab(2)
-        AssertLocalizedWindow(settingsDialog.tabBuilt[2]
-            && settingsDialog.tabControls[2].Length > 0,
-            language " 监控与启动页没有在首次切换时构建")
-        firstTabState := App.uiInteractions.GetButton(
-            settingsDialog.tabButtons[1].Hwnd)
-        secondTabState := App.uiInteractions.GetButton(
-            settingsDialog.tabButtons[2].Hwnd)
+        settingsDialog.SwitchTab(3)
+        AssertLocalizedWindow(settingsDialog.tabBuilt[3]
+            && settingsDialog.tabControls[3].Length > 0,
+            language " 监控页没有在首次切换时构建")
         AssertLocalizedWindow(settingsDialog.intervalEdit.Visible
             && settingsDialog.retryEdit.Visible
             && settingsDialog.recursiveImportCheck.Visible
             && !settingsDialog.showAtStartupCheck.Visible
-            && settingsDialog.gracefulStopEdit == ""
-            && firstTabState.textColor == UiThemeService.Color("TabText")
-            && secondTabState.textColor
-                == UiThemeService.Color("TabActiveText"),
-            language " 监控与启动页的控件归属错误")
+            && !settingsDialog.shortcutButton.Visible
+            && settingsDialog.gracefulStopEdit == "",
+            language " 监控页的控件归属错误")
         AssertProductionWindowLayout(settingsDialog.gui, language,
             "SettingsWindow Monitoring")
         AssertSettingsPageContentInset(settingsDialog, language,
@@ -602,14 +798,20 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         recursiveImportRect := GetControlClientRect(
             settingsDialog.recursiveImportCheck.Hwnd,
             settingsDialog.gui.Hwnd)
-        AssertLocalizedWindow(Abs((recursiveImportRect.Left
-                + recursiveImportRect.Right) / 2
-                - settingsClientRect.Width / 2) <= centerTolerance,
-            language " 导入子目录选项没有按实际文字宽度水平居中")
+        intervalRect := GetControlClientRect(settingsDialog.intervalEdit.Hwnd,
+            settingsDialog.gui.Hwnd)
+        AssertLocalizedWindow(Abs(recursiveImportRect.Left
+                - intervalRect.Left) <= centerTolerance,
+            language " 导入子目录选项没有与监控字段左边界对齐")
+        AssertSettingsControlGroupCentered(settingsDialog,
+            [settingsDialog.intervalLabel, settingsDialog.intervalEdit,
+                settingsDialog.retryLabel, settingsDialog.retryEdit,
+                settingsDialog.recursiveImportCheck], language,
+            "监控页字段组", centerTolerance)
 
-        settingsDialog.SwitchTab(3)
-        AssertLocalizedWindow(settingsDialog.tabBuilt[3]
-            && settingsDialog.tabControls[3].Length > 0,
+        settingsDialog.SwitchTab(4)
+        AssertLocalizedWindow(settingsDialog.tabBuilt[4]
+            && settingsDialog.tabControls[4].Length > 0,
             language " 停止策略页没有在首次切换时构建")
         AssertLocalizedWindow(settingsDialog.gracefulStopEdit.Visible
             && settingsDialog.ctrlCWaitEdit.Visible
@@ -624,14 +826,23 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         forceTerminateRect := GetControlClientRect(
             settingsDialog.forceTerminateCheck.Hwnd,
             settingsDialog.gui.Hwnd)
-        AssertLocalizedWindow(Abs((forceTerminateRect.Left
-                + forceTerminateRect.Right) / 2
-                - settingsClientRect.Width / 2) <= centerTolerance,
-            language " 强制终止选项没有按实际文字宽度水平居中")
+        gracefulStopRect := GetControlClientRect(
+            settingsDialog.gracefulStopEdit.Hwnd,
+            settingsDialog.gui.Hwnd)
+        AssertLocalizedWindow(Abs(forceTerminateRect.Left
+                - gracefulStopRect.Left) <= centerTolerance,
+            language " 强制终止选项没有与停止策略字段左边界对齐")
+        AssertSettingsControlGroupCentered(settingsDialog,
+            [settingsDialog.gracefulStopLabel,
+                settingsDialog.gracefulStopEdit,
+                settingsDialog.ctrlCWaitLabel,
+                settingsDialog.ctrlCWaitEdit,
+                settingsDialog.forceTerminateCheck], language,
+            "停止策略页字段组", centerTolerance)
 
-        settingsDialog.SwitchTab(4)
-        AssertLocalizedWindow(settingsDialog.tabBuilt[4]
-            && settingsDialog.tabControls[4].Length > 0,
+        settingsDialog.SwitchTab(5)
+        AssertLocalizedWindow(settingsDialog.tabBuilt[5]
+            && settingsDialog.tabControls[5].Length > 0,
             language " 日志页没有在首次切换时构建")
         AssertLocalizedWindow(settingsDialog.logMaxEdit.Visible
             && settingsDialog.logRetentionEdit.Visible
@@ -646,10 +857,18 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         clearLogsCenteredRect := GetControlClientRect(
             settingsDialog.clearLogsOnStartupCheck.Hwnd,
             settingsDialog.gui.Hwnd)
-        AssertLocalizedWindow(Abs((clearLogsCenteredRect.Left
-                + clearLogsCenteredRect.Right) / 2
-                - settingsClientRect.Width / 2) <= centerTolerance,
-            language " 启动清理日志选项没有按实际文字宽度水平居中")
+        AssertLocalizedWindow(Abs(clearLogsCenteredRect.Left
+                - GetControlClientRect(settingsDialog.logMaxEdit.Hwnd,
+                    settingsDialog.gui.Hwnd).Left) <= centerTolerance,
+            language " 启动清理日志选项没有与日志字段左边界对齐")
+        settingsDialog.logDirEdit.GetPos(&logFieldX, , &logFieldWidth)
+        expectedLogFieldX := Floor((settingsDialog.layout.WindowWidth
+            - settingsDialog.layout.LogField.AnchorWidth) / 2)
+        AssertLocalizedWindow(logFieldX == expectedLogFieldX
+            && logFieldWidth == Round(
+                settingsDialog.layout.LogField.AnchorWidth * 1.5)
+            && settingsDialog.layout.LogField.X == expectedLogFieldX,
+            language " 日志路径框加长时改变了原有左边距，或未增加二分之一")
 
         logBrowseHwnd := FindChildControlByText(settingsDialog.gui.Hwnd,
             Tr("浏览"))
@@ -665,48 +884,103 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             settingsDialog.clearLogsOnStartupCheck.Hwnd,
             settingsDialog.gui.Hwnd)
         logRowGap := Max(8, Round(8 * windowDpi / 96))
+        ; Edit HWND 位于 26 高的圆角输入背景内部，断言需计入其纵向内边距。
+        logGroupMaxGap := Round(16 * windowDpi / 96)
+        logMaxRect := GetControlClientRect(settingsDialog.logMaxEdit.Hwnd,
+            settingsDialog.gui.Hwnd)
+        logRetentionLabelRect := GetControlClientRect(
+            settingsDialog.logRetentionLabel.Hwnd,
+            settingsDialog.gui.Hwnd)
+        logRetentionRect := GetControlClientRect(
+            settingsDialog.logRetentionEdit.Hwnd,
+            settingsDialog.gui.Hwnd)
+        logDirLabelRect := GetControlClientRect(
+            settingsDialog.logDirLabel.Hwnd, settingsDialog.gui.Hwnd)
         AssertLocalizedWindow(logPathRect.Width > retryRect.Width
             && Abs(logBrowseRect.Left - logPathRect.Left)
                 <= centerTolerance
             && logBrowseRect.Top >= logPathRect.Bottom + logRowGap
-            && clearLogsRect.Top >= logBrowseRect.Bottom + logRowGap,
-            language " 日志路径输入框未延长，或浏览按钮未在下一行左对齐")
+            && clearLogsRect.Top >= logBrowseRect.Bottom + logRowGap
+            && logRetentionLabelRect.Top - logMaxRect.Bottom
+                <= logGroupMaxGap
+            && logDirLabelRect.Top - logRetentionRect.Bottom
+                <= logGroupMaxGap,
+            language " 日志页字段间距不紧凑，或路径操作没有分行左对齐")
 
-        alignedInputs := [
-            {Label: Tr("进程状态检查间隔（毫秒）："),
-                Edit: settingsDialog.intervalEdit},
-            {Label: Tr("崩溃自动重启延迟序列（秒）："),
-                Edit: settingsDialog.retryEdit},
-            {Label: Tr("GUI 程序关闭超时（秒）："),
-                Edit: settingsDialog.gracefulStopEdit},
-            {Label: Tr("CLI 程序关闭超时（秒）："),
-                Edit: settingsDialog.ctrlCWaitEdit},
-            {Label: Tr("运行日志显示上限（条）："),
-                Edit: settingsDialog.logMaxEdit},
-            {Label: Tr("批处理日志保留天数："),
-                Edit: settingsDialog.logRetentionEdit},
-            {Label: Tr("批处理日志保存路径："),
-                Edit: settingsDialog.logDirEdit}
+        firstContentTops := [
+            GetControlClientRect(settingsDialog.languageLabel.Hwnd,
+                settingsDialog.gui.Hwnd).Top,
+            GetControlClientRect(settingsDialog.shortcutLabel.Hwnd,
+                settingsDialog.gui.Hwnd).Top,
+            GetControlClientRect(settingsDialog.intervalLabel.Hwnd,
+                settingsDialog.gui.Hwnd).Top,
+            GetControlClientRect(settingsDialog.gracefulStopLabel.Hwnd,
+                settingsDialog.gui.Hwnd).Top,
+            GetControlClientRect(settingsDialog.logMaxLabel.Hwnd,
+                settingsDialog.gui.Hwnd).Top
         ]
-        alignedInputLeft := ""
-        for alignedInput in alignedInputs {
-            alignedLabelHwnd := FindChildControlByText(
-                settingsDialog.gui.Hwnd, alignedInput.Label)
-            AssertLocalizedWindow(alignedLabelHwnd,
-                language " 无法定位设置标签：" alignedInput.Label)
-            alignedLabelStyle := DllCall("user32\GetWindowLongPtrW", "Ptr",
-                alignedLabelHwnd, "Int", -16, "Ptr")
-            AssertLocalizedWindow((alignedLabelStyle & 0x3) == 0x2,
-                language " 输入框标签没有右对齐：" alignedInput.Label)
-            alignedEditRect := GetControlClientRect(
-                alignedInput.Edit.Hwnd, settingsDialog.gui.Hwnd)
-            if alignedInputLeft == ""
-                alignedInputLeft := alignedEditRect.Left
-            else
-                AssertLocalizedWindow(Abs(alignedEditRect.Left
-                    - alignedInputLeft) <= centerTolerance,
-                    language " 设置输入框没有形成统一垂直线："
-                        alignedInput.Label)
+        for contentTop in firstContentTops {
+            AssertLocalizedWindow(Abs(contentTop - firstContentTops[1])
+                    <= centerTolerance,
+                language " 设置页签顶部留白不一致")
+        }
+
+        alignedInputPages := [
+            [
+                {Label: settingsDialog.intervalLabel,
+                    Caption: Tr("进程状态检查间隔（毫秒）："),
+                    Edit: settingsDialog.intervalEdit},
+                {Label: settingsDialog.retryLabel,
+                    Caption: Tr("崩溃自动重启延迟序列（秒）："),
+                    Edit: settingsDialog.retryEdit}
+            ],
+            [
+                {Label: settingsDialog.gracefulStopLabel,
+                    Caption: Tr("GUI 程序关闭超时（秒）："),
+                    Edit: settingsDialog.gracefulStopEdit},
+                {Label: settingsDialog.ctrlCWaitLabel,
+                    Caption: Tr("CLI 程序关闭超时（秒）："),
+                    Edit: settingsDialog.ctrlCWaitEdit}
+            ],
+            [
+                {Label: settingsDialog.logMaxLabel,
+                    Caption: Tr("运行日志显示上限（条）："),
+                    Edit: settingsDialog.logMaxEdit},
+                {Label: settingsDialog.logRetentionLabel,
+                    Caption: Tr("批处理日志保留天数："),
+                    Edit: settingsDialog.logRetentionEdit},
+                {Label: settingsDialog.logDirLabel,
+                    Caption: Tr("批处理日志保存路径："),
+                    Edit: settingsDialog.logDirEdit}
+            ]
+        ]
+        for alignedInputs in alignedInputPages {
+            alignedInputLeft := ""
+            for alignedInput in alignedInputs {
+                strippedLabel := settingsDialog.SplitFieldCaption(
+                    alignedInput.Caption).Label
+                alignedLabelStyle := DllCall("user32\GetWindowLongPtrW", "Ptr",
+                    alignedInput.Label.Hwnd, "Int", -16, "Ptr")
+                alignedLabelRect := GetControlClientRect(
+                    alignedInput.Label.Hwnd, settingsDialog.gui.Hwnd)
+                alignedEditRect := GetControlClientRect(
+                    alignedInput.Edit.Hwnd, settingsDialog.gui.Hwnd)
+                AssertLocalizedWindow(alignedInput.Label.Text == strippedLabel
+                    && (alignedLabelStyle & 0x3) == 0
+                    && !RegExMatch(alignedInput.Label.Text, "[：:]$")
+                    && Abs(alignedLabelRect.Left - alignedEditRect.Left)
+                        <= centerTolerance
+                    && alignedLabelRect.Bottom <= alignedEditRect.Top,
+                    language " 设置字段没有按无冒号标题在上、值在下左对齐："
+                        strippedLabel)
+                if alignedInputLeft == ""
+                    alignedInputLeft := alignedEditRect.Left
+                else
+                    AssertLocalizedWindow(Abs(alignedEditRect.Left
+                        - alignedInputLeft) <= centerTolerance,
+                        language " 同一页设置输入框没有形成统一垂直线："
+                            strippedLabel)
+            }
         }
         settingsDialog.intervalEdit.GetPos(, , &intervalInputWidth)
         settingsDialog.retryEdit.GetPos(, , &retryInputWidth)
@@ -731,11 +1005,15 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             settingsDialog.saveButton.Hwnd)
         cancelButtonState := App.uiInteractions.GetButton(
             settingsDialog.cancelButton.Hwnd)
-        AssertLocalizedWindow(!saveButtonState.HasOwnProp("buttonImage")
+        AssertLocalizedWindow(saveButtonState.normal
+                == UiThemeService.Color("Save")
+            && saveButtonState.current == UiThemeService.Color("Save")
+            && !saveButtonState.HasOwnProp("buttonImage")
             && !saveButtonState.HasOwnProp("buttonIcon")
             && !cancelButtonState.HasOwnProp("buttonImage")
             && !cancelButtonState.HasOwnProp("buttonIcon"),
-            language " 设置窗口保存或取消按钮不应显示前置图标")
+            language " 设置窗口保存按钮语义色或保存／取消图标规则错误")
+        settingsDialog.SwitchTab(2)
         AssertLocalizedWindow(settingsDialog.shortcutLabel
             && settingsDialog.taskLabel && settingsDialog.shortcutButton
             && settingsDialog.shortcutFeedbackText
@@ -1336,6 +1614,7 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             && customBrowseState.buttonImage.sourcePath
                 == GetApplicationAssetPath(
                     "ui-icons\lucide\folder-open.svg")
+            && customSaveState.normal == UiThemeService.Color("Save")
             && !customSaveState.HasOwnProp("buttonImage")
             && !customSaveState.HasOwnProp("buttonIcon")
             && !customCancelState.HasOwnProp("buttonImage")
@@ -1388,6 +1667,7 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         AssertLocalizedWindow(environmentBrowseState.buttonImage.sourcePath
                 == GetApplicationAssetPath(
                     "ui-icons\lucide\folder-open.svg")
+            && environmentSaveState.normal == UiThemeService.Color("Save")
             && !environmentSaveState.HasOwnProp("buttonImage")
             && !environmentSaveState.HasOwnProp("buttonIcon")
             && !environmentCancelState.HasOwnProp("buttonImage")
@@ -1548,6 +1828,7 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
                     "ui-icons\lucide\wand-sparkles.svg")
             && maintenanceClearState.buttonImage.sourcePath
                 == GetApplicationAssetPath("ui-icons\lucide\trash-2.svg")
+            && maintenanceSaveState.normal == UiThemeService.Color("Save")
             && !maintenanceSaveState.HasOwnProp("buttonImage")
             && !maintenanceSaveState.HasOwnProp("buttonIcon")
             && !maintenanceCancelState.HasOwnProp("buttonImage")
@@ -1840,7 +2121,8 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         tooltipDialog.Close()
 
         AssertLocalizedWindow(App.uiInteractions.Buttons.Count == 0
-            && App.uiInteractions.TextInputs.Count == 0,
+            && App.uiInteractions.TextInputs.Count == 0
+            && TextInputDecorationRouter.Decorations.Count == 0,
             language " 关闭所有窗口后仍保留交互注册")
     } finally {
         if tooltipDialog
@@ -1908,6 +2190,20 @@ RunEnvironmentSettingsPreview() {
     DetectHiddenWindows(true)
     try RunOneLocalizedWindowPass("zh-CN", true, false, false, "dark")
     finally DetectHiddenWindows(priorHiddenWindowMode)
+}
+
+RunSettingsPreview(tabIndex := 1) {
+    priorHiddenWindowMode := A_DetectHiddenWindows
+    DetectHiddenWindows(true)
+    OnMessage(Win32.WM_MEASUREITEM, OnMeasureApplicationControl)
+    OnMessage(Win32.WM_DRAWITEM, OnDrawApplicationControl)
+    try RunOneLocalizedWindowPass("zh-CN", false, false, false, "dark",
+        tabIndex)
+    finally {
+        OnMessage(Win32.WM_MEASUREITEM, OnMeasureApplicationControl, 0)
+        OnMessage(Win32.WM_DRAWITEM, OnDrawApplicationControl, 0)
+        DetectHiddenWindows(priorHiddenWindowMode)
+    }
 }
 
 RunAboutSettingsPreview() {

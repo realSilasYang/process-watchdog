@@ -93,13 +93,13 @@ class EnvironmentSettingsDialog extends ManagedWindow {
             actionStartX := Round((windowWidth - 170) / 2)
             btnSave := this.gui.Add("Text", "x" actionStartX
                 " y" actionY " w80 h28 Center 0x200 Background"
-                    UiThemeService.Color("Primary") " c"
+                    UiThemeService.Color("Save") " c"
                     UiThemeService.Color("ButtonText"), Tr("保存"))
             btnCancel := this.gui.Add("Text", "x" (actionStartX + 90)
                 " y" actionY " w80 h28 Center 0x200 Background"
                     UiThemeService.Color("Toolbar") " c"
                     UiThemeService.Color("ToolbarText"), Tr("取消"))
-            RegisterHoverButton(btnSave, UiThemeService.Color("Primary"))
+            RegisterHoverButton(btnSave, UiThemeService.Color("Save"))
             RegisterHoverButton(btnCancel, UiThemeService.Color("Toolbar"))
             RegisterButtonClick(btnSave, ObjBindMethod(this, "Save"),
                 ButtonFeedbackMode.Dismissive)
