@@ -37,7 +37,10 @@ runner 中的 `dist` 上传和审计发行物。
 6. 普通 CI 使用仓库内经哈希固定的 `tools/ci-toolchain.resolved.json` 和缓存，先按
    路径分类：纯文档只运行不需要 LFS 的快速门禁；运行时变更增加真实 Windows／GUI；
    主分支非文档变更和发行工程 Pull Request 再增加可复现打包，避免上游变化和大型
-   资源处理拖慢无关提交。发布演练与正式发布则重新查询 AutoHotkey 最新稳定版和
+   资源处理拖慢无关提交。需要完整字体的作业不直接拉取 LFS，而是从最新正式
+   `fonts.zip` 恢复字体并逐项核对当前 `assets/fonts/metadata.json` 的 SHA-256；正式
+   字体发生变化时必须先通过可用的 LFS 或其它受审计渠道提供新字节，旧发布物不会被
+   当成新字体。发布演练与正式发布则重新查询 AutoHotkey 最新稳定版和
    Ahk2Exe 最新发布版，并冻结本次 `toolchain.resolved.json`。检查发行目录包含
    AutoHotkey 许可证、对应提交的完整源码归档和这份解析快照，且 SBOM 与实际归档
    哈希一致。

@@ -49,7 +49,11 @@ after fixing that failure, rerun the same command.
    `tools/ci-toolchain.resolved.json` and classifies changed paths first.
    Documentation-only changes run a no-LFS fast gate; runtime changes add real
    Windows/GUI integration; non-documentation `main` pushes and release-engineering
-   pull requests add reproducible packaging. The dry run and formal release instead query
+   pull requests add reproducible packaging. Jobs that need complete fonts do not
+   consume LFS transfer quota; they restore the latest published `fonts.zip` and
+   verify every file against the current SHA-256 metadata. A genuinely changed
+   font must first be supplied through working LFS or another audited channel;
+   an old release asset is never accepted as new font content. The dry run and formal release instead query
    the latest stable AutoHotkey and latest published Ahk2Exe, then freeze one
    `toolchain.resolved.json`. Confirm that the package contains the AutoHotkey
    license, corresponding source archive, resolved snapshot, and an SBOM
