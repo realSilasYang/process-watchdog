@@ -30,19 +30,99 @@ class ProcessSnapshotIndex {
             && nowTicks - this.CapturedAtTicks <= maximumAgeMs
     }
 
-    ObserveImagePath(targetPath) {
+    ObserveImagePath(targetPath, fallbackContext := "") {
         key := this.Canonical(targetPath)
         observation := this.ObserveEntries(this.ByImagePath, key, "process-image")
         if !observation.IsStopped()
             return observation
         SplitPath(targetPath, &targetName)
-        if (targetName != "" && this.HasLiveEntryWithoutValue(this.ByName,
-            StrLower(targetName), "exe")) {
+        inaccessibleCandidates := this.GetInaccessibleNameCandidates(targetName,
+            &identityUnavailable)
+        if (inaccessibleCandidates.Length && !identityUnavailable
+            && this.IsImagePathFallbackAllowed(fallbackContext)) {
+            inferred := this.InferInaccessibleImageCandidate(
+                inaccessibleCandidates, fallbackContext)
+            if inferred.HasOwnProp("Observation")
+                return inferred.Observation
+            if inferred.Ambiguous
+                return ProcessObservation.Unknown(this.CapturedAtTicks,
+                    "process-image", "存在多个同名进程，无法唯一确认",
+                    ProcessObservationReason.AmbiguousTarget)
+        }
+        if (inaccessibleCandidates.Length || identityUnavailable) {
             return ProcessObservation.Unknown(this.CapturedAtTicks,
                 "process-image", "同名进程的镜像路径不可用",
                 ProcessObservationReason.InaccessibleImagePath)
         }
         return observation
+    }
+
+    GetInaccessibleNameCandidates(targetName, &identityUnavailable := false) {
+        candidates := []
+        identityUnavailable := false
+        if targetName == "" || !this.ByName.Has(StrLower(targetName))
+            return candidates
+        for processInfo in this.ByName[StrLower(targetName)] {
+            if processInfo.HasOwnProp("exe") && processInfo.exe != ""
+                continue
+            liveStatus := this.GetLiveStatus(processInfo)
+            if liveStatus > 0
+                candidates.Push(processInfo)
+            else if liveStatus < 0
+                identityUnavailable := true
+        }
+        return candidates
+    }
+
+    IsImagePathFallbackAllowed(fallbackContext) {
+        return IsObject(fallbackContext)
+            && fallbackContext.HasOwnProp("AllowInaccessibleImageFallback")
+            && fallbackContext.AllowInaccessibleImageFallback
+    }
+
+    InferInaccessibleImageCandidate(candidates, fallbackContext) {
+        if candidates.Length != 1
+            return {Ambiguous: candidates.Length > 1}
+        candidate := candidates[1]
+        priorPid := this.ContextValue(fallbackContext, "PriorPID", 0)
+        priorIdentity := String(this.ContextValue(fallbackContext,
+            "PriorCreationIdentity", ""))
+        identity := this.ProcessIdentity(candidate)
+        matchesPrior := priorPid && candidate.pid == priorPid
+            && priorIdentity != "" && identity != ""
+            && StrLower(identity) == StrLower(priorIdentity)
+        recentSeconds := Max(1, Integer(this.ContextValue(fallbackContext,
+            "RecentStartSeconds", 0)))
+        recentStart := recentSeconds > 0
+            && this.WasProcessStartedRecently(candidate, recentSeconds)
+        if matchesPrior || recentStart {
+            return {Observation: ProcessObservation.Running(candidate.pid,
+                identity, this.CapturedAtTicks, "process-image-inferred")}
+        }
+        return {}
+    }
+
+    WasProcessStartedRecently(processInfo, maximumAgeSeconds) {
+        creation := this.ContextValue(processInfo, "creation", "")
+        creation := SubStr(String(creation), 1, 14)
+        if !RegExMatch(creation, "^\d{14}$")
+            return false
+        try return Abs(DateDiff(A_Now, creation, "Seconds"))
+            <= maximumAgeSeconds
+        catch
+            return false
+    }
+
+    ProcessIdentity(processInfo) {
+        if processInfo.HasOwnProp("identity") && processInfo.identity != ""
+            return String(processInfo.identity)
+        return processInfo.HasOwnProp("creation")
+            ? String(processInfo.creation) : ""
+    }
+
+    ContextValue(objectValue, propertyName, defaultValue := "") {
+        return IsObject(objectValue) && objectValue.HasOwnProp(propertyName)
+            ? objectValue.%propertyName% : defaultValue
     }
 
     ObserveCommandTarget(targetPath, launcherPath := "") {

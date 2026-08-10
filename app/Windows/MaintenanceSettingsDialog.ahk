@@ -50,8 +50,11 @@ class MaintenanceSettingsDialog extends ManagedWindow {
             SetDarkControl(this.enableCheck.Hwnd)
             RegisterHandCursorControl(this.enableCheck)
 
-            browseWidth := isCompact ? 48 : 70
-            autoWidth := isCompact ? 44 : 70
+            ; 紧凑布局仍需为图标、间距和中文标签预留完整空间；过窄时
+            ; Text 控件会把标签裁成“浏览…”、“自动…”。输入框宽度由
+            ; 同一公式自动让位，按钮的右边界和窗口尺寸保持不变。
+            browseWidth := isCompact ? 84 : 110
+            autoWidth := isCompact ? 72 : 136
             rootInputWidth := contentWidth - browseWidth - autoWidth - 20
             browseX := 20 + rootInputWidth + 10
             autoX := browseX + browseWidth + 10
@@ -79,27 +82,27 @@ class MaintenanceSettingsDialog extends ManagedWindow {
             stableX := detectionX + timingWidth + timingGap
             maxWaitX := stableX + timingWidth + timingGap
             this.gui.Add("Text", "x" detectionX " y176 w" timingWidth
-                " h20 BackgroundTrans", Tr("退出检测窗口（秒）："))
+                " h20 BackgroundTrans",
+                RTrim(Tr("退出检测窗口（秒）："), "：: "))
             detectionInputX := detectionX
-                + Floor((timingWidth - shortTimingWidth) / 2)
             stableInputX := stableX
-                + Floor((timingWidth - shortTimingWidth) / 2)
             maxWaitInputX := maxWaitX
-                + Floor((timingWidth - longTimingWidth) / 2)
             detectionInput := AddCenteredSingleLineEdit(this.gui,
                 detectionInputX,
                 200, shortTimingWidth, 26,
                 stateObj.MaintenanceConfig.DetectionSeconds, "Number")
             this.detectionEdit := detectionInput.Edit
             this.gui.Add("Text", "x" stableX " y176 w" timingWidth
-                " h20 BackgroundTrans", Tr("文件稳定等待（秒）："))
+                " h20 BackgroundTrans",
+                RTrim(Tr("文件稳定等待（秒）："), "：: "))
             stableInput := AddCenteredSingleLineEdit(this.gui, stableInputX,
                 200,
                 shortTimingWidth, 26,
                 stateObj.MaintenanceConfig.StableSeconds, "Number")
             this.stableEdit := stableInput.Edit
             this.gui.Add("Text", "x" maxWaitX " y176 w" timingWidth
-                " h20 BackgroundTrans", Tr("最长升级等待（秒）："))
+                " h20 BackgroundTrans",
+                RTrim(Tr("最长升级等待（秒）："), "：: "))
             maxWaitInput := AddCenteredSingleLineEdit(this.gui,
                 maxWaitInputX,
                 200, longTimingWidth, 26,
@@ -115,8 +118,9 @@ class MaintenanceSettingsDialog extends ManagedWindow {
                     UiThemeService.Color("Toolbar") " c"
                     UiThemeService.Color("ToolbarText"),
                 Tr("清除记录"))
+            learnedEditY := 274
             this.learnedEdit := this.gui.Add("Edit",
-                "x20 y270 w" contentWidth
+                "x20 y" learnedEditY " w" contentWidth
                 " h70 Background" UiThemeService.Color("Surface") " c"
                     UiThemeService.Color("ReadonlyText")
                     " -E0x200 ReadOnly Multi VScroll",
@@ -124,7 +128,8 @@ class MaintenanceSettingsDialog extends ManagedWindow {
             RegisterTextInputControl(this.learnedEdit, true)
             SetDarkControl(this.learnedEdit.Hwnd)
 
-            this.gui.Add("Text", "x20 y352 w" contentWidth
+            statusY := learnedEditY + 82
+            this.gui.Add("Text", "x20 y" statusY " w" contentWidth
                 " h24 0x200 BackgroundTrans c"
                     UiThemeService.Color("HintText"),
                 this.GetStatusText())
@@ -135,9 +140,10 @@ class MaintenanceSettingsDialog extends ManagedWindow {
             actionStartX := Round((windowWidth - actionWidth) / 2)
             btnSaveX := isBlocking ? actionStartX + resumeWidth + 10 : actionStartX
             btnCancelX := btnSaveX + 90
+            actionY := statusY + 38
             if isBlocking {
                 btnResume := this.gui.Add("Text",
-                    "x" actionStartX " y390 w" resumeWidth
+                    "x" actionStartX " y" actionY " w" resumeWidth
                     " h28 Center 0x200 Background" UiThemeService.Color("Pause")
                         " c" UiThemeService.Color("ButtonText"),
                     Tr("结束升级等待并恢复守护"))
@@ -147,11 +153,11 @@ class MaintenanceSettingsDialog extends ManagedWindow {
                     ButtonFeedbackMode.Dismissive)
             }
             btnSave := this.gui.Add("Text", "x" btnSaveX
-                " y390 w80 h28 Center 0x200 Background"
+                " y" actionY " w80 h28 Center 0x200 Background"
                     UiThemeService.Color("Save") " c"
                     UiThemeService.Color("ButtonText"), Tr("保存"))
             btnCancel := this.gui.Add("Text", "x" btnCancelX
-                " y390 w80 h28 Center 0x200 Background"
+                " y" actionY " w80 h28 Center 0x200 Background"
                     UiThemeService.Color("Toolbar") " c"
                     UiThemeService.Color("ToolbarText"), Tr("取消"))
 
@@ -172,7 +178,7 @@ class MaintenanceSettingsDialog extends ManagedWindow {
             RegisterButtonClick(btnCancel, ObjBindMethod(this, "Close"), ButtonFeedbackMode.Dismissive)
             this.gui.OnEvent("Close", ObjBindMethod(this, "Close"))
             this.gui.OnEvent("Escape", ObjBindMethod(this, "Close"))
-            ShowApplicationWindow(this.gui, "w" windowWidth " h435")
+            ShowApplicationWindow(this.gui, "w" windowWidth " h" (actionY + 45))
             ShowSingleLineEditFromStart(targetInput.Edit)
         } catch as openErr {
             this.Close()

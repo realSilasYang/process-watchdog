@@ -31,29 +31,57 @@ class MaintenanceActorMatcher {
 
     Match(processInfo, targetPath, rootPath, learnedActors, targetPid := 0,
         targetCreationIdentity := "", processMap := "", maintenanceBlocking := false,
-        trackedActorAnchors := "") {
+        trackedActorAnchors := "", confirmedFootprint := false) {
+        context := this.CreateMatchContext(targetPath, rootPath, learnedActors,
+            targetPid, targetCreationIdentity, processMap,
+            maintenanceBlocking, trackedActorAnchors, confirmedFootprint)
+        return this.MatchPrepared(processInfo, context)
+    }
+
+    CreateMatchContext(targetPath, rootPath, learnedActors, targetPid := 0,
+        targetCreationIdentity := "", processMap := "", maintenanceBlocking := false,
+        trackedActorAnchors := "", confirmedFootprint := false) {
+        canonicalRoot := this.Canonical(rootPath)
+        return {
+            TargetPath: this.Canonical(targetPath),
+            RootPath: canonicalRoot,
+            LearnedPaths: this.BuildLearnedPathSet(learnedActors,
+                canonicalRoot),
+            TargetPid: targetPid,
+            TargetCreationIdentity: targetCreationIdentity,
+            ProcessMap: processMap,
+            MaintenanceBlocking: !!maintenanceBlocking,
+            TrackedActorAnchors: trackedActorAnchors,
+            ConfirmedFootprint: !!confirmedFootprint
+        }
+    }
+
+    MatchPrepared(processInfo, context) {
+        targetPid := context.TargetPid
         pid := this.Value(processInfo, "pid", 0)
         if !pid || (targetPid && pid == targetPid)
             return MaintenanceActorMatchResult(false)
 
-        executablePath := this.Canonical(this.Value(processInfo, "exe", ""))
-        targetPath := this.Canonical(targetPath)
-        rootPath := this.Canonical(rootPath)
+        executablePath := this.CanonicalExecutablePath(processInfo)
+        targetPath := context.TargetPath
+        rootPath := context.RootPath
         if (executablePath != "" && targetPath != ""
             && executablePath == targetPath)
             return MaintenanceActorMatchResult(false)
 
-        learned := this.MatchesLearnedPath(processInfo, learnedActors, rootPath)
+        learned := executablePath != ""
+            && context.LearnedPaths.Has(executablePath)
         installerLike := this.Value(processInfo, "installerLike",
             this.IsInstallerLike(processInfo))
         underRoot := executablePath != ""
-            && this.PathIsWithinRoot(executablePath, rootPath)
-        referencesRoot := this.ReferencesRoot(processInfo, targetPath, rootPath)
+            && this.CanonicalPathIsWithinRoot(executablePath, rootPath)
+        referencesRoot := this.ReferencesCanonicalRoot(processInfo,
+            targetPath, rootPath)
         descendant := this.IsDescendantOfTarget(processInfo, targetPid,
-            targetCreationIdentity, processMap)
-        actorDescendant := maintenanceBlocking
-            && this.IsDescendantOfTrackedActor(processInfo, processMap,
-                trackedActorAnchors)
+            context.TargetCreationIdentity, context.ProcessMap)
+        actorDescendant := context.MaintenanceBlocking
+            && this.IsDescendantOfTrackedActor(processInfo,
+                context.ProcessMap, context.TrackedActorAnchors)
         evidence := ""
         if learned
             evidence := "learned-scoped-path"
@@ -63,12 +91,25 @@ class MaintenanceActorMatcher {
             evidence := "installer-references-root"
         else if installerLike && descendant
             evidence := "installer-descendant"
-        else if maintenanceBlocking && (descendant || actorDescendant)
+        else if context.MaintenanceBlocking && context.ConfirmedFootprint
+            && installerLike
+            ; 例如由 Windows Installer 服务代理的 msiexec，命令行可能只有
+            ; 产品代码，既不在安装目录内，也没有目标父进程关系。只有目标
+            ; 足迹已经发生变化时才接受这条弱关联，避免普通运行期误匹配。
+            evidence := "maintenance-installer-signal"
+        else if context.MaintenanceBlocking && context.ConfirmedFootprint
+            && underRoot
+            evidence := "maintenance-under-root"
+        else if context.MaintenanceBlocking && context.ConfirmedFootprint
+            && referencesRoot
+            evidence := "maintenance-references-root"
+        else if context.MaintenanceBlocking && (descendant || actorDescendant)
             evidence := "maintenance-descendant"
         if evidence == ""
             return MaintenanceActorMatchResult(false)
 
-        signature := this.BuildLearningSignature(processInfo, rootPath)
+        signature := evidence == "maintenance-installer-signal" ? ""
+            : this.BuildLearningSignature(processInfo, rootPath)
         return MaintenanceActorMatchResult(true, evidence, signature)
     }
 
@@ -129,8 +170,12 @@ class MaintenanceActorMatcher {
     }
 
     MatchesLearnedPath(processInfo, learnedActors, rootPath) {
-        executablePath := this.Canonical(this.Value(processInfo, "exe", ""))
-        if executablePath == "" || Type(learnedActors) != "Array"
+        executablePath := this.CanonicalExecutablePath(processInfo)
+        if executablePath == ""
+            return false
+        if Type(learnedActors) == "Map"
+            return learnedActors.Has(executablePath)
+        if Type(learnedActors) != "Array"
             return false
         for signature in learnedActors {
             normalized := this.NormalizeLearnedSignature(signature, rootPath)
@@ -156,17 +201,21 @@ class MaintenanceActorMatcher {
             return ""
         if (expectedRoot != "" && signatureRoot != expectedRoot)
             return ""
+        ; 旧版本可能把 msiexec、winget 等全局工具写入学习记录。其完整
+        ; 路径不能证明以后仍服务于本目标，因此只接受安装根内的专属程序。
+        if !this.PathIsWithinRoot(executablePath, signatureRoot)
+            return ""
         return "P:" executablePath "|R:" signatureRoot
     }
 
     BuildLearningSignature(processInfo, rootPath) {
-        executablePath := this.Canonical(this.Value(processInfo, "exe", ""))
+        executablePath := this.CanonicalExecutablePath(processInfo)
         rootPath := this.Canonical(rootPath)
-        processName := StrLower(Trim(this.Value(processInfo, "name", "")))
         if executablePath == "" || rootPath == ""
             return ""
-        if this.PathIsWithinRoot(executablePath, this.Canonical(A_Temp))
-            || RegExMatch(processName, "\d{3,}")
+        if !this.CanonicalPathIsWithinRoot(executablePath, rootPath)
+            || this.CanonicalPathIsWithinRoot(executablePath,
+                this.Canonical(A_Temp))
             return ""
         return "P:" executablePath "|R:" rootPath
     }
@@ -177,21 +226,46 @@ class MaintenanceActorMatcher {
     }
 
     ReferencesRoot(processInfo, targetPath, rootPath) {
+        return this.ReferencesCanonicalRoot(processInfo,
+            this.Canonical(targetPath), this.Canonical(rootPath))
+    }
+
+    ReferencesCanonicalRoot(processInfo, targetPath, rootPath) {
         if rootPath == ""
             return false
-        for argument in this.ParseCommandLine(this.Value(processInfo, "cmd", "")) {
+        for candidate in this.CanonicalCommandPaths(processInfo) {
+            if (candidate == targetPath
+                || this.CanonicalPathIsWithinRoot(candidate, rootPath))
+                return true
+        }
+        return false
+    }
+
+    CanonicalCommandPaths(processInfo) {
+        if processInfo.HasOwnProp("maintenanceCommandPaths")
+            return processInfo.maintenanceCommandPaths
+        paths := []
+        for argument in this.ParseCommandLine(
+                this.Value(processInfo, "cmd", "")) {
             candidate := Trim(argument, " `t`r`n`"',;()")
             separator := InStr(candidate, "=")
             if (separator > 0 && separator < StrLen(candidate))
                 candidate := SubStr(candidate, separator + 1)
             candidate := this.Canonical(candidate)
-            if candidate == "" || !RegExMatch(candidate, "i)^[a-z]:\\|^\\\\")
-                continue
-            if (candidate == targetPath
-                || this.PathIsWithinRoot(candidate, rootPath))
-                return true
+            if candidate != ""
+                && RegExMatch(candidate, "i)^[a-z]:\\|^\\\\")
+                paths.Push(candidate)
         }
-        return false
+        processInfo.maintenanceCommandPaths := paths
+        return paths
+    }
+
+    CanonicalExecutablePath(processInfo) {
+        if processInfo.HasOwnProp("maintenanceCanonicalExe")
+            return processInfo.maintenanceCanonicalExe
+        executablePath := this.Canonical(this.Value(processInfo, "exe", ""))
+        processInfo.maintenanceCanonicalExe := executablePath
+        return executablePath
     }
 
     IsDescendantOfTarget(processInfo, targetPid, targetCreationIdentity,
@@ -300,6 +374,19 @@ class MaintenanceActorMatcher {
         return false
     }
 
+    BuildLearnedPathSet(learnedActors, rootPath) {
+        learnedPaths := Map()
+        learnedPaths.CaseSense := "Off"
+        if Type(learnedActors) != "Array"
+            return learnedPaths
+        for signature in learnedActors {
+            normalized := this.NormalizeLearnedSignature(signature, rootPath)
+            if normalized != ""
+                learnedPaths[this.SignatureExecutablePath(normalized)] := true
+        }
+        return learnedPaths
+    }
+
     ActorAnchorMatches(identity, actorPid, childInfo, processMap) {
         if !(identity is MaintenanceActorIdentity)
             || identity.PID != actorPid {
@@ -354,6 +441,10 @@ class MaintenanceActorMatcher {
     PathIsWithinRoot(candidatePath, rootPath) {
         candidatePath := this.Canonical(candidatePath)
         rootPath := this.Canonical(rootPath)
+        return this.CanonicalPathIsWithinRoot(candidatePath, rootPath)
+    }
+
+    CanonicalPathIsWithinRoot(candidatePath, rootPath) {
         if candidatePath == "" || rootPath == ""
             return false
         rootPrefix := SubStr(rootPath, StrLen(rootPath), 1) == "\"

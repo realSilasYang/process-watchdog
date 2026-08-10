@@ -25,6 +25,10 @@ class MaintenanceCoordinatorTestContext {
     static ReplaceDuringRefresh := false
     static QueryCount := 0
     static RestoredSessions := Map()
+    static RecoveryObservation := ""
+    static TargetReady := true
+    static FingerprintOverride := ""
+    static FingerprintCount := 0
 }
 
 class MaintenanceFakeInspector {
@@ -109,6 +113,7 @@ class MaintenanceFakeWatcher {
         this.Active := false
         this.Closed := false
         this.ThrowOnPoll := false
+        this.Changes := []
     }
 
     Open() {
@@ -124,7 +129,9 @@ class MaintenanceFakeWatcher {
     Poll() {
         if this.ThrowOnPoll
             throw Error("模拟目录监听异常")
-        return []
+        changes := this.Changes
+        this.Changes := []
+        return changes
     }
 }
 
@@ -158,7 +165,25 @@ MaintenanceTestDeserializeSession(encodedValue) {
 }
 
 MaintenanceTestFingerprint(path) {
+    MaintenanceCoordinatorTestContext.FingerprintCount++
+    if MaintenanceCoordinatorTestContext.FingerprintOverride != ""
+        return MaintenanceCoordinatorTestContext.FingerprintOverride
     return "FP:" path
+}
+
+class CountingCoordinatorMaintenanceMatcher extends MaintenanceActorMatcher {
+    __New(parameters*) {
+        super.__New(parameters*)
+        this.MatchCounts := Map()
+        this.MatchCounts.CaseSense := "Off"
+    }
+
+    MatchPrepared(processInfo, context) {
+        rootPath := context.RootPath
+        this.MatchCounts[rootPath] := this.MatchCounts.Has(rootPath)
+            ? this.MatchCounts[rootPath] + 1 : 1
+        return super.MatchPrepared(processInfo, context)
+    }
 }
 
 MaintenanceTestSubject(path) {
@@ -174,7 +199,7 @@ MaintenanceTestSupported(*) {
 }
 
 MaintenanceTestReady(*) {
-    return true
+    return MaintenanceCoordinatorTestContext.TargetReady
 }
 
 MaintenanceTestLog(message) {
@@ -192,7 +217,11 @@ MaintenanceTestNormalizeTarget(path) {
     return path
 }
 
-MaintenanceTestObserve(*) {
+MaintenanceTestObserve(path := "", snapshotIndex := "",
+    maximumSnapshotAgeMs := 0, observationContext := "") {
+    if IsObject(MaintenanceCoordinatorTestContext.RecoveryObservation)
+        && IsObject(observationContext)
+        return MaintenanceCoordinatorTestContext.RecoveryObservation
     return ProcessObservation.Stopped(1, "test")
 }
 
@@ -379,6 +408,26 @@ RunMaintenanceCoordinatorTests() {
     inspector.NativeReady := true
     stateObj.LastFileActivityTicks := 0
 
+    ; 更新器扫描证据暂不可用时，升级恢复仍应尝试一次受控的目标复核，
+    ; 不能因为 MaintenanceActorCheckedTicks 暂未刷新而一路等到超时。
+    stateObj.MaintenanceMode := MaintenancePhase.Stabilizing
+    stateObj.MaintenanceFileChanged := true
+    stateObj.MaintenanceStartedTicks := coordinator.Now() - 10000
+    stateObj.MaintenanceLastActivityTicks := coordinator.Now() - 5000
+    stateObj.MaintenanceActorCheckedTicks := 0
+    recoveryPid := DllCall("kernel32\GetCurrentProcessId", "UInt")
+    MaintenanceCoordinatorTestContext.RecoveryObservation :=
+        ProcessObservation.Running(recoveryPid, "EXPECTED-CREATION",
+            coordinator.Now(), "process-image-inferred")
+    MaintenanceCoordinatorTestContext.TargetReady := false
+    coordinator.Advance(path, stateObj)
+    AssertCoordinator(stateObj.MaintenanceMode == MaintenancePhase.Normal
+        && InStr(stateObj.State, "RUNNING:"),
+        "升级进程证据暂不可用时，唯一目标复核没有恢复正常守护")
+    MaintenanceCoordinatorTestContext.TargetReady := true
+    MaintenanceCoordinatorTestContext.RecoveryObservation := ""
+    coordinator.ResetSession(path, stateObj, false)
+
     currentPid := DllCall("kernel32\GetCurrentProcessId", "UInt")
     stateObj.PID := currentPid
     stateObj.PIDCreationIdentity := "EXPECTED-CREATION"
@@ -533,6 +582,168 @@ RunMaintenanceCoordinatorTests() {
     AssertCoordinator(!coordinator.IsRelevantFootprintChange(path, stateObj,
         "notes.txt", sharedWatcherEntry),
         "共享安装目录中的普通文档变化被错误提升为升级证据")
+    AssertCoordinator(coordinator.IsRelevantFootprintChange(path, stateObj,
+            "App.exe", sharedWatcherEntry),
+        "安装根目录中的目标文件变化没有被识别")
+    AssertCoordinator(!coordinator.IsRelevantFootprintChange(path, stateObj,
+            "nested\App.exe", sharedWatcherEntry),
+        "子目录中的同名文件被错误当成目标文件变化")
+    AssertCoordinator(!coordinator.IsRelevantFootprintChange(path, stateObj,
+            "*", sharedWatcherEntry),
+        "普通状态下的监听溢出被错误当成已确认升级足迹")
+
+    ; 监听溢出或畸形通知没有具体文件路径，只能要求目标指纹立即复核。
+    ; 指纹不变时不得制造升级活动；指纹确实变化时仍应进入原有流程。
+    stateObj.SafetyFingerprint := "FP:" path
+    stateObj.MaintenanceFingerprintCheckedTicks := coordinator.Now()
+    stateObj.MaintenanceFileChanged := false
+    stateObj.LastFileActivityTicks := 0
+    MaintenanceCoordinatorTestContext.FingerprintOverride := "FP:" path
+    MaintenanceCoordinatorTestContext.FingerprintCount := 0
+    sharedWatcherEntry.watcher.Changes := [{Action: 0, RelativePath: "*"}]
+    coordinator.EventTick()
+    AssertCoordinator(MaintenanceCoordinatorTestContext.FingerprintCount > 0
+        && !stateObj.MaintenanceFileChanged
+        && stateObj.LastFileActivityTicks == 0,
+        "监听溢出没有复核目标指纹，或在指纹未变时制造了升级活动")
+
+    stateObj.MaintenanceFingerprintCheckedTicks := coordinator.Now()
+    MaintenanceCoordinatorTestContext.FingerprintCount := 0
+    sharedWatcherEntry.watcher.Changes := [{Action: 3,
+        RelativePath: "nested\App.exe"}]
+    coordinator.EventTick()
+    AssertCoordinator(MaintenanceCoordinatorTestContext.FingerprintCount > 0
+        && !stateObj.MaintenanceFileChanged
+        && stateObj.LastFileActivityTicks == 0,
+        "子目录同名文件没有复核目标指纹，或被直接当成目标文件变化")
+
+    stateObj.MaintenanceFingerprintCheckedTicks := coordinator.Now()
+    MaintenanceCoordinatorTestContext.FingerprintOverride := "FP:CHANGED"
+    MaintenanceCoordinatorTestContext.FingerprintCount := 0
+    sharedWatcherEntry.watcher.Changes := [{Action: 0, RelativePath: "*"}]
+    coordinator.EventTick()
+    AssertCoordinator(MaintenanceCoordinatorTestContext.FingerprintCount > 0
+        && stateObj.MaintenanceFileChanged
+        && stateObj.LastFileActivityTicks > 0,
+        "监听溢出后的目标指纹真实变化没有进入升级保护流程")
+    coordinator.ResetSession(path, stateObj, false)
+    MaintenanceCoordinatorTestContext.FingerprintOverride := ""
+
+    stateObj.MaintenanceMode := MaintenancePhase.Updating
+    stateObj.MaintenanceFileChanged := true
+    stateObj.LastFileActivityTicks := 0
+    AssertCoordinator(coordinator.IsRelevantFootprintChange(path, stateObj,
+            "notes.txt", sharedWatcherEntry)
+        && coordinator.IsRelevantFootprintChange(path, stateObj,
+            "*", sharedWatcherEntry),
+        "升级会话中的后续写入或监听溢出没有刷新稳定等待")
+    coordinator.RecordFootprintActivity(path, stateObj, "*")
+    AssertCoordinator(stateObj.LastFileActivityTicks > 0
+        && stateObj.MaintenanceMode == MaintenancePhase.Updating,
+        "升级会话中的后续文件活动没有延长稳定等待")
+    coordinator.ResetSession(path, stateObj, false)
+
+    ; Windows Installer 代理可能只有产品代码，既不在安装根目录也没有
+    ; 父子关系。只有足迹已确认变化且进程近期启动时才接受这条弱证据，
+    ; 且绝不把它写入永久学习列表。
+    msiPid := 720001
+    recentCreation := A_Now
+    msiProcess := {pid: msiPid, parent: 0, name: "msiexec.exe",
+        cmd: "/I {PRODUCT-CODE}", exe: "C:\Windows\System32\msiexec.exe",
+        creation: recentCreation, identity: MaintenanceTestCreationIdentity(msiPid)}
+    stateObj.MaintenanceMode := MaintenancePhase.Normal
+    stateObj.MaintenanceFileChanged := false
+    coordinator.RefreshActors([msiProcess], false, true,
+        MaintenanceTestCreateIndex([msiProcess], coordinator.Now(), true),
+        false)
+    AssertCoordinator(stateObj.TransientActorIdentities.Count == 0,
+        "普通运行期的外部 msiexec 被错误纳入升级参与者")
+    stateObj.MaintenanceMode := MaintenancePhase.Updating
+    stateObj.MaintenanceFileChanged := true
+    stateObj.MaintenanceLastActivityTicks := coordinator.Now()
+    staleMsiPid := 720000
+    staleMsiProcess := {pid: staleMsiPid, parent: 0,
+        name: "msiexec.exe", cmd: "/I {OTHER-PRODUCT}",
+        exe: "C:\Windows\System32\msiexec.exe",
+        creation: FormatTime(DateAdd(A_Now, -10, "Minutes"),
+            "yyyyMMddHHmmss"),
+        identity: MaintenanceTestCreationIdentity(staleMsiPid)}
+    coordinator.RefreshActors([staleMsiProcess], false, true,
+        MaintenanceTestCreateIndex([staleMsiProcess], coordinator.Now(),
+            true), false)
+    AssertCoordinator(stateObj.TransientActorIdentities.Count == 0,
+        "足迹变化后把早已运行的无关 msiexec 误认成升级参与者")
+    coordinator.RefreshActors([msiProcess], false, true,
+        MaintenanceTestCreateIndex([msiProcess], coordinator.Now(), true),
+        false)
+    AssertCoordinator(stateObj.TransientActorIdentities.Count == 1
+        && stateObj.TransientActorIdentities[msiPid ":"
+            MaintenanceTestCreationIdentity(msiPid)].Match.Evidence
+            == "maintenance-installer-signal"
+        && stateObj.MaintenanceLearningCandidates.Count == 0,
+        "确认足迹后的近期外部 msiexec 没有被识别为临时参与者")
+    coordinator.ResetSession(path, stateObj, false)
+
+    ; 普通名称的覆盖/复制进程没有安装器关键词，足迹确认后仍可凭安装
+    ; 根目录路径进入完整快照候选集。
+    copyPid := 720002
+    copyProcess := {pid: copyPid, parent: 0, name: "FileCopyHost.exe",
+        cmd: "", exe: rootPath "\FileCopyHost.exe", creation: "",
+        identity: MaintenanceTestCreationIdentity(copyPid)}
+    stateObj.MaintenanceMode := MaintenancePhase.Updating
+    stateObj.MaintenanceFileChanged := true
+    stateObj.MaintenanceLastActivityTicks := coordinator.Now()
+    coordinator.RefreshActors([copyProcess], false, true,
+        MaintenanceTestCreateIndex([copyProcess], coordinator.Now(), true),
+        false)
+    AssertCoordinator(stateObj.TransientActorIdentities.Count == 1
+        && stateObj.TransientActorIdentities[copyPid ":"
+            MaintenanceTestCreationIdentity(copyPid)].Match.Evidence
+            == "maintenance-under-root",
+        "普通名称的安装目录内复制进程没有进入升级参与者")
+    coordinator.ResetSession(path, stateObj, false)
+
+    ; 一个目标确认升级足迹后可以扫描完整快照，但不能迫使其他目标也遍历
+    ; 全部普通进程。这里用 300 个非候选进程验证对象级候选隔离。
+    savedAppStates := runtime.appStates
+    runtime.appStates := Map()
+    runtime.appStates.CaseSense := "Off"
+    runtime.appStates[path] := stateObj
+    isolatedRootPath := rootPath "-candidate-isolation"
+    isolatedPath := isolatedRootPath "\Second.exe"
+    isolatedState := CreateMaintenanceTestSupervisor(isolatedRootPath)
+    runtime.appStates[isolatedPath] := isolatedState
+    countingMatcher := CountingCoordinatorMaintenanceMatcher(
+        MaintenanceTestCreationIdentity)
+    runtime.maintenanceActorMatcher := countingMatcher
+    stateObj.MaintenanceMode := MaintenancePhase.Updating
+    stateObj.MaintenanceFileChanged := true
+    stateObj.LastFileActivityTicks := coordinator.Now()
+    stateObj.MaintenanceLastActivityTicks := coordinator.Now()
+    ordinaryProcesses := []
+    Loop 300 {
+        ordinaryProcesses.Push({pid: 800000 + A_Index, parent: 0,
+            name: "Worker" A_Index ".exe", cmd: "",
+            exe: "C:\Neutral\Worker" A_Index ".exe", creation: "",
+            identity: MaintenanceTestCreationIdentity(800000 + A_Index)})
+    }
+    coordinator.RefreshActors(ordinaryProcesses, false, true,
+        MaintenanceTestCreateIndex(ordinaryProcesses, coordinator.Now(),
+            true), false)
+    firstRootKey := countingMatcher.Canonical(rootPath)
+    secondRootKey := countingMatcher.Canonical(isolatedRootPath)
+    AssertCoordinator(countingMatcher.MatchCounts.Has(firstRootKey)
+        && countingMatcher.MatchCounts[firstRootKey] == 300
+        && !countingMatcher.MatchCounts.Has(secondRootKey),
+        "完整进程快照从已确认升级目标扩散到了其他守护对象"
+        . "（已确认=" (countingMatcher.MatchCounts.Has(firstRootKey)
+            ? countingMatcher.MatchCounts[firstRootKey] : 0)
+        . "，其他=" (countingMatcher.MatchCounts.Has(secondRootKey)
+            ? countingMatcher.MatchCounts[secondRootKey] : 0) "）")
+    runtime.maintenanceActorMatcher := MaintenanceActorMatcher(
+        MaintenanceTestCreationIdentity)
+    coordinator.ResetSession(path, stateObj, false)
+    runtime.appStates := savedAppStates
 
     learnedActorPath := rootPath "\ProductMaintenance.exe"
     learnedSignature := "P:" MaintenanceTestCanonical(learnedActorPath)
@@ -657,6 +868,13 @@ RunMaintenanceCoordinatorTests() {
     runtime.appStates[recoveringPath] := recoveringState
     recentStartedAt := FormatTime(DateAdd(A_NowUTC, -1, "Seconds"),
         "yyyyMMddHHmmss")
+    restoredActorIdentity := MaintenanceActorIdentity(730001,
+        "0011223344556677", rootPath "\Updater2026.exe", rootPath, [])
+    restoredActorSignature := "P:" MaintenanceTestCanonical(
+        rootPath "\Updater2026.exe") "|R:" MaintenanceTestCanonical(rootPath)
+    restoredActorRecord := {Identity: restoredActorIdentity,
+        Match: MaintenanceActorMatchResult(true,
+            "installer-under-root", restoredActorSignature)}
     MaintenanceCoordinatorTestContext.RestoredSessions := Map(
         "TIMED", {Path: timedOutPath, Mode: MaintenancePhase.TimedOut,
             StartedAt: recentStartedAt, BaselineFingerprint: "FP-OLD",
@@ -667,7 +885,9 @@ RunMaintenanceCoordinatorTests() {
         "ACTIVE", {Path: recoveringPath,
             Mode: MaintenancePhase.Stabilizing,
             StartedAt: recentStartedAt, BaselineFingerprint: "FP-ACTIVE",
-            FileChanged: true, Explicit: false})
+            FileChanged: true, Explicit: false,
+            ActorRecords: [restoredActorRecord],
+            LearningCandidates: [restoredActorSignature]})
     IniDelete(journalPath, "Sessions")
     IniWrite("TIMED", journalPath, "Sessions", "Timed")
     IniWrite("INVALID", journalPath, "Sessions", "Invalid")
@@ -679,8 +899,14 @@ RunMaintenanceCoordinatorTests() {
         "超时或损坏的恢复会话绕过了用户确认并重新进入自动恢复")
     AssertCoordinator(recoveringState.MaintenanceMode
             == MaintenancePhase.Recovering
-        && recoveringState.Pending,
-        "有效的未完成升级会话没有进入保守恢复阶段")
+        && recoveringState.Pending
+        && recoveringState.KnownActorIdentities.Has(
+            restoredActorIdentity.Key)
+        && recoveringState.TransientActorIdentities.Has(
+            restoredActorIdentity.Key)
+        && recoveringState.MaintenanceLearningCandidates.Has(
+            restoredActorSignature),
+        "有效的未完成升级会话没有恢复更新器身份和待学习特征")
 
     coordinator.Shutdown()
     AssertCoordinator(!coordinator.Initialize()

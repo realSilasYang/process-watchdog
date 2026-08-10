@@ -6,6 +6,11 @@
 class FileScanService {
     static MaximumResultLimit := 20000
     static MaximumContentMatches := 2
+    static FailureLaunchFailed := "LaunchFailed"
+    static FailureExitedWithoutResult := "ExitedWithoutResult"
+    static FailureTimedOut := "TimedOut"
+    static FailureMalformedResult := "MalformedResult"
+    static FailureCancelled := "Cancelled"
 
     __New(callbacks, host := "") {
         this.Callbacks := callbacks
@@ -34,6 +39,18 @@ class FileScanService {
         this.Workers := Map()
         this.Workers.CaseSense := "Off"
         this.Stopped := false
+        this.LastWorkerKind := ""
+        this.LastWorkerFailureReason := ""
+        this.LastWorkerFailureDetail := ""
+        this.LastWorkerFailureTicks := 0
+        this.LastWorkerRetryTicks := 0
+        this.LastWorkerSuccessTicks := 0
+        this.WorkerFailureCount := 0
+        this.WorkerFailuresByReason := Map()
+        this.WorkerFailuresByReason.CaseSense := "Off"
+        this.WorkerFailureLogTicks := Map()
+        this.WorkerFailureLogTicks.CaseSense := "Off"
+        this.WorkerFailureLogIntervalMs := 30000
     }
 
     IsSupported(filePath) {
@@ -220,8 +237,10 @@ class FileScanService {
                 }
             }
             this.DeleteOutputFiles(outputPath)
-            try this.Callbacks.Log.Call(this.Text("无法启动后台文件扫描：{1}",
-                this.DiagnosticText(scanError.Message)))
+            failureDetail := this.DiagnosticText(scanError.Message)
+            this.RecordWorkerFailure(kind,
+                FileScanService.FailureLaunchFailed, failureDetail, 0,
+                this.Text("无法启动后台文件扫描：{1}", failureDetail))
             return ""
         }
         job := {Pid: workerPid, Handle: workerHandle, Path: outputPath,
@@ -247,26 +266,55 @@ class FileScanService {
     }
 
     PollContentMatch(job) {
-        if !IsObject(job) || !job.HasOwnProp("Path")
-            return {Ready: true, Paths: [], Truncated: false, Failed: true}
+        if !IsObject(job) || !job.HasOwnProp("Path") {
+            failureReason := FileScanService.FailureMalformedResult
+            this.RecordWorkerFailure("ContentMatch", failureReason,
+                "InvalidJob")
+            return {Ready: true, Paths: [], Truncated: false, Failed: true,
+                FailureReason: failureReason}
+        }
         if FileExist(job.Path) {
-            paths := this.ReadResult(job.Path, &truncated, &ready)
-            return {Ready: ready, Paths: paths, Truncated: truncated,
-                Failed: !ready}
+            paths := this.ReadResult(job.Path, &truncated, &ready,
+                &failureReason)
+            ; 正式结果路径只会由工作器原子发布；一旦出现但协议损坏，任务
+            ; 已经终止，不能继续以“尚未就绪”轮询一个已被清理的工作器。
+            return {Ready: true, Paths: paths, Truncated: truncated,
+                Failed: !ready, FailureReason: failureReason}
         }
-        workerExited := job.HasOwnProp("Handle") && job.Handle
-            && this.GetWorkerHandleStatus(job.Handle) == 0
-        if this.Now() >= job.DeadlineTicks || workerExited {
+        workerHandle := job.HasOwnProp("Handle") ? job.Handle : 0
+        if workerHandle {
+            workerExited := this.GetWorkerHandleStatus(workerHandle) == 0
+        } else {
+            currentCreation := ""
+            try currentCreation := this.Callbacks.GetCreationIdentity.Call(
+                job.Pid)
+            workerExited := !ProcessExist(job.Pid)
+                || (job.CreationIdentity != "" && currentCreation != ""
+                    && currentCreation != job.CreationIdentity)
+        }
+        timedOut := this.Now() >= job.DeadlineTicks
+        if timedOut || workerExited {
+            failureReason := timedOut ? FileScanService.FailureTimedOut
+                : FileScanService.FailureExitedWithoutResult
             this.Stop(job.Pid, job.Path, job.CreationIdentity, job.Handle)
-            return {Ready: true, Paths: [], Truncated: false, Failed: true}
+            this.RecordWorkerFailure(job.Kind, failureReason,
+                timedOut ? "WorkerDeadlineExceeded"
+                    : "WorkerExitedBeforeResult", 0,
+                this.Text("后台扫描失败或超时") " [FileScan."
+                    . job.Kind "=" failureReason "]")
+            return {Ready: true, Paths: [], Truncated: false, Failed: true,
+                FailureReason: failureReason}
         }
-        return {Ready: false, Paths: [], Truncated: false, Failed: false}
+        return {Ready: false, Paths: [], Truncated: false, Failed: false,
+            FailureReason: ""}
     }
 
     StopContentMatch(job) {
         if !IsObject(job) || !job.HasOwnProp("Path")
             return false
         this.Stop(job.Pid, job.Path, job.CreationIdentity, job.Handle)
+        this.RecordWorkerFailure(job.Kind,
+            FileScanService.FailureCancelled, "CancelledByCaller")
         return true
     }
 
@@ -305,14 +353,24 @@ class FileScanService {
         }
     }
 
-    ReadResult(outputPath, &truncated := false, &resultReady := false) {
+    ReadResult(outputPath, &truncated := false, &resultReady := false,
+        &failureReason := "") {
         truncated := false
         resultReady := false
-        try resultText := FileRead(outputPath, "UTF-16")
-        catch
-            return []
-        try return this.ParseResultText(resultText, &truncated, &resultReady)
-        finally {
+        failureReason := ""
+        job := this.Workers.Has(outputPath) ? this.Workers[outputPath] : ""
+        jobKind := IsObject(job) && job.HasOwnProp("Kind")
+            ? job.Kind : ""
+        paths := []
+        readFailed := false
+        try {
+            try resultText := FileRead(outputPath, "UTF-16")
+            catch
+                readFailed := true
+            if !readFailed
+                paths := this.ParseResultText(resultText, &truncated,
+                    &resultReady)
+        } finally {
             workerHandle := this.Workers.Has(outputPath)
                 ? this.Workers[outputPath].Handle : 0
             if workerHandle && this.GetWorkerHandleStatus(workerHandle) != 0
@@ -323,6 +381,18 @@ class FileScanService {
                 try this.Callbacks.Log.Call(this.Text(
                     "无法清理后台扫描结果文件：{1}", outputPath))
         }
+        if jobKind != "" {
+            if resultReady
+                this.RecordWorkerSuccess(jobKind)
+            else {
+                failureReason := FileScanService.FailureMalformedResult
+                this.RecordWorkerFailure(jobKind, failureReason,
+                    "InvalidProtocol", 0,
+                    this.Text("后台扫描失败或超时") " [FileScan."
+                        . jobKind "=MalformedResult]")
+            }
+        }
+        return paths
     }
 
     ParseResultText(resultText, &truncated := false,
@@ -648,6 +718,85 @@ class FileScanService {
     CloseWorkerHandle(handle) {
         if handle
             DllCall("kernel32\CloseHandle", "Ptr", handle)
+    }
+
+    RecordWorkerFailure(kind, reason, detail := "", retryTicks := 0,
+        logMessage := "") {
+        kind := this.DiagnosticValue(kind)
+        reason := Trim(String(reason))
+        if reason == ""
+            return false
+        detail := this.DiagnosticValue(detail)
+        nowTicks := this.Now()
+        logKey := kind "|" reason
+        shouldLog := false
+        previousCritical := A_IsCritical
+        Critical("On")
+        try {
+            this.LastWorkerKind := kind
+            this.LastWorkerFailureReason := reason
+            this.LastWorkerFailureDetail := detail
+            this.LastWorkerFailureTicks := nowTicks
+            this.LastWorkerRetryTicks := retryTicks
+            this.WorkerFailureCount++
+            this.WorkerFailuresByReason[reason] :=
+                this.WorkerFailuresByReason.Has(reason)
+                ? this.WorkerFailuresByReason[reason] + 1 : 1
+            if logMessage != ""
+                && (!this.WorkerFailureLogTicks.Has(logKey)
+                    || nowTicks - this.WorkerFailureLogTicks[logKey]
+                        >= this.WorkerFailureLogIntervalMs) {
+                this.WorkerFailureLogTicks[logKey] := nowTicks
+                shouldLog := true
+            }
+        } finally Critical(previousCritical ? previousCritical : "Off")
+        if shouldLog && this.Callbacks.HasOwnProp("Log")
+            && IsObject(this.Callbacks.Log) {
+            try this.Callbacks.Log.Call(logMessage)
+        }
+        return true
+    }
+
+    RecordWorkerSuccess(kind) {
+        kind := this.DiagnosticValue(kind)
+        successTicks := this.Now()
+        previousCritical := A_IsCritical
+        Critical("On")
+        try {
+            this.LastWorkerKind := kind
+            this.LastWorkerSuccessTicks := successTicks
+        } finally Critical(previousCritical ? previousCritical : "Off")
+    }
+
+    BuildDiagnosticText(prefix := "FileScanWorker") {
+        previousCritical := A_IsCritical
+        Critical("On")
+        try {
+            text := prefix ".ActiveCount=" this.Workers.Count "`r`n"
+                . prefix ".LastKind=" this.LastWorkerKind "`r`n"
+                . prefix ".LastFailureReason="
+                    . this.LastWorkerFailureReason "`r`n"
+                . prefix ".LastFailureDetail="
+                    . this.LastWorkerFailureDetail "`r`n"
+                . prefix ".LastFailureTicks="
+                    . this.LastWorkerFailureTicks "`r`n"
+                . prefix ".LastFailureRetryTicks="
+                    . this.LastWorkerRetryTicks "`r`n"
+                . prefix ".LastSuccessTicks="
+                    . this.LastWorkerSuccessTicks "`r`n"
+                . prefix ".FailureCount=" this.WorkerFailureCount "`r`n"
+            for reason, count in this.WorkerFailuresByReason
+                text .= prefix ".FailureByReason."
+                    . RegExReplace(reason, "[^A-Za-z0-9_.-]", "_")
+                    . "=" count "`r`n"
+            return text
+        } finally Critical(previousCritical ? previousCritical : "Off")
+    }
+
+    DiagnosticValue(value) {
+        value := String(value)
+        value := RegExReplace(value, "[\r\n=]+", " ")
+        return SubStr(value, 1, 500)
     }
 
     Shutdown(*) {

@@ -27,6 +27,14 @@ RecordGuardMutationError(errors, operationError, description) {
 class GuardMutationOwner {
 }
 
+GuardGateTestNow(clockState) {
+    return clockState.Now
+}
+
+GuardGateTestLog(logs, message) {
+    logs.Push(message)
+}
+
 class FailingArmGuardMutationQueue extends GuardMutationQueue {
     Arm(*) {
         this.LastError := Error("模拟定时器创建失败")
@@ -53,6 +61,40 @@ RunGuardWorkGateTests() {
     AssertGuardWorkGate(gate.Busy, "工作门获取后没有进入忙碌状态")
     AssertGuardWorkGate(!gate.TryEnter(), "工作门允许重复进入")
     gate.Leave()
+
+    diagnosticClock := {Now: 1000}
+    diagnosticLogs := []
+    diagnosticGate := GuardWorkGate(
+        GuardGateTestNow.Bind(diagnosticClock),
+        GuardGateTestLog.Bind(diagnosticLogs), 2, 1000)
+    AssertGuardWorkGate(diagnosticGate.TryEnter("OwnerA"),
+        "带标签的工作门无法获取")
+    diagnosticClock.Now := 1100
+    AssertGuardWorkGate(!diagnosticGate.TryEnter("RequesterA"),
+        "竞争请求错误获取了工作门")
+    diagnosticClock.Now := 1200
+    AssertGuardWorkGate(!diagnosticGate.TryEnter("RequesterB")
+        && diagnosticLogs.Length == 1
+        && InStr(diagnosticLogs[1], "Owner=OwnerA")
+        && InStr(diagnosticLogs[1], "Requester=RequesterB"),
+        "连续竞争没有生成带双方标签的限频警告")
+    diagnosticSnapshot := diagnosticGate.Snapshot()
+    AssertGuardWorkGate(diagnosticSnapshot.Busy
+        && diagnosticSnapshot.CurrentOwner == "OwnerA"
+        && diagnosticSnapshot.CurrentHoldMs == 200
+        && diagnosticSnapshot.ContentionCount == 2
+        && diagnosticSnapshot.ContentionByRequester["RequesterA"] == 1
+        && diagnosticSnapshot.ContentionByBlockingOwner["OwnerA"] == 2,
+        "工作门竞争快照缺少持有者、时长或分项计数")
+    diagnosticClock.Now := 1400
+    AssertGuardWorkGate(diagnosticGate.Leave(),
+        "带诊断的工作门无法释放")
+    diagnosticText := diagnosticGate.BuildDiagnosticText()
+    AssertGuardWorkGate(InStr(diagnosticText,
+            "GuardWorkGate.LongestHoldMs=400")
+        && InStr(diagnosticText,
+            "GuardWorkGate.ContentionByRequester.RequesterA=1"),
+        "工作门诊断文本缺少最长持有时长或请求方竞争计数")
     AssertGuardWorkGate(!gate.Busy && gate.TryEnter(),
         "工作门释放后无法重新进入")
     gate.Leave()

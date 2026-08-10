@@ -7,6 +7,40 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.0.11] - 2026-08-11
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides preferred and fallback fonts that must be installed into Windows first; it is not required to run the application.
+- **`process-watchdog-2.0.11-source.zip` (complete source edition):** Includes the AHK source, modules, tests, and documentation without fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64 locally.
+- **`process-watchdog-2.0.11-windows-x64.zip` (complete portable edition, recommended):** Includes the EXE, documentation, licenses, and required runtime resources without fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([official latest version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application search; the bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### ✨ Added
+
+- **Version-directory update relocation:** For direct-file targets installed under version directories such as `2.0.10` or `v2.0.11`, update protection can search the same parent directory for exactly one same-named entry after target-file changes are confirmed. It records and continuously verifies that candidate's SHA-256 before asking the user to update the monitored path; multiple candidates, duplicate copies, or incomplete scans are never guessed.
+
+---
+
+### 🚀 Improvements
+
+- **Broader update-protection evidence:** Watcher overflow, same-named files in subdirectories, and changes to configuration, resources, or archives during an active update now trigger timely verification. Once target-footprint changes are confirmed, recent installer processes proxied by system installer services can also be recognized without install-path arguments, while ordinary writes in shared install roots remain excluded.
+- **Explainable and resumable updater learning:** A dedicated updater confirmed during a real update is learned as a full executable path scoped to its installation root. Global installer tools, temporary-directory programs, and process names alone cannot become permanent evidence. An unfinished session preserves transient updater identities and pending learning candidates across an assistant restart, then commits them only after the update completes successfully.
+- **Process recognition for restricted image paths:** Process image lookup now has a device-path fallback. Only during a confirmed update, and only for one same-named process, the assistant may use the pre-update PID creation identity or a recent start time to confirm recovery, reducing update timeouts when the application is already running.
+- **More efficient maintenance scanning and clearer diagnostics:** Multi-target scans reuse common candidates and parsed command-line paths, while a full process snapshot is considered only for the target with confirmed update-footprint activity. Diagnostic bundles now include work-gate owner, contention, and hold times plus categorized process-snapshot and file-scan worker failures, retries, and recent successes.
+- **Clearer update-protection settings:** The three timing labels no longer use colons and align with their inputs, installation-directory action buttons retain their full labels, and the spacing below Clear Records is tighter.
+
+---
+
+### 🐛 Fixed
+
+- **Running applications no longer time out after an update:** Fixed some applications already running after an update while a temporarily inaccessible process image path kept the assistant waiting until update protection timed out. Ambiguous same-name candidates or unverifiable creation identities still remain unknown and are never adopted blindly.
+- **Background-worker failures remain observable:** Process snapshot and content-scan workers now distinguish launch failure, exit without a result, timeout, malformed output, and cancellation. A malformed file-scan result is no longer left in a pending state after its worker has exited.
+
+---
+
 ## 🎉 Version [2.0.10] - 2026-08-08
 
 ### 📦 Release Assets
@@ -482,7 +516,8 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.10...HEAD
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.11...HEAD
+[2.0.11]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.10...v2.0.11
 [2.0.10]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.9...v2.0.10
 [2.0.9]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.8...v2.0.9
 [2.0.8]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.7...v2.0.8

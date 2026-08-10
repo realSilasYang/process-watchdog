@@ -800,7 +800,7 @@ AssertContextMenuToggleLayout() {
         && GetDisplayHotSwitchMenuText(Main.contextMenu, 6)
             == Tr("🛡️ 以管理员身份运行") "`t✓"
         && GetDisplayHotSwitchMenuText(Main.contextMenu, 7)
-            == Tr("🔄 软件升级保护") "`t✓"
+            == Tr("🔄 软件升级保护设置") "`t✓"
         && GetDisplayHotSwitchMenuText(Main.contextMenu, 9)
             == Tr("📄 查看批处理输出日志"),
         "右键菜单顺序、靠右勾号或批处理日志项不正确")
@@ -813,7 +813,7 @@ AssertContextMenuToggleLayout() {
             == Tr("🛡️ 以管理员身份运行")
         && Main.contextMenu.Handle == contextMenuHandle
         && GetDisplayHotSwitchMenuText(Main.contextMenu, 7)
-            == Tr("🔄 软件升级保护")
+            == Tr("🔄 软件升级保护设置")
         && (maintenanceState & 0x0003)
         && DllCall("user32\GetMenuItemCount", "Ptr",
             Main.contextMenu.Handle, "Int") == 8,

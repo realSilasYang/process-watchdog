@@ -328,9 +328,61 @@ RunFileScanServiceTests() {
         failedService := CreateFileScanTestService(failedState, rootPath,
             scriptPath)
         AssertFileScan(failedService.Start(rootPath, true, 10, 5)
-            == "" && failedState.Logs.Length == 1,
+            == "" && failedState.Logs.Length == 1
+            && failedService.LastWorkerFailureReason == "LaunchFailed",
             "工作器启动异常没有被隔离并记录")
         failedService.Shutdown()
+
+        diagnosticState := FileScanTestState()
+        diagnosticService := CreateFileScanTestService(diagnosticState,
+            rootPath, scriptPath)
+        timedOutJob := diagnosticService.StartContentMatch(rootPath,
+            rootPath "\old.exe", expectedContentSize, expectedContentHash,
+            false, 1)
+        diagnosticState.Now := timedOutJob.DeadlineTicks
+        timedOutResult := diagnosticService.PollContentMatch(timedOutJob)
+        AssertFileScan(timedOutResult.Ready && timedOutResult.Failed
+            && timedOutResult.FailureReason == "TimedOut"
+            && diagnosticService.LastWorkerFailureReason == "TimedOut",
+            "内容扫描超时没有返回并保留结构化失败原因")
+
+        exitedJob := diagnosticService.StartContentMatch(rootPath,
+            rootPath "\old.exe", expectedContentSize, expectedContentHash,
+            false, 5)
+        diagnosticService.HandleStatus[exitedJob.Handle] := 0
+        exitedResult := diagnosticService.PollContentMatch(exitedJob)
+        AssertFileScan(exitedResult.Ready && exitedResult.Failed
+            && exitedResult.FailureReason == "ExitedWithoutResult",
+            "内容扫描工作器无结果退出没有与超时区分")
+
+        identityOnlyJob := {Pid: 2147483000, Handle: 0,
+            Path: rootPath "\identity-only-no-result.tmp",
+            CreationIdentity: "OLD", DeadlineTicks: diagnosticState.Now + 5000,
+            Kind: "ContentMatch"}
+        identityOnlyResult := diagnosticService.PollContentMatch(
+            identityOnlyJob)
+        AssertFileScan(identityOnlyResult.Ready && identityOnlyResult.Failed
+            && identityOnlyResult.FailureReason == "ExitedWithoutResult",
+            "无进程句柄时没有通过 PID 与创建身份识别工作器退出")
+
+        malformedJob := diagnosticService.StartContentMatch(rootPath,
+            rootPath "\old.exe", expectedContentSize, expectedContentHash,
+            false, 5)
+        FileAppend("BROKEN`r`n", malformedJob.Path, "UTF-16")
+        malformedResult := diagnosticService.PollContentMatch(malformedJob)
+        AssertFileScan(malformedResult.Ready && malformedResult.Failed
+            && malformedResult.FailureReason == "MalformedResult",
+            "内容扫描损坏结果没有返回结构化失败原因")
+
+        cancelledJob := diagnosticService.StartContentMatch(rootPath,
+            rootPath "\old.exe", expectedContentSize, expectedContentHash,
+            false, 5)
+        AssertFileScan(diagnosticService.StopContentMatch(cancelledJob)
+            && diagnosticService.LastWorkerFailureReason == "Cancelled"
+            && InStr(diagnosticService.BuildDiagnosticText(),
+                "FileScanWorker.FailureByReason.TimedOut=1"),
+            "主动取消内容扫描没有记录状态，或诊断文本缺少分类计数")
+        diagnosticService.Shutdown()
 
         raceState := FileScanTestState()
         raceService := CreateFileScanTestService(raceState, rootPath,

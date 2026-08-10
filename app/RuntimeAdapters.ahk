@@ -144,18 +144,31 @@ GetDefaultMaintenanceRoot(path) {
         if (effectiveTarget != "") {
             SplitPath(effectiveTarget, , &effectiveDirectory)
             if (effectiveDirectory != "")
-                return effectiveDirectory
+                return GetMaintenanceRootForDirectory(effectiveDirectory)
         }
         workingDir := App.shortcutTargetResolver.GetWorkingDirectory(path)
         if (workingDir != "")
-            return StrLen(workingDir) > 3 ? RTrim(workingDir, "\") : workingDir
+            return GetMaintenanceRootForDirectory(workingDir)
         targetPath := App.shortcutTargetResolver.GetTargetPath(path)
         if (targetPath != "") {
             SplitPath(targetPath, , &targetDirectory)
-            return targetDirectory
+            return GetMaintenanceRootForDirectory(targetDirectory)
         }
     }
     SplitPath(path, , &directory)
+    return GetMaintenanceRootForDirectory(directory)
+}
+
+GetMaintenanceRootForDirectory(directory) {
+    directory := Trim(String(directory), " `t`r`n`"")
+    if directory == ""
+        return ""
+    directory := StrLen(directory) > 3 ? RTrim(directory, "\") : directory
+    SplitPath(directory, &directoryName, &parentRoot)
+    if directoryName != ""
+        && parentRoot != ""
+        && TargetRelocationService.IsVersionedInstallDirectory(directoryName)
+        return parentRoot
     return directory
 }
 
@@ -568,12 +581,13 @@ InvalidateShortcutRuntimeIdentity(path, stateObj) {
     return true
 }
 
-ObserveTarget(target, snapshotIndex := "", maximumSnapshotAgeMs := 0) {
+ObserveTarget(target, snapshotIndex := "", maximumSnapshotAgeMs := 0,
+    observationContext := "") {
     target := NormalizeTargetPath(target)
     stateObj := App.appStates.Has(target) ? App.appStates[target] : ""
     specs := App.targetSpecsService.Get(target, stateObj)
     return App.targetProbe.Observe(specs.Probe, snapshotIndex,
-        maximumSnapshotAgeMs)
+        maximumSnapshotAgeMs, observationContext)
 }
 
 IsOneShotTarget(path, resolvedTarget := "") {

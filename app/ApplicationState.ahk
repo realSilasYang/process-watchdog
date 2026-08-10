@@ -50,7 +50,7 @@ class ApplicationState {
         this.maintenanceProcessInterval := 1000
         this.maintenanceFingerprintInterval := 30000
         this.maintenanceFingerprintRetryInterval := 5000
-        this.guardWorkGate := GuardWorkGate()
+        this.guardWorkGate := GuardWorkGate(GetTickCount64, LogMsg)
         this.guardMutationQueue := GuardMutationQueue(this.guardWorkGate,
             HandleGuardMutationError)
         this.appStates := Map()
@@ -106,6 +106,7 @@ class ApplicationState {
             this.displayConfigCodec, this.appConfigSnapshotService)
         this.maintenanceSessionCodec := MaintenanceSessionCodec()
         this.targetIdentityService := TargetIdentityService(this, {
+            GetDefaultRoot: GetDefaultMaintenanceRoot,
             InvalidateRuntimeIdentity: InvalidateShortcutRuntimeIdentity,
             Localize: Tr,
             Log: LogMsg,
@@ -298,7 +299,7 @@ class ApplicationState {
             this.ClearPendingProcessSnapshot()
             return false
         }
-        if !this.guardWorkGate.TryEnter() {
+        if !this.guardWorkGate.TryEnter("ProcessSnapshotDelivery") {
             try SetTimer(this.processSnapshotDeliveryTimer, -25)
             return false
         }
@@ -353,7 +354,7 @@ class ApplicationState {
     RetryDirtyAppConfig(*) {
         if !this.appsDirty
             return
-        if !this.guardWorkGate.TryEnter() {
+        if !this.guardWorkGate.TryEnter("ConfigSaveRetry") {
             this.guardMutationQueue.Enqueue(SaveAppsToIni.Bind(false))
             return
         }

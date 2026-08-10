@@ -205,7 +205,9 @@ RunProcessSnapshotServiceTests() {
     clockState.Now := 24000
     failedStartResult := failingPathService.Start()
     AssertSnapshotService(!failedStartResult
-        && !failingPathService.WorkerStarting,
+        && !failingPathService.WorkerStarting
+        && failingPathService.LastWorkerFailureReason == "LaunchFailed"
+        && failingPathService.LastWorkerRetryTicks > clockState.Now,
         "启动准备异常后后台快照服务终态错误"
         . "（result=" failedStartResult
         . "，starting=" failingPathService.WorkerStarting "）")
@@ -305,6 +307,70 @@ RunProcessSnapshotServiceTests() {
         "强制刷新没有使旧快照失效")
     service.WorkerPid := 0
     service.WorkerStartedTicks := 0
+
+    diagnosticService := HandleBoundProcessSnapshotService("",
+        BuildTestSnapshotIndex, "", IdentitySnapshotField,
+        IdentitySnapshotField, "", ReadSnapshotTestClock.Bind(clockState),
+        5000, 30000, false)
+    diagnosticService.WorkerPid := 901
+    diagnosticService.WorkerHandle := 9010
+    diagnosticService.WorkerPath := A_Temp
+        . "\watchdog-snapshot-exited-without-result.tmp"
+    diagnosticService.WorkerStartedTicks := clockState.Now
+    diagnosticService.RequestTicks := clockState.Now
+    diagnosticService.FakeHandleStatus := 0
+    try FileDelete(diagnosticService.WorkerPath)
+    AssertSnapshotService(!diagnosticService.Pump()
+        && diagnosticService.LastWorkerFailureReason
+            == "ExitedWithoutResult"
+        && diagnosticService.LastWorkerRetryTicks == clockState.Now + 3000,
+        "无结果退出的快照工作器没有保留结构化失败与重试时间")
+
+    clockState.Now += 40000
+    diagnosticService.WorkerPid := 902
+    diagnosticService.WorkerHandle := 9020
+    diagnosticService.WorkerPath := A_Temp
+        . "\watchdog-snapshot-timeout.tmp"
+    diagnosticService.WorkerStartedTicks := clockState.Now - 30001
+    diagnosticService.RequestTicks := clockState.Now - 30001
+    diagnosticService.FakeHandleStatus := 1
+    try FileDelete(diagnosticService.WorkerPath)
+    AssertSnapshotService(!diagnosticService.Pump()
+        && diagnosticService.LastWorkerFailureReason == "TimedOut"
+        && diagnosticService.LastWorkerRetryTicks == clockState.Now + 5000,
+        "超时快照工作器没有保留结构化失败与重试时间")
+
+    malformedPath := A_Temp "\watchdog-snapshot-malformed-result.tmp"
+    try FileDelete(malformedPath)
+    FileAppend("BROKEN`r`n", malformedPath, "UTF-16")
+    diagnosticService.WorkerPid := 903
+    diagnosticService.WorkerHandle := 9030
+    diagnosticService.WorkerPath := malformedPath
+    diagnosticService.WorkerStartedTicks := clockState.Now
+    diagnosticService.RequestTicks := clockState.Now
+    diagnosticService.FakeHandleStatus := 0
+    AssertSnapshotService(!diagnosticService.Pump()
+        && diagnosticService.LastWorkerFailureReason == "MalformedResult",
+        "损坏快照结果没有记录结构化失败原因")
+
+    obsoletePath := A_Temp "\watchdog-snapshot-obsolete-result.tmp"
+    try FileDelete(obsoletePath)
+    AssertSnapshotService(diagnosticService.WriteWorkerFile(obsoletePath,
+        ProvideWorkerTestSnapshot.Bind(snapshot)),
+        "无法建立取消结果测试文件")
+    diagnosticService.WorkerPid := 904
+    diagnosticService.WorkerHandle := 9040
+    diagnosticService.WorkerPath := obsoletePath
+    diagnosticService.WorkerStartedTicks := clockState.Now
+    diagnosticService.RequestTicks := clockState.Now
+    diagnosticService.PendingFreshRequestTicks := clockState.Now + 1
+    diagnosticService.FakeHandleStatus := 0
+    AssertSnapshotService(!diagnosticService.Pump()
+        && diagnosticService.LastWorkerFailureReason == "Cancelled"
+        && InStr(diagnosticService.BuildDiagnosticText(),
+            "ProcessSnapshotWorker.FailureByReason.TimedOut=1"),
+        "过时快照结果没有记录取消状态，或诊断文本缺少分类计数")
+    diagnosticService.Stop()
 
     AssertSnapshotService(service.PublishSnapshot(snapshot,
         clockState.Now, true),

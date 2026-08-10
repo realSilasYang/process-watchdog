@@ -12,6 +12,8 @@ The bundle contains:
 - Application, Windows, and AutoHotkey versions; DPI; and GDI/USER handle counts.
 - Total, enabled, and paused item counts plus monitoring and update phase summaries.
 - Scheduler queue, configuration warnings, recovery records, and log counts.
+- Current and recent work-gate owners, hold times, contention counts, and sustained-contention warnings.
+- Recent success, categorized failure, retry time, and cumulative counts for background process-snapshot and file-scan workers.
 - The current runtime log text.
 - Dependency locks and resvg/Everything version records.
 

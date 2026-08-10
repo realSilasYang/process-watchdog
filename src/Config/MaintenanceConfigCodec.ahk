@@ -80,9 +80,8 @@ class MaintenanceConfigCodec {
             && this.Callbacks.IsSupportedTarget.Call(resolvedTarget)
         if (!normalized.RootIsCustom || normalized.InstallRoot == "") {
             if (resolvedTarget != "") {
-                SplitPath(resolvedTarget, , &resolvedDirectory)
-                normalized.InstallRoot := this.Callbacks.NormalizeRoot.Call(
-                    resolvedDirectory)
+                normalized.InstallRoot := this.Callbacks.GetDefaultRoot.Call(
+                    resolvedTarget)
             } else if (config && Type(config) == "Object"
                 && config.HasOwnProp("InstallRoot")) {
                 normalized.InstallRoot := this.Callbacks.NormalizeRoot.Call(

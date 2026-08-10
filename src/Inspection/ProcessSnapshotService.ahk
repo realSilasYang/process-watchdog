@@ -4,6 +4,12 @@
 ; 关闭是终态，任何启动中或迟到的工作器都必须再次验证代际，不能在关闭后复活。
 
 class ProcessSnapshotService {
+    static FailureLaunchFailed := "LaunchFailed"
+    static FailureExitedWithoutResult := "ExitedWithoutResult"
+    static FailureTimedOut := "TimedOut"
+    static FailureMalformedResult := "MalformedResult"
+    static FailureCancelled := "Cancelled"
+
     __New(creationIdentityResolver := "", indexFactory := "",
         snapshotPublishedCallback := "", encoder := "", decoder := "",
         logger := "", clock := "", reuseIntervalMs := 5000,
@@ -41,6 +47,17 @@ class ProcessSnapshotService {
         this.PumpRunning := false
         this.WorkerPollIntervalMs := 250
         this.WorkerPollTimer := ObjBindMethod(this, "PollWorker")
+        this.LastWorkerFailureReason := ""
+        this.LastWorkerFailureDetail := ""
+        this.LastWorkerFailureTicks := 0
+        this.LastWorkerRetryTicks := 0
+        this.LastWorkerSuccessTicks := 0
+        this.WorkerFailureCount := 0
+        this.WorkerFailuresByReason := Map()
+        this.WorkerFailuresByReason.CaseSense := "Off"
+        this.WorkerFailureLogTicks := Map()
+        this.WorkerFailureLogTicks.CaseSense := "Off"
+        this.WorkerFailureLogIntervalMs := 30000
     }
 
     StoreSnapshot(snapshot, capturedAtTicks := 0,
@@ -218,8 +235,12 @@ class ProcessSnapshotService {
         } catch as workerError {
             if !this.Stopped {
                 try this.DelayRetry(5000, nowTicks)
-                this.Log(this.Text("无法启动后台进程快照任务：{1}",
-                    this.DiagnosticText(workerError.Message)))
+                failureDetail := this.DiagnosticText(workerError.Message)
+                this.RecordWorkerFailure(
+                    ProcessSnapshotService.FailureLaunchFailed,
+                    failureDetail, this.RetryAfterTicks,
+                    this.Text("无法启动后台进程快照任务：{1}",
+                        failureDetail))
             }
         } finally {
             if startReserved {
@@ -311,18 +332,29 @@ class ProcessSnapshotService {
             this.ResetWorkerState(true)
             if completedIsObsolete {
                 this.RetryAfterTicks := 0
+                this.RecordWorkerFailure(
+                    ProcessSnapshotService.FailureCancelled,
+                    "SupersededResult", 0)
                 return false
             }
             if !resultReady || !snapshot.Length {
                 this.PendingFreshRequestTicks := Max(
                     this.PendingFreshRequestTicks, completedRequestTicks)
                 this.DelayRetry(3000)
-                this.Log(this.Text("后台进程快照为空或不完整，已忽略本次结果并安排重试。"))
+                this.RecordWorkerFailure(
+                    ProcessSnapshotService.FailureMalformedResult,
+                    resultReady ? "EmptySnapshot" : "InvalidProtocol",
+                    this.RetryAfterTicks,
+                    this.Text("后台进程快照为空或不完整，已忽略本次结果并安排重试。")
+                        . " [ProcessSnapshot=MalformedResult]")
                 return false
             }
             this.RetryAfterTicks := 0
-            return this.PublishSnapshot(snapshot, snapshotTicks, true, "",
-                completedRequestTicks)
+            published := this.PublishSnapshot(snapshot, snapshotTicks, true,
+                "", completedRequestTicks)
+            if published
+                this.RecordWorkerSuccess()
+            return published
         }
         workerHandleStatus := this.GetWorkerHandleStatus(
             this.WorkerHandle)
@@ -341,6 +373,11 @@ class ProcessSnapshotService {
                 this.PendingFreshRequestTicks := Max(
                     this.PendingFreshRequestTicks, failedRequestTicks)
             this.DelayRetry(3000)
+            this.RecordWorkerFailure(
+                ProcessSnapshotService.FailureExitedWithoutResult,
+                "WorkerExitedBeforeResult", this.RetryAfterTicks,
+                this.Text("后台进程快照为空或不完整，已忽略本次结果并安排重试。")
+                    . " [ProcessSnapshot=ExitedWithoutResult]")
             return false
         }
         if (this.Now() - this.WorkerStartedTicks > 30000) {
@@ -354,6 +391,11 @@ class ProcessSnapshotService {
             } else {
                 this.DelayRetry(2000)
             }
+            this.RecordWorkerFailure(
+                ProcessSnapshotService.FailureTimedOut,
+                "WorkerDeadlineExceeded", this.RetryAfterTicks,
+                this.Text("后台进程快照为空或不完整，已忽略本次结果并安排重试。")
+                    . " [ProcessSnapshot=TimedOut]")
         }
         return false
     }
@@ -373,6 +415,9 @@ class ProcessSnapshotService {
                 this.ArmWorkerPoll()
                 return requestTicks
             }
+            this.RecordWorkerFailure(
+                ProcessSnapshotService.FailureCancelled,
+                "SupersededByFreshRequest", 0)
         }
         this.RetryAfterTicks := 0
         this.PendingFreshRequestTicks := Max(
@@ -521,6 +566,81 @@ class ProcessSnapshotService {
         if !nowTicks
             nowTicks := this.Now()
         this.RetryAfterTicks := nowTicks + Max(0, Integer(delayMs))
+    }
+
+    RecordWorkerFailure(reason, detail := "", retryTicks := 0,
+        logMessage := "") {
+        reason := Trim(String(reason))
+        if reason == ""
+            return false
+        detail := this.DiagnosticValue(detail)
+        nowTicks := this.Now()
+        shouldLog := false
+        previousCritical := A_IsCritical
+        Critical("On")
+        try {
+            this.LastWorkerFailureReason := reason
+            this.LastWorkerFailureDetail := detail
+            this.LastWorkerFailureTicks := nowTicks
+            this.LastWorkerRetryTicks := retryTicks
+            this.WorkerFailureCount++
+            this.WorkerFailuresByReason[reason] :=
+                this.WorkerFailuresByReason.Has(reason)
+                ? this.WorkerFailuresByReason[reason] + 1 : 1
+            if logMessage != ""
+                && (!this.WorkerFailureLogTicks.Has(reason)
+                    || nowTicks - this.WorkerFailureLogTicks[reason]
+                        >= this.WorkerFailureLogIntervalMs) {
+                this.WorkerFailureLogTicks[reason] := nowTicks
+                shouldLog := true
+            }
+        } finally Critical(previousCritical ? previousCritical : "Off")
+        if shouldLog
+            this.Log(logMessage)
+        return true
+    }
+
+    RecordWorkerSuccess() {
+        successTicks := this.Now()
+        previousCritical := A_IsCritical
+        Critical("On")
+        try this.LastWorkerSuccessTicks := successTicks
+        finally Critical(previousCritical ? previousCritical : "Off")
+    }
+
+    BuildDiagnosticText(prefix := "ProcessSnapshotWorker") {
+        previousCritical := A_IsCritical
+        Critical("On")
+        try {
+            text := prefix ".Active=" (this.WorkerPid ? 1 : 0) "`r`n"
+                . prefix ".Pid=" this.WorkerPid "`r`n"
+                . prefix ".StartedTicks=" this.WorkerStartedTicks "`r`n"
+                . prefix ".PendingRequestTicks="
+                    . this.PendingFreshRequestTicks "`r`n"
+                . prefix ".RetryAfterTicks=" this.RetryAfterTicks "`r`n"
+                . prefix ".LastFailureReason="
+                    . this.LastWorkerFailureReason "`r`n"
+                . prefix ".LastFailureDetail="
+                    . this.LastWorkerFailureDetail "`r`n"
+                . prefix ".LastFailureTicks="
+                    . this.LastWorkerFailureTicks "`r`n"
+                . prefix ".LastFailureRetryTicks="
+                    . this.LastWorkerRetryTicks "`r`n"
+                . prefix ".LastSuccessTicks="
+                    . this.LastWorkerSuccessTicks "`r`n"
+                . prefix ".FailureCount=" this.WorkerFailureCount "`r`n"
+            for reason, count in this.WorkerFailuresByReason
+                text .= prefix ".FailureByReason."
+                    . RegExReplace(reason, "[^A-Za-z0-9_.-]", "_")
+                    . "=" count "`r`n"
+            return text
+        } finally Critical(previousCritical ? previousCritical : "Off")
+    }
+
+    DiagnosticValue(value) {
+        value := String(value)
+        value := RegExReplace(value, "[\r\n=]+", " ")
+        return SubStr(value, 1, 500)
     }
 
     WriteWorkerFile(outputPath, snapshotProvider) {

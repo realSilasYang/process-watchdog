@@ -1007,6 +1007,8 @@ foreach ($processInspectorHook in @(
     'GetElevationState(pid)',
     'kernel32\CreateToolhelp32Snapshot',
     'Win32.PROCESS_QUERY_LIMITED_INFORMATION',
+    'psapi\GetProcessImageFileNameW',
+    'kernel32\QueryDosDeviceW',
     'Win32.TOKEN_QUERY',
     'Win32.TOKEN_ELEVATION',
     'advapi32\OpenProcessToken',
@@ -1571,6 +1573,16 @@ foreach ($maintenanceActorHook in @(
         $failures.Add("Missing maintenance actor matcher hook: $maintenanceActorHook")
     }
 }
+if ($maintenanceActorMatcherSource -notmatch 'NormalizeLearnedSignature\(signature, rootPath := ""\)[\s\S]{0,900}!this\.PathIsWithinRoot\(executablePath, signatureRoot\)' -or
+    $maintenanceActorMatcherSource -notmatch 'BuildLearningSignature\(processInfo, rootPath\)[\s\S]{0,500}!this\.CanonicalPathIsWithinRoot\(executablePath, rootPath\)') {
+    $failures.Add('Persistent maintenance actors must be scoped to executables inside their installation root')
+}
+if (-not $maintenanceActorMatcherSource.Contains('CreateMatchContext(') -or
+    -not $maintenanceActorMatcherSource.Contains('MatchPrepared(processInfo, context)') -or
+    $maintenanceActorMatcherSource -notmatch 'CanonicalCommandPaths\(processInfo\)[\s\S]{0,180}maintenanceCommandPaths' -or
+    $maintenanceCoordinatorSource -notmatch 'actorCandidates\s*:=\s*maintenanceBlocking[\s\S]{0,220}\?\s*snapshot\s*:\s*commonActorCandidates') {
+    $failures.Add('Maintenance actor matching must cache process parsing and scope full snapshots to each confirmed target')
+}
 if ($source -notmatch 'this\.maintenanceActorMatcher\s*:=\s*MaintenanceActorMatcher\([\s\S]{0,160}ObjBindMethod\(this\.processInspector,\s*"GetCreationIdentity"\)') {
     $failures.Add('Maintenance actor identity checks must use the shared ProcessInspector')
 }
@@ -1625,19 +1637,24 @@ foreach ($legacyMaintenanceOwner in @(
     }
 }
 if ($guardWorkGateSource -notmatch 'class GuardWorkGate' -or
-    $guardWorkGateSource -notmatch 'TryEnter\(\)[\s\S]{0,180}Critical\("On"\)[\s\S]{0,180}this\.Busy\s*:=\s*true' -or
+    $guardWorkGateSource -notmatch 'TryEnter\(owner := "Unspecified"\)[\s\S]{0,1200}Critical\("On"\)[\s\S]{0,1200}this\.Busy\s*:=\s*true' -or
     $guardWorkGateSource -notmatch 'finally[\s\S]{0,100}Critical\(previousCritical \? previousCritical : "Off"\)' -or
-    $source -notmatch 'this\.guardWorkGate\s*:=\s*GuardWorkGate\(\)' -or
-    $guardRuntimeSource -notmatch 'MonitorTick\(\)[\s\S]{0,180}this\.Runtime\.guardWorkGate\.TryEnter\(\)' -or
+    $guardWorkGateSource -notmatch 'BuildDiagnosticText\(prefix := "GuardWorkGate"\)' -or
+    $guardWorkGateSource -notmatch 'this\.ContentionCount\+\+' -or
+    $source -notmatch 'this\.guardWorkGate\s*:=\s*GuardWorkGate\(GetTickCount64, LogMsg\)' -or
+    $guardRuntimeSource -notmatch 'MonitorTick\(\)[\s\S]{0,220}this\.Runtime\.guardWorkGate\.TryEnter\("GuardMonitorTick"\)' -or
     $guardRuntimeSource -notmatch 'MonitorTick\(\)[\s\S]{0,18000}this\.Runtime\.guardWorkGate\.Leave\(\)' -or
     [regex]::Matches($maintenanceCoordinatorSource,
-        'this\.Runtime\.guardWorkGate\.TryEnter\(\)').Count -lt 2 -or
+        'this\.Runtime\.guardWorkGate\.TryEnter\("Maintenance[^"\r\n]+"\)').Count -lt 2 -or
     [regex]::Matches($maintenanceCoordinatorSource,
         'this\.Runtime\.guardWorkGate\.Leave\(\)').Count -lt 2) {
     $failures.Add('Main monitoring and both maintenance loops must share the explicit guard work gate')
 }
+if ($applicationTelemetrySource -notmatch 'BuildDiagnosticStateSummary\(\)[\s\S]{0,1800}guardWorkGate\.BuildDiagnosticText\(\)[\s\S]{0,220}processSnapshots\.BuildDiagnosticText\(\)[\s\S]{0,220}fileScanner\.BuildDiagnosticText\(\)') {
+    $failures.Add('Runtime diagnostics must include guard-gate and background-worker state')
+}
 if ($guardMutationQueueSource -notmatch 'class GuardMutationQueue' -or
-    $guardMutationQueueSource -notmatch 'Drain\(\*\)[\s\S]{0,700}this\.WorkGate\.TryEnter\(\)' -or
+    $guardMutationQueueSource -notmatch 'Drain\(\*\)[\s\S]{0,700}this\.WorkGate\.TryEnter\("GuardMutationQueue"\)' -or
     $guardMutationQueueSource -notmatch 'finally[\s\S]{0,180}this\.WorkGate\.Leave\(\)' -or
     $guardMutationQueueSource -match '\bSleep\(' -or
     $source -notmatch 'QueueGuardMutation\(ApplyMainListReorder\.Bind\(' -or
@@ -1677,8 +1694,8 @@ foreach ($guardRuntimeHook in @(
         $failures.Add("Missing guard runtime hook: $guardRuntimeHook")
     }
 }
-if ($guardRuntimeSource -notmatch 'Restart\(path,[\s\S]{0,900}guardWorkGate\.TryEnter\(\)[\s\S]{0,800}ScheduleRestartPreservingSnapshot\(path,[\s\S]{0,180}expectedSupervisor, 100\)[\s\S]{0,700}RestartCore\(' -or
-    $guardRuntimeSource -notmatch 'Verify\(path,[\s\S]{0,900}guardWorkGate\.TryEnter\(\)[\s\S]{0,600}ScheduleVerificationFor\(path, expectedSupervisor, 100\)[\s\S]{0,600}VerifyCore\(' -or
+if ($guardRuntimeSource -notmatch 'Restart\(path,[\s\S]{0,900}guardWorkGate\.TryEnter\("GuardRestart"\)[\s\S]{0,800}ScheduleRestartPreservingSnapshot\(path,[\s\S]{0,180}expectedSupervisor, 100\)[\s\S]{0,700}RestartCore\(' -or
+    $guardRuntimeSource -notmatch 'Verify\(path,[\s\S]{0,900}guardWorkGate\.TryEnter\("GuardVerify"\)[\s\S]{0,600}ScheduleVerificationFor\(path, expectedSupervisor, 100\)[\s\S]{0,600}VerifyCore\(' -or
     $guardRuntimeSource -notmatch 'MonitorTick\(\)[\s\S]{0,9000}this\.RestartCore\(path\)') {
     $failures.Add('Restart and verification must participate in the shared guard work gate')
 }
@@ -1751,7 +1768,7 @@ foreach ($legacyMaintenanceSymbol in @(
     }
 }
 foreach ($maintenanceIntegrationPattern in @(
-    'matcher\.Match\(processInfo,',
+    'matcher\.MatchPrepared\(processInfo,',
     'activeKnown\[identityKey\]\s*:=\s*actorRecord',
     'activeTransient\[identityKey\]\s*:=\s*actorRecord',
     'HasActiveActors\(stateObj\)[\s\S]{0,900}GetIdentityStatus\(',
@@ -1770,6 +1787,12 @@ if ($maintenanceCoordinatorSource -notmatch 'EnsureWatcher\(path, stateObj\)[\s\
 if ($maintenanceCoordinatorSource -notmatch 'EventTick\(\)[\s\S]{0,120}this\.Stopped\s*\|\|\s*!this\.Initialized' -or
     $maintenanceCoordinatorSource -notmatch 'catch\s+as\s+watcherError[\s\S]{0,180}entry\.watcher\.Close\(\)[\s\S]{0,220}continue') {
     $failures.Add('Maintenance watcher failures must be isolated and stopped callbacks must not reopen watchers')
+}
+if ($maintenanceCoordinatorSource -notmatch 'EventTick\(\)[\s\S]{0,1800}fingerprintRequests[\s\S]{0,5000}forcedFingerprintCheck' -or
+    $maintenanceCoordinatorSource -notmatch 'IsRelevantFootprintChange\(path, stateObj, relativePath,[\s\S]{0,260}FootprintChangeRequiresFingerprint' -or
+    $maintenanceCoordinatorSource -notmatch 'FootprintChangeRequiresFingerprint\(path, stateObj, relativePath,[\s\S]{0,240}relativePath == "\*"' -or
+    $maintenanceCoordinatorSource -notmatch '!InStr\(relativePath, "\\"\) && !InStr\(subjectRelative, "\\"\)') {
+    $failures.Add('Ambiguous maintenance file notifications must require a target fingerprint check outside active upgrade sessions')
 }
 if ($targetLauncherSource -match '(?i)BuildInvocation\(launchSpec') {
     $failures.Add('TargetLauncher parameter names must not shadow the LaunchSpec class')
@@ -1842,7 +1865,7 @@ if ($source -match 'stateObj\.FailCount\s*<\s*maxAttempts') {
 if ($guardRuntimeSource -notmatch 'Shutdown\(\*\)[\s\S]{0,500}this\.Runtime\.scheduler\.Shutdown\(\)') {
     $failures.Add('Application shutdown must stop the shared scheduler')
 }
-if ($maintenanceCoordinatorSource -notmatch 'QueueCommand\(command\)[\s\S]{0,500}guardWorkGate\.TryEnter\(\)[\s\S]{0,500}guardWorkGate\.Leave\(\)' -or
+if ($maintenanceCoordinatorSource -notmatch 'QueueCommand\(command\)[\s\S]{0,500}guardWorkGate\.TryEnter\("MaintenanceCommand"\)[\s\S]{0,500}guardWorkGate\.Leave\(\)' -or
     $maintenanceCoordinatorSource -notmatch 'EventTick\(\)[\s\S]{0,500}DrainPendingCommands\(\)') {
     $failures.Add('Explicit maintenance commands must serialize through the shared guard work gate')
 }
@@ -1917,7 +1940,7 @@ if ($source -match 'if\s*\([^\r\n]*stateObj\.State[^\r\n]*\)[\s\S]{0,180}(?:Sche
 }
 foreach ($snapshotIndexHook in @(
     'class ProcessSnapshotIndex',
-    'ObserveImagePath(targetPath)',
+    'ObserveImagePath(targetPath, fallbackContext := "")',
     'ObserveCommandTarget(targetPath, launcherPath := "")',
     'ObserveCustomRuntimeTarget(targetPath, launcherPath)',
     'GetLauncherMatchStatus(processInfo, launcherPath)',
@@ -1955,6 +1978,18 @@ foreach ($snapshotServiceHook in @(
 }
 if ($snapshotServiceSource -notmatch 'ReadWorkerResult\(outputPath,[\s\S]{0,2400}snapshot\.Length\s*!=\s*expectedCount[\s\S]{0,120}resultReady\s*:=\s*true') {
     $failures.Add('Process snapshot results must reject partial or corrupt worker output')
+}
+foreach ($workerFailureReason in @('LaunchFailed', 'ExitedWithoutResult',
+    'TimedOut', 'MalformedResult', 'Cancelled')) {
+    if (-not $snapshotServiceSource.Contains('"' + $workerFailureReason + '"') -or
+        -not $fileScanServiceSource.Contains('"' + $workerFailureReason + '"')) {
+        $failures.Add("Background workers must retain structured failure reason: $workerFailureReason")
+    }
+}
+if (-not $snapshotServiceSource.Contains('BuildDiagnosticText(prefix := "ProcessSnapshotWorker")') -or
+    -not $fileScanServiceSource.Contains('BuildDiagnosticText(prefix := "FileScanWorker")') -or
+    $fileScanServiceSource -notmatch 'PollContentMatch\(job\)[\s\S]{0,900}FailureReason') {
+    $failures.Add('Background worker failures must be exposed through results and diagnostic text')
 }
 if ($fileScanServiceSource -notmatch 'ParseResultText\(resultText, &truncated := false,[\s\S]{0,1800}paths\.Length\s*!=\s*expectedCount[\s\S]{0,180}resultReady\s*:=\s*true' -or
     $fileScanServiceSource -notmatch 'expectedCount\s*>\s*FileScanService\.MaximumResultLimit') {
@@ -2028,14 +2063,14 @@ if ($snapshotServiceSource -match '\bApp\.') {
 }
 foreach ($targetProbeHook in @(
     'class TargetProbe',
-    'Observe(probeSpec, snapshotIndex := "", maximumSnapshotAgeMs := 0)',
+    'Observe(probeSpec, snapshotIndex := "", maximumSnapshotAgeMs := 0,',
     'ObserveProcessName(processName)',
-    'ObserveImagePath(targetPath, snapshotIndex := "")',
+    'ObserveImagePath(targetPath, snapshotIndex := "", observationContext := "",',
     'ObserveCommandTarget(targetPath, snapshotIndex := ""',
     'ObserveAutoHotkeyScript(targetPath, maximumSnapshotAgeMs := 0)',
     'ObserveWorkingDirectory(workingDirectory, preferredName := ""',
     'snapshotIndex.ObserveCommandTarget(targetPath, launcherPath)',
-    'snapshotIndex.ObserveImagePath(targetPath)'
+    'snapshotIndex.ObserveImagePath(targetPath,'
 )) {
     if (-not $targetProbeSource.Contains($targetProbeHook)) {
         $failures.Add("Missing target probe module hook: $targetProbeHook")
@@ -2115,7 +2150,7 @@ $manualStopSource = [regex]::Match($mainSource,
 if (-not $manualStopSource -or $manualStopSource -match 'SaveAppsToIni\(\)' -or
     $manualStopSource -match 'stateObj\.Enabled\s*:=\s*1' -or
     $manualStopSource -notmatch 'guardWorkGate\.Leave\(\)[\s\S]{0,180}StopTargetProcess\(pid, creationIdentity\)' -or
-    $manualStopSource -notmatch 'CompleteManualStopAfterStop\([\s\S]{0,900}guardWorkGate\.TryEnter\(\)' -or
+    $manualStopSource -notmatch 'CompleteManualStopAfterStop\([\s\S]{0,900}guardWorkGate\.TryEnter\([^)]*\)' -or
     $manualStopSource -notmatch 'FinalizeManualStop\(path, stateObj, expectedGeneration\)' -or
     $manualStopSource -match 'RestartCore\(') {
     $failures.Add('Manual stop must execute outside the shared gate, revalidate ownership, and never restart the target')
@@ -2236,7 +2271,7 @@ else {
         $failures.Add('Manual restart must revalidate controller ownership after blocking operations')
     }
     if ($manualRestartSource -notmatch 'guardWorkGate\.Leave\(\)[\s\S]{0,220}StopTargetProcess\(pid, creationIdentity\)' -or
-        $manualRestartSource -notmatch 'CompleteManualRestartAfterStop\([\s\S]{0,700}guardWorkGate\.TryEnter\(\)') {
+        $manualRestartSource -notmatch 'CompleteManualRestartAfterStop\([\s\S]{0,700}guardWorkGate\.TryEnter\([^)]*\)') {
         $failures.Add('Manual restart must stop outside the shared gate and reacquire it before launch')
     }
     if ($manualRestartSource -notmatch 'ManualRestartRequested\s*\|\|\s*stateObj\.ManualStopRequested' -or
@@ -2254,7 +2289,7 @@ $mainContextOrderPattern =
     'Tr\("🎨 自定义名称和图标"\)[\s\S]{0,180}' +
     'Tr\("⚙️ 进程识别与启动设置"\)[\s\S]{0,220}' +
     'Tr\("🛡️ 以管理员身份运行"\)[\s\S]{0,260}' +
-    'Tr\("🔄 软件升级保护"\)'
+    'Tr\("🔄 软件升级保护设置"\)'
 if ($mainSource -notmatch $mainContextOrderPattern -or
     $mainSource -notmatch '\{Text: Tr\("🔄 重新启动"\), Action: RestartSelectedApp\}[\s\S]{0,140}\{Text: Tr\("⏹️ 结束运行"\), Action: EndSelectedApp\}[\s\S]{0,180}\{Text: Tr\("✒️ 编辑完整路径（F2）"\)[\s\S]{0,180}\{Text: Tr\("📂 打开所在位置"\), Action: OpenFileLocation\}') {
     $failures.Add('Main context menu must preserve the requested restart, stop, edit, location, display, launch, admin, and maintenance order')
@@ -3414,7 +3449,10 @@ if (-not $mainSource.Contains('#Include src\Core\TargetContentRelocationService.
     -not $targetRelocationServiceSource.Contains('class TargetRelocationService') -or
     -not $targetRelocationServiceSource.Contains('"ContentHash"') -or
     -not $targetRelocationServiceSource.Contains('StartContentScan.Call(rootPath,') -or
-    -not $targetRelocationServiceSource.Contains('signature.ContentHash == currentCandidate.ContentHash') -or
+    -not $targetRelocationServiceSource.Contains('signature.ContentHash == currentCandidate.NewContentHash') -or
+    -not $targetRelocationServiceSource.Contains('"VersionedEntryUnique"') -or
+    -not $targetRelocationServiceSource.Contains('升级期间检测到唯一同名新版本入口，等待用户确认：{1} -> {2}') -or
+    -not $targetRelocationServiceSource.Contains('TryDetectVersionedUpgrade(path, stateObj)') -or
     -not $targetRelocationServiceSource.Contains('IsMaintenanceBusy(path, stateObj)') -or
     -not $targetRelocationServiceSource.Contains('this.Callbacks.IsMaintenanceProtectionEnabled.Call(path,') -or
     -not $source.Contains('IsMaintenanceProtectionEnabled: ObjBindMethod(') -or
@@ -3431,6 +3469,8 @@ if (-not $mainSource.Contains('#Include src\Core\TargetContentRelocationService.
     -not $targetRelocationServiceSource.Contains('completedRootIndex == 1') -or
     -not $targetRelocationServiceSource.Contains('useEverything := currentRootIndex > 1') -or
     -not $targetContentRelocationTestSource.Contains('最近有效目录中的唯一内容候选没有优先于远端相同副本') -or
+    -not $targetContentRelocationTestSource.Contains('确认期间被替换的版本目录候选仍被视为有效') -or
+    -not $targetContentRelocationTestSource.Contains('多个同名版本入口没有暂停自动迁移') -or
     -not $fileScanServiceTestSource.Contains('VS Code 历史、版本库或缓存副本仍参与内容迁移候选计数') -or
     -not $source.Contains('PrepareWatchPathTransition(previousPath, requestedPath)') -or
     -not $source.Contains('PrepareWatchPathTransitionFromState(previousPath, requestedPath,') -or
@@ -3441,6 +3481,9 @@ if (-not $mainSource.Contains('#Include src\Core\TargetContentRelocationService.
     -not $source.Contains('if selectedBefore {') -or
     -not $source.Contains('migratedRow := FindRow(transition.NewPath)') -or
     -not $targetRelocationPromptSource.Contains('class TargetRelocationPrompt extends ManagedWindow') -or
+    -not $targetRelocationPromptSource.Contains('内容完全一致 / SHA-256') -or
+    -not $targetRelocationPromptSource.Contains('唯一同名新版本入口 / SHA-256') -or
+    -not $targetRelocationPromptSource.Contains('升级期间发现唯一同名新版本入口；已记录并持续校验候选 SHA-256') -or
     -not $source.Contains('this.targetRelocation := TargetRelocationPrompt(mainGui)')) {
     $failures.Add('Moved direct targets must use SHA-256 content identity, background candidate scanning, a confirmed shared migration transaction, and managed-window lifecycle')
 }

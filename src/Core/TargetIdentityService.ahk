@@ -113,10 +113,15 @@ class TargetIdentityService {
             "MaintenanceConfig") && !stateObj.MaintenanceConfig.RootIsCustom
         if hasAutomaticMaintenanceRoot {
             priorInstallRoot := stateObj.MaintenanceConfig.InstallRoot
-            SplitPath(freshTarget, , &freshDirectory)
-            nextInstallRoot := freshDirectory != ""
-                ? this.Callbacks.NormalizeRoot.Call(freshDirectory)
-                : priorInstallRoot
+            nextInstallRoot := this.Callbacks.HasOwnProp("GetDefaultRoot")
+                ? this.Callbacks.GetDefaultRoot.Call(freshTarget)
+                : ""
+            if nextInstallRoot == "" {
+                SplitPath(freshTarget, , &freshDirectory)
+                nextInstallRoot := freshDirectory != ""
+                    ? this.Callbacks.NormalizeRoot.Call(freshDirectory)
+                    : priorInstallRoot
+            }
             rootChanged := !this.Callbacks.PathsEquivalent.Call(
                 priorInstallRoot, nextInstallRoot)
         }

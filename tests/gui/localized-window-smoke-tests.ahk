@@ -1809,13 +1809,27 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             language, "MaintenanceSettingsDialog")
         AssertProductionWindowLayout(maintenanceWindow.gui, language,
             "MaintenanceSettingsDialog")
+        maintenanceBrowseHwnd := FindChildControlByText(
+            maintenanceWindow.gui.Hwnd, Tr("浏览"))
+        maintenanceAutoHwnd := FindChildControlByText(
+            maintenanceWindow.gui.Hwnd, Tr("自动"))
+        maintenanceDetectionLabelHwnd := FindChildControlByText(
+            maintenanceWindow.gui.Hwnd,
+            RTrim(Tr("退出检测窗口（秒）："), "：: "))
+        maintenanceStableLabelHwnd := FindChildControlByText(
+            maintenanceWindow.gui.Hwnd,
+            RTrim(Tr("文件稳定等待（秒）："), "：: "))
+        maintenanceMaxWaitLabelHwnd := FindChildControlByText(
+            maintenanceWindow.gui.Hwnd,
+            RTrim(Tr("最长升级等待（秒）："), "：: "))
+        maintenanceClearHwnd := FindChildControlByText(
+            maintenanceWindow.gui.Hwnd, Tr("清除记录"))
         maintenanceBrowseState := App.uiInteractions.GetButton(
-            FindChildControlByText(maintenanceWindow.gui.Hwnd, Tr("浏览")))
+            maintenanceBrowseHwnd)
         maintenanceAutoState := App.uiInteractions.GetButton(
-            FindChildControlByText(maintenanceWindow.gui.Hwnd, Tr("自动")))
+            maintenanceAutoHwnd)
         maintenanceClearState := App.uiInteractions.GetButton(
-            FindChildControlByText(maintenanceWindow.gui.Hwnd,
-                Tr("清除记录")))
+            maintenanceClearHwnd)
         maintenanceSaveState := App.uiInteractions.GetButton(
             FindChildControlByText(maintenanceWindow.gui.Hwnd, Tr("保存")))
         maintenanceCancelState := App.uiInteractions.GetButton(
@@ -1834,6 +1848,73 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             && !maintenanceCancelState.HasOwnProp("buttonImage")
             && !maintenanceCancelState.HasOwnProp("buttonIcon"),
             language " 升级保护窗口的功能 SVG 或保存／取消纯文字规则错误")
+        maintenanceDpi := DllCall("user32\GetDpiForWindow", "Ptr",
+            maintenanceWindow.gui.Hwnd, "UInt")
+        if !maintenanceDpi
+            maintenanceDpi := 96
+        maintenanceBrowseWidthDip := LocalizationService.UsesCompactLayout()
+            ? 84 : 110
+        maintenanceAutoWidthDip := LocalizationService.UsesCompactLayout()
+            ? 72 : 136
+        maintenanceBrowseWidth := Round(maintenanceBrowseWidthDip
+            * maintenanceDpi / 96)
+        maintenanceAutoWidth := Round(maintenanceAutoWidthDip
+            * maintenanceDpi / 96)
+        maintenanceVisualReserve := Round((
+            maintenanceBrowseState.buttonImage.sizeDip
+            + maintenanceBrowseState.buttonImage.gapDip + 8)
+            * maintenanceDpi / 96)
+        maintenanceBrowseRect := GetControlClientRect(
+            maintenanceBrowseHwnd, maintenanceWindow.gui.Hwnd)
+        maintenanceAutoRect := GetControlClientRect(
+            maintenanceAutoHwnd, maintenanceWindow.gui.Hwnd)
+        AssertLocalizedWindow(
+            Abs(maintenanceBrowseRect.Width - maintenanceBrowseWidth) <= 2
+            && Abs(maintenanceAutoRect.Width - maintenanceAutoWidth) <= 2
+            && MeasureNativeControlText(maintenanceBrowseHwnd, Tr("浏览"))
+                + maintenanceVisualReserve <= maintenanceBrowseRect.Width
+            && MeasureNativeControlText(maintenanceAutoHwnd, Tr("自动"))
+                + maintenanceVisualReserve <= maintenanceAutoRect.Width,
+            language " 升级保护窗口的图文按钮宽度不足：浏览文本="
+                MeasureNativeControlText(maintenanceBrowseHwnd, Tr("浏览"))
+                "px，自动文本="
+                MeasureNativeControlText(maintenanceAutoHwnd, Tr("自动"))
+                "px，预留=" maintenanceVisualReserve
+                "px，浏览控件=" maintenanceBrowseRect.Width
+                "px，自动控件=" maintenanceAutoRect.Width "px")
+        maintenanceDetectionLabelRect := GetControlClientRect(
+            maintenanceDetectionLabelHwnd, maintenanceWindow.gui.Hwnd)
+        maintenanceStableLabelRect := GetControlClientRect(
+            maintenanceStableLabelHwnd, maintenanceWindow.gui.Hwnd)
+        maintenanceMaxWaitLabelRect := GetControlClientRect(
+            maintenanceMaxWaitLabelHwnd, maintenanceWindow.gui.Hwnd)
+        maintenanceDetectionEditRect := GetControlClientRect(
+            maintenanceWindow.detectionEdit.Hwnd, maintenanceWindow.gui.Hwnd)
+        maintenanceStableEditRect := GetControlClientRect(
+            maintenanceWindow.stableEdit.Hwnd, maintenanceWindow.gui.Hwnd)
+        maintenanceMaxWaitEditRect := GetControlClientRect(
+            maintenanceWindow.maxWaitEdit.Hwnd, maintenanceWindow.gui.Hwnd)
+        maintenanceClearRect := GetControlClientRect(
+            maintenanceClearHwnd, maintenanceWindow.gui.Hwnd)
+        maintenanceLearnedRect := GetControlClientRect(
+            maintenanceWindow.learnedEdit.Hwnd, maintenanceWindow.gui.Hwnd)
+        minimumLearnedGap := Round(4 * maintenanceDpi / 96)
+        AssertLocalizedWindow(
+            !RegExMatch(GetNativeWindowText(maintenanceDetectionLabelHwnd),
+                "[：:]\s*$")
+            && !RegExMatch(GetNativeWindowText(maintenanceStableLabelHwnd),
+                "[：:]\s*$")
+            && !RegExMatch(GetNativeWindowText(maintenanceMaxWaitLabelHwnd),
+                "[：:]\s*$")
+            && maintenanceDetectionEditRect.Left
+                == maintenanceDetectionLabelRect.Left
+            && maintenanceStableEditRect.Left == maintenanceStableLabelRect.Left
+            && maintenanceMaxWaitEditRect.Left
+                == maintenanceMaxWaitLabelRect.Left
+            && maintenanceLearnedRect.Top
+                - (maintenanceClearRect.Top + maintenanceClearRect.Height)
+                >= minimumLearnedGap,
+            language " 升级保护窗口标签、输入框或学习记录间距布局错误")
         maintenanceWindow.Close()
 
         firstRelocationCandidate := {
@@ -1846,7 +1927,7 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             Token: 102,
             OldPath: "C:\Tools\Smoke\old-script.py",
             NewPath: "C:\Tools\Smoke\renamed-script.py",
-            Evidence: "ContentHash"
+            Evidence: "VersionedEntryUnique"
         }
         invalidRelocationCandidate := {
             Token: 103,
@@ -1881,6 +1962,10 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
                     == firstRelocationCandidate.OldPath
                 && relocationPrompt.newPathEdit.Value
                     == firstRelocationCandidate.NewPath
+                && relocationPrompt.descriptionLabel.Text == Tr(
+                    "小助手找到了与原文件内容完全一致的新路径。确认后将更新守护目标，名称、图标和启动设置保持不变。")
+                && relocationPrompt.evidenceLabel.Text == Tr("识别依据：")
+                    Tr("内容完全一致 / SHA-256")
                 && relocationPrompt.updateButton.Text == Tr("更新守护路径")
                 && relocationPrompt.ignoreButton.Text == Tr("忽略")
                 && !updateButtonState.HasOwnProp("buttonImage")
@@ -1907,7 +1992,11 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
                     == secondRelocationCandidate.Token
                 && relocationPrompt.queuedCandidates.Length == 0
                 && relocationPrompt.newPathEdit.Value
-                    == secondRelocationCandidate.NewPath,
+                    == secondRelocationCandidate.NewPath
+                && relocationPrompt.descriptionLabel.Text == Tr(
+                    "升级期间发现唯一同名新版本入口；已记录并持续校验候选 SHA-256。确认后将更新守护目标，名称、图标和启动设置保持不变。")
+                && relocationPrompt.evidenceLabel.Text == Tr("识别依据：")
+                    Tr("唯一同名新版本入口 / SHA-256"),
             language " 当前候选失效后没有继续显示下一项")
         relocationPrompt.Close()
         AssertLocalizedWindow(relocationServiceStub.IgnoredTokens.Length == 1
