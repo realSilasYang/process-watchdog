@@ -208,6 +208,18 @@ DetectContentRelocation(harness, oldPath, stateObj) {
     return harness.Service.TryDetect(oldPath, stateObj)
 }
 
+CreateContentRelocationTestDirectory(rootPath, directoryName) {
+    directoryPath := rootPath "\" directoryName
+    DirCreate(directoryPath)
+    ; GitHub runner 的 A_Temp 可能是 8.3 短路径，而目录枚举会返回长路径。
+    ; 测试夹具必须采用与生产扫描相同的路径表示，避免 Map 模拟产生假阴性。
+    Loop Files, rootPath "\*", "D" {
+        if A_LoopFileName == directoryName
+            return A_LoopFileFullPath
+    }
+    throw Error("无法解析测试版本目录的规范路径：" directoryPath)
+}
+
 RunTargetContentRelocationServiceTests() {
     hashA := "A" . Format("{:063}", 0)
     hashB := "B" . Format("{:063}", 0)
@@ -244,12 +256,13 @@ RunTargetContentRelocationServiceTests() {
             && !TargetRelocationService.IsVersionedInstallDirectory("release"),
         "版本目录名称识别规则错误")
 
-    versionRoot := A_Temp "\watchdog-version-relocation-"
-        . DllCall("kernel32\GetCurrentProcessId", "UInt")
-    versionOldDir := versionRoot "\app-1.0.0"
-    versionNewDir := versionRoot "\app-1.1.0"
-    try DirCreate(versionOldDir)
-    try DirCreate(versionNewDir)
+    testRunId := DllCall("kernel32\GetCurrentProcessId", "UInt")
+        . "-" A_TickCount
+    versionRoot := A_Temp "\watchdog-version-relocation-" testRunId
+    versionOldDir := CreateContentRelocationTestDirectory(versionRoot,
+        "app-1.0.0")
+    versionNewDir := CreateContentRelocationTestDirectory(versionRoot,
+        "app-1.1.0")
     versionOld := versionOldDir "\Product.exe"
     versionNew := versionNewDir "\Product.exe"
     versionHarness := ContentRelocationTestHarness()
@@ -286,12 +299,11 @@ RunTargetContentRelocationServiceTests() {
             versionHarness.Candidates[1]),
         "确认期间被替换的版本目录候选仍被视为有效")
 
-    liveVersionRoot := A_Temp "\watchdog-version-live-"
-        . DllCall("kernel32\GetCurrentProcessId", "UInt")
-    liveOldDir := liveVersionRoot "\app-2.0.0"
-    liveNewDir := liveVersionRoot "\app-2.1.0"
-    try DirCreate(liveOldDir)
-    try DirCreate(liveNewDir)
+    liveVersionRoot := A_Temp "\watchdog-version-live-" testRunId
+    liveOldDir := CreateContentRelocationTestDirectory(liveVersionRoot,
+        "app-2.0.0")
+    liveNewDir := CreateContentRelocationTestDirectory(liveVersionRoot,
+        "app-2.1.0")
     liveOld := liveOldDir "\Product.exe"
     liveNew := liveNewDir "\Product.exe"
     liveVersionHarness := ContentRelocationTestHarness()
@@ -311,14 +323,13 @@ RunTargetContentRelocationServiceTests() {
                 liveVersionHarness.Candidates[1]),
         "旧版本入口仍存在时没有发布唯一新版本确认候选")
 
-    ambiguousRoot := A_Temp "\watchdog-version-ambiguous-"
-        . DllCall("kernel32\GetCurrentProcessId", "UInt")
-    ambiguousOldDir := ambiguousRoot "\app-1.0.0"
-    ambiguousNewOneDir := ambiguousRoot "\app-1.1.0"
-    ambiguousNewTwoDir := ambiguousRoot "\app-1.2.0"
-    try DirCreate(ambiguousOldDir)
-    try DirCreate(ambiguousNewOneDir)
-    try DirCreate(ambiguousNewTwoDir)
+    ambiguousRoot := A_Temp "\watchdog-version-ambiguous-" testRunId
+    ambiguousOldDir := CreateContentRelocationTestDirectory(ambiguousRoot,
+        "app-1.0.0")
+    ambiguousNewOneDir := CreateContentRelocationTestDirectory(ambiguousRoot,
+        "app-1.1.0")
+    ambiguousNewTwoDir := CreateContentRelocationTestDirectory(ambiguousRoot,
+        "app-1.2.0")
     ambiguousOld := ambiguousOldDir "\Product.exe"
     ambiguousOne := ambiguousNewOneDir "\Product.exe"
     ambiguousTwo := ambiguousNewTwoDir "\Product.exe"
