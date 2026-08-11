@@ -159,9 +159,9 @@ foreach ($prefix in @('src\', 'app\', 'tests\core\', 'assets\', 'config\',
         }
     }
 }
-# 随包字体中存在超过 GitHub 普通对象单文件限制的完整 CJK 集合。字体必须统一
-# 通过 Git LFS 追踪，三个会读取或打包字体的工作流也必须显式还原 LFS 对象；否则
-# 本地测试看到的是完整字体，CI 和 Release 却只会得到一百多字节的指针文件。
+# 随包字体中存在超过 GitHub 普通对象单文件限制的完整 CJK 集合，因此仍统一通过
+# Git LFS 追踪。CI 和发布不直接消耗 LFS 配额，而是从最新正式 fonts.zip 恢复字节，
+# 再按当前 metadata.json 逐项校验；指针、旧字体或损坏缓存都不能进入测试或构建。
 foreach ($fontExtension in @('ttc', 'ttf', 'otf')) {
     $attributeProbe = git -C $projectRoot check-attr filter -- `
         "assets/fonts/__repository_check__.$fontExtension"
@@ -170,13 +170,14 @@ foreach ($fontExtension in @('ttc', 'ttf', 'otf')) {
         throw "Packaged *.$fontExtension fonts must be tracked by Git LFS."
     }
 }
-$lfsWorkflows = @('ci.yml', 'release.yml', 'soak.yml')
-foreach ($workflowName in $lfsWorkflows) {
+$fontWorkflows = @('ci.yml', 'release.yml', 'release-dry-run.yml', 'soak.yml')
+foreach ($workflowName in $fontWorkflows) {
     $workflowPath = Join-Path $projectRoot `
         ".github\workflows\$workflowName"
     $workflowText = Get-Content -LiteralPath $workflowPath -Raw -Encoding UTF8
-    if ($workflowText -notmatch '(?m)^\s+lfs:\s+true\s*$') {
-        throw "$workflowName must restore packaged Git LFS font assets."
+    if ($workflowText -match '(?m)^\s+lfs:\s+true\s*$' -or
+        -not $workflowText.Contains('.\tools\restore-font-assets.ps1')) {
+        throw "$workflowName must restore verified fonts without an LFS transfer."
     }
 }
 if ($trackedNormalized.Contains('watchdog.ini')) {
@@ -768,7 +769,7 @@ if (-not $ciWorkflow.Contains('path: dist/**') -or
     -not $ciWorkflow.Contains('.\tests\verify-windows-integration.ps1') -or
     -not $ciWorkflow.Contains('.\tests\reproducible-build.ps1') -or
     -not $ciWorkflow.Contains('lfs: false') -or
-    -not $ciWorkflow.Contains('lfs: true') -or
+    -not $ciWorkflow.Contains('.\tools\restore-font-assets.ps1') -or
     $ciWorkflow.Contains('.\tools\invoke-release-validation.ps1')) {
     throw 'CI must separate fast, Windows integration and reproducible release validation.'
 }

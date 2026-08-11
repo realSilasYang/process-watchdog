@@ -100,7 +100,9 @@ All targets share one `WatchdogScheduler`. A due-time min-heap and one resettabl
 timer replace a permanent timer per item. Heap operations use short critical
 sections; business callbacks run in normal thread state. `GuardWorkGate`
 serializes main monitoring, updater scanning, directory events, and explicit
-maintenance. A busy gate briefly reschedules work without blocking the UI.
+maintenance. A busy gate briefly reschedules work without blocking the UI. The
+gate records current and recent owners, hold times, contention sources, and
+rate-limited sustained-contention warnings for diagnostic export.
 
 After fast retries are exhausted, `RestartPolicy` continues at the final
 configured interval; successful probing resets the count. Controller ownership
@@ -115,11 +117,23 @@ references the root, or a target parent-child chain. Actor caches use PID plus
 creation identity, so PID reuse cannot extend protection.
 
 After an update that changes the target file, a scoped updater signature can be
-learned. A process name alone, or a path without a scope root, cannot become
-permanent evidence. When a shortcut target moves, the final installation root is
-resolved before learned signatures are checked. Unfinished sessions are written
-atomically to `watchdog.maintenance.ini` and used only while a real unfinished
-state exists.
+learned. Only the full path of a dedicated program inside the installation root
+can become permanent evidence; process names, global installer tools, temporary
+paths, and paths without a scope root cannot. When a shortcut target moves, the
+final installation root is resolved before learned signatures are checked.
+Unfinished sessions preserve confirmed transient updater identities and pending
+learning candidates atomically in `watchdog.maintenance.ini`, and are used only
+while a real unfinished state exists.
+
+Normal content relocation still requires the original exact size and complete
+SHA-256. When a direct-file target is under a recognized version directory,
+update protection may accept exactly one same-named entry under the same parent
+as a restricted candidate after a target-file change. The candidate's own
+SHA-256 is recorded and continuously verified, and relocation still requires
+user confirmation; ambiguity or an incomplete scan prevents migration. During
+update recovery only, an inaccessible process image may be accepted when the
+unique same-named process has the pre-update creation identity or recent-start
+evidence. Normal probing never enables this fallback.
 
 ## Configuration and history
 

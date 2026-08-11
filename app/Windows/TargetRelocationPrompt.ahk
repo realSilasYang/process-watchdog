@@ -9,6 +9,8 @@ class TargetRelocationPrompt extends ManagedWindow {
         this.queuedCandidates := []
         this.oldPathEdit := ""
         this.newPathEdit := ""
+        this.descriptionLabel := ""
+        this.evidenceLabel := ""
         this.updateButton := ""
         this.ignoreButton := ""
         this.closingSilently := false
@@ -54,9 +56,14 @@ class TargetRelocationPrompt extends ManagedWindow {
                 " h26 BackgroundTrans", Tr("检测到守护目标可能已更名"))
             this.gui.SetFont("norm s9 c" UiThemeService.Color("MutedText"),
                 LocalizationService.GetUiFontName())
-            this.gui.Add("Text", "x24 y52 w" contentWidth
-                " h42 BackgroundTrans", Tr(
-                    "小助手找到了与原文件内容完全一致的新路径。确认后将更新守护目标，名称、图标和启动设置保持不变。"))
+            isVersionedEntry := candidate.HasOwnProp("Evidence")
+                && candidate.Evidence == "VersionedEntryUnique"
+            descriptionText := isVersionedEntry
+                ? Tr("升级期间发现唯一同名新版本入口；已记录并持续校验候选 SHA-256。确认后将更新守护目标，名称、图标和启动设置保持不变。")
+                : Tr("小助手找到了与原文件内容完全一致的新路径。确认后将更新守护目标，名称、图标和启动设置保持不变。")
+            this.descriptionLabel := this.gui.Add("Text",
+                "x24 y52 w" contentWidth " h42 BackgroundTrans",
+                descriptionText)
 
             this.gui.SetFont("norm s9 c" UiThemeService.Color("Text"),
                 LocalizationService.GetUiFontName())
@@ -80,8 +87,11 @@ class TargetRelocationPrompt extends ManagedWindow {
 
             this.gui.SetFont("norm s9 c" UiThemeService.Color("MutedText"),
                 LocalizationService.GetUiFontName())
-            evidenceText := "SHA-256"
-            this.gui.Add("Text", "x24 y216 w" contentWidth
+            evidenceText := isVersionedEntry
+                ? Tr("唯一同名新版本入口 / SHA-256")
+                : Tr("内容完全一致 / SHA-256")
+            this.evidenceLabel := this.gui.Add("Text",
+                "x24 y216 w" contentWidth
                 " h20 Center BackgroundTrans",
                 Tr("识别依据：") evidenceText)
             this.gui.Add("Text", "x24 y246 w" contentWidth

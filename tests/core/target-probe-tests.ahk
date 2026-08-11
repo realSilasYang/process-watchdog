@@ -86,6 +86,23 @@ RunTargetProbeTests() {
     AssertTargetProbe(inaccessibleObservation.IsUnknown(),
         "同名进程镜像路径不可读时没有返回 Unknown")
 
+    ; 升级恢复允许原生快照先发现候选，再复用后台快照核对创建身份，
+    ; 以支持新 PID 的近期启动降级确认。
+    snapshotProvider.Index := ProcessSnapshotIndex([{
+        pid: currentPid, parent: 0, name: "Sample.exe", cmd: "", exe: "",
+        identity: "CREATION-" currentPid, observedTicks: 12001
+    }], 12001, false, "", ResolveTestCreationIdentity)
+    inferredObservation := probe.Observe(ProbeSpec(
+        TargetProbeKind.ImagePath, "C:\Apps\Sample.exe"), "", 1000, {
+            AllowInaccessibleImageFallback: true,
+            PriorPID: currentPid,
+            PriorCreationIdentity: "CREATION-" currentPid,
+            RecentStartSeconds: 0
+        })
+    AssertTargetProbe(inferredObservation.IsRunning()
+        && inferredObservation.Source == "process-image-inferred",
+        "原生快照与后台快照没有协同完成升级恢复降级确认")
+
     autoHotkeyProvider.Result := {Ready: true, Complete: true,
         Scripts: [{PID: currentPid, Path: "C:\Jobs\hotkey.ahk"}],
         CapturedAtTicks: 12001, Reason: ""}

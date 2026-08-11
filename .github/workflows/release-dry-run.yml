@@ -21,7 +21,21 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-          lfs: true
+          lfs: false
+
+      - name: Restore verified font archive cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/font-assets
+          key: ${{ runner.os }}-fonts-${{ hashFiles('assets/fonts/metadata.json') }}
+
+      - name: Restore release-verified font assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          .\tools\restore-font-assets.ps1
+          -Repository '${{ github.repository }}'
 
       - name: Confirm release state without modifying GitHub
         id: release_meta

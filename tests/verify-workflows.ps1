@@ -69,7 +69,7 @@ Assert-WorkflowContains 'ci.yml' $ci @(
     'include-hidden-files: true'
     'fetch-depth: 0'
     'lfs: false'
-    'lfs: true'
+    '.\tools\restore-font-assets.ps1'
     '  verify:'
     '    name: verify'
     '    if: always()'
@@ -99,6 +99,8 @@ Assert-WorkflowContains 'release-dry-run.yml' $dryRun @(
     'path: dist/**'
     'include-hidden-files: true'
     'fetch-depth: 0'
+    'lfs: false'
+    '.\tools\restore-font-assets.ps1'
 )
 foreach ($forbidden in @('softprops/action-gh-release@',
         'gh release edit', 'contents: write',
@@ -137,6 +139,8 @@ Assert-WorkflowContains 'release.yml' $release @(
     '-SecondPowerShellPath powershell.exe'
     'include-hidden-files: true'
     'fetch-depth: 0'
+    'lfs: false'
+    '.\tools\restore-font-assets.ps1'
 )
 foreach ($asset in $userAssets) {
     if (([regex]::Matches($release, [regex]::Escape($asset))).Count -ne 2) {
@@ -156,6 +160,8 @@ $soak = Get-WorkflowText 'soak.yml'
 Assert-WorkflowContains 'soak.yml' $soak @(
     'tools\ci-toolchain.resolved.json'
     'actions/cache@'
+    'lfs: false'
+    '.\tools\restore-font-assets.ps1'
 )
 
 Write-Host "GitHub Actions 工作流已通过 actionlint $($toolLock.tools.actionlint.version) 与发布边界检查。"

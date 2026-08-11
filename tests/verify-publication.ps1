@@ -139,8 +139,14 @@ if (-not $fullScanRoot.StartsWith($fullProjectRoot,
 New-Item -ItemType Directory -Force -Path $fullScanRoot | Out-Null
 try {
     $checkoutPrefix = $fullScanRoot.Replace('\', '/') + '/'
-    git -C $projectRoot checkout-index --all --force `
-        "--prefix=$checkoutPrefix"
+    $previousSkipSmudge = $env:GIT_LFS_SKIP_SMUDGE
+    try {
+        $env:GIT_LFS_SKIP_SMUDGE = '1'
+        git -C $projectRoot checkout-index --all --force `
+            "--prefix=$checkoutPrefix"
+    } finally {
+        $env:GIT_LFS_SKIP_SMUDGE = $previousSkipSmudge
+    }
     if ($LASTEXITCODE -ne 0) {
         throw 'Unable to export the staged publication snapshot.'
     }

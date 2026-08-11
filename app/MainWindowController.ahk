@@ -423,7 +423,7 @@ PerformManualRestart(path, expectedSupervisor, expectedGeneration,
         ClearManualRestartRequest(expectedSupervisor, expectedGeneration)
         return
     }
-    if !App.guardWorkGate.TryEnter() {
+    if !App.guardWorkGate.TryEnter("ManualRestart") {
         retryCallback := PerformManualRestart.Bind(path,
             expectedSupervisor, expectedGeneration, attempt)
         TryScheduleManualRestartCallback(retryCallback, path,
@@ -509,7 +509,7 @@ CompleteManualRestartAfterStop(path, expectedSupervisor,
                 expectedGeneration)
         return
     }
-    if !App.guardWorkGate.TryEnter() {
+    if !App.guardWorkGate.TryEnter("ManualRestartAfterStop") {
         retryCallback := CompleteManualRestartAfterStop.Bind(path,
             expectedSupervisor, expectedGeneration, pid,
             creationIdentity, stopResult)

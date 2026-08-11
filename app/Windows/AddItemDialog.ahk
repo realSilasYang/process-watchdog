@@ -426,7 +426,7 @@ class AddItemDialog extends ManagedWindow {
             this.Close()
             return
         }
-        if !App.guardWorkGate.TryEnter()
+        if !App.guardWorkGate.TryEnter("BatchImport")
             return
         try this.ConsumeBatchImportCore()
         finally App.guardWorkGate.Leave()

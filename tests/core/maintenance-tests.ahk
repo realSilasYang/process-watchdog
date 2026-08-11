@@ -17,6 +17,18 @@ class FakeCreationResolver {
     }
 }
 
+class CountingCommandLineMaintenanceMatcher extends MaintenanceActorMatcher {
+    __New(parameters*) {
+        super.__New(parameters*)
+        this.ParseCount := 0
+    }
+
+    ParseCommandLine(commandLine) {
+        this.ParseCount++
+        return super.ParseCommandLine(commandLine)
+    }
+}
+
 AssertMaintenance(value, message) {
     if !value
         throw Error(message)
@@ -124,6 +136,12 @@ RunMaintenanceTests() {
         "P:c:\program files\product\updater.exe|R:c:\program files\product",
         updaterMatch.LearnableSignature,
         "学习特征没有绑定完整路径与作用根")
+    numberedUpdaterSignature := matcher.BuildLearningSignature({
+        pid: 509, parent: 0, name: "Updater2026.exe", cmd: "",
+        exe: rootPath "\Updater2026.exe"
+    }, rootPath)
+    AssertMaintenance(numberedUpdaterSignature != "",
+        "包含版本数字的稳定更新器路径被错误排除学习")
 
     outsideUpdater := {pid: 502, parent: 0, name: "Updater.exe", cmd: "",
         exe: "D:\Unrelated\Updater.exe", creation: "SNAPSHOT-B"}
@@ -136,6 +154,11 @@ RunMaintenanceTests() {
     AssertMaintenanceEqual("", matcher.BuildLearningSignature({
         pid: 503, parent: 0, name: "Updater.exe", cmd: "", exe: ""
     }, rootPath), "缺少完整路径的演员不应生成永久特征")
+    tempRoot := A_Temp "\Product"
+    AssertMaintenanceEqual("", matcher.BuildLearningSignature({
+        pid: 510, parent: 0, name: "Updater.exe", cmd: "",
+        exe: tempRoot "\Updater.exe"
+    }, tempRoot), "临时目录中的更新程序不应生成永久特征")
     AssertMaintenance(matcher.PathIsWithinRoot("C:\Product\Updater.exe",
         "C:\"), "驱动器根目录未被识别为路径作用根")
     AssertMaintenance(!matcher.PathIsWithinRoot("C:\Product2\Updater.exe",
@@ -147,9 +170,9 @@ RunMaintenanceTests() {
     helper := {pid: 504, parent: 0, name: "Helper.exe", cmd: "",
         exe: helperPath, creation: "SNAPSHOT-C"}
     creationResolver.Values[504] := "LIVE-C"
-    AssertMaintenance(matcher.Match(helper, targetPath, rootPath,
+    AssertMaintenance(!matcher.Match(helper, targetPath, rootPath,
         [scopedSignature]).Matched,
-        "同一作用根的已学习完整路径没有命中")
+        "旧版安装根外学习特征仍能命中通用外部程序")
     AssertMaintenance(!matcher.Match(helper,
         "D:\Other\Other.exe", "D:\Other", [scopedSignature]).Matched,
         "已学习路径越过其作用根命中其他目标")
@@ -163,6 +186,27 @@ RunMaintenanceTests() {
         "命令行引用安装根的安装程序没有被识别")
     AssertMaintenanceEqual("installer-references-root", commandMatch.Evidence,
         "命令行作用根证据错误")
+    AssertMaintenanceEqual("", commandMatch.LearnableSignature,
+        "安装根外的通用安装器被错误写入永久学习特征")
+
+    countingMatcher := CountingCommandLineMaintenanceMatcher(
+        creationResolver)
+    sharedCommandProcess := {pid: 508, parent: 0, name: "setup.exe",
+        cmd: '"C:\Tools\setup.exe" --root="C:\Program Files\Product"',
+        exe: "C:\Tools\setup.exe", creation: "SNAPSHOT-CACHE"}
+    firstContext := countingMatcher.CreateMatchContext(targetPath, rootPath,
+        [], 0, "", Map(), false, Map(), false)
+    secondContext := countingMatcher.CreateMatchContext(
+        "D:\Other\Other.exe", "D:\Other", [], 0, "", Map(), false,
+        Map(), false)
+    countingMatcher.MatchPrepared(sharedCommandProcess, firstContext)
+    countingMatcher.MatchPrepared(sharedCommandProcess, secondContext)
+    AssertMaintenanceEqual(1, countingMatcher.ParseCount,
+        "同一快照进程的命令行在多个目标匹配中被重复解析")
+    AssertMaintenance(sharedCommandProcess.HasOwnProp(
+            "maintenanceCommandPaths")
+        && sharedCommandProcess.HasOwnProp("maintenanceCanonicalExe"),
+        "升级参与者匹配没有把进程级规范化结果保存在快照对象中")
 
     processMap := Map(
         100, {pid: 100, parent: 0, name: "Product.exe", cmd: "",
@@ -180,6 +224,8 @@ RunMaintenanceTests() {
         "升级期间的多级子进程没有按父链识别")
     AssertMaintenanceEqual("maintenance-descendant",
         descendantMatch.Evidence, "多级父链证据错误")
+    AssertMaintenanceEqual("", descendantMatch.LearnableSignature,
+        "安装根外的临时子进程被错误写入永久学习特征")
     descendantIdentity := matcher.CreateIdentity(descendant, rootPath,
         processMap)
     AssertMaintenanceEqual("506:WORKER-LIVE", descendantIdentity.Key,

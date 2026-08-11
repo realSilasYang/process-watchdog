@@ -139,7 +139,7 @@ class GuardMutationQueue {
         gateAcquired := false
         operation := ""
         try {
-            gateAcquired := this.WorkGate.TryEnter()
+            gateAcquired := this.WorkGate.TryEnter("GuardMutationQueue")
             if !gateAcquired
                 return false
             previousCritical := A_IsCritical

@@ -45,9 +45,9 @@ The main window keeps each target's order, application icon, display name, privi
 - Monitor EXE, AHK, Python, JavaScript, PowerShell, BAT, CMD, and LNK targets.
 - Use `Running`, `Stopped`, and `Unknown` probe results; an unknown result never triggers a blind restart.
 - Give every target its own controller, generation, and task tokens, so stale callbacks become invalid immediately after pausing, deletion, or path changes.
-- After a directly added file or one of its parent folders is renamed, or the file is moved across folders or volumes, narrow candidates by compatible extension and exact size, verify the complete SHA-256 content hash, then ask for confirmation. Recovery also works for moves made while the assistant was closed; names, file IDs, and directory notifications are not identity evidence.
+- After a directly added file or one of its parent folders is renamed, or the file is moved across folders or volumes, narrow candidates by compatible extension and exact size, verify the complete SHA-256 content hash, then ask for confirmation. Recovery also works for moves made while the assistant was closed. Normal relocation never uses names, file IDs, or directory notifications; a version-directory update is a restricted exception only after an update is confirmed and exactly one same-named entry exists under the same parent, with that candidate's SHA-256 continuously verified.
 - Enforce an administrator requirement when configured; report a privilege mismatch for an existing process and elevate the next monitored launch.
-- Keep update protection off by default. When enabled, combine updater processes, parent-child relationships, installation-directory activity, and file stability before pausing or resuming monitoring.
+- Keep update protection off by default. When enabled, combine updater processes, parent-child relationships, installation-directory activity, and file stability before pausing or resuming monitoring. A successful update learns only a dedicated updater inside the install root as a full path scoped to that root; global installer tools, temporary programs, and process names never become permanent evidence.
 - Replace configuration atomically. Records that cannot be parsed are moved to `[Recovery]` instead of being silently discarded.
 - Use the Everything service exclusively for application search, without a local full-disk fallback or an application-imposed result limit. Large result sets are appended in short batches so icon extraction does not monopolize the UI.
 - Support Simplified Chinese, Traditional Chinese (Hong Kong), Traditional Chinese (Taiwan), English, Japanese, Vietnamese, Korean, Spanish, French, Brazilian Portuguese, Russian, German, and Italian. The interface follows the Windows UI language by default, falls back to English for unsupported languages, and can be selected manually under Display. Language and content-font changes take effect immediately in the current process without stopping or reinitializing guard tasks.
@@ -142,7 +142,7 @@ Right-click an item in the main list to:
 - Restart the target, stop it, edit its full path, or open its file location. Restart applies the configured stop policy before launching again; Stop Running also pauses monitoring so the target is not launched again automatically.
 - Configure process identification and launch settings before the administrator toggle.
 - Toggle the administrator requirement. A running target with insufficient privileges is reported; after monitoring is resumed, the next launch is elevated as configured.
-- Configure update protection.
+- Open Update Protection Settings.
 - BAT and CMD entries additionally show View batch output log. Other target
   types do not show this command. The file is created only when the assistant
   actually launches that batch entry and captures its standard output and error.
@@ -173,12 +173,16 @@ The default retry delays are 1, 10, and 60 seconds. After the fast sequence is e
 
 Update protection is disabled by default and must be enabled per item:
 
-1. Right-click the target and open Update Protection.
+1. Right-click the target and open Update Protection Settings.
 2. Select automatic update detection and launch protection.
 3. Verify the installation footprint, exit-detection window, file-stability wait, and maximum update wait.
 4. Save the settings and let the application perform one real update normally. The assistant combines updater processes, parent-child relationships, installation-directory activity, file notifications, and learned updater signatures to decide whether protection should begin.
 
 Once an update is confirmed, automatic launch is suspended. Normal monitoring resumes only after activity ends and the target files are stable. If detection times out or does not match reality, use End update wait and resume monitoring in the same window. The launch entry is still checked for safety before recovery.
+
+Learning does not record a same-named process as soon as it appears. A permanent updater signature is saved only when a real update changed the target file, the updater has a complete path inside this target's installation footprint, and the update then completed successfully. Global tools such as `msiexec` or `winget`, temporary-directory processes, name-only candidates, and unsuccessful updates are not learned. An unfinished session temporarily preserves confirmed updater identities and pending signatures so evaluation can continue after restarting the assistant.
+
+For a direct-file target installed under a version directory such as `2.0.10` or `v2.0.11`, the assistant proposes relocation only when exactly one same-named entry exists in another version directory under the same parent, and it continuously verifies that candidate's own SHA-256. Multiple candidates, duplicate copies, or an incomplete scan remain unresolved. If a process image path is temporarily inaccessible, recovery is confirmed only within an already confirmed update, with exactly one same-named process, and with either the same pre-update creation identity or a recent start time.
 
 Update protection is not a general installer or Windows-service manager. For portable applications, updaters outside the installation directory, or unusual launchers, inspect the runtime log before adjusting the footprint and rules.
 

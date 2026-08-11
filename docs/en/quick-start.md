@@ -33,7 +33,8 @@ runtime, and update-protection settings, and the change can be undone. Ignore
 keeps the old path and returns the item to its normal missing-target state.
 Rename confirmation is suppressed while update protection is evaluating or
 handling an update, so an updater's backup file is not presented as a new
-target.
+target. A version-directory update is a restricted exception described under
+Protect an application that updates itself below.
 
 Scanning runs in a separate worker process and does not block monitoring or the
 interface. If more than one identical copy is found in a completed search scope,
@@ -99,3 +100,20 @@ target file becomes available and stable again.
 
 If the application exposes a clear Check for updates command, you can also begin
 and end explicit maintenance from the Update Protection window.
+
+Updater learning occurs only after a real update changes the target file and
+completes successfully. The updater must have a complete path inside the target's
+installation footprint, and its signature is stored as a full path scoped to the
+installation root. Global `msiexec` or `winget` tools, temporary-directory
+programs, name-only candidates, and failed updates do not leave permanent
+records. An unfinished session preserves only confirmed transient updaters and
+pending signatures so evaluation can continue after restarting the assistant.
+
+For targets under version directories such as `2.0.10` or `v2.0.11`, the
+assistant checks sibling version directories after an update and target-file
+change have been confirmed. It proposes relocation only for exactly one
+same-named entry and continuously verifies that candidate's SHA-256. Multiple
+candidates, duplicate copies, or incomplete scans remain unresolved. A process
+whose image path is temporarily inaccessible is accepted only when the update
+is already confirmed, the same-named candidate is unique, and its creation
+identity matches the pre-update process or it started recently.

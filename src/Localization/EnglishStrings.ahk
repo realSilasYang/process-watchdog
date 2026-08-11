@@ -1549,8 +1549,8 @@ class EnglishStrings {
             "🔄 软件升级中",
                 "🔄 Application Updating")
         catalog.Set(
-            "🔄 软件升级保护",
-                "🔄 Update Protection")
+            "🔄 软件升级保护设置",
+                "🔄 Update Protection Settings")
         catalog.Set(
             "⏹️ 结束运行",
                 "⏹️ Stop Target")
@@ -1886,19 +1886,23 @@ class EnglishStrings {
         catalog.Set("无", "None")
         catalog.Set("，另有 {1} 个", ", plus {1} more")
         catalog.Set("检测到内容一致的守护目标新位置，等待用户确认：{1} -> {2}", "A new location with matching content was detected`; awaiting confirmation: {1} -> {2}")
+        catalog.Set("升级期间检测到唯一同名新版本入口，等待用户确认：{1} -> {2}", "A unique same-named entry in a new version directory was detected during the upgrade`; awaiting confirmation: {1} -> {2}")
         catalog.Set("守护目标内容迁移识别异常：{1}", "Monitored-target content relocation detection error: {1}")
         catalog.Set("等待确认目标新位置", "Waiting to confirm the target's new location")
         catalog.Set("确认目标新位置", "Confirm New Target Location")
         catalog.Set("检测到守护目标可能已更名", "A monitored target may have been renamed")
         catalog.Set("小助手找到了与原文件内容完全一致的新路径。确认后将更新守护目标，名称、图标和启动设置保持不变。", "The assistant found a new path whose file content is an exact match. Confirming updates the monitored target while preserving its name, icon, and launch settings.")
+        catalog.Set("升级期间发现唯一同名新版本入口；已记录并持续校验候选 SHA-256。确认后将更新守护目标，名称、图标和启动设置保持不变。", "The only same-named entry in a new version directory was found during the upgrade. Its SHA-256 is recorded and rechecked. Confirming updates the monitored target without changing its name, icon, or launch settings.")
         catalog.Set("原路径：", "Previous path:")
         catalog.Set("新路径：", "New path:")
         catalog.Set("识别依据：", "Detection evidence: ")
+        catalog.Set("内容完全一致 / SHA-256", "Exact content match / SHA-256")
+        catalog.Set("唯一同名新版本入口 / SHA-256", "Unique same-named version entry / SHA-256")
         catalog.Set("更新守护路径", "Update monitored path")
         catalog.Set("忽略", "Ignore")
         catalog.Set("更新已更名的守护目标", "Update renamed monitored target")
         catalog.Set("• 直接添加的程序或脚本本身或上级目录被更名、跨目录或跨磁盘移动后，小助手会按文件大小筛选并以 SHA-256 内容哈希确认新路径；即使移动发生在小助手关闭期间也能识别。", "• After a directly added program, script, or parent folder is renamed or moved across folders or drives, the assistant filters by file size and confirms the new path with a SHA-256 content hash, even when the move happened while the assistant was closed.")
-        catalog.Set("• 文件名、文件 ID 和目录监听不参与迁移判断。发现多个内容相同的副本或扫描未完整完成时不会猜测目标；确认后只更新守护路径，名称、图标和启动设置保持不变。", "• File names, file IDs, and directory watchers are not used for relocation decisions. The assistant does not guess when identical copies exist or a scan is incomplete. Confirming changes only the monitored path and preserves the name, icon, and launch settings.")
+        catalog.Set("• 常规迁移不使用文件名、文件 ID 或目录监听作为判断依据。版本目录升级是受限例外：升级期间仅在同一父目录中存在唯一同名新版本入口时提出迁移，并记录、持续校验候选 SHA-256。发现多个候选、多个内容相同的副本或扫描未完整完成时不会猜测目标；确认后只更新守护路径，名称、图标和启动设置保持不变。", "• Regular relocation decisions do not use file names, file IDs, or directory watchers. Version-directory upgrades are a restricted exception: during an upgrade, relocation is proposed only when exactly one same-named entry exists in a new version directory under the same parent, and that candidate's SHA-256 is recorded and continuously verified. The assistant does not guess when multiple candidates or identical copies exist, or when a scan is incomplete. Confirming changes only the monitored path and preserves the name, icon, and launch settings.")
         catalog.Set("; AppN 与 [Apps] 中同名的直接文件目标一一对应，依次保存文件大小和 SHA-256 内容哈希。", "; Each AppN entry corresponds to the directly monitored file with the same name in [Apps] and stores its file size followed by its SHA-256 content hash.")
         catalog.Set("; 此节由小助手自动维护，用于在文件或目录改名、跨目录或跨磁盘移动后确认内容未变；请勿手动编辑。", "; The assistant maintains this section automatically to verify unchanged content after file or folder renames and moves across folders or drives. Do not edit it manually.")
         catalog.Set("Everything64.dll 已加载，但 Everything 后台实例未响应；正在尝试定位并启动 Everything 本体。",
@@ -1951,6 +1955,12 @@ class EnglishStrings {
             "The command line provides only a relative target path, so it cannot be matched reliably")
         catalog.Set("候选进程镜像路径不可访问",
             "The candidate process image path is inaccessible")
+        catalog.Set("发现多个版本目录包含同名入口，已暂停自动迁移：{1}",
+            "Multiple version directories contain an entry with the same name; automatic relocation is paused: {1}")
+        catalog.Set("版本目录迁移候选暂不可读取，将稍后重试：{1}",
+            "The version-directory relocation candidate is temporarily unreadable and will be retried later: {1}")
+        catalog.Set("版本目录迁移候选仍在本次忽略冷却期内：{1} -> {2}",
+            "The version-directory relocation candidate is still in this ignore cooldown: {1} -> {2}")
         catalog.Set("候选进程创建身份无法核对",
             "The candidate process creation identity cannot be verified")
         catalog.Set("存在多个候选进程，无法唯一确认",

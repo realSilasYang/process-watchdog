@@ -23,6 +23,7 @@ class ContentRelocationTestState {
         this.Generation := 1
         this.RelocationPending := false
         this.MaintenanceBusy := false
+        this.MaintenanceFileChanged := false
         this.MaintenanceProtectionEnabled := false
         this.RecentMaintenanceSignal := false
         this.ContentHash := contentHash
@@ -207,6 +208,18 @@ DetectContentRelocation(harness, oldPath, stateObj) {
     return harness.Service.TryDetect(oldPath, stateObj)
 }
 
+CreateContentRelocationTestDirectory(rootPath, directoryName) {
+    directoryPath := rootPath "\" directoryName
+    DirCreate(directoryPath)
+    ; GitHub runner 的 A_Temp 可能是 8.3 短路径，而目录枚举会返回长路径。
+    ; 测试夹具必须采用与生产扫描相同的路径表示，避免 Map 模拟产生假阴性。
+    Loop Files, rootPath "\*", "D" {
+        if A_LoopFileName == directoryName
+            return A_LoopFileFullPath
+    }
+    throw Error("无法解析测试版本目录的规范路径：" directoryPath)
+}
+
 RunTargetContentRelocationServiceTests() {
     hashA := "A" . Format("{:063}", 0)
     hashB := "B" . Format("{:063}", 0)
@@ -236,6 +249,108 @@ RunTargetContentRelocationServiceTests() {
             && !renameState.RelocationPending
             && renameState.ResetCount == 1,
         "忽略内容候选没有释放控制器")
+
+    AssertContentRelocation(
+        TargetRelocationService.IsVersionedInstallDirectory("app-1.2.3")
+            && TargetRelocationService.IsVersionedInstallDirectory("v2.0.0-beta.1")
+            && !TargetRelocationService.IsVersionedInstallDirectory("release"),
+        "版本目录名称识别规则错误")
+
+    testRunId := DllCall("kernel32\GetCurrentProcessId", "UInt")
+        . "-" A_TickCount
+    versionRoot := A_Temp "\watchdog-version-relocation-" testRunId
+    versionOldDir := CreateContentRelocationTestDirectory(versionRoot,
+        "app-1.0.0")
+    versionNewDir := CreateContentRelocationTestDirectory(versionRoot,
+        "app-1.1.0")
+    versionOld := versionOldDir "\Product.exe"
+    versionNew := versionNewDir "\Product.exe"
+    versionHarness := ContentRelocationTestHarness()
+    versionState := versionHarness.AddTarget(versionOld, hashA, 128)
+    versionHarness.Service.SyncTargets()
+    versionHarness.Files[versionOld] := false
+    versionHarness.AddCandidate(versionNew, hashB, 256)
+    AssertContentRelocation(!versionHarness.Service.TryDetect(versionOld,
+            versionState), "版本目录迁移首次缺失观察没有等待稳定延迟")
+    versionHarness.Advance(TargetRelocationService.CandidateDelayMs + 1)
+    versionPublished := versionHarness.Service.TryDetect(versionOld,
+        versionState)
+    versionValid := versionHarness.Candidates.Length == 1
+        ? versionHarness.Service.ValidateCandidate(
+            versionHarness.Candidates[1]) : false
+    AssertContentRelocation(versionPublished
+            && versionHarness.Candidates.Length == 1
+            && versionHarness.Candidates[1].Evidence
+                == "VersionedEntryUnique"
+            && versionHarness.Candidates[1].NewContentHash == hashB
+            && versionHarness.Candidates[1].NewContentSize == 256
+            && versionHarness.Logs.Length
+            && InStr(versionHarness.Logs[-1], "唯一同名新版本入口")
+            && versionValid,
+        "版本目录中唯一同名新入口没有进入确认迁移流程"
+            "（published=" versionPublished
+            "，count=" versionHarness.Candidates.Length
+            "，valid=" versionValid
+            "，logs=" (versionHarness.Logs.Length
+                ? versionHarness.Logs[-1] : "") "）")
+    versionHarness.Signatures[versionNew] := versionHarness.CreateSignature(
+        hashA, 256, "20260103030303")
+    AssertContentRelocation(!versionHarness.Service.ValidateCandidate(
+            versionHarness.Candidates[1]),
+        "确认期间被替换的版本目录候选仍被视为有效")
+
+    liveVersionRoot := A_Temp "\watchdog-version-live-" testRunId
+    liveOldDir := CreateContentRelocationTestDirectory(liveVersionRoot,
+        "app-2.0.0")
+    liveNewDir := CreateContentRelocationTestDirectory(liveVersionRoot,
+        "app-2.1.0")
+    liveOld := liveOldDir "\Product.exe"
+    liveNew := liveNewDir "\Product.exe"
+    liveVersionHarness := ContentRelocationTestHarness()
+    liveVersionState := liveVersionHarness.AddTarget(liveOld, hashA, 128)
+    liveVersionState.MaintenanceBusy := true
+    liveVersionState.MaintenanceFileChanged := true
+    liveVersionHarness.Service.SyncTargets()
+    liveVersionHarness.AddCandidate(liveNew, hashB, 256)
+    AssertContentRelocation(!liveVersionHarness.Service
+            .TryDetectVersionedUpgrade(liveOld, liveVersionState),
+        "旧版本仍存在时的首次版本候选观察没有等待稳定延迟")
+    liveVersionHarness.Advance(TargetRelocationService.CandidateDelayMs + 1)
+    AssertContentRelocation(liveVersionHarness.Service
+            .TryDetectVersionedUpgrade(liveOld, liveVersionState)
+            && liveVersionHarness.Candidates.Length == 1
+            && liveVersionHarness.Service.ValidateCandidate(
+                liveVersionHarness.Candidates[1]),
+        "旧版本入口仍存在时没有发布唯一新版本确认候选")
+
+    ambiguousRoot := A_Temp "\watchdog-version-ambiguous-" testRunId
+    ambiguousOldDir := CreateContentRelocationTestDirectory(ambiguousRoot,
+        "app-1.0.0")
+    ambiguousNewOneDir := CreateContentRelocationTestDirectory(ambiguousRoot,
+        "app-1.1.0")
+    ambiguousNewTwoDir := CreateContentRelocationTestDirectory(ambiguousRoot,
+        "app-1.2.0")
+    ambiguousOld := ambiguousOldDir "\Product.exe"
+    ambiguousOne := ambiguousNewOneDir "\Product.exe"
+    ambiguousTwo := ambiguousNewTwoDir "\Product.exe"
+    ambiguousHarness := ContentRelocationTestHarness()
+    ambiguousState := ambiguousHarness.AddTarget(ambiguousOld, hashA, 128)
+    ambiguousHarness.Service.SyncTargets()
+    ambiguousHarness.Files[ambiguousOld] := false
+    ambiguousHarness.AddCandidate(ambiguousOne, hashB, 256)
+    ambiguousHarness.AddCandidate(ambiguousTwo, hashB, 256)
+    AssertContentRelocation(!ambiguousHarness.Service.TryDetect(ambiguousOld,
+            ambiguousState), "多个版本目录首次缺失观察没有等待稳定延迟")
+    ambiguousHarness.Advance(TargetRelocationService.CandidateDelayMs + 1)
+    AssertContentRelocation(!ambiguousHarness.Service.TryDetect(ambiguousOld,
+            ambiguousState)
+            && ambiguousHarness.Candidates.Length == 0
+            && ambiguousHarness.Logs.Length
+            && InStr(ambiguousHarness.Logs[-1], "多个版本目录"),
+        "多个同名版本入口没有暂停自动迁移")
+    try DirDelete(versionRoot, true)
+    try DirDelete(liveVersionRoot, true)
+    try DirDelete(ambiguousRoot, true)
 
     directoryHarness := ContentRelocationTestHarness()
     directoryOld := "D:\Projects\Windows\后台常驻\worker.ahk"
@@ -388,6 +503,6 @@ try {
     RunTargetContentRelocationServiceTests()
     ExitApp(0)
 } catch as testError {
-    FileAppend(testError.Message "`n" testError.Stack "`n", "**")
+    try FileAppend(testError.Message "`n" testError.Stack "`n", "**")
     ExitApp(1)
 }

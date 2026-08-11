@@ -67,8 +67,41 @@ class ProcessInspector {
                 "UInt*", &characterCount, "Int") {
                 return StrGet(pathBuffer, characterCount, "UTF-16")
             }
+            ; 某些升级器或 Qt 程序的进程句柄可以查询，但
+            ; QueryFullProcessImageNameW 偶发返回失败。PSAPI 使用同一
+            ; 查询权限提供设备路径回退，避免把可确认的目标降级为 Unknown。
+            deviceBuffer := Buffer(32768 * 2, 0)
+            deviceLength := DllCall("psapi\GetProcessImageFileNameW", "Ptr",
+                processHandle, "Ptr", deviceBuffer, "UInt", 32767, "UInt")
+            if deviceLength {
+                devicePath := StrGet(deviceBuffer, deviceLength, "UTF-16")
+                resolvedPath := this.ResolveDevicePath(devicePath)
+                if resolvedPath != ""
+                    return resolvedPath
+            }
         } finally {
             DllCall("kernel32\CloseHandle", "Ptr", processHandle)
+        }
+        return ""
+    }
+
+    ResolveDevicePath(devicePath) {
+        devicePath := Trim(String(devicePath))
+        if (devicePath == "" || SubStr(devicePath, 1, 8) != "\Device\")
+            return devicePath
+        Loop 26 {
+            drive := Chr(64 + A_Index) ":"
+            targetBuffer := Buffer(1024 * 2, 0)
+            targetLength := DllCall("kernel32\QueryDosDeviceW", "Str", drive,
+                "Ptr", targetBuffer, "UInt", 1024, "UInt")
+            if !targetLength
+                continue
+            deviceName := StrGet(targetBuffer, targetLength, "UTF-16")
+            if (devicePath == deviceName)
+                return drive
+            if (SubStr(devicePath, 1, StrLen(deviceName) + 1)
+                == deviceName "\")
+                return drive SubStr(devicePath, StrLen(deviceName) + 1)
         }
         return ""
     }

@@ -222,7 +222,7 @@ class GuardRuntime {
     MonitorTick() {
         if this.Stopped
             return
-        if !this.Runtime.guardWorkGate.TryEnter()
+        if !this.Runtime.guardWorkGate.TryEnter("GuardMonitorTick")
             return
         loopStartedTicks := 0
         try {
@@ -816,7 +816,7 @@ class GuardRuntime {
         if this.Stopped
             return
         path := this.NormalizePath(path)
-        if !this.Runtime.guardWorkGate.TryEnter() {
+        if !this.Runtime.guardWorkGate.TryEnter("GuardRestart") {
             if (scheduledTask is TargetScheduledTask
                 && !this.IsScheduledTaskCurrent(path, expectedSupervisor,
                     scheduledTask, "Restart"))
@@ -1078,7 +1078,7 @@ class GuardRuntime {
         if this.Stopped
             return
         path := this.NormalizePath(path)
-        if !this.Runtime.guardWorkGate.TryEnter() {
+        if !this.Runtime.guardWorkGate.TryEnter("GuardVerify") {
             if (scheduledTask is TargetScheduledTask
                 && !this.IsScheduledTaskCurrent(path, expectedSupervisor,
                     scheduledTask, "Verify"))

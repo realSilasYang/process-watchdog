@@ -13,7 +13,7 @@
 
 ;@Ahk2Exe-SetName 进程守护小助手
 ;@Ahk2Exe-SetDescription 进程、脚本和快捷方式守护工具
-;@Ahk2Exe-SetVersion 2.0.10.0
+;@Ahk2Exe-SetVersion 2.0.11.0
 ;@Ahk2Exe-SetCopyright Copyright (c) 2026 进程守护小助手 contributors
 ;@Ahk2Exe-SetMainIcon assets\app\watchdog.ico
 
@@ -632,7 +632,7 @@ ConfigureMainContextMenu(isAdmin := false, maintenanceEnabled := false,
         Tr("🛡️ 以管理员身份运行"), isAdmin)
     contextMenu.Add(adminLabel, ToggleRunAsAdmin)
     maintenanceLabel := FormatContextMenuToggleLabel(
-        Tr("🔄 软件升级保护"), maintenanceEnabled)
+        Tr("🔄 软件升级保护设置"), maintenanceEnabled)
     contextMenu.Add(maintenanceLabel, OpenMaintenanceSettings)
     if !maintenanceSupported
         contextMenu.Disable(maintenanceLabel)
@@ -659,7 +659,7 @@ BuildMainContextPopupItems(isAdmin := false, maintenanceEnabled := false,
         {Text: Tr("⚙️ 进程识别与启动设置"), Action: OpenEnvSettings},
         {Text: Tr("🛡️ 以管理员身份运行"), Check: isAdmin,
             Action: ToggleRunAsAdmin},
-        {Text: Tr("🔄 软件升级保护"), Check: maintenanceEnabled,
+        {Text: Tr("🔄 软件升级保护设置"), Check: maintenanceEnabled,
             Action: OpenMaintenanceSettings, Enabled: maintenanceSupported}
     ]
     if batchLogSupported {

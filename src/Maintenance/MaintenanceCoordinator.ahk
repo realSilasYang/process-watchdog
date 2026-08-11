@@ -117,7 +117,7 @@ class MaintenanceCoordinator {
             this.PendingCommands.Push(command)
             return true
         }
-        if !this.Runtime.guardWorkGate.TryEnter() {
+        if !this.Runtime.guardWorkGate.TryEnter("MaintenanceCommand") {
             this.PendingCommands.Push(command)
             return true
         }
@@ -257,6 +257,7 @@ class MaintenanceCoordinator {
             stateObj.MaintenanceBaselineFingerprint := session.BaselineFingerprint
             stateObj.MaintenanceFileChanged := session.FileChanged
             stateObj.ExplicitMaintenance := session.Explicit
+            this.RestoreActorRecords(stateObj, session)
             if (restoredAsTimedOut
                 || elapsedSeconds >= stateObj.MaintenanceConfig.MaxWaitSeconds) {
                 stateObj.RestoreMaintenanceMode(MaintenancePhase.TimedOut)
@@ -274,10 +275,70 @@ class MaintenanceCoordinator {
         this.SaveJournal()
     }
 
+    RestoreActorRecords(stateObj, session) {
+        stateObj.KnownActorIdentities := Map()
+        stateObj.TransientActorIdentities := Map()
+        stateObj.MaintenanceLearningCandidates := Map()
+        if !IsObject(session)
+            return false
+        restoredTicks := this.Now()
+        restoredCount := 0
+        if session.HasOwnProp("ActorRecords")
+            && Type(session.ActorRecords) == "Array" {
+            for actorRecord in session.ActorRecords {
+                if !IsObject(actorRecord)
+                    || !actorRecord.HasOwnProp("Identity")
+                    || !(actorRecord.Identity is MaintenanceActorIdentity)
+                    continue
+                identity := actorRecord.Identity
+                if identity.PID <= 0 || identity.CreationIdentity == ""
+                    continue
+                if this.Runtime.maintenanceActorMatcher.Canonical(
+                    identity.RootPath) != this.Runtime
+                        .maintenanceActorMatcher.Canonical(
+                            stateObj.MaintenanceConfig.InstallRoot)
+                    continue
+                actorRecord.LastSeenTicks := restoredTicks
+                stateObj.KnownActorIdentities[identity.Key] := actorRecord
+                stateObj.TransientActorIdentities[identity.Key] := actorRecord
+                restoredCount++
+                if actorRecord.HasOwnProp("Match")
+                    && IsObject(actorRecord.Match)
+                    && actorRecord.Match.HasOwnProp("LearnableSignature")
+                    && actorRecord.Match.LearnableSignature != "" {
+                    normalizedSignature := this.Runtime
+                        .maintenanceActorMatcher.NormalizeLearnedSignature(
+                            actorRecord.Match.LearnableSignature,
+                            stateObj.MaintenanceConfig.InstallRoot)
+                    actorRecord.Match.LearnableSignature := normalizedSignature
+                    if normalizedSignature != ""
+                        stateObj.MaintenanceLearningCandidates[
+                            normalizedSignature] := true
+                }
+            }
+        }
+        if session.HasOwnProp("LearningCandidates")
+            && Type(session.LearningCandidates) == "Array" {
+            for signature in session.LearningCandidates {
+                normalizedSignature := this.Runtime.maintenanceActorMatcher
+                    .NormalizeLearnedSignature(signature,
+                        stateObj.MaintenanceConfig.InstallRoot)
+                if normalizedSignature != ""
+                    stateObj.MaintenanceLearningCandidates[
+                        normalizedSignature] := true
+            }
+        }
+        if restoredCount {
+            stateObj.LastActorSeenTicks := restoredTicks
+            this.JournalDirty := true
+        }
+        return restoredCount > 0
+    }
+
     ProcessTick() {
         if this.Stopped || !this.Initialized
             return
-        if !this.Runtime.guardWorkGate.TryEnter()
+        if !this.Runtime.guardWorkGate.TryEnter("MaintenanceProcessTick")
             return
         loopStartedTicks := 0
         try {
@@ -343,7 +404,7 @@ class MaintenanceCoordinator {
     EventTick() {
         if this.Stopped || !this.Initialized
             return
-        if !this.Runtime.guardWorkGate.TryEnter()
+        if !this.Runtime.guardWorkGate.TryEnter("MaintenanceEventTick")
             return
         loopStartedTicks := 0
         try {
@@ -351,6 +412,8 @@ class MaintenanceCoordinator {
             nowTicks := this.Now()
             this.DrainPendingCommands()
             staleRoots := []
+            fingerprintRequests := Map()
+            fingerprintRequests.CaseSense := "Off"
             for rootKey, entry in this.Watchers {
                 if !entry.subscribers.Count {
                     staleRoots.Push(rootKey)
@@ -375,11 +438,23 @@ class MaintenanceCoordinator {
                             if (this.Runtime.appStates.Has(path)
                                 && this.Runtime.appStates[path] == stateObj
                                 && stateObj.Enabled
-                                && this.IsProtectionEnabled(path, stateObj)
-                                && this.IsRelevantFootprintChange(path,
-                                    stateObj, change.RelativePath, entry)) {
-                                this.RecordFootprintActivity(path, stateObj,
-                                    change.RelativePath)
+                                && this.IsProtectionEnabled(path, stateObj)) {
+                                requiresFingerprint :=
+                                    this.FootprintChangeRequiresFingerprint(
+                                        path, stateObj, change.RelativePath,
+                                        entry)
+                                if (requiresFingerprint
+                                    && stateObj.MaintenanceMode
+                                        == MaintenancePhase.Normal) {
+                                    ; 通知溢出和子目录同名文件都不能单独证明目标
+                                    ; 已变化，但必须绕过常规间隔在本轮立即复核。
+                                    fingerprintRequests[path] := stateObj
+                                    stateObj.MaintenanceFingerprintCheckedTicks := 0
+                                } else if this.IsRelevantFootprintChange(path,
+                                    stateObj, change.RelativePath, entry) {
+                                    this.RecordFootprintActivity(path, stateObj,
+                                        change.RelativePath)
+                                }
                             }
                         } catch as targetEventError {
                             this.LogTargetError(path, targetEventError)
@@ -415,13 +490,17 @@ class MaintenanceCoordinator {
                         ? this.Runtime.maintenanceFingerprintInterval
                         : this.Runtime.maintenanceFingerprintRetryInterval)
                     : 1000
+                forcedFingerprintCheck := fingerprintRequests.Has(path)
+                    && fingerprintRequests[path] == stateObj
                 shouldCheckFingerprint := stateObj.MaintenanceMode
                     != MaintenancePhase.TimedOut
-                    && (!stateObj.MaintenanceFingerprintCheckedTicks
+                    && (forcedFingerprintCheck
+                        || !stateObj.MaintenanceFingerprintCheckedTicks
                         || nowTicks - stateObj.MaintenanceFingerprintCheckedTicks
                             >= fingerprintInterval)
                 if (shouldCheckFingerprint
-                    && stateObj.MaintenanceMode == MaintenancePhase.Normal) {
+                    && stateObj.MaintenanceMode == MaintenancePhase.Normal
+                    && !forcedFingerprintCheck) {
                     if (normalFingerprintChecks >= normalFingerprintBudget)
                         shouldCheckFingerprint := false
                     else
@@ -540,7 +619,16 @@ class MaintenanceCoordinator {
 
     IsRelevantFootprintChange(path, stateObj, relativePath,
         watcherEntry := "") {
-        if (relativePath == "*")
+        if this.FootprintChangeRequiresFingerprint(path, stateObj,
+            relativePath, watcherEntry) {
+            return this.IsBlocking(stateObj)
+                && stateObj.MaintenanceMode != MaintenancePhase.TimedOut
+        }
+        ; 进入升级会话后，配置、资源、临时文件以及无扩展名文件同样是
+        ; 更新器活动证据。普通运行期仍使用下面的白名单，避免共享安装
+        ; 目录中的日常写入触发升级保护。
+        if (this.IsBlocking(stateObj)
+            && stateObj.MaintenanceMode != MaintenancePhase.TimedOut)
             return true
         relativePath := StrReplace(relativePath, "/", "\")
         SplitPath(relativePath, &changedName, , &extension)
@@ -556,15 +644,38 @@ class MaintenanceCoordinator {
             && StrLower(relativePath) == StrLower(subjectRelative))
             return true
         SplitPath(subjectPath, &targetName)
-        if (!InStr(subjectRelative, "\")
+        if (!InStr(relativePath, "\") && !InStr(subjectRelative, "\")
             && StrLower(changedName) == StrLower(targetName))
             return true
         extension := StrLower(extension)
         ; 同一套件的多个目标常共享根目录下的 DLL、资源包和运行库。无法把
         ; 公共文件变化唯一归给某个 EXE 时，必须通知全部订阅者，不能让变化
         ; 因“归属不明”而完全消失；目标仍在运行时这只记录证据，不会直接暂停。
-        return InStr("|exe|com|dll|sys|ocx|cpl|mui|pak|bin|dat|node|asar|jar|",
+        return InStr("|exe|com|dll|sys|ocx|cpl|mui|pak|bin|dat|node|asar|jar|json|xml|ini|cfg|config|resources|nupkg|msi|cab|zip|7z|",
             "|" extension "|") != 0
+    }
+
+    FootprintChangeRequiresFingerprint(path, stateObj, relativePath,
+        watcherEntry := "") {
+        relativePath := StrReplace(relativePath, "/", "\")
+        if relativePath == "*"
+            return true
+        if !InStr(relativePath, "\")
+            return false
+
+        subjectPath := this.Callbacks.GetMaintenanceSubjectPath.Call(path)
+        rootPath := watcherEntry && watcherEntry.HasOwnProp("rootPath")
+            ? watcherEntry.rootPath : stateObj.MaintenanceConfig.InstallRoot
+        canonicalSubject := this.CanonicalPath(subjectPath)
+        canonicalRoot := RTrim(this.CanonicalPath(rootPath), "\")
+        subjectRelative := canonicalSubject == canonicalRoot ? ""
+            : (InStr(canonicalSubject, canonicalRoot "\") == 1
+                ? SubStr(canonicalSubject, StrLen(canonicalRoot) + 2) : "")
+        if subjectRelative == "" || InStr(subjectRelative, "\")
+            return false
+        SplitPath(relativePath, &changedName)
+        SplitPath(subjectPath, &targetName)
+        return StrLower(changedName) == StrLower(targetName)
     }
 
     QueryNativeSnapshot(&snapshotReady) {
@@ -643,8 +754,9 @@ class MaintenanceCoordinator {
                 candidates.Push(processInfo)
                 continue
             }
-            if (processInfo.exe != "" && learnedPaths.Count
-                && learnedPaths.Has(matcher.Canonical(processInfo.exe))) {
+            executablePath := matcher.CanonicalExecutablePath(processInfo)
+            if (executablePath != "" && learnedPaths.Count
+                && learnedPaths.Has(executablePath)) {
                 candidates.Push(processInfo)
                 continue
             }
@@ -677,7 +789,8 @@ class MaintenanceCoordinator {
         processMap := Map()
         for processInfo in snapshot
             processMap[processInfo.pid] := processInfo
-        actorCandidates := this.BuildActorCandidates(snapshot, processMap)
+        commonActorCandidates := this.BuildActorCandidates(snapshot,
+            processMap)
         snapshotTicks := snapshotIndex is ProcessSnapshotIndex
             ? snapshotIndex.CapturedAtTicks : this.Now()
         if updateSnapshotStore && supportsCommandLine {
@@ -699,25 +812,41 @@ class MaintenanceCoordinator {
             transientActorIdentities := stateObj.TransientActorIdentities
             trackedActorAnchors := matcher.BuildActorAnchorMap(
                 transientActorIdentities)
+            targetPid := stateObj.PID ? stateObj.PID : stateObj.LastKnownPID
+            targetCreation := stateObj.PID
+                ? stateObj.PIDCreationIdentity
+                : stateObj.LastKnownPIDCreationIdentity
+            subjectPath := this.Callbacks.GetMaintenanceSubjectPath.Call(path)
+            rootPath := stateObj.MaintenanceConfig.InstallRoot
+            maintenanceBlocking := this.IsBlocking(stateObj)
+            confirmedFootprint := this.HasConfirmedMaintenanceFootprint(
+                stateObj)
+            matchContext := matcher.CreateMatchContext(subjectPath, rootPath,
+                stateObj.MaintenanceConfig.LearnedActors, targetPid,
+                targetCreation, processMap, maintenanceBlocking,
+                trackedActorAnchors, confirmedFootprint)
+            ; 普通名称的服务、解压器和复制工具只有在本目标已确认发生升级
+            ; 足迹变化后才需要完整快照；其他目标继续使用公共小候选集。
+            actorCandidates := maintenanceBlocking
+                && stateObj.MaintenanceMode != MaintenancePhase.TimedOut
+                && confirmedFootprint
+                ? snapshot : commonActorCandidates
             activeKnown := Map()
             activeTransient := Map()
             observedTransientCount := 0
             for processInfo in actorCandidates {
-                targetPid := stateObj.PID ? stateObj.PID : stateObj.LastKnownPID
-                targetCreation := stateObj.PID
-                    ? stateObj.PIDCreationIdentity
-                    : stateObj.LastKnownPIDCreationIdentity
-                matchResult := matcher.Match(processInfo,
-                    this.Callbacks.GetMaintenanceSubjectPath.Call(path),
-                    stateObj.MaintenanceConfig.InstallRoot,
-                    stateObj.MaintenanceConfig.LearnedActors, targetPid,
-                    targetCreation, processMap, this.IsBlocking(stateObj),
-                    trackedActorAnchors)
+                matchResult := matcher.MatchPrepared(processInfo,
+                    matchContext)
                 if !matchResult.Matched
                     continue
-                identity := matcher.CreateIdentity(processInfo,
-                    stateObj.MaintenanceConfig.InstallRoot, processMap)
+                identity := matcher.CreateIdentity(processInfo, rootPath,
+                    processMap)
                 if !(identity is MaintenanceActorIdentity)
+                    continue
+                if (matchResult.Evidence == "maintenance-installer-signal"
+                    && !this.WasProcessStartedRecently(processInfo,
+                        Max(30, stateObj.MaintenanceConfig.DetectionSeconds * 3))
+                    && !transientActorIdentities.Has(identity.Key))
                     continue
                 actorRecord := {Process: processInfo, Identity: identity,
                     Match: matchResult, LastSeenTicks: snapshotTicks}
@@ -748,9 +877,13 @@ class MaintenanceCoordinator {
                 activeTransient)
             this.RetainRecentActorAnchors(stateObj,
                 transientActorIdentities, activeTransient, snapshotTicks)
+            transientActorsChanged := !this.ActorIdentitySetsEqual(
+                transientActorIdentities, activeTransient)
             stateObj.KnownActorIdentities := activeKnown
             stateObj.TransientActorIdentities := activeTransient
             stateObj.MaintenanceActorCheckedTicks := snapshotTicks
+            if transientActorsChanged && this.IsBlocking(stateObj)
+                this.JournalDirty := true
             if (observedTransientCount && this.IsBlocking(stateObj))
                 stateObj.MaintenanceLastActivityTicks := this.Now()
             } catch as targetActorError {
@@ -779,6 +912,8 @@ class MaintenanceCoordinator {
         signature := actorRecord.Match.LearnableSignature
         if (signature != "")
             stateObj.MaintenanceLearningCandidates[signature] := true
+        if this.IsBlocking(stateObj)
+            this.JournalDirty := true
         if !this.TargetAppearsRunning(stateObj) && stateObj.Enabled
             this.Enter(path, stateObj, "检测到相关安装进程")
         return true
@@ -865,6 +1000,17 @@ class MaintenanceCoordinator {
         return activeRecords
     }
 
+    ActorIdentitySetsEqual(firstRecords, secondRecords) {
+        if Type(firstRecords) != "Map" || Type(secondRecords) != "Map"
+            return false
+        if firstRecords.Count != secondRecords.Count
+            return false
+        for identityKey in firstRecords
+            if !secondRecords.Has(identityKey)
+                return false
+        return true
+    }
+
     HasFreshActorEvidence(stateObj, nowTicks) {
         checkedTicks := stateObj.MaintenanceActorCheckedTicks
         requiredTicks := Max(stateObj.MaintenanceStartedTicks,
@@ -874,6 +1020,12 @@ class MaintenanceCoordinator {
         return checkedTicks && checkedTicks >= requiredTicks
             && nowTicks >= checkedTicks
             && nowTicks - checkedTicks <= maximumAgeMs
+    }
+
+    HasConfirmedMaintenanceFootprint(stateObj) {
+        return !!stateObj.MaintenanceFileChanged
+            && (stateObj.LastFileActivityTicks
+                || stateObj.MaintenanceMode == MaintenancePhase.Recovering)
     }
 
     HasRecentSignal(stateObj) {
@@ -1047,13 +1199,21 @@ class MaintenanceCoordinator {
             return false
         known := Map()
         known.CaseSense := "Off"
-        for signature in stateObj.MaintenanceConfig.LearnedActors
-            known[signature] := true
+        rootPath := stateObj.MaintenanceConfig.InstallRoot
+        matcher := this.Runtime.maintenanceActorMatcher
+        for signature in stateObj.MaintenanceConfig.LearnedActors {
+            normalized := matcher.NormalizeLearnedSignature(signature,
+                rootPath)
+            if normalized != ""
+                known[normalized] := true
+        }
         changed := false
         for signature in stateObj.MaintenanceLearningCandidates {
-            if !known.Has(signature) {
-                stateObj.MaintenanceConfig.LearnedActors.Push(signature)
-                known[signature] := true
+            normalized := matcher.NormalizeLearnedSignature(signature,
+                rootPath)
+            if (normalized != "" && !known.Has(normalized)) {
+                stateObj.MaintenanceConfig.LearnedActors.Push(normalized)
+                known[normalized] := true
                 changed := true
             }
         }
@@ -1068,6 +1228,8 @@ class MaintenanceCoordinator {
         if !this.IsCurrentSession(path, stateObj, expectedGeneration,
             expectedMode)
             return false
+        recoveryObservationContext := this.BuildRecoveryObservationContext(
+            stateObj)
         learnedChanged := this.LearnActors(path, stateObj)
         identityChanged := this.Callbacks.RefreshShortcutIdentity.Call(path,
             stateObj, true)
@@ -1095,7 +1257,8 @@ class MaintenanceCoordinator {
                 MaintenancePhase.Normal)
                 return false
         }
-        observation := this.Callbacks.ObserveTarget.Call(path, "", 1000)
+        observation := this.Callbacks.ObserveTarget.Call(path, "", 1000,
+            recoveryObservationContext)
         if !this.IsCurrentSession(path, stateObj, expectedGeneration,
             MaintenancePhase.Normal)
             return false
@@ -1107,6 +1270,8 @@ class MaintenanceCoordinator {
                 return false
             stateObj.FailCount := 0
             this.Callbacks.UpdateRunningState.Call(path, stateObj)
+            if observation.Source == "process-image-inferred"
+                this.Log(this.Text("候选进程镜像路径不可访问"))
             this.Log(this.Text("软件升级完成，已恢复正常守护：{1}", path))
             return true
         }
@@ -1123,6 +1288,36 @@ class MaintenanceCoordinator {
             GuardStatusKind.MaintenanceRecovering)
         this.Callbacks.ScheduleRestart.Call(path, stateObj, 200)
         this.Log(this.Text("软件升级完成，准备恢复启动：{1}", path))
+        return true
+    }
+
+    BuildRecoveryObservationContext(stateObj) {
+        if !stateObj.MaintenanceFileChanged
+            return ""
+        priorPid := stateObj.PID ? stateObj.PID : stateObj.LastKnownPID
+        priorIdentity := stateObj.PIDCreationIdentity != ""
+            ? stateObj.PIDCreationIdentity
+            : stateObj.LastKnownPIDCreationIdentity
+        detectionSeconds := stateObj.MaintenanceConfig.DetectionSeconds
+        return {
+            AllowInaccessibleImageFallback: true,
+            PriorPID: priorPid,
+            PriorCreationIdentity: priorIdentity,
+            RecentStartSeconds: Max(30, detectionSeconds * 6)
+        }
+    }
+
+    TryCompleteFromRecoveryObservation(path, stateObj) {
+        observationContext := this.BuildRecoveryObservationContext(stateObj)
+        if !IsObject(observationContext)
+            return false
+        try observation := this.Callbacks.ObserveTarget.Call(path, "", 1000,
+            observationContext)
+        catch
+            return false
+        if !IsObject(observation) || !observation.IsRunning()
+            return false
+        this.Complete(path, stateObj)
         return true
     }
 
@@ -1148,6 +1343,9 @@ class MaintenanceCoordinator {
     }
 
     Advance(path, stateObj) {
+        if stateObj.HasOwnProp("RelocationPending")
+            && stateObj.RelocationPending
+            return
         mode := stateObj.MaintenanceMode
         if (mode == MaintenancePhase.Normal
             || mode == MaintenancePhase.TimedOut)
@@ -1155,6 +1353,17 @@ class MaintenanceCoordinator {
         if !stateObj.Enabled || !this.IsProtectionEnabled(path, stateObj) {
             this.ResetSession(path, stateObj)
             return
+        }
+        if this.Runtime.HasOwnProp("targetRelocationService")
+            && IsObject(this.Runtime.targetRelocationService) {
+            relocationService := this.Runtime.targetRelocationService
+            if stateObj.MaintenanceFileChanged
+                && relocationService.TryDetectVersionedUpgrade(path,
+                    stateObj)
+                return
+            if !this.TargetSubjectExists(path, stateObj)
+                && relocationService.TryDetect(path, stateObj)
+                return
         }
         nowTicks := this.Now()
         if (mode == MaintenancePhase.Arbitrating) {
@@ -1246,6 +1455,12 @@ class MaintenanceCoordinator {
                 GuardStatusKind.MaintenanceUpdating)
             return
         }
+        ; 受限权限下目标文件可能暂时不可读，但升级器已经启动了唯一的
+        ; 同名新实例。该复核只携带升级会话上下文，必须在 IsReady() 的
+        ; 结果阻塞恢复之前执行；普通探活不会进入此分支。
+        if !fileReady
+            && this.TryCompleteFromRecoveryObservation(path, stateObj)
+            return
         if !fileReady {
             stateObj.MaintenanceMode := MaintenancePhase.Updating
             this.UpdateState(path, stateObj, FileExist(path)
@@ -1263,6 +1478,11 @@ class MaintenanceCoordinator {
             return
         }
         if !this.HasFreshActorEvidence(stateObj, nowTicks) {
+            ; 更新器扫描证据暂不可用时，仍可用升级上下文对目标本身做一次
+            ; 受控复核。只有唯一同名候选、创建身份可核对且为升级前同一实例
+            ; 或近期启动实例才会通过；普通轮询不会进入这条路径。
+            if this.TryCompleteFromRecoveryObservation(path, stateObj)
+                return
             this.UpdateState(path, stateObj,
                 this.Text("⏳ 等待进程状态..."),
                 GuardStatusKind.WaitingObservation)

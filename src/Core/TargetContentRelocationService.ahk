@@ -1,6 +1,8 @@
 ; 直接文件目标的内容迁移识别服务。
-; 目标消失后在独立工作进程中按扩展名和文件大小筛选候选，再以 SHA-256
-; 确认内容完全一致。路径、文件名、卷和文件系统身份都不参与匹配。
+; 常规迁移在独立工作进程中按扩展名和文件大小筛选候选，再以 SHA-256
+; 确认内容完全一致；路径、文件名、卷和文件系统身份都不参与匹配。
+; 版本目录升级是受限例外：升级期间只接受同一父目录下唯一的同名新版本入口，
+; 并记录、持续校验该候选自身的 SHA-256，始终交由用户确认后再迁移。
 
 class TargetRelocationService {
     static PollIntervalMs := 500
@@ -12,6 +14,9 @@ class TargetRelocationService {
     static ScanRetryIntervalMs := 30000
     static ScanTimeoutSeconds := 60
     static DiagnosticRepeatIntervalMs := 30000
+    static VersionedScanIntervalMs := 1000
+    static VersionDirectoryPattern :=
+        "i)^(?:app[-_. ]*)?v?\d+(?:\.\d+){1,4}(?:[-+][0-9a-z][0-9a-z.-]*)?$"
 
     __New(runtime, callbacks) {
         this.Runtime := runtime
@@ -83,6 +88,7 @@ class TargetRelocationService {
             contentSize := stateObj.HasOwnProp("ContentSize")
                 ? Max(0, stateObj.ContentSize) : 0
             signature := this.GetContentSignature(path)
+            versionInfo := this.GetVersionedEntryInfo(path)
             if signature.Available {
                 contentHash := signature.ContentHash
                 contentSize := signature.FileSize
@@ -105,6 +111,14 @@ class TargetRelocationService {
                 SearchRootIndex: 1,
                 ActiveRootIndex: 0,
                 MatchedPaths: [],
+                VersionedParentRoot: versionInfo.HasOwnProp("ParentRoot")
+                    ? versionInfo.ParentRoot : "",
+                VersionedDirectoryName: versionInfo.HasOwnProp(
+                    "DirectoryName") ? versionInfo.DirectoryName : "",
+                VersionedEntryName: versionInfo.HasOwnProp("EntryName")
+                    ? versionInfo.EntryName : "",
+                VersionedObservedTicks: 0,
+                LastVersionedScanTicks: 0,
                 NextScanTicks: 0,
                 LastDiagnosticKey: "",
                 LastDiagnosticTicks: 0
@@ -163,6 +177,8 @@ class TargetRelocationService {
         this.CancelScan(record)
         if this.IsMaintenanceBusy(path, stateObj)
             return false
+        record.VersionedObservedTicks := 0
+        record.LastVersionedScanTicks := 0
         nowTicks := this.Now()
         if !force && record.LastBaselineTicks
             && nowTicks - record.LastBaselineTicks
@@ -234,6 +250,11 @@ class TargetRelocationService {
         if nowTicks - record.MissingObservedTicks
             < TargetRelocationService.CandidateDelayMs
             return false
+        versionedCandidate := this.ResolveVersionedCandidate(record)
+        versionedResult := this.HandleVersionedCandidate(path, stateObj,
+            record, versionedCandidate, nowTicks)
+        if versionedResult.Handled
+            return versionedResult.Published
         if this.IsMaintenanceBusy(path, stateObj) {
             this.NoteDiagnostic(record, "MaintenanceBusy",
                 this.Text("内容迁移暂缓：目标正处于升级保护、维护恢复或近期启动信号保护中：{1}",
@@ -266,6 +287,73 @@ class TargetRelocationService {
             candidateSignature)
     }
 
+    TryDetectVersionedUpgrade(path, stateObj) {
+        path := this.NormalizePath(path)
+        if !this.IsCurrent(path, stateObj) || !stateObj.Enabled
+            || !this.IsEligiblePath(path)
+            || !this.Callbacks.IsMaintenanceBlocking.Call(stateObj)
+            || !stateObj.HasOwnProp("MaintenanceFileChanged")
+            || !stateObj.MaintenanceFileChanged
+            return false
+        if stateObj.HasOwnProp("RelocationPending")
+            && stateObj.RelocationPending
+            return true
+        if this.PendingCandidates.Has(path)
+            return true
+        if !this.Targets.Has(path)
+            this.SyncTargets()
+        if !this.Targets.Has(path)
+            return false
+        record := this.Targets[path]
+        if record.VersionedParentRoot == ""
+            return false
+        nowTicks := this.Now()
+        if !record.VersionedObservedTicks {
+            record.VersionedObservedTicks := nowTicks
+            return false
+        }
+        if nowTicks - record.VersionedObservedTicks
+            < TargetRelocationService.CandidateDelayMs
+            return false
+        if record.LastVersionedScanTicks
+            && nowTicks - record.LastVersionedScanTicks
+                < TargetRelocationService.VersionedScanIntervalMs
+            return false
+        record.LastVersionedScanTicks := nowTicks
+        versionedResult := this.HandleVersionedCandidate(path, stateObj,
+            record, this.ResolveVersionedCandidate(record), nowTicks)
+        return versionedResult.Handled && versionedResult.Published
+    }
+
+    HandleVersionedCandidate(path, stateObj, record, candidateInfo,
+        nowTicks) {
+        result := {Handled: false, Published: false}
+        if !IsObject(candidateInfo)
+            return result
+        result.Handled := true
+        if ((candidateInfo.HasOwnProp("Ambiguous")
+                && candidateInfo.Ambiguous)
+            || !candidateInfo.HasOwnProp("Path"))
+            return result
+        candidatePath := this.NormalizePath(candidateInfo.Path)
+        candidateSignature := this.CandidateSignature(path, candidatePath,
+            candidateInfo.ContentHash)
+        if this.IgnoredCandidates.Has(candidateSignature)
+            && this.IgnoredCandidates[candidateSignature] > nowTicks {
+            this.NoteDiagnostic(record, "IgnoredVersioned|" candidatePath,
+                this.Text("版本目录迁移候选仍在本次忽略冷却期内：{1} -> {2}",
+                    record.Path, candidatePath))
+            return result
+        }
+        if this.IgnoredCandidates.Has(candidateSignature)
+            this.IgnoredCandidates.Delete(candidateSignature)
+        result.Published := this.PublishCandidate(path, candidatePath,
+            stateObj, "VersionedEntryUnique", record.ContentHash,
+            record.ContentSize, candidateSignature,
+            candidateInfo.ContentHash, candidateInfo.ContentSize)
+        return result
+    }
+
     ResolveCandidate(record) {
         if !this.IsContentHash(record.ContentHash) {
             this.NoteDiagnostic(record, "NoBaseline",
@@ -286,8 +374,12 @@ class TargetRelocationService {
                 reason := scanResult.Failed
                     ? this.Text("后台扫描失败或超时")
                     : this.Text("扫描未能在时限内完整核对")
+                failureReason := scanResult.HasOwnProp("FailureReason")
+                    ? String(scanResult.FailureReason) : ""
+                if failureReason != ""
+                    reason .= " [" failureReason "]"
                 this.NoteDiagnostic(record,
-                    "ScanIncomplete|" completedRootIndex,
+                    "ScanIncomplete|" completedRootIndex "|" failureReason,
                     this.Text("内容迁移扫描未完成，将稍后重试：{1}（搜索根：{2}；原因：{3}）",
                         record.Path, completedRoot, reason))
                 this.ResetScanCycle(record,
@@ -371,8 +463,77 @@ class TargetRelocationService {
         return ""
     }
 
+    ResolveVersionedCandidate(record) {
+        parentRoot := record.HasOwnProp("VersionedParentRoot")
+            ? record.VersionedParentRoot : ""
+        entryName := record.HasOwnProp("VersionedEntryName")
+            ? record.VersionedEntryName : ""
+        directoryName := record.HasOwnProp("VersionedDirectoryName")
+            ? record.VersionedDirectoryName : ""
+        if parentRoot == "" || entryName == "" || directoryName == ""
+            return ""
+        if !DirExist(parentRoot)
+            return ""
+        candidates := []
+        try {
+            Loop Files, RTrim(parentRoot, "\") "\*", "D" {
+                if !TargetRelocationService.IsVersionedInstallDirectory(
+                    A_LoopFileName)
+                    continue
+                if StrLower(A_LoopFileName) == StrLower(directoryName)
+                    continue
+                candidatePath := RTrim(A_LoopFileFullPath, "\") "\"
+                    . entryName
+                if !this.IsCandidatePathValid(record.Path, candidatePath)
+                    continue
+                candidates.Push(candidatePath)
+                if candidates.Length > 1 {
+                    this.NoteDiagnostic(record, "VersionedAmbiguous",
+                        this.Text("发现多个版本目录包含同名入口，已暂停自动迁移：{1}",
+                            record.Path))
+                    return {Ambiguous: true}
+                }
+            }
+        } catch
+            return ""
+        if !candidates.Length
+            return ""
+        signature := this.GetContentSignature(candidates[1])
+        if !signature.Available || !this.IsContentHash(signature.ContentHash) {
+            this.NoteDiagnostic(record, "VersionedCandidateUnavailable",
+                this.Text("版本目录迁移候选暂不可读取，将稍后重试：{1}",
+                    candidates[1]))
+            return {Pending: true}
+        }
+        return {Path: candidates[1], ContentHash: signature.ContentHash,
+            ContentSize: signature.FileSize}
+    }
+
+    GetVersionedEntryInfo(path) {
+        info := {ParentRoot: "", DirectoryName: "", EntryName: ""}
+        SplitPath(path, &entryName, &directory)
+        if entryName == "" || directory == ""
+            return info
+        SplitPath(RTrim(directory, "\"), &directoryName, &parentRoot)
+        if directoryName == "" || parentRoot == ""
+            return info
+        if !TargetRelocationService.IsVersionedInstallDirectory(
+            directoryName)
+            return info
+        info.ParentRoot := RTrim(parentRoot, "\")
+        info.DirectoryName := directoryName
+        info.EntryName := entryName
+        return info
+    }
+
+    static IsVersionedInstallDirectory(directoryName) {
+        return RegExMatch(Trim(String(directoryName)),
+            TargetRelocationService.VersionDirectoryPattern) != 0
+    }
+
     PublishCandidate(oldPath, newPath, stateObj, evidence, contentHash,
-        contentSize, candidateSignature) {
+        contentSize, candidateSignature, newContentHash := "",
+        newContentSize := -1) {
         if !this.IsCurrent(oldPath, stateObj)
             return false
         stateObj.CancelScheduledTasks()
@@ -384,6 +545,9 @@ class TargetRelocationService {
             Evidence: evidence,
             ContentHash: contentHash,
             ContentSize: contentSize,
+            NewContentHash: newContentHash != ""
+                ? StrUpper(newContentHash) : StrUpper(contentHash),
+            NewContentSize: newContentSize >= 0 ? newContentSize : contentSize,
             Signature: candidateSignature,
             State: stateObj,
             Generation: stateObj.Generation,
@@ -394,9 +558,15 @@ class TargetRelocationService {
         this.NextToken++
         this.PendingCandidates[oldPath] := candidate
         this.UpdatePendingState(candidate)
-        this.Log(this.Text(
-            "检测到内容一致的守护目标新位置，等待用户确认：{1} -> {2}",
-            oldPath, newPath))
+        if evidence == "VersionedEntryUnique" {
+            this.Log(this.Text(
+                "升级期间检测到唯一同名新版本入口，等待用户确认：{1} -> {2}",
+                oldPath, newPath))
+        } else {
+            this.Log(this.Text(
+                "检测到内容一致的守护目标新位置，等待用户确认：{1} -> {2}",
+                oldPath, newPath))
+        }
         this.DeliverCandidate(candidate)
         return true
     }
@@ -415,15 +585,17 @@ class TargetRelocationService {
             || stateObj.Generation != currentCandidate.Generation
             || !stateObj.HasOwnProp("RelocationPending")
             || !stateObj.RelocationPending
-            || this.TargetExists(oldPath)
+            || (this.TargetExists(oldPath)
+                && currentCandidate.Evidence != "VersionedEntryUnique")
             || !this.IsCandidatePathValid(oldPath,
                 currentCandidate.NewPath)
-            || this.IsMaintenanceBusy(oldPath, stateObj)
+            || (this.IsMaintenanceBusy(oldPath, stateObj)
+                && currentCandidate.Evidence != "VersionedEntryUnique")
             return false
         signature := this.GetContentSignature(currentCandidate.NewPath)
         return signature.Available
-            && signature.FileSize == currentCandidate.ContentSize
-            && signature.ContentHash == currentCandidate.ContentHash
+            && signature.FileSize == currentCandidate.NewContentSize
+            && signature.ContentHash == currentCandidate.NewContentHash
     }
 
     Complete(candidate) {
@@ -503,7 +675,7 @@ class TargetRelocationService {
     PollTick(*) {
         if this.Stopped || !this.Running
             return
-        if !this.Runtime.guardWorkGate.TryEnter()
+        if !this.Runtime.guardWorkGate.TryEnter("TargetRelocationPoll")
             return
         try {
             this.SyncTargets()
@@ -721,7 +893,8 @@ class TargetRelocationService {
     PollContentScan(job) {
         try return this.Callbacks.PollContentScan.Call(job)
         catch
-            return {Ready: true, Paths: [], Truncated: false, Failed: true}
+            return {Ready: true, Paths: [], Truncated: false, Failed: true,
+                FailureReason: "PollFailed"}
     }
 
     TargetExists(path) {

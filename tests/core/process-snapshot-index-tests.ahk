@@ -148,6 +148,47 @@ RunProcessSnapshotIndexTests() {
             == ProcessObservationReason.ProcessIdentityUnavailable,
         "创建身份不可核对时不得把快照候选报告为确定运行")
 
+    ; 升级恢复可显式启用受控降级：唯一同名候选且创建身份与升级前
+    ; 目标一致时，可以在镜像路径不可访问的情况下恢复守护。
+    inferredIndex := ProcessSnapshotIndex([{
+        pid: currentPid, parent: 0, name: "Restricted.exe",
+        cmd: "", exe: "", identity: "KNOWN-INSTANCE",
+        observedTicks: capturedAt
+    }], capturedAt, false, "",
+        ResolveSnapshotIndexIdentity.Bind(Map(currentPid,
+            "KNOWN-INSTANCE")))
+    inferredObservation := inferredIndex.ObserveImagePath(
+        "C:\Apps\Restricted.exe", {
+            AllowInaccessibleImageFallback: true,
+            PriorPID: currentPid,
+            PriorCreationIdentity: "KNOWN-INSTANCE",
+            RecentStartSeconds: 0
+        })
+    AssertTrue(inferredObservation.IsRunning()
+        && inferredObservation.Source == "process-image-inferred",
+        "升级恢复上下文没有使用唯一同名且身份一致的降级证据")
+    strictInferredObservation := inferredIndex.ObserveImagePath(
+        "C:\Apps\Restricted.exe")
+    AssertTrue(strictInferredObservation.IsUnknown(),
+        "普通探活不应隐式启用镜像路径降级")
+
+    ambiguousInferredIndex := AlwaysLiveProcessSnapshotIndex([{
+        pid: currentPid, parent: 0, name: "Restricted.exe", cmd: "", exe: "",
+        identity: "ONE", observedTicks: capturedAt
+    }, {
+        pid: currentPid + 1, parent: 0, name: "Restricted.exe", cmd: "", exe: "",
+        identity: "TWO", observedTicks: capturedAt
+    }], capturedAt, false)
+    ambiguousInferredObservation := ambiguousInferredIndex.ObserveImagePath(
+        "C:\Apps\Restricted.exe", {
+            AllowInaccessibleImageFallback: true,
+            RecentStartSeconds: 60
+        })
+    AssertTrue(ambiguousInferredObservation.IsUnknown()
+        && ambiguousInferredObservation.ReasonCode
+            == ProcessObservationReason.AmbiguousTarget,
+        "升级恢复遇到多个同名候选时不得猜测其中一个")
+
     workingDirectoryIndex := ProcessSnapshotIndex([{
         pid: currentPid, parent: 0, name: "Actual.exe", cmd: "",
         exe: "C:\Suite\Actual.exe", creation: "LIVE",

@@ -49,8 +49,8 @@ RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", argumen
         normalizedMaintenance.Enabled := requestedMaintenance
             && IsMaintenanceSupportedTarget(resolvedTarget)
         if (!normalizedMaintenance.RootIsCustom || normalizedMaintenance.InstallRoot == "") {
-            SplitPath(resolvedTarget, , &resolvedDirectory)
-            normalizedMaintenance.InstallRoot := NormalizeMaintenanceRoot(resolvedDirectory)
+            normalizedMaintenance.InstallRoot := GetDefaultMaintenanceRoot(
+                resolvedTarget)
         }
     }
     fingerprintTarget := resolvedTarget != "" ? resolvedTarget : path
@@ -322,7 +322,7 @@ CheckEditMonitor(GuiCtrlObj, sessionId := 0) {
 ProcessEditFinish(GuiCtrlObj, Item, sessionId := 0) {
     if (sessionId && sessionId != App.editSessionId)
         return
-    if !App.guardWorkGate.TryEnter() {
+    if !App.guardWorkGate.TryEnter("InlineEdit") {
         SetTimer(ProcessEditFinish.Bind(GuiCtrlObj, Item, sessionId), -25)
         return
     }

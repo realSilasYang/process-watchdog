@@ -258,6 +258,12 @@ BuildDiagnosticStateSummary() {
         . "RecoveryEntries=" App.configRecoveryEntries.Length "`r`n"
         . "LogEntries=" App.logMessages.Length "`r`n"
         . "LogRevision=" App.logRevision "`r`n"
+    if App.HasOwnProp("guardWorkGate")
+        text .= App.guardWorkGate.BuildDiagnosticText()
+    if App.HasOwnProp("processSnapshots")
+        text .= App.processSnapshots.BuildDiagnosticText()
+    if App.HasOwnProp("fileScanner")
+        text .= App.fileScanner.BuildDiagnosticText()
     for phase, count in phaseCounts
         text .= "GuardPhase." phase "=" count "`r`n"
     for phase, count in maintenanceCounts
