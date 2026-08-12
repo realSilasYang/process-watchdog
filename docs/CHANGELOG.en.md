@@ -7,6 +7,33 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.0.12] - 2026-08-12
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides preferred and fallback fonts that must be installed into Windows first; it is not required to run the application.
+- **`process-watchdog-2.0.12-source.zip` (complete source edition):** Includes the AHK source, modules, tests, and documentation without fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64 locally.
+- **`process-watchdog-2.0.12-windows-x64.zip` (complete portable edition, recommended):** Includes the EXE, documentation, licenses, and required runtime resources without fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([official latest version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application search; the bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### 🚀 Improvements
+
+- **Complete light-theme adaptation:** Windows, text fields, list states, the status bar, and semantic icons now receive targeted light colors only where contrast was insufficient or a color conflicted with the background. The existing dark palette, original dark-mode icon pixels, and dark QR assets remain unchanged.
+- **Reliable theme-switch rendering:** Theme-specific icons now use distinct cache identities and refresh promptly after a theme change instead of retaining colors from the previous theme. Status and action icons use clear semantic colors on light backgrounds.
+- **More readable light hover previews:** Light mode uses a pale blue-gray background, near-black 10 pt UI text, comfortable padding, and automatic wrapping up to 420 DIP while retaining delayed display, mouse pass-through, and Windows 11 system rounding. Dark-mode behavior remains unchanged.
+- **More compact donation window:** The divider and nearby excess whitespace are removed, the window is narrower, and dedicated QR images are used in light mode. The revised prompt is synchronized across all 13 UI languages.
+
+---
+
+### 🐛 Fixed
+
+- **No stale colors after theme changes:** Fixed some window buttons, status-bar icons, and list icons not immediately applying the active theme after switching between light and dark modes.
+- **Restored light-theme contrast:** Fixed insufficient contrast or visual conflicts affecting some read-only text, decorative backgrounds, and hover previews on light backgrounds without changing established dark-mode styling.
+
+---
+
 ## 🎉 Version [2.0.11] - 2026-08-11
 
 ### 📦 Release Assets
@@ -517,7 +544,8 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.11...HEAD
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.12...HEAD
+[2.0.12]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.11...v2.0.12
 [2.0.11]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.10...v2.0.11
 [2.0.10]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.9...v2.0.10
 [2.0.9]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.8...v2.0.9

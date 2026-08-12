@@ -1639,7 +1639,7 @@ class GermanStrings {
         catalog.Set("帮助", "Hilfe")
         catalog.Set("提交反馈", "Feedback senden")
         catalog.Set("支持开源项目", "Open-Source-Projekt unterstützen")
-        catalog.Set("如果小助手为您节省了排查问题和恢复程序的时间，欢迎通过下方二维码打赏作者！`n请选择扶贫方式：", "Wenn Ihnen der Assistent Zeit bei der Fehlersuche und Wiederherstellung von Programmen erspart hat, unterstützen Sie den Autor gern über die QR-Codes unten!`nWählen Sie aus, wie Sie helfen möchten:")
+        catalog.Set("如果小助手为您节省了恢复程序的时间，欢迎通过下方二维码打赏作者！`n请选择扶贫方式（≥Д≤）", "Wenn Ihnen der Assistent Zeit bei der Wiederherstellung von Programmen erspart hat, unterstützen Sie den Autor gern über die QR-Codes unten!`nWählen Sie aus, wie Sie helfen möchten (≥Д≤)")
         catalog.Set("微信支付", "WeChat Pay")
         catalog.Set("支付宝", "Alipay")
         catalog.Set("二维码图片未找到", "QR-Code-Bild nicht gefunden")

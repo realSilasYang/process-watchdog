@@ -148,7 +148,8 @@ class MaintenanceSettingsDialog extends ManagedWindow {
                         " c" UiThemeService.Color("ButtonText"),
                     Tr("结束升级等待并恢复守护"))
                 RegisterHoverButton(btnResume, UiThemeService.Color("Pause"))
-                SetButtonLucideIcon(btnResume, "play.svg", 14, 6)
+                SetButtonLucideIcon(btnResume, "play.svg", 14, 6,
+                    "theme:MonitoringIcon")
                 RegisterButtonClick(btnResume, ObjBindMethod(this, "ResumeProtection"),
                     ButtonFeedbackMode.Dismissive)
             }
@@ -168,9 +169,12 @@ class MaintenanceSettingsDialog extends ManagedWindow {
             RegisterHoverButton(btnClearLearned, UiThemeService.Color("Toolbar"))
             RegisterHoverButton(btnSave, UiThemeService.Color("Save"))
             RegisterHoverButton(btnCancel, UiThemeService.Color("Toolbar"))
-            SetButtonLucideIcon(btnBrowse, "folder-open.svg", 14, 6)
-            SetButtonLucideIcon(btnAutoRoot, "wand-sparkles.svg", 14, 6)
-            SetButtonLucideIcon(btnClearLearned, "trash-2.svg", 14, 6)
+            SetButtonLucideIcon(btnBrowse, "folder-open.svg", 14, 6,
+                "theme:BrowseIcon")
+            SetButtonLucideIcon(btnAutoRoot, "wand-sparkles.svg", 14, 6,
+                "theme:AutomationIcon")
+            SetButtonLucideIcon(btnClearLearned, "trash-2.svg", 14, 6,
+                "theme:DangerIcon")
             RegisterButtonClick(btnBrowse, ObjBindMethod(this, "BrowseRoot"))
             RegisterButtonClick(btnAutoRoot, ObjBindMethod(this, "UseAutomaticRoot"))
             RegisterButtonClick(btnClearLearned, ObjBindMethod(this, "ClearLearned"))

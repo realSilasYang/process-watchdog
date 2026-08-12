@@ -1412,7 +1412,7 @@ CreateShellSvgPaddedIcon(filePath, iconSize, cellSize, offsetX := "",
 }
 
 CreateSvgPaddedIcon(filePath, iconSize, cellSize, useStatusQuality := false,
-    offsetX := "", offsetY := "") {
+    offsetX := "", offsetY := "", tintColor := "") {
     ; 状态图标使用更高的超采样倍率后再由 WIC Fant 缩小，可显著改善
     ; 小尺寸圆弧和斜边；普通自定义 SVG 保持原开销，避免大量导入时变慢。
     renderSize := useStatusQuality
@@ -1421,6 +1421,11 @@ CreateSvgPaddedIcon(filePath, iconSize, cellSize, useStatusQuality := false,
     snapshot := App.svgRenderer.RenderFile(filePath,
         App.iconResources.MainDpi, renderSize)
     if snapshot {
+        if tintColor != "" {
+            tintedSnapshot := TintButtonIconSnapshot(snapshot, tintColor)
+            if tintedSnapshot
+                snapshot := tintedSnapshot
+        }
         renderedIcon := CreatePixelSnapshotPaddedIcon(snapshot,
             iconSize, cellSize, 0, offsetX, offsetY)
         if renderedIcon
@@ -1563,6 +1568,42 @@ StatusIconResourceFiles() {
     return resourceFiles
 }
 
+StatusIconColorRoles() {
+    static colorRoles := Map(
+        GuardStatusKind.Initializing, "InitializingIcon",
+        GuardStatusKind.Running, "SuccessIcon",
+        GuardStatusKind.PermissionMismatch, "PermissionIcon",
+        GuardStatusKind.Paused, "PauseIcon",
+        GuardStatusKind.SuspectedStop, "DangerIcon",
+        GuardStatusKind.WaitingObservation, "WaitingIcon",
+        GuardStatusKind.StartCountdown, "WaitingIcon",
+        GuardStatusKind.RetryCountdown, "WaitingIcon",
+        GuardStatusKind.CoolingDown, "WaitingIcon",
+        GuardStatusKind.Starting, "StartupIcon",
+        GuardStatusKind.Verifying, "QueryIcon",
+        GuardStatusKind.TargetMissing, "DangerIcon",
+        GuardStatusKind.ProgramMissing, "DangerIcon",
+        GuardStatusKind.ScriptMissing, "DangerIcon",
+        GuardStatusKind.RelocationPending, "RelocationIcon",
+        GuardStatusKind.SafeStartWait, "SafeStartIcon",
+        GuardStatusKind.LaunchRetry, "DangerIcon",
+        GuardStatusKind.MaintenanceArbitrating, "QueryIcon",
+        GuardStatusKind.MaintenanceUpdating, "UpdateIcon",
+        GuardStatusKind.MaintenanceFileWaiting, "WaitingIcon",
+        GuardStatusKind.MaintenanceStabilizing, "WaitingIcon",
+        GuardStatusKind.MaintenanceRecovering, "WaitingIcon",
+        GuardStatusKind.MaintenanceTimedOut, "DangerIcon",
+        GuardStatusKind.Unknown, "UnknownIcon"
+    )
+    return colorRoles
+}
+
+GetStatusIconColor(statusKind) {
+    colorRoles := StatusIconColorRoles()
+    return colorRoles.Has(statusKind)
+        ? UiThemeService.Color(colorRoles[statusKind]) : ""
+}
+
 GetStatusIconResourcePath(statusKind) {
     resourceFiles := StatusIconResourceFiles()
     if !resourceFiles.Has(statusKind)
@@ -1583,10 +1624,12 @@ CreateStatusResourceIcon(statusKind, glyphSize, cellSize, offsetY := "") {
     resourcePath := GetStatusIconResourcePath(statusKind)
     if resourcePath == "" || !FileExist(resourcePath)
         return 0
-    ; 状态图标全部来自随项目分发的 SVG 资源。CreateSvgPaddedIcon 只负责
-    ; 使用 resvg/WIC 解码、缩放和居中，不再在运行时计算任何图标几何。
+    ; SVG 文件保留深色主题原有语义色；浅色主题只在像素快照层替换为同语义
+    ; 的高对比色，不改写资源，也不在运行时计算任何图标几何。
+    tintColor := UiThemeService.IsDark()
+        ? "" : GetStatusIconColor(statusKind)
     return CreateSvgPaddedIcon(resourcePath, glyphSize, cellSize, true,
-        "", offsetY)
+        "", offsetY, tintColor)
 }
 
 StatusIconVisualScale(statusKind) {
@@ -1707,6 +1750,9 @@ RefreshMainStatusIconAlignment() {
                 Main.lv.IL := imageList
             }
         }
+        if succeeded
+            Main.statusIconTheme := UiThemeService.IsDark()
+                ? "dark" : "light"
         return succeeded
     } finally {
         if redrawSuspended

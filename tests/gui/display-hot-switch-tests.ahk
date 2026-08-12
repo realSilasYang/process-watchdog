@@ -276,9 +276,12 @@ CreateDisplayHotSwitchMainWindow() {
     RegisterHoverButton(Main.btnSet, UiThemeService.Color("Toolbar"))
     RegisterHoverButton(Main.btnSupport, UiThemeService.Color("Toolbar"))
     RegisterHoverButton(Main.btnAbout, UiThemeService.Color("Toolbar"))
-    SetButtonLucideIcon(Main.btnSet, "settings.svg", 15, 6)
-    SetButtonLucideIcon(Main.btnSupport, "circle-question-mark.svg", 15, 6)
-    SetButtonLucideIcon(Main.btnAbout, "circle-info.svg", 15, 6)
+    SetButtonLucideIcon(Main.btnSet, "settings.svg", 15, 6,
+        "theme:SettingsIcon")
+    SetButtonLucideIcon(Main.btnSupport, "circle-question-mark.svg", 15, 6,
+        "theme:HelpIcon")
+    SetButtonLucideIcon(Main.btnAbout, "circle-info.svg", 15, 6,
+        "theme:AboutIcon")
 
     Main.gui.SetFont("s12 c" UiThemeService.Color("Text"),
         LocalizationService.GetUiFontName())
@@ -419,6 +422,31 @@ AssertMainCommandButtonThemeState() {
                 && pauseState.textColor
                     == UiThemeService.Color("DisabledButtonText"),
                 theme " 主题刷新后无选择命令仍残留旧主题或可用配色")
+            for iconSpec in [
+                    {Button: Main.btnSet, Role: "SettingsIcon"},
+                    {Button: Main.btnSupport, Role: "HelpIcon"},
+                    {Button: Main.btnAbout, Role: "AboutIcon"}] {
+                iconState := App.uiInteractions.GetButton(
+                    iconSpec.Button.Hwnd)
+                expectedTint := theme == "dark"
+                    ? "source" : UiThemeService.Color(iconSpec.Role)
+                AssertDisplayHotSwitch(
+                    iconState.buttonImage.tintMode == "theme"
+                    && iconState.buttonImage.resolvedTint
+                        == expectedTint,
+                    theme " 主题刷新后主命令图标仍使用旧主题像素："
+                        iconSpec.Role)
+                previousTint := iconState.buttonImage.resolvedTint
+                iconState.buttonImage.resolvedTint := "000000"
+                AssertDisplayHotSwitch(SetButtonSvgIcon(iconSpec.Button,
+                        iconState.buttonImage.sourcePath,
+                        iconState.buttonImage.sizeDip,
+                        iconState.buttonImage.gapDip,
+                        "theme:" iconSpec.Role)
+                    && iconState.buttonImage.resolvedTint == previousTint,
+                    theme " 相同 SVG 参数命中缓存后没有刷新主题色："
+                        iconSpec.Role)
+            }
         }
     } finally {
         UiThemeService.Configure(requestedTheme)

@@ -92,6 +92,8 @@ class SettingsWindow extends ManagedWindow {
             Tr("停止策略"), Tr("日志")]
         tabIconNames := ["monitor.svg", "rocket.svg", "activity.svg",
             "octagon-x.svg", "logs.svg"]
+        tabIconColorRoles := ["DisplayIcon", "StartupIcon", "MonitoringIcon",
+            "StrongDangerIcon", "LogsIcon"]
         tabGap := 8
         tabWidths := this.GetTabButtonWidths(tabLabels, windowWidth - 30,
             isCompact, tabGap)
@@ -101,7 +103,8 @@ class SettingsWindow extends ManagedWindow {
         tabX := 15 + Floor(((windowWidth - 30) - tabGroupWidth) / 2)
         for tabIndex, tabLabel in tabLabels {
             this.CreateTabButton(tabIndex, tabX, tabWidths[tabIndex],
-                tabLabel, tabIconNames[tabIndex])
+                tabLabel, tabIconNames[tabIndex],
+                tabIconColorRoles[tabIndex])
             tabX += tabWidths[tabIndex] + tabGap
         }
         pageX := 30
@@ -131,7 +134,7 @@ class SettingsWindow extends ManagedWindow {
 
         ; 显示页使用统一宽度的纵向字段：语义图标和标题在上，值控件在下一行。
         this.languageLabel := this.AddDisplayFieldHeader(70,
-            Tr("界面语言："), "languages.svg")
+            Tr("界面语言："), "languages.svg", "LanguageIcon")
         languageLabels := []
         this.languageCodes := []
         selectedLanguageIndex := 1
@@ -149,7 +152,7 @@ class SettingsWindow extends ManagedWindow {
                 AddComboBoxDisplayPadding(languageLabels)))
         ApplyDarkComboBoxTheme(this.languageDropDown.Hwnd)
         this.fontLabel := this.AddDisplayFieldHeader(153,
-            Tr("界面内容字体："), "type.svg")
+            Tr("界面内容字体："), "type.svg", "FontIcon")
         fontLabels := [Tr("跟随语言默认（{1}）",
             LocalizationService.GetLanguageDefaultUiFontName())]
         this.fontValues := ["auto"]
@@ -173,7 +176,7 @@ class SettingsWindow extends ManagedWindow {
         this.fontDropDownCommandRegistered := true
 
         this.themeLabel := this.AddDisplayFieldHeader(236,
-            Tr("主题："), "palette.svg")
+            Tr("主题："), "palette.svg", "ThemeIcon")
         this.themeValues := ["auto", "light", "dark"]
         themeLabels := [Tr("跟随系统"), Tr("浅色"), Tr("深色")]
         selectedThemeIndex := 1
@@ -258,14 +261,15 @@ class SettingsWindow extends ManagedWindow {
         return {Label: caption, Separator: "："}
     }
 
-    CreateTabButton(index, x, width, text, iconName) {
+    CreateTabButton(index, x, width, text, iconName, iconColorRole) {
         button := this.gui.Add("Text", "x" x " y12 w" width " h28 Center 0x200 Background"
             UiThemeService.Color("Tab") " c" UiThemeService.Color("TabText"), text)
         this.tabButtons.Push(button)
         this.tabButtonPages.Push(index)
         RegisterHoverButton(button, UiThemeService.Color("Tab"), "", "",
             UiThemeService.Color("TabText"), "center")
-        SetButtonLucideIcon(button, iconName, 14, 6)
+        SetButtonLucideIcon(button, iconName, 14, 6,
+            "theme:" iconColorRole)
         RegisterButtonClick(button, ObjBindMethod(this, "SwitchTab", index))
         return button
     }
@@ -277,7 +281,7 @@ class SettingsWindow extends ManagedWindow {
         return control
     }
 
-    AddDisplayFieldHeader(y, caption, iconName) {
+    AddDisplayFieldHeader(y, caption, iconName, iconColorRole) {
         fieldLayout := this.layout.DisplayField
         iconSize := 26
         iconControl := this.AddTabControl(1, this.gui.Add("Text",
@@ -287,7 +291,8 @@ class SettingsWindow extends ManagedWindow {
         ; 禁用的同色圆角控件只承担 SVG 绘制，不进入 Tab 顺序，也没有悬浮背景。
         RegisterHoverButton(iconControl, UiThemeService.Color("Window"),
             UiThemeService.Color("Window"), UiThemeService.Color("Window"))
-        SetButtonLucideIcon(iconControl, iconName, 22, 0)
+        SetButtonLucideIcon(iconControl, iconName, 22, 0,
+            "theme:" iconColorRole)
         SetRegisteredButtonEnabled(iconControl, false)
         return this.AddTabControl(1, this.gui.Add("Text",
             "x" (fieldLayout.X + 38) " y" y " w"
@@ -417,9 +422,11 @@ class SettingsWindow extends ManagedWindow {
         RegisterHoverButton(this.shortcutButton,
             UiThemeService.Color("Toolbar"))
         RegisterHoverButton(this.taskButton, UiThemeService.Color("Toolbar"))
-        SetButtonLucideIcon(this.shortcutButton, "square-plus.svg", 14, 6)
+        SetButtonLucideIcon(this.shortcutButton, "square-plus.svg", 14, 6,
+            "theme:BrowseIcon")
         ; 任务状态只在该页首次显示后查询，创建阶段保持中性加载状态。
-        SetButtonLucideIcon(this.taskButton, "loader-circle.svg", 14, 6)
+        SetButtonLucideIcon(this.taskButton, "loader-circle.svg", 14, 6,
+            "theme:InitializingIcon")
         SetRegisteredButtonEnabled(this.taskButton, false)
         RegisterButtonClick(this.shortcutButton,
             ObjBindMethod(this, "CreateShortcut"))
@@ -535,7 +542,8 @@ class SettingsWindow extends ManagedWindow {
         RegisterHandCursorControl(this.clearLogsOnStartupCheck)
         RegisterHoverButton(this.logBrowseButton,
             UiThemeService.Color("Toolbar"))
-        SetButtonLucideIcon(this.logBrowseButton, "folder-open.svg", 14, 6)
+        SetButtonLucideIcon(this.logBrowseButton, "folder-open.svg", 14, 6,
+            "theme:BrowseIcon")
         RegisterButtonClick(this.logBrowseButton,
             ObjBindMethod(this, "BrowseLogDirectory"))
         this.tabBuilt[5] := true
@@ -668,6 +676,7 @@ class SettingsWindow extends ManagedWindow {
         if !state.HasOwnProp("releaseResetTimer") || !state.releaseResetTimer
             state.current := normalColor
         state.textColor := textColor
+        RefreshButtonImageTint(state)
         return true
     }
 
@@ -939,17 +948,22 @@ class SettingsWindow extends ManagedWindow {
         if !task {
             this.taskButton.Text := Tr("开启")
             iconName := "play.svg"
+            iconColorRole := "SuccessIcon"
         } else if IsOwnedWatchdogTask(task) {
             this.taskButton.Text := Tr("关闭")
             iconName := "power.svg"
+            iconColorRole := "StrongDangerIcon"
         } else if IsProjectWatchdogTask(task) {
             this.taskButton.Text := Tr("切换")
             iconName := "repeat-2.svg"
+            iconColorRole := "RelocationIcon"
         } else {
             this.taskButton.Text := Tr("冲突")
             iconName := "triangle-alert.svg"
+            iconColorRole := "WarningIcon"
         }
-        SetButtonLucideIcon(this.taskButton, iconName, 14, 6)
+        SetButtonLucideIcon(this.taskButton, iconName, 14, 6,
+            "theme:" iconColorRole)
         SetRegisteredButtonEnabled(this.taskButton, true)
         return true
     }

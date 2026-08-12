@@ -453,6 +453,8 @@ AssertNativeSvgRasterization(filePath, expectedAspectRatio := 0) {
 }
 
 AssertStatusIconResources() {
+    originalTheme := UiThemeService.GetRequestedTheme()
+    UiThemeService.Configure("dark")
     specs := Map(
         GuardStatusKind.Initializing,
             {Color: 0x0F7EE7, File: "loader-circle.svg"},
@@ -505,8 +507,11 @@ AssertStatusIconResources() {
         GuardStatusKind.Unknown,
             {Color: 0x858585, File: "circle-info-unknown.svg"})
     resourceFiles := StatusIconResourceFiles()
+    colorRoles := StatusIconColorRoles()
     AssertCustomIcon(resourceFiles.Count == specs.Count,
         "状态图标资源映射数量不完整")
+    AssertCustomIcon(colorRoles.Count == specs.Count,
+        "状态图标语义色映射数量不完整")
     usedColors := Map()
     usedFiles := Map()
     for statusKind, spec in specs {
@@ -515,6 +520,10 @@ AssertStatusIconResources() {
         AssertCustomIcon(resourceFiles.Has(statusKind)
             && resourceFiles[statusKind] == spec.File,
             "状态图标资源映射错误：" statusKind)
+        AssertCustomIcon(colorRoles.Has(statusKind)
+            && GetStatusIconColor(statusKind)
+                == Format("{:06X}", spec.Color),
+            "深色主题没有保留状态 SVG 的原有语义色：" statusKind)
         AssertCustomIcon(StatusIconVisualScale(statusKind) == 1.00,
             "主列表状态图标没有使用统一 Lucide 视觉比例：" statusKind)
         AssertCustomIcon(!usedColors.Has(spec.Color)
@@ -645,6 +654,112 @@ AssertStatusIconResources() {
         AssertCustomIcon(!InStr(visualSource, retiredFunction "("),
             "状态图标仍依赖运行时自绘函数：" retiredFunction)
     }
+
+    UiThemeService.Configure("light")
+    for statusKind in specs {
+        lightColor := GetStatusIconColor(statusKind)
+        AssertCustomIcon(GetButtonColorContrastRatio(lightColor,
+                UiThemeService.Color("Surface")) >= 3,
+            "浅色主题状态图标未达到 3:1 非文本对比度：" statusKind)
+    }
+    AssertCustomIcon(GetStatusIconColor(GuardStatusKind.PermissionMismatch)
+            == "A16207"
+        && GetStatusIconColor(GuardStatusKind.SafeStartWait) == "5F9B0D",
+        "深浅背景均清晰的状态颜色被无意义替换")
+    AssertCustomIcon(GetStatusIconColor(GuardStatusKind.Running) == "157A50"
+        && GetStatusIconColor(GuardStatusKind.Paused) == "B45309"
+        && GetStatusIconColor(GuardStatusKind.WaitingObservation) == "1D4ED8",
+        "浅色主题没有替换低对比度状态颜色")
+    UiThemeService.Configure(originalTheme)
+}
+
+AssertThemeAwareIconPalette() {
+    originalTheme := UiThemeService.GetRequestedTheme()
+    darkSourceColors := Map(
+        "SettingsIcon", "BABABC", "HelpIcon", "23A9F2",
+        "AboutIcon", "B9A3FF", "SearchIcon", "1EA596",
+        "BrowseIcon", "93A8EA", "UpdateIcon", "878DF9",
+        "DonationIcon", "F78FB3", "LogsIcon", "5DD4E8",
+        "AutomationIcon", "B9A3FF", "DisplayIcon", "4EA1FF",
+        "LanguageIcon", "4EA1FF", "FontIcon", "43C97B",
+        "ThemeIcon", "F0A020", "StartupIcon", "B4875A",
+        "MonitoringIcon", "69D19A", "SuccessIcon", "03C078",
+        "DangerIcon", "EF4444", "StrongDangerIcon", "FF9A9A",
+        "WarningIcon", "FBBF24", "PauseIcon", "F4A71D",
+        "WaitingIcon", "A0B7FF", "QueryIcon", "E9C08C",
+        "RelocationIcon", "5DD4E8", "UnknownIcon", "858585",
+        "InitializingIcon", "0F7EE7")
+    try {
+        UiThemeService.Configure("dark")
+        for role, sourceColor in darkSourceColors {
+            AssertCustomIcon(UiThemeService.Color(role) == sourceColor,
+                "深色主题无意义地改写了原有清晰图标颜色：" role)
+            AssertCustomIcon(GetButtonColorContrastRatio(
+                    UiThemeService.Color(role),
+                    UiThemeService.Color("Toolbar")) >= 3,
+                "深色主题图标与工具栏对比不足：" role)
+        }
+
+        UiThemeService.Configure("light")
+        for role in darkSourceColors {
+            AssertCustomIcon(GetButtonColorContrastRatio(
+                    UiThemeService.Color(role),
+                    UiThemeService.Color("Toolbar")) >= 3,
+                "浅色主题图标与工具栏对比不足：" role)
+        }
+
+        sourcePixels := Buffer(4, 0)
+        NumPut("UChar", 0x17, sourcePixels, 0)
+        NumPut("UChar", 0x31, sourcePixels, 1)
+        NumPut("UChar", 0x53, sourcePixels, 2)
+        NumPut("UChar", 0x80, sourcePixels, 3)
+        sourceSnapshot := {Width: 1, Height: 1, Pixels: sourcePixels}
+        iconState := {
+            normal: UiThemeService.Color("Toolbar"),
+            textColor: UiThemeService.Color("ToolbarText"),
+            buttonImage: {
+                sourceSnapshot: sourceSnapshot,
+                tintMode: "theme",
+                tintRole: "SettingsIcon",
+                resolvedTint: "source",
+                Width: 1,
+                Height: 1,
+                Pixels: sourcePixels
+            }
+        }
+        AssertCustomIcon(RefreshButtonImageTint(iconState)
+            && iconState.buttonImage.resolvedTint
+                == UiThemeService.Color("SettingsIcon")
+            && iconState.buttonImage.Pixels != sourcePixels,
+            "浅色主题没有生成独立的语义色像素")
+        UiThemeService.Configure("dark")
+        AssertCustomIcon(RefreshButtonImageTint(iconState)
+            && iconState.buttonImage.resolvedTint == "source"
+            && iconState.buttonImage.Pixels == sourcePixels
+            && NumGet(iconState.buttonImage.Pixels, 0, "UInt")
+                == NumGet(sourcePixels, 0, "UInt"),
+            "切回深色主题后没有逐字节恢复 SVG 原始像素")
+
+        sourcePixels := Buffer(8, 0)
+        NumPut("UChar", 255, sourcePixels, 0)
+        NumPut("UChar", 255, sourcePixels, 1)
+        NumPut("UChar", 255, sourcePixels, 2)
+        NumPut("UChar", 255, sourcePixels, 3)
+        NumPut("UChar", 128, sourcePixels, 4)
+        NumPut("UChar", 128, sourcePixels, 5)
+        NumPut("UChar", 128, sourcePixels, 6)
+        NumPut("UChar", 128, sourcePixels, 7)
+        tinted := TintButtonIconSnapshot(
+            {Width: 2, Height: 1, Pixels: sourcePixels}, "112233")
+        AssertCustomIcon(tinted
+            && NumGet(tinted.Pixels, 0, "UChar") == 0x33
+            && NumGet(tinted.Pixels, 1, "UChar") == 0x22
+            && NumGet(tinted.Pixels, 2, "UChar") == 0x11
+            && NumGet(tinted.Pixels, 3, "UChar") == 0xFF
+            && Abs(NumGet(tinted.Pixels, 4, "UChar") - 0x1A) <= 1
+            && NumGet(tinted.Pixels, 7, "UChar") == 0x80,
+            "主题着色没有保持 SVG 快照的预乘 BGRA 与半透明边缘")
+    } finally UiThemeService.Configure(originalTheme)
 }
 
 AssertAdminOverlayIcon() {
@@ -857,6 +972,7 @@ RunCustomIconImageTests() {
             AssertNativeSvgRasterization(externalSvgPath)
         }
         AssertIndexedIconResourceSelection(singleFrameIcoPath)
+        AssertThemeAwareIconPalette()
         AssertStatusIconResources()
         AssertAdminOverlayIcon()
         AssertCompleteMainImageList()

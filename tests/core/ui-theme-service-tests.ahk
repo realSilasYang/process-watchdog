@@ -72,6 +72,7 @@ RunUiThemeServiceTests() {
         ["ButtonText", "Add"], ["ButtonText", "Delete"],
         ["ButtonText", "Pause"], ["TabText", "Tab"],
         ["TabActiveText", "TabActive"],
+        ["HoverPreviewText", "HoverPreview"],
         ["DisabledButtonText", "DeleteDisabled"],
         ["DisabledButtonText", "PauseDisabled"]
     ] {
@@ -84,6 +85,13 @@ RunUiThemeServiceTests() {
     AssertUiTheme(UiThemeService.Color("Toolbar") == "D0DEEC"
         && UiThemeService.Color("ToolbarText") == "334155",
         "浅色主题的次要按钮没有使用浅蓝灰背景与深色文字")
+    hoverPreviewContrast := ThemeContrastRatio(
+        UiThemeService.Color("HoverPreviewText"),
+        UiThemeService.Color("HoverPreview"))
+    AssertUiTheme(UiThemeService.Color("HoverPreview") == "E2E8F0"
+        && UiThemeService.Color("HoverPreviewText") == "0F172A"
+        && Round(hoverPreviewContrast, 2) == 14.48,
+        "浅色悬停预览没有使用 14.48:1 的指定灰蓝配色")
     AssertUiTheme(UiThemeService.Color("DeleteDisabled") == "787676"
         && UiThemeService.Color("PauseDisabled") == "777671"
         && ThemeColorSaturation(UiThemeService.Color("DeleteDisabled"))
@@ -108,6 +116,11 @@ RunUiThemeServiceTests() {
         && UiThemeService.Color("Pause")
             != UiThemeService.Color("PauseDisabled"),
         "深色主题的删除／暂停可用色与不可用色缺少明确区分")
+    AssertUiTheme(UiThemeService.Color("HoverPreview")
+            == UiThemeService.Color("Tooltip")
+        && UiThemeService.Color("HoverPreviewText")
+            == UiThemeService.Color("TooltipText"),
+        "新增浅色悬停预览适配改变了深色提示配色")
     AssertUiTheme(!UiThemeService.HandleSystemSettingChange(),
         "固定主题仍响应了系统主题变化")
 

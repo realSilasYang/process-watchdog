@@ -107,6 +107,9 @@ $settingsWindowSource = Get-Content -LiteralPath `
 $aboutWindowSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\Windows\AboutWindow.ahk') `
     -Raw -Encoding UTF8
+$donationWindowSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\Windows\DonationWindow.ahk') `
+    -Raw -Encoding UTF8
 $customDisplayDialogSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\Windows\CustomDisplayDialog.ahk') `
     -Raw -Encoding UTF8
@@ -133,6 +136,9 @@ $win32Source = Get-Content -LiteralPath `
     -Raw -Encoding UTF8
 $contextMenuPresenterSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\UI\ContextMenuPresenter.ahk') `
+    -Raw -Encoding UTF8
+$statusBarPresenterSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\UI\StatusBarPresenter.ahk') `
     -Raw -Encoding UTF8
 $mainContextPopupWindowSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\Windows\MainContextPopupWindow.ahk') `
@@ -791,9 +797,35 @@ foreach ($svgLibraryHook in @(
 }
 if ($source -notmatch '#Include src\\UI\\SvgRenderLibrary\.ahk' -or
     $source -notmatch 'this\.svgRenderer\s*:=\s*SvgRenderLibrary\([\s\S]{0,120}third_party\\resvg\\resvg\.dll' -or
-    $source -notmatch 'CreateSvgPaddedIcon\([\s\S]{0,500}svgRenderer\.RenderFile\([\s\S]{0,500}CreateShellSvgPaddedIcon\(' -or
+    $source -notmatch 'CreateSvgPaddedIcon\([\s\S]{0,800}svgRenderer\.RenderFile\([\s\S]{0,800}CreateShellSvgPaddedIcon\(' -or
     $source -notmatch 'ShutdownApplicationResources\(\*\)[\s\S]{0,360}App\.svgRenderer\.Shutdown\(\)') {
     $failures.Add('ApplicationState must own resvg and preserve Shell fallback plus explicit shutdown')
+}
+if (-not $interactionPresenterSource.Contains(
+        'TintButtonIconSnapshot(snapshot, color)') -or
+    $interactionPresenterSource -notmatch
+        'SetButtonSvgIcon\(ctrl, svgPath, sizeDip := 14, gapDip := 7,[\s\S]{0,2500}\^theme:\(\.\+\)\$' -or
+    $interactionPresenterSource -notmatch
+        'case "theme":[\s\S]{0,180}UiThemeService\.IsDark\(\)[\s\S]{0,80}return "source"' -or
+    $interactionPresenterSource -notmatch
+        'SetButtonTextColor\(ctrl, color\)[\s\S]{0,500}RefreshButtonImageTint\(state\)' -or
+    $mainVisualPipelineSource -notmatch
+        'StatusIconColorRoles\(\)[\s\S]{0,2200}GetStatusIconColor\(statusKind\)' -or
+    $mainVisualPipelineSource -notmatch
+        'tintColor\s*:=\s*UiThemeService\.IsDark\(\)[\s\S]{0,80}\?\s*""\s*:\s*GetStatusIconColor\(statusKind\)' -or
+    $applicationTelemetrySource -notmatch
+        'IconColorRole:\s*"SuccessIcon"[\s\S]{0,2600}IconColorRole:\s*"WarningIcon"' -or
+    $statusBarPresenterSource -notmatch
+        'cacheKey\s*:=\s*svgPath[\s\S]{0,120}StrUpper\(tintColor\)' -or
+    $statusBarPresenterSource -notmatch
+        'iconColor\s*:=\s*!UiThemeService\.IsDark\(\)[\s\S]{0,160}IconColorRole' -or
+    $mainSource -notmatch
+        '(?m)^RefreshMainWindowTheme\(\)\s*\{[\s\S]{0,1800}RefreshMainStatusIconAlignment\(\)' -or
+    $uiThemeServiceSource -notmatch
+        '\["SettingsIcon", "BABABC"\][\s\S]{0,2600}\["SettingsIcon", "475569"\]' -or
+    $maintenanceSettingsDialogSource -match
+        'SetButtonLucideIcon\(btnResume,\s*"play\.svg",[^\r\n]*"auto"') {
+    $failures.Add('Theme-aware SVG icons must use untouched source pixels in dark mode, tint low-contrast light variants, and refresh cached button pixels')
 }
 if (($source + "`n" + $allModuleSource) -match
     'FindSvgBrowserRasterizer|EnsureSvgBrowserRaster|GetSvgRasterCachePath|BuildSvgBrowserCommand|CleanupSvgBrowserProfile|--headless=new|edge-profile-|msedge\.exe') {
@@ -2520,7 +2552,7 @@ elseif ($logWindowMatch.Value.Contains('CreateOwnedGui(')) {
     $failures.Add('The log window must not acquire or disable the main window')
 }
 if ($logWindowMatch.Success -and
-    ($logWindowMatch.Value -notmatch 'RegisterHoverButton\(this\.exportButton,[\s\S]{0,120}RegisterButtonClick\(this\.exportButton' -or
+    ($logWindowMatch.Value -notmatch 'RegisterHoverButton\(this\.exportButton,[\s\S]{0,200}RegisterButtonClick\(this\.exportButton' -or
         $logWindowMatch.Value -notmatch 'diagnosticBundleService\.Export\(' -or
         $logWindowMatch.Value -notmatch 'this\.exportButton\.Move\(\(Width - 120\) // 2, Height - 40, 120, 30\)')) {
     $failures.Add('The log window must expose the local diagnostic bundle export')
@@ -2810,6 +2842,18 @@ $shutdownApplicationUiSource = [regex]::Match($source,
     '(?ms)^ShutdownApplicationUi\(\*\)\s*\{.*?(?=^AcquireApplicationMutex\()').Value
 $darkTooltipSource = [regex]::Match($source,
     '(?ms)^class DarkTooltipWindow extends ManagedWindow\s*\{.*?(?=^class HistoryToastWindow)').Value
+if ($darkTooltipSource -notmatch
+        'GetPresentationConfig\(\)[\s\S]{0,1800}HoverPreview[\s\S]{0,220}FontSize:\s*10[\s\S]{0,180}PaddingX:\s*12[\s\S]{0,100}PaddingY:\s*8[\s\S]{0,180}MaxTextWidth:\s*420[\s\S]{0,100}DelayMs:\s*350[\s\S]{0,120}OffsetX:\s*12[\s\S]{0,100}OffsetY:\s*20[\s\S]{0,180}E0x08000020' -or
+    $darkTooltipSource -notmatch
+        'SetFont\("norm s"\s*appearance\.FontSize[\s\S]{0,120}LocalizationService\.GetUiFontName\(\)' -or
+    $darkTooltipSource -notmatch
+        'ResizeTextControl\(text,\s*appearance\.MaxTextWidth\)' -or
+    $darkTooltipSource -notmatch
+        'DwmSetWindowAttribute[^\r\n]*"Int",\s*33[^\r\n]*"Int\*",\s*2' -or
+    $applicationSearchSource -notmatch
+        'tooltipText\s*:=\s*Tr\("名称：\{1\}`n真实路径：\{2\}"[\s\S]{0,220}UiThemeService\.IsDark\(\)[\s\S]{0,100}this\.tooltip\.Show\(tooltipText\)[\s\S]{0,100}else[\s\S]{0,100}this\.tooltip\.Schedule\(tooltipText\)') {
+    $failures.Add('Light hover previews must use the specified accessible palette, metrics, delay, wrapping, cursor offset, pass-through style, and Windows 11 rounding without changing dark metrics')
+}
 $applyStateSource = [regex]::Match($source,
     '(?ms)^ApplyState\(.*?(?=^SaveAppsToIni\()').Value
 $batchStartSource = [regex]::Match($addItemDialogSource,
@@ -2928,9 +2972,9 @@ if ($settingsWindowSource -notmatch 'displayFieldWidth\s*:=\s*Min\(isCompact\s*\
     $settingsWindowSource -notmatch 'SplitFieldCaption\(caption\)[\s\S]{0,260}\(\[：:\]\)\$' -or
     $settingsWindowSource -notmatch 'AddSettingsFieldLabel\(index, y, caption, groupControls\s*:=\s*""\)[\s\S]{0,260}SplitFieldCaption\(caption\)\.Label[\s\S]{0,120}groupControls\.Push\(labelControl\)' -or
     $settingsWindowSource -notmatch 'CenterSettingsControlGroup\(controls\)[\s\S]{0,420}Floor\(\(this\.layout\.WindowWidth\s*-\s*groupWidth\)\s*/\s*2\)[\s\S]{0,120}control\.Move\(groupX\)' -or
-    $settingsWindowSource -notmatch 'AddDisplayFieldHeader\(70,[\s\S]{0,80}Tr\("界面语言："\),\s*"languages\.svg"\)' -or
-    $settingsWindowSource -notmatch 'AddDisplayFieldHeader\(153,[\s\S]{0,80}Tr\("界面内容字体："\),\s*"type\.svg"\)' -or
-    $settingsWindowSource -notmatch 'AddDisplayFieldHeader\(236,[\s\S]{0,80}Tr\("主题："\),\s*"palette\.svg"\)' -or
+    $settingsWindowSource -notmatch 'AddDisplayFieldHeader\(70,[\s\S]{0,100}Tr\("界面语言："\),\s*"languages\.svg",\s*"LanguageIcon"\)' -or
+    $settingsWindowSource -notmatch 'AddDisplayFieldHeader\(153,[\s\S]{0,100}Tr\("界面内容字体："\),\s*"type\.svg",\s*"FontIcon"\)' -or
+    $settingsWindowSource -notmatch 'AddDisplayFieldHeader\(236,[\s\S]{0,100}Tr\("主题："\),\s*"palette\.svg",\s*"ThemeIcon"\)' -or
     $settingsWindowSource -notmatch 'logFieldAnchorWidth\s*:=\s*layout\.IsCompact\s*\?\s*240\s*:\s*294[\s\S]{0,180}logFieldX\s*:=\s*Floor\(\(layout\.WindowWidth\s*-\s*logFieldAnchorWidth\)\s*/\s*2\)[\s\S]{0,120}logPathWidth\s*:=\s*Round\(logFieldAnchorWidth\s*\*\s*1\.5\)') {
     $failures.Add('Settings fields must use compact per-page widths, strip trailing colons, stack values below labels, and center each page by its longest control')
 }
@@ -2947,6 +2991,17 @@ if (-not $aboutWindowSource.Contains(
     $aboutWindowSource -notmatch 'SetButtonTooltip\(this\.projectButton, Tr\("点个 star 吧~"\)\)' -or
     $aboutWindowSource -notmatch 'GuiModules\.donation\.Show\(this\.gui\)') {
     $failures.Add('About window must keep its read-only information and ordinary Check Update, Donate, Open Source actions in order')
+}
+if ($donationWindowSource -match 'dividerY|UiThemeService\.Color\("Divider"\)' -or
+    $donationWindowSource -notmatch
+        'windowWidth\s*:=\s*compactLayout\s*\?\s*500\s*:\s*680' -or
+    $donationWindowSource -notmatch
+        '如果小助手为您节省了恢复程序的时间，欢迎通过下方二维码打赏作者！`n请选择扶贫方式（≥Д≤）' -or
+    $donationWindowSource -match '排查问题和恢复程序' -or
+    $donationWindowSource -notmatch 'qrLabelY\s*:=\s*messageY\s*\+\s*messageHeight\s*\+\s*10' -or
+    $donationWindowSource -notmatch 'ResolveQrImagePath\(assetStem\)[\s\S]{0,500}UiThemeService\.IsDark\(\)[\s\S]{0,180}-浅色界面\.png' -or
+    $donationWindowSource -notmatch 'fallbackSuffix[\s\S]{0,500}FileExist\(fallbackPath\)') {
+    $failures.Add('Donation window must omit its divider and nearby whitespace, select theme-specific QR assets, and keep the opposite-theme fallback')
 }
 if (-not $settingsWindowSource.Contains(
         'this.shortcutLabel.Move(integrationGroupX)') -or
@@ -2986,12 +3041,12 @@ $settingsStartupSource = [regex]::Match($settingsWindowSource,
     '(?ms)^    BuildStartupTab\(\)\s*\{.*?(?=^    BuildMonitoringTab\()').Value
 if (-not $settingsShowSource -or
     -not $settingsStartupSource -or
-    $settingsStartupSource -notmatch 'SetButtonLucideIcon\(this\.taskButton, "loader-circle\.svg"[\s\S]{0,120}SetRegisteredButtonEnabled\(this\.taskButton, false\)' -or
+    $settingsStartupSource -notmatch 'SetButtonLucideIcon\(this\.taskButton, "loader-circle\.svg"[\s\S]{0,220}SetRegisteredButtonEnabled\(this\.taskButton, false\)' -or
     $settingsShowSource -match 'SetTimer\(this\.taskStatusTimer, -1\)' -or
     $settingsWindowSource -notmatch 'SwitchTab\(index,[\s\S]{0,2200}if index == 2 && this\.taskButton[\s\S]{0,100}SetTimer\(this\.taskStatusTimer, -1\)' -or
     $settingsShowSource -match 'UpdateTaskButtonStatus\(\)[\s\S]{0,180}ShowApplicationWindow\(' -or
     $settingsWindowSource -notmatch 'RefreshTaskStatusAfterTabShow\(\*\)[\s\S]{0,180}this\.UpdateTaskButtonStatus\(\)' -or
-    $settingsWindowSource -notmatch 'UpdateTaskButtonStatus\(\)[\s\S]{0,900}SetRegisteredButtonEnabled\(this\.taskButton, true\)' -or
+    $settingsWindowSource -notmatch 'UpdateTaskButtonStatus\(\)[\s\S]{0,1300}SetRegisteredButtonEnabled\(this\.taskButton, true\)' -or
     $settingsWindowSource -notmatch 'Close\(\*\)[\s\S]{0,120}SetTimer\(this\.taskStatusTimer, 0\)') {
     $failures.Add('Settings must query Task Scheduler only after the Startup tab is shown and cancel the deferred query on close')
 }

@@ -1701,7 +1701,7 @@ class VietnameseStrings {
         catalog.Set("帮助", "Trợ giúp")
         catalog.Set("提交反馈", "Gửi phản hồi")
         catalog.Set("支持开源项目", "Ủng hộ dự án mã nguồn mở")
-        catalog.Set("如果小助手为您节省了排查问题和恢复程序的时间，欢迎通过下方二维码打赏作者！`n请选择扶贫方式：", "Nếu trợ lý đã giúp bạn tiết kiệm thời gian tìm nguyên nhân sự cố và khôi phục chương trình, hãy ủng hộ tác giả qua mã QR bên dưới!`nVui lòng chọn cách ủng hộ:")
+        catalog.Set("如果小助手为您节省了恢复程序的时间，欢迎通过下方二维码打赏作者！`n请选择扶贫方式（≥Д≤）", "Nếu trợ lý đã giúp bạn tiết kiệm thời gian khôi phục chương trình, hãy ủng hộ tác giả qua mã QR bên dưới!`nVui lòng chọn cách ủng hộ (≥Д≤)")
         catalog.Set("微信支付", "WeChat Pay")
         catalog.Set("支付宝", "Alipay")
         catalog.Set("二维码图片未找到", "Không tìm thấy ảnh mã QR")

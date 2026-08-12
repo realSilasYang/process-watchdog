@@ -192,7 +192,8 @@ class EnvironmentSettingsDialog extends ManagedWindow {
         RegisterHoverButton(this.resolutionActionButton,
             UiThemeService.Color("Toolbar"))
         SetButtonLucideIcon(this.resolutionActionButton,
-            isManual ? "folder-open.svg" : "scan-search.svg", 14, 6)
+            isManual ? "folder-open.svg" : "scan-search.svg", 14, 6,
+            isManual ? "theme:BrowseIcon" : "theme:QueryIcon")
         RegisterButtonClick(this.resolutionActionButton,
             ObjBindMethod(this, "HandleResolutionAction"))
 
@@ -268,7 +269,8 @@ class EnvironmentSettingsDialog extends ManagedWindow {
                 Tr("参数顺序为：启动程序参数、目标路径、目标参数；例如 Java 使用 -jar。"))
             RegisterHoverButton(btnBrowseRuntime,
                 UiThemeService.Color("Toolbar"))
-            SetButtonLucideIcon(btnBrowseRuntime, "folder-open.svg", 14, 6)
+            SetButtonLucideIcon(btnBrowseRuntime, "folder-open.svg", 14, 6,
+                "theme:BrowseIcon")
             RegisterButtonClick(btnBrowseRuntime,
                 ObjBindMethod(this, "BrowseRuntime"))
             workDirLabelY := 371
@@ -330,7 +332,8 @@ class EnvironmentSettingsDialog extends ManagedWindow {
             SetDarkControl(inputControl.Hwnd)
         RegisterHoverButton(btnBrowseWorkDir,
             UiThemeService.Color("Toolbar"))
-        SetButtonLucideIcon(btnBrowseWorkDir, "folder-open.svg", 14, 6)
+        SetButtonLucideIcon(btnBrowseWorkDir, "folder-open.svg", 14, 6,
+            "theme:BrowseIcon")
         RegisterButtonClick(btnBrowseWorkDir,
             ObjBindMethod(this, "BrowseWorkDir"))
         this.envEdit.OnEvent("Change",
@@ -351,7 +354,7 @@ class EnvironmentSettingsDialog extends ManagedWindow {
             this.currentResolutionSource := "用户指定"
             this.resolutionActionButton.Text := Tr("选择程序")
             SetButtonLucideIcon(this.resolutionActionButton,
-                "folder-open.svg", 14, 6)
+                "folder-open.svg", 14, 6, "theme:BrowseIcon")
             this.UpdateResolutionPresentation()
             return
         }
@@ -361,7 +364,7 @@ class EnvironmentSettingsDialog extends ManagedWindow {
             UiThemeService.Color("Surface"))
         this.resolutionActionButton.Text := Tr("重新识别")
         SetButtonLucideIcon(this.resolutionActionButton,
-            "scan-search.svg", 14, 6)
+            "scan-search.svg", 14, 6, "theme:QueryIcon")
         this.RefreshAutomaticResolution()
     }
 

@@ -110,8 +110,10 @@ class AddItemDialog extends ManagedWindow {
         RegisterHoverButton(this.browseButton, UiThemeService.Color("Toolbar"))
         RegisterHoverButton(this.okButton, UiThemeService.Color("Primary"))
         RegisterHoverButton(this.cancelButton, UiThemeService.Color("Toolbar"))
-        SetButtonLucideIcon(this.searchButton, "search.svg", 14, 6)
-        SetButtonLucideIcon(this.browseButton, "folder-open.svg", 14, 6)
+        SetButtonLucideIcon(this.searchButton, "search.svg", 14, 6,
+            "theme:SearchIcon")
+        SetButtonLucideIcon(this.browseButton, "folder-open.svg", 14, 6,
+            "theme:BrowseIcon")
         RegisterButtonClick(this.searchButton, ObjBindMethod(this.search, "Show"))
         RegisterButtonClick(this.browseButton, ObjBindMethod(this, "ShowBrowseMenu"))
         RegisterButtonClick(this.okButton, ObjBindMethod(this, "Confirm"), ButtonFeedbackMode.Dismissive)

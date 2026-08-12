@@ -88,7 +88,8 @@ class CustomDisplayDialog extends ManagedWindow {
                 this.defaultIconButton, btnCancel]
                 RegisterHoverButton(button, UiThemeService.Color("Toolbar"))
             RegisterHoverButton(btnSave, UiThemeService.Color("Save"))
-            SetButtonLucideIcon(btnBrowse, "folder-open.svg", 14, 6)
+            SetButtonLucideIcon(btnBrowse, "folder-open.svg", 14, 6,
+                "theme:BrowseIcon")
             RegisterButtonClick(this.defaultNameButton,
                 ObjBindMethod(this, "UseDefaultName"))
             RegisterButtonClick(btnBrowse, ObjBindMethod(this, "BrowseIcon"))

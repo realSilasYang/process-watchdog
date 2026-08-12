@@ -1416,6 +1416,107 @@ GetButtonColorLuma(color) {
     return red * 299 + green * 587 + blue * 114
 }
 
+GetButtonColorRelativeLuminance(color) {
+    colorValue := ParseButtonColorValue(color)
+    if (colorValue < 0)
+        return -1
+    components := []
+    for shift in [16, 8, 0] {
+        component := ((colorValue >> shift) & 0xFF) / 255
+        components.Push(component <= 0.04045
+            ? component / 12.92
+            : ((component + 0.055) / 1.055) ** 2.4)
+    }
+    return components[1] * 0.2126 + components[2] * 0.7152
+        + components[3] * 0.0722
+}
+
+GetButtonColorContrastRatio(firstColor, secondColor) {
+    firstLuminance := GetButtonColorRelativeLuminance(firstColor)
+    secondLuminance := GetButtonColorRelativeLuminance(secondColor)
+    if firstLuminance < 0 || secondLuminance < 0
+        return 0
+    lighter := Max(firstLuminance, secondLuminance)
+    darker := Min(firstLuminance, secondLuminance)
+    return (lighter + 0.05) / (darker + 0.05)
+}
+
+TintButtonIconSnapshot(snapshot, color) {
+    colorValue := ParseButtonColorValue(color)
+    if colorValue < 0 || !IsObject(snapshot)
+        || !snapshot.HasOwnProp("Width") || !snapshot.HasOwnProp("Height")
+        || !snapshot.HasOwnProp("Pixels")
+        return false
+    red := (colorValue >> 16) & 0xFF
+    green := (colorValue >> 8) & 0xFF
+    blue := colorValue & 0xFF
+    pixels := Buffer(snapshot.Width * snapshot.Height * 4, 0)
+    Loop snapshot.Width * snapshot.Height {
+        offset := (A_Index - 1) * 4
+        alpha := NumGet(snapshot.Pixels, offset + 3, "UChar")
+        if !alpha
+            continue
+        ; SvgRenderLibrary 返回预乘 BGRA；着色后仍保持预乘格式，供 GDI+
+        ; 直接以 SourceOver 合成到圆角按钮表面。
+        NumPut("UChar", Round(blue * alpha / 255), pixels, offset)
+        NumPut("UChar", Round(green * alpha / 255), pixels, offset + 1)
+        NumPut("UChar", Round(red * alpha / 255), pixels, offset + 2)
+        NumPut("UChar", alpha, pixels, offset + 3)
+    }
+    return {Width: snapshot.Width, Height: snapshot.Height, Pixels: pixels}
+}
+
+ResolveButtonImageTintColor(state, image) {
+    if !IsObject(image) || !image.HasOwnProp("tintMode")
+        return ""
+    switch image.tintMode {
+        case "auto":
+            return state.HasOwnProp("textColor")
+                ? state.textColor : UiThemeService.Color("ButtonText")
+        case "theme":
+            ; 深色主题直接复用资源原始像素，确保启用浅色适配不会改变既有样式。
+            if UiThemeService.IsDark()
+                return "source"
+            tintColor := UiThemeService.Color(image.tintRole)
+            backgroundColor := state.HasOwnProp("normal")
+                ? state.normal : UiThemeService.Color("Window")
+            ; 语义色优先；活动标签或特殊按钮底色使其低于非文本图形的
+            ; 3:1 对比度时，才回退到该按钮已经校验过的文字色。
+            if GetButtonColorContrastRatio(tintColor, backgroundColor) < 3
+                && state.HasOwnProp("textColor")
+                return state.textColor
+            return tintColor
+        case "explicit":
+            return image.requestedTint
+    }
+    return ""
+}
+
+RefreshButtonImageTint(state) {
+    if !IsObject(state) || !state.HasOwnProp("buttonImage")
+        return false
+    image := state.buttonImage
+    if !IsObject(image) || !image.HasOwnProp("tintMode")
+        || image.tintMode == "none"
+        return false
+    tintColor := ResolveButtonImageTintColor(state, image)
+    if tintColor == ""
+        return false
+    if image.HasOwnProp("resolvedTint")
+        && StrLower(image.resolvedTint) == StrLower(tintColor)
+        return false
+    resolvedSnapshot := tintColor == "source"
+        ? image.sourceSnapshot
+        : TintButtonIconSnapshot(image.sourceSnapshot, tintColor)
+    if !resolvedSnapshot
+        return false
+    image.Width := resolvedSnapshot.Width
+    image.Height := resolvedSnapshot.Height
+    image.Pixels := resolvedSnapshot.Pixels
+    image.resolvedTint := tintColor
+    return true
+}
+
 DarkenButtonColor(color, factor := 0.86) {
     colorValue := ParseButtonColorValue(color)
     if (colorValue < 0)
@@ -1756,7 +1857,8 @@ ClearButtonIcon(ctrl) {
 ; SVG 只在按钮创建时通过 resvg 解析一次，状态对象持有渲染后的预乘 BGRA
 ; Buffer。每次重绘只进行内存像素合成，不读取文件、不重新解析 SVG，也不持有
 ; HBITMAP／HICON，窗口销毁并注销交互状态后即可自动释放全部图像内存。
-SetButtonSvgIcon(ctrl, svgPath, sizeDip := 14, gapDip := 7) {
+SetButtonSvgIcon(ctrl, svgPath, sizeDip := 14, gapDip := 7,
+    tintColor := "none") {
     try hWnd := ctrl.Hwnd
     catch
         return false
@@ -1769,17 +1871,46 @@ SetButtonSvgIcon(ctrl, svgPath, sizeDip := 14, gapDip := 7) {
         sizeDip := Max(8, sizeDip + 0)
         gapDip := Max(0, gapDip + 0)
         svgPath := String(svgPath)
+        requestedTint := Trim(String(tintColor))
     } catch {
         return false
     }
     if svgPath == "" || !FileExist(svgPath) || DirExist(svgPath)
         return false
+    tintMode := StrLower(requestedTint)
+    tintRole := ""
+    if tintMode == "" || tintMode == "none" {
+        tintMode := "none"
+        requestedTint := ""
+    } else if tintMode == "auto" {
+        tintMode := "auto"
+        requestedTint := ""
+    } else if RegExMatch(requestedTint, "i)^theme:(.+)$", &tintMatch) {
+        tintMode := "theme"
+        tintRole := Trim(tintMatch[1])
+        if tintRole == "" || !UiThemeService.HasColor(tintRole)
+            return false
+        requestedTint := ""
+    } else {
+        colorValue := ParseButtonColorValue(requestedTint)
+        if colorValue < 0
+            return false
+        tintMode := "explicit"
+        requestedTint := Format("{:06X}", colorValue)
+    }
     if state.HasOwnProp("buttonImage")
         && state.buttonImage.HasOwnProp("sourcePath")
         && state.buttonImage.sourcePath == svgPath
         && state.buttonImage.sizeDip == sizeDip
         && state.buttonImage.gapDip == gapDip
+        && state.buttonImage.HasOwnProp("tintMode")
+        && state.buttonImage.tintMode == tintMode
+        && state.buttonImage.tintRole == tintRole
+        && state.buttonImage.requestedTint == requestedTint {
+        if RefreshButtonImageTint(state)
+            RedrawRoundedButton(hWnd)
         return true
+    }
     dpi := DllCall("user32\GetDpiForWindow", "Ptr", hWnd, "UInt")
     if !dpi
         dpi := 96
@@ -1790,13 +1921,23 @@ SetButtonSvgIcon(ctrl, svgPath, sizeDip := 14, gapDip := 7) {
     snapshot := App.svgRenderer.RenderFile(svgPath, dpi, renderSize)
     if !snapshot
         return false
-    state.buttonImage := {
+    image := {
         Width: snapshot.Width,
         Height: snapshot.Height,
         Pixels: snapshot.Pixels,
         sizeDip: sizeDip,
         gapDip: gapDip,
-        sourcePath: svgPath
+        sourcePath: svgPath,
+        sourceSnapshot: snapshot,
+        tintMode: tintMode,
+        tintRole: tintRole,
+        requestedTint: requestedTint,
+        resolvedTint: ""
+    }
+    state.buttonImage := image
+    if tintMode != "none" && !RefreshButtonImageTint(state) {
+        state.DeleteProp("buttonImage")
+        return false
     }
     if state.HasOwnProp("buttonIcon")
         state.DeleteProp("buttonIcon")
@@ -1806,14 +1947,15 @@ SetButtonSvgIcon(ctrl, svgPath, sizeDip := 14, gapDip := 7) {
 
 ; 全应用的 Lucide 功能图标统一从受许可的资源目录解析。窗口只声明图标文件名
 ; 与排版尺寸，不再各自拼接资源路径，便于复用同一语义资源并集中审计发行内容。
-SetButtonLucideIcon(ctrl, iconName, sizeDip := 14, gapDip := 7) {
+SetButtonLucideIcon(ctrl, iconName, sizeDip := 14, gapDip := 7,
+    tintColor := "none") {
     try iconName := String(iconName)
     catch
         return false
     if iconName == "" || InStr(iconName, "\") || InStr(iconName, "/")
         return false
     return SetButtonSvgIcon(ctrl, GetApplicationAssetPath(
-        "ui-icons\lucide\" iconName), sizeDip, gapDip)
+        "ui-icons\lucide\" iconName), sizeDip, gapDip, tintColor)
 }
 
 ; 悬浮提示跟随按钮交互状态注册，不由具体窗口另建计时器。这样托管窗口销毁并
@@ -1999,6 +2141,7 @@ SetButtonTextColor(ctrl, color) {
     if App.uiInteractions.HasButton(hWnd) {
         state := App.uiInteractions.GetButton(hWnd)
         state.textColor := color
+        RefreshButtonImageTint(state)
         if state.HasOwnProp("roundedOwnerDraw") && state.roundedOwnerDraw {
             RedrawRoundedButton(hWnd)
             return true
