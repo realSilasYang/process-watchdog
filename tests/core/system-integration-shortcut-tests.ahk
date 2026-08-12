@@ -135,7 +135,7 @@ RunSystemIntegrationShortcutTests() {
                 && ReadShortcutAppUserModelId(chainPaths.Programs)
                     == GetApplicationUserModelId(),
             "创建按钮生成的开始菜单入口未满足目标隔离、Logo 或 AppID 约束")
-        if HasRunnableAhkFileAssociation() {
+        if HasRunnableAhkV2FileAssociation() {
             Run(chainPaths.Desktop, chainRoot)
             deadline := A_TickCount + 10000
             while !FileExist(probeOutput) && A_TickCount < deadline
@@ -181,7 +181,7 @@ CountSystemIntegrationShortcutFiles(directory, pattern) {
     return count
 }
 
-HasRunnableAhkFileAssociation() {
+HasRunnableAhkV2FileAssociation() {
     static ASSOCSTR_EXECUTABLE := 2
     executableLength := 0
     result := DllCall("shlwapi\AssocQueryStringW",
@@ -194,5 +194,13 @@ HasRunnableAhkFileAssociation() {
         "UInt", 0, "UInt", ASSOCSTR_EXECUTABLE, "WStr", ".ahk",
         "Ptr", 0, "Ptr", executableBuffer, "UInt*", &executableLength,
         "Int")
-    return result >= 0 && !!FileExist(StrGet(executableBuffer, "UTF-16"))
+    if result < 0
+        return false
+    executablePath := StrGet(executableBuffer, "UTF-16")
+    if !FileExist(executablePath)
+        return false
+    try associatedVersion := FileGetVersion(executablePath)
+    catch
+        return false
+    return RegExMatch(associatedVersion, "^([2-9]|[1-9][0-9]+)\.")
 }
