@@ -7,6 +7,29 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.0.13] - 2026-08-13
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides preferred and fallback fonts that must be installed into Windows first; it is not required to run the application.
+- **`process-watchdog-2.0.13-source.zip` (complete source edition):** Includes the AHK source, modules, tests, and documentation without fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64 locally.
+- **`process-watchdog-2.0.13-windows-x64.zip` (complete portable edition, recommended):** Includes the EXE, documentation, licenses, and required runtime resources without fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([official latest version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application search; the bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### 🚀 Improvements
+
+- **Reliable shortcut creation:** Desktop and Start menu entries are created and verified as one transaction. If either fails, previous shortcuts are restored, preventing partial results, and successful entries notify Windows Shell immediately.
+
+---
+
+### 🐛 Fixed
+
+- **Unrelated AHK taskbar icons are no longer contaminated:** The source edition uses a stable product-specific Windows identity, and its shortcuts target the assistant script directly while retaining the product icon. They no longer associate that icon with the shared AutoHotkey interpreter. Precisely matched legacy shortcuts are migrated automatically.
+
+---
+
 ## 🎉 Version [2.0.12] - 2026-08-12
 
 ### 📦 Release Assets

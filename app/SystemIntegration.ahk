@@ -64,21 +64,57 @@ ShowAbout(*) {
 
 CreateApplicationShortcutFile(shortcutPath, scriptPath, workingDirectory,
     iconPath, compiled, interpreterPath) {
-    if compiled {
-        FileCreateShortcut(scriptPath, shortcutPath, workingDirectory, "",
-            Tr("进程守护小助手"), iconPath)
-    } else {
-        ; 源码版仍显式绑定当前 AHK 解释器，不能依赖另一台设备上可能缺失或
-        ; 指向旧版本的 .ahk 文件关联。
-        FileCreateShortcut(interpreterPath, shortcutPath, workingDirectory,
-            '"' scriptPath '"', Tr("进程守护小助手"), iconPath, , , 1)
-    }
+    ; 源码快捷方式也以 .ahk 文件本身为 Shell 目标。系统仍通过文件关联
+    ; 启动解释器，但不会再把产品图标反向关联到公共 AutoHotkey64.exe。
+    if !WriteApplicationShortcut(shortcutPath, scriptPath, workingDirectory,
+            "", Tr("进程守护小助手"), iconPath,
+            GetApplicationUserModelId())
+        return false
     return ApplicationShortcutMatches(shortcutPath, scriptPath, compiled,
-        interpreterPath)
+        interpreterPath, workingDirectory)
+}
+
+WriteApplicationShortcut(shortcutPath, targetPath, workingDirectory,
+    arguments, description, iconPath, appUserModelId) {
+    try {
+        shellLink := ComObject(
+            "{00021401-0000-0000-C000-000000000046}",
+            "{000214F9-0000-0000-C000-000000000046}")
+        if ComCall(20, shellLink, "WStr", targetPath, "Int") < 0
+            return false
+        if ComCall(11, shellLink, "WStr", arguments, "Int") < 0
+            return false
+        if ComCall(9, shellLink, "WStr", workingDirectory, "Int") < 0
+            return false
+        if ComCall(7, shellLink, "WStr", description, "Int") < 0
+            return false
+        if iconPath != ""
+            && ComCall(17, shellLink, "WStr", iconPath, "Int", 0,
+                "Int") < 0
+            return false
+        if ComCall(15, shellLink, "Int", 1, "Int") < 0
+            return false
+        if !SetShellLinkAppUserModelId(shellLink, appUserModelId)
+            return false
+        persistFile := ComObjQuery(shellLink,
+            "{0000010B-0000-0000-C000-000000000046}")
+        return ComCall(6, persistFile, "WStr", shortcutPath, "Int", true,
+            "Int") >= 0
+    } catch {
+        return false
+    }
 }
 
 ApplicationShortcutMatches(shortcutPath, scriptPath, compiled,
-    interpreterPath) {
+    interpreterPath, workingDirectory := "") {
+    return ApplicationShortcutLaunchMatches(shortcutPath, scriptPath,
+            workingDirectory, compiled, interpreterPath)
+        && ReadShortcutAppUserModelId(shortcutPath)
+            == GetApplicationUserModelId()
+}
+
+ApplicationShortcutLaunchMatches(shortcutPath, scriptPath, workingDirectory,
+    compiled, interpreterPath) {
     if !FileExist(shortcutPath) || DirExist(shortcutPath)
         return false
     shortcutInfo := ShortcutResolver.Read(shortcutPath)
@@ -86,12 +122,235 @@ ApplicationShortcutMatches(shortcutPath, scriptPath, compiled,
         return false
     actualTarget := shortcutInfo.TargetPath
     actualArguments := shortcutInfo.Arguments
-    expectedTarget := compiled ? scriptPath : interpreterPath
-    if StrLower(StrReplace(Trim(actualTarget), "/", "\"))
-        != StrLower(StrReplace(Trim(expectedTarget), "/", "\"))
+    if !PathsEquivalent(actualTarget, scriptPath)
         return false
-    expectedArguments := compiled ? "" : '"' scriptPath '"'
-    return Trim(actualArguments) == expectedArguments
+    if workingDirectory != ""
+        && !PathsEquivalent(shortcutInfo.WorkingDirectory, workingDirectory)
+        return false
+    return Trim(actualArguments) == ""
+}
+
+LegacyApplicationShortcutLaunchMatches(shortcutPath, scriptPath,
+    workingDirectory, compiled, interpreterPath) {
+    if compiled || !FileExist(shortcutPath) || DirExist(shortcutPath)
+        return false
+    shortcutInfo := ShortcutResolver.Read(shortcutPath)
+    if !shortcutInfo.Readable
+        return false
+    if !PathsEquivalent(shortcutInfo.TargetPath, interpreterPath)
+        return false
+    if workingDirectory != ""
+        && !PathsEquivalent(shortcutInfo.WorkingDirectory, workingDirectory)
+        return false
+    return Trim(shortcutInfo.Arguments) == '"' scriptPath '"'
+}
+
+GetShortcutAppUserModelIdPropertyKey() {
+    static propertyKey := ""
+    if IsObject(propertyKey)
+        return propertyKey
+    propertyKey := Buffer(20, 0)
+    result := DllCall("ole32\IIDFromString", "WStr",
+        "{9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3}", "Ptr",
+        propertyKey, "Int")
+    if result < 0 {
+        propertyKey := ""
+        throw Error("无法解析快捷方式应用身份属性。")
+    }
+    NumPut("UInt", 5, propertyKey, 16)
+    return propertyKey
+}
+
+OpenShortcutShellLink(shortcutPath) {
+    shellLink := ComObject(
+        "{00021401-0000-0000-C000-000000000046}",
+        "{000214F9-0000-0000-C000-000000000046}")
+    persistFile := ComObjQuery(shellLink,
+        "{0000010B-0000-0000-C000-000000000046}")
+    if ComCall(5, persistFile, "WStr", shortcutPath, "UInt", 0,
+            "Int") < 0
+        throw Error("无法读取快捷方式：" shortcutPath)
+    return {Link: shellLink, PersistFile: persistFile}
+}
+
+SetShellLinkAppUserModelId(shellLink, appUserModelId) {
+    properties := ComObjQuery(shellLink,
+        "{886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99}")
+    propertyValue := Buffer(24, 0)
+    propertyReference := ComValue(0x400C, propertyValue.Ptr)
+    propertyReference[] := String(appUserModelId)
+    try return ComCall(6, properties, "Ptr",
+        GetShortcutAppUserModelIdPropertyKey(), "Ptr", propertyValue,
+        "Int") >= 0
+    finally propertyReference[] := 0
+}
+
+ReadShortcutAppUserModelId(shortcutPath) {
+    if !FileExist(shortcutPath) || DirExist(shortcutPath)
+        return ""
+    propertyValue := Buffer(24, 0)
+    try {
+        shortcut := OpenShortcutShellLink(shortcutPath)
+        properties := ComObjQuery(shortcut.Link,
+            "{886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99}")
+        if ComCall(5, properties, "Ptr",
+                GetShortcutAppUserModelIdPropertyKey(), "Ptr",
+                propertyValue, "Int") < 0
+            return ""
+        valueType := NumGet(propertyValue, 0, "UShort")
+        valuePointer := NumGet(propertyValue, 8, "Ptr")
+        ; 属性系统可把同一字符串规范化为 VT_BSTR 或 VT_LPWSTR。
+        return ((valueType == 8 || valueType == 31) && valuePointer)
+            ? StrGet(valuePointer, "UTF-16") : ""
+    } catch {
+        return ""
+    } finally {
+        try DllCall("ole32\PropVariantClear", "Ptr", propertyValue)
+    }
+}
+
+BackupApplicationShortcutFile(shortcutPath) {
+    if DirExist(shortcutPath)
+        throw Error("快捷方式路径被目录占用：" shortcutPath)
+    if !FileExist(shortcutPath)
+        return {Target: shortcutPath, Existed: false, Backup: ""}
+    backupPath := shortcutPath ".backup-" A_TickCount "-"
+        Format("{:08X}", Random(0, 0xFFFFFFFF))
+    FileCopy(shortcutPath, backupPath, false)
+    return {Target: shortcutPath, Existed: true, Backup: backupPath}
+}
+
+RestoreApplicationShortcutBackups(backups) {
+    failures := []
+    for backup in backups {
+        try {
+            if backup.Existed
+                FileCopy(backup.Backup, backup.Target, true)
+            else if FileExist(backup.Target)
+                FileDelete(backup.Target)
+        } catch as rollbackError {
+            failures.Push(backup.Target "：" rollbackError.Message)
+        }
+    }
+    return failures.Length ? JoinApplicationShortcutErrors(failures) : ""
+}
+
+DeleteApplicationShortcutBackups(backups) {
+    for backup in backups
+        if backup.Backup != "" && FileExist(backup.Backup)
+            try FileDelete(backup.Backup)
+}
+
+JoinApplicationShortcutErrors(messages) {
+    result := ""
+    for message in messages
+        result .= (result == "" ? "" : "；") message
+    return result
+}
+
+CreateApplicationShortcuts(shortcutPaths := "", launchSpec := "") {
+    if !IsObject(shortcutPaths) {
+        shortcutName := Tr("进程守护小助手") ".lnk"
+        shortcutPaths := {
+            Desktop: A_Desktop "\" shortcutName,
+            Programs: A_Programs "\" shortcutName
+        }
+    }
+    if !IsObject(launchSpec) {
+        launchSpec := {
+            ScriptPath: A_ScriptFullPath,
+            WorkingDirectory: A_ScriptDir,
+            Compiled: A_IsCompiled,
+            InterpreterPath: A_AhkPath,
+            IconPath: GetApplicationIconPath()
+        }
+    }
+    programsExisted := !!FileExist(shortcutPaths.Programs)
+    desktopExisted := !!FileExist(shortcutPaths.Desktop)
+    backups := []
+    preserveBackups := false
+    try {
+        backups.Push(BackupApplicationShortcutFile(shortcutPaths.Programs))
+        backups.Push(BackupApplicationShortcutFile(shortcutPaths.Desktop))
+        if !CreateApplicationShortcutFile(shortcutPaths.Programs,
+                launchSpec.ScriptPath, launchSpec.WorkingDirectory,
+                launchSpec.IconPath, launchSpec.Compiled,
+                launchSpec.InterpreterPath)
+            throw Error(shortcutPaths.Programs)
+        if !CreateApplicationShortcutFile(shortcutPaths.Desktop,
+                launchSpec.ScriptPath, launchSpec.WorkingDirectory,
+                launchSpec.IconPath, launchSpec.Compiled,
+                launchSpec.InterpreterPath)
+            throw Error(shortcutPaths.Desktop)
+    } catch as shortcutError {
+        rollbackErrors := RestoreApplicationShortcutBackups(backups)
+        for backup in backups
+            NotifyShellShortcutChanged(backup.Target, backup.Existed)
+        if rollbackErrors != "" {
+            preserveBackups := true
+            throw Error(shortcutError.Message "；回滚快捷方式失败："
+                rollbackErrors)
+        }
+        throw shortcutError
+    } finally {
+        if !preserveBackups
+            DeleteApplicationShortcutBackups(backups)
+    }
+    NotifyShellShortcutChanged(shortcutPaths.Programs, programsExisted)
+    NotifyShellShortcutChanged(shortcutPaths.Desktop, desktopExisted)
+    return shortcutPaths
+}
+
+RepairApplicationShortcutIdentities(shortcutPaths := "",
+    launchSpec := "") {
+    if !IsObject(shortcutPaths) {
+        shortcutName := Tr("进程守护小助手") ".lnk"
+        shortcutPaths := [A_Programs "\" shortcutName,
+            A_Desktop "\" shortcutName]
+    }
+    if !IsObject(launchSpec) {
+        launchSpec := {
+            ScriptPath: A_ScriptFullPath,
+            WorkingDirectory: A_ScriptDir,
+            Compiled: A_IsCompiled,
+            InterpreterPath: A_AhkPath
+        }
+    }
+    repaired := 0
+    for shortcutPath in shortcutPaths {
+        canonicalLaunch := ApplicationShortcutLaunchMatches(shortcutPath,
+            launchSpec.ScriptPath, launchSpec.WorkingDirectory,
+            launchSpec.Compiled, launchSpec.InterpreterPath)
+        legacyLaunch := LegacyApplicationShortcutLaunchMatches(shortcutPath,
+            launchSpec.ScriptPath, launchSpec.WorkingDirectory,
+            launchSpec.Compiled, launchSpec.InterpreterPath)
+        if !canonicalLaunch && !legacyLaunch
+            continue
+        if canonicalLaunch && ReadShortcutAppUserModelId(shortcutPath)
+            == GetApplicationUserModelId()
+            continue
+        repairSuffix := ".identity-" ProcessExist() "-" A_TickCount ".lnk"
+        repairPath := shortcutPath repairSuffix
+        try {
+            if !WriteApplicationShortcut(repairPath, launchSpec.ScriptPath,
+                    launchSpec.WorkingDirectory, "",
+                    Tr("进程守护小助手"), GetApplicationIconPath(),
+                    GetApplicationUserModelId())
+                continue
+            if !ApplicationShortcutMatches(repairPath,
+                    launchSpec.ScriptPath, launchSpec.Compiled,
+                    launchSpec.InterpreterPath,
+                    launchSpec.WorkingDirectory)
+                continue
+            FileMove(repairPath, shortcutPath, true)
+            NotifyShellShortcutChanged(shortcutPath, true)
+            repaired++
+        } finally {
+            if FileExist(repairPath)
+                try FileDelete(repairPath)
+        }
+    }
+    return repaired
 }
 
 NotifyShellShortcutChanged(shortcutPath, existedBefore := false) {
@@ -122,27 +381,9 @@ NotifyShellShortcutChanged(shortcutPath, existedBefore := false) {
 
 CreateDesktopShortcut(ownerGui := "", *) {
     try {
-        shortcutName := Tr("进程守护小助手")
-        desktopPath := A_Desktop "\" shortcutName ".lnk"
-        programsPath := A_Programs "\" shortcutName ".lnk"
-        scriptPath := A_ScriptFullPath
-        iconPath := GetApplicationIconPath()
-        programsExisted := !!FileExist(programsPath)
-        desktopExisted := !!FileExist(desktopPath)
-
-        ; 先创建更容易被忽略的开始菜单入口；只有两处均完成且能读回正确
-        ; 目标时才反馈成功，不能再由桌面一处成功掩盖另一处异常。
-        if !CreateApplicationShortcutFile(programsPath, scriptPath,
-                A_ScriptDir, iconPath, A_IsCompiled, A_AhkPath)
-            throw Error(programsPath)
-        if !CreateApplicationShortcutFile(desktopPath, scriptPath,
-                A_ScriptDir, iconPath, A_IsCompiled, A_AhkPath)
-            throw Error(desktopPath)
-
-        NotifyShellShortcutChanged(programsPath, programsExisted)
-        NotifyShellShortcutChanged(desktopPath, desktopExisted)
+        shortcutPaths := CreateApplicationShortcuts()
         LogMsg(Tr("已创建桌面与开始菜单快捷方式。") " "
-            desktopPath " | " programsPath)
+            shortcutPaths.Desktop " | " shortcutPaths.Programs)
         return true
     } catch as shortcutErr {
         ShowDarkMsgBox(Tr("创建快捷方式失败：{1}",
