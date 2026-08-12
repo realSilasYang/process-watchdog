@@ -135,13 +135,15 @@ RunSystemIntegrationShortcutTests() {
                 && ReadShortcutAppUserModelId(chainPaths.Programs)
                     == GetApplicationUserModelId(),
             "创建按钮生成的开始菜单入口未满足目标隔离、Logo 或 AppID 约束")
-        Run(chainPaths.Desktop, chainRoot)
-        deadline := A_TickCount + 10000
-        while !FileExist(probeOutput) && A_TickCount < deadline
-            Sleep(50)
-        AssertSystemIntegrationShortcut(FileExist(probeOutput)
-                && FileRead(probeOutput, "UTF-8") == chainRoot "|0",
-            "源码快捷方式未能经系统文件关联启动或工作目录不正确")
+        if HasRunnableAhkFileAssociation() {
+            Run(chainPaths.Desktop, chainRoot)
+            deadline := A_TickCount + 10000
+            while !FileExist(probeOutput) && A_TickCount < deadline
+                Sleep(50)
+            AssertSystemIntegrationShortcut(FileExist(probeOutput)
+                    && FileRead(probeOutput, "UTF-8") == chainRoot "|0",
+                "源码快捷方式未能经系统文件关联启动或工作目录不正确")
+        }
 
         rollbackRoot := testRoot "\rollback"
         DirCreate(rollbackRoot)
@@ -177,4 +179,20 @@ CountSystemIntegrationShortcutFiles(directory, pattern) {
     Loop Files directory "\" pattern, "FR"
         count++
     return count
+}
+
+HasRunnableAhkFileAssociation() {
+    static ASSOCSTR_EXECUTABLE := 2
+    executableLength := 0
+    result := DllCall("shlwapi\AssocQueryStringW",
+        "UInt", 0, "UInt", ASSOCSTR_EXECUTABLE, "WStr", ".ahk",
+        "Ptr", 0, "Ptr", 0, "UInt*", &executableLength, "Int")
+    if result < 0 || executableLength <= 1
+        return false
+    executableBuffer := Buffer(executableLength * 2, 0)
+    result := DllCall("shlwapi\AssocQueryStringW",
+        "UInt", 0, "UInt", ASSOCSTR_EXECUTABLE, "WStr", ".ahk",
+        "Ptr", 0, "Ptr", executableBuffer, "UInt*", &executableLength,
+        "Int")
+    return result >= 0 && !!FileExist(StrGet(executableBuffer, "UTF-16"))
 }
