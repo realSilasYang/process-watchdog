@@ -135,7 +135,7 @@ RunSystemIntegrationShortcutTests() {
                 && ReadShortcutAppUserModelId(chainPaths.Programs)
                     == GetApplicationUserModelId(),
             "创建按钮生成的开始菜单入口未满足目标隔离、Logo 或 AppID 约束")
-        if HasRunnableAhkV2FileAssociation() {
+        if CanLaunchAhkV2ThroughFileAssociation(chainRoot) {
             Run(chainPaths.Desktop, chainRoot)
             deadline := A_TickCount + 10000
             while !FileExist(probeOutput) && A_TickCount < deadline
@@ -203,4 +203,23 @@ HasRunnableAhkV2FileAssociation() {
     catch
         return false
     return RegExMatch(associatedVersion, "^([2-9]|[1-9][0-9]+)\.")
+}
+
+CanLaunchAhkV2ThroughFileAssociation(testRoot) {
+    if !HasRunnableAhkV2FileAssociation()
+        return false
+    probeScript := testRoot "\association-capability-probe.ahk"
+    probeOutput := testRoot "\association-capability-result.txt"
+    FileAppend('#Requires AutoHotkey v2.0`n'
+        . 'FileAppend("ready", A_ScriptDir '
+        . '"\association-capability-result.txt", "UTF-8")`n'
+        . 'ExitApp`n', probeScript, "UTF-8")
+    try Run(probeScript, testRoot)
+    catch
+        return false
+    deadline := A_TickCount + 5000
+    while !FileExist(probeOutput) && A_TickCount < deadline
+        Sleep(50)
+    return FileExist(probeOutput)
+        && FileRead(probeOutput, "UTF-8") == "ready"
 }
