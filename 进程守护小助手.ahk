@@ -13,7 +13,7 @@
 
 ;@Ahk2Exe-SetName 进程守护小助手
 ;@Ahk2Exe-SetDescription 进程、脚本和快捷方式守护工具
-;@Ahk2Exe-SetVersion 2.0.12.0
+;@Ahk2Exe-SetVersion 2.0.13.0
 ;@Ahk2Exe-SetCopyright Copyright (c) 2026 进程守护小助手 contributors
 ;@Ahk2Exe-SetMainIcon assets\app\watchdog.ico
 
@@ -234,14 +234,18 @@ if shellReady
 A_IconHidden := true
 Sleep(50)
 A_IconHidden := false
-; Windows 会把未注册的 AppUserModelID 直接显示为通知来源名称；必须稳定且可读。
-try DllCall("shell32\SetCurrentProcessExplicitAppUserModelID", "WStr", Tr("进程守护小助手"))
+; 源码版由公共 AutoHotkey64.exe 承载，必须在创建首个 GUI 前声明产品专属
+; 身份；快捷方式使用同一 ID，避免 Shell 把小助手 Logo 关联到普通 AHK 脚本。
+ConfigureApplicationShellIdentity()
 
 applicationIconPath := GetApplicationIconPath()
 if FileExist(applicationIconPath) {
     TraySetIcon(applicationIconPath)
     SetWindowIcon(A_ScriptHwnd, applicationIconPath)
 }
+; 只迁移目标、参数和工作目录都属于本项目的既有快捷方式；不创建新入口，
+; 也不触碰其它 AutoHotkey 脚本或系统文件关联。
+try RepairApplicationShortcutIdentities()
 
 ; 主窗口在共享服务之后创建；控件安装前先建立唯一的长期窗口所有者。
 global Main := MainWindow()

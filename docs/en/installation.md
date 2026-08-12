@@ -58,10 +58,14 @@ automatic startup removes only a task created by this application whose ownershi
 identity still matches.
 
 Both compiled and source runtime forms are supported. An EXE-created shortcut points
-to the actual runtime EXE. A source-created shortcut points to the current AutoHotkey interpreter and
-passes the main AHK file as an argument. The scheduled task records the current
-form in the same way. Desktop, Start menu, and scheduled-task entries use one
-product name, so only one form is integrated at a time:
+to the actual runtime EXE. A source-created shortcut points directly to the assistant's main AHK file,
+letting the Windows file association select the AutoHotkey interpreter. Both forms write the assistant's
+stable product-specific application identity and icon. They do not associate the product icon with the
+shared AutoHotkey interpreter or affect taskbar icons for unrelated AHK scripts. Existing
+interpreter-plus-script shortcuts are migrated only when their complete identity matches this project.
+Desktop and Start menu entries are created and verified together; if either operation fails, both entries
+are restored to their previous state. The scheduled task records the current form in the same way.
+Desktop, Start menu, and scheduled-task entries use one product name, so only one form is integrated at a time:
 
 - Creating shortcuts from the other form updates the entries with the same names.
 - If Startup finds a project-owned task for the other form, it shows

@@ -26,6 +26,10 @@ $appModuleSource = ($appModuleFiles | ForEach-Object {
 $source = $appModuleSource + "`n" + $mainSource
 $applicationTelemetrySource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\ApplicationTelemetry.ahk') -Raw -Encoding UTF8
+$runtimeAdaptersSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\RuntimeAdapters.ahk') -Raw -Encoding UTF8
+$systemIntegrationSource = Get-Content -LiteralPath `
+    (Join-Path $projectRoot 'app\SystemIntegration.ahk') -Raw -Encoding UTF8
 $mainVisualPipelineSource = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'app\UI\MainVisualPipeline.ahk') -Raw -Encoding UTF8
 $interactionPresenterSource = Get-Content -LiteralPath `
@@ -703,7 +707,7 @@ foreach ($dependencyDocument in @(
 
 foreach ($notificationRequirement in @(
     'OnMessage(Win32.AHK_NOTIFYICON, OnTrayNotification)',
-    'SetCurrentProcessExplicitAppUserModelID", "WStr"',
+    'ConfigureApplicationShellIdentity()',
     '(lParam & 0xFFFF) == Win32.NIN_BALLOONUSERCLICK',
     'SetTimer(OpenNotificationWindows, -1)',
     'ShowMainGui()',
@@ -714,8 +718,22 @@ foreach ($notificationRequirement in @(
         $failures.Add("Missing actionable notification behavior: $notificationRequirement")
     }
 }
-if ($source -notmatch 'SetCurrentProcessExplicitAppUserModelID",\s*"WStr",\s*Tr\("\u8FDB\u7A0B\u5B88\u62A4\u5C0F\u52A9\u624B"\)') {
-    $failures.Add('Notification AppUserModelID must use the localized stable application name')
+if ($source -notmatch 'ConfigureApplicationShellIdentity\(\)' -or
+    $runtimeAdaptersSource -notmatch 'return\s+"realSilasYang\.ProcessWatchdogAssistant"' -or
+    $systemIntegrationSource -notmatch 'WriteApplicationShortcut\([\s\S]{0,500}GetApplicationUserModelId\(\)') {
+    $failures.Add('Process and shortcut identities must share the stable product AppUserModelID')
+}
+if ($systemIntegrationSource -notmatch
+        'CreateApplicationShortcutFile\([\s\S]{0,260}WriteApplicationShortcut\(shortcutPath,\s*scriptPath,\s*workingDirectory' -or
+    $systemIntegrationSource -match
+        'CreateApplicationShortcutFile\([\s\S]{0,260}targetPath\s*:=\s*compiled\s*\?\s*scriptPath\s*:\s*interpreterPath') {
+    $failures.Add('Source shortcuts must target the product script, never the shared AutoHotkey interpreter')
+}
+if ($settingsWindowSource -notmatch
+        'CreateShortcut\(\*\)\s*\{[\s\S]{0,180}CreateDesktopShortcut\(this\.gui\)[\s\S]{0,100}ShowShortcutCreatedFeedback\(\)' -or
+    $systemIntegrationSource -notmatch
+        'CreateDesktopShortcut\([\s\S]{0,180}CreateApplicationShortcuts\(\)') {
+    $failures.Add('The settings shortcut button must use the verified transactional shortcut service')
 }
 if ($source -match 'ProcessWatchdog_\s*"?\s*\.\s*A_ScriptHwnd') {
     $failures.Add('Notification AppUserModelID must not contain a per-process window handle')

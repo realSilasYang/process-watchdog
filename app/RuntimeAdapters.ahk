@@ -23,6 +23,21 @@ GetApplicationIconPath() {
     return GetApplicationAssetPath("app\watchdog.ico")
 }
 
+GetApplicationUserModelId() {
+    ; 不包含语言、版本、安装路径或解释器名称，确保源码版和 EXE 版共享
+    ; 同一应用身份，同时不会污染由公共 AutoHotkey 解释器承载的其它脚本。
+    return "realSilasYang.ProcessWatchdogAssistant"
+}
+
+ConfigureApplicationShellIdentity() {
+    try result := DllCall(
+        "shell32\SetCurrentProcessExplicitAppUserModelID",
+        "WStr", GetApplicationUserModelId(), "Int")
+    catch
+        return false
+    return result >= 0
+}
+
 ParseBoundedInteger(value, minValue, maxValue) {
     value := Trim(String(value))
     if !RegExMatch(value, "^\d+$")
