@@ -6,14 +6,14 @@
     【核心特性说明】
     1. 多态守护：支持原生应用、解释型脚本、批处理文件和快捷方式等常见启动入口。
     2. 进程探活：优先使用原生快照与已核验 PID，命令行证据由后台 WMI 快照补充。
-    3. 深色界面：通过 Windows 原生窗口、主题和 Shell 接口统一适配标题栏、控件与图标。
+    3. 主题界面：通过 Windows 原生窗口、主题和 Shell 接口统一适配标题栏、控件与图标。
     4. 异常处理：快速重试耗尽后改为间隔自动重试，避免连续崩溃造成资源过度占用。
 ================================================================================
 */
 
 ;@Ahk2Exe-SetName 进程守护小助手
 ;@Ahk2Exe-SetDescription 进程、脚本和快捷方式守护工具
-;@Ahk2Exe-SetVersion 2.0.11.0
+;@Ahk2Exe-SetVersion 2.0.12.0
 ;@Ahk2Exe-SetCopyright Copyright (c) 2026 进程守护小助手 contributors
 ;@Ahk2Exe-SetMainIcon assets\app\watchdog.ico
 
@@ -342,11 +342,15 @@ SetButtonLeadingTextSlot(Main.btnDel, 20, 4)
 RegisterHoverButton(Main.btnSet, UiThemeService.Color("Toolbar"))
 RegisterHoverButton(Main.btnSupport, UiThemeService.Color("Toolbar"))
 RegisterHoverButton(Main.btnAbout, UiThemeService.Color("Toolbar"))
-SetButtonLucideIcon(Main.btnSet, "settings.svg", 15, 6)
-SetButtonLucideIcon(Main.btnSupport, "circle-question-mark.svg", 15, 6)
-SetButtonLucideIcon(Main.btnAbout, "circle-info.svg", 15, 6)
+SetButtonLucideIcon(Main.btnSet, "settings.svg", 15, 6,
+    "theme:SettingsIcon")
+SetButtonLucideIcon(Main.btnSupport, "circle-question-mark.svg", 15, 6,
+    "theme:HelpIcon")
+SetButtonLucideIcon(Main.btnAbout, "circle-info.svg", 15, 6,
+    "theme:AboutIcon")
 ; 主列表统一使用 28px 逻辑尺寸，并按窗口 DPI 缩放。
 Main.appIcons := CreateMainImageList(Main.statusIconIndices)
+Main.statusIconTheme := UiThemeService.IsDark() ? "dark" : "light"
 
 Main.gui.SetFont("s12 c" UiThemeService.Color("Text"),
     LocalizationService.GetUiFontName()) ; 列表单独使用较大字号，便于连续扫描名称和状态。
@@ -765,6 +769,10 @@ RefreshMainWindowTheme() {
         " c" UiThemeService.Color("Text"))
     Main.lv.SetFont("c" UiThemeService.Color("Text"))
     SetDarkListView(Main.lv.Hwnd)
+    currentStatusIconTheme := UiThemeService.IsDark() ? "dark" : "light"
+    if !Main.HasOwnProp("statusIconTheme")
+        || Main.statusIconTheme != currentStatusIconTheme
+        RefreshMainStatusIconAlignment()
     if App.activeInlineEditHwnd
         DarkInlineEditThemeRegistry.Refresh(App.activeInlineEditHwnd)
     if Main.HasOwnProp("listHeader") && IsObject(Main.listHeader) {

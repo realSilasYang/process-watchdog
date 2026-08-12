@@ -1,4 +1,4 @@
-; 深色悬浮提示窗口。
+; 主题悬浮提示窗口。
 ; 根据文本测量结果和当前显示器工作区动态定位，既不抢夺键盘焦点，也不越出屏幕；
 ; 字体和窗口句柄只在窗口存活期间使用，销毁后必须清空以免命中旧对象。
 
@@ -8,6 +8,39 @@ class DarkTooltipWindow extends ManagedWindow {
         this.lastHwnd := 0
         this.lastRow := 0
         this.textControl := ""
+        this.appearanceKey := ""
+    }
+
+    GetPresentationConfig() {
+        if UiThemeService.IsDark() {
+            return {
+                Key: "dark",
+                Background: UiThemeService.Color("Tooltip"),
+                Text: UiThemeService.Color("TooltipText"),
+                FontSize: 9,
+                PaddingX: 12,
+                PaddingY: 8,
+                MaxTextWidth: 440,
+                DelayMs: 500,
+                OffsetX: 10,
+                OffsetY: 20,
+                ExtendedStyle: ""
+            }
+        }
+        return {
+            Key: "light",
+            Background: UiThemeService.Color("HoverPreview"),
+            Text: UiThemeService.Color("HoverPreviewText"),
+            FontSize: 10,
+            PaddingX: 12,
+            PaddingY: 8,
+            MaxTextWidth: 420,
+            DelayMs: 350,
+            OffsetX: 12,
+            OffsetY: 20,
+            ; WS_EX_NOACTIVATE | WS_EX_TRANSPARENT：不抢焦点，命中测试穿透。
+            ExtendedStyle: " +E0x08000020"
+        }
     }
 
     HandleMouseMove(wParam, lParam, msg, hwnd) {
@@ -71,11 +104,20 @@ class DarkTooltipWindow extends ManagedWindow {
                     text := Tr("查看版本、运行环境和项目入口")
                 }
             }
-            if (text != "") {
-                this.hoverTimer := ObjBindMethod(this, "Show", text)
-                SetTimer(this.hoverTimer, -500)
-            }
+            if (text != "")
+                this.Schedule(text)
         }
+    }
+
+    Schedule(text) {
+        text := RTrim(NormalizeUserVisibleParentheses(text), "`r`n")
+        if text == ""
+            return false
+        this.CancelTimer()
+        this.Hide(false)
+        this.hoverTimer := ObjBindMethod(this, "Show", text)
+        SetTimer(this.hoverTimer, -this.GetPresentationConfig().DelayMs)
+        return true
     }
 
     BuildEnvironmentText(state) {
@@ -105,16 +147,23 @@ class DarkTooltipWindow extends ManagedWindow {
         ; 一个额外空行，因此在统一入口裁掉行尾换行，再进行测量和显示。
         text := RTrim(NormalizeUserVisibleParentheses(text), "`r`n")
         this.hoverTimer := 0
+        appearance := this.GetPresentationConfig()
+        if this.IsOpen() && this.appearanceKey != appearance.Key {
+            this.DestroyGui()
+            this.textControl := ""
+        }
         if !this.IsOpen() {
-            this.gui := Gui("-Caption +ToolWindow +AlwaysOnTop +LastFound")
-            this.gui.BackColor := UiThemeService.Color("Tooltip")
-            this.gui.SetFont("s9 c" UiThemeService.Color("TooltipText"),
+            this.gui := Gui("-Caption +ToolWindow +AlwaysOnTop +LastFound"
+                appearance.ExtendedStyle)
+            this.gui.BackColor := appearance.Background
+            this.gui.SetFont("norm s" appearance.FontSize " c"
+                appearance.Text,
                 LocalizationService.GetUiFontName())
-            this.gui.MarginX := 12
-            this.gui.MarginY := 8
+            this.gui.MarginX := appearance.PaddingX
+            this.gui.MarginY := appearance.PaddingY
             this.textControl := this.gui.Add("Text", "Background"
-                UiThemeService.Color("Tooltip") " c"
-                UiThemeService.Color("TooltipText"), text)
+                appearance.Background " c" appearance.Text, text)
+            this.appearanceKey := appearance.Key
             if (VerCompare(A_OSVersion, "10.0.18362") >= 0) {
                 try DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", this.gui.Hwnd, "Int", 33, "Int*", 2, "Int", 4)
                 try DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", this.gui.Hwnd, "Int", 2, "Int*", 2, "Int", 4)
@@ -122,16 +171,16 @@ class DarkTooltipWindow extends ManagedWindow {
         } else {
             this.textControl.Text := text
         }
-        this.ResizeTextControl(text)
+        this.ResizeTextControl(text, appearance.MaxTextWidth)
         point := Buffer(8)
         DllCall("user32\GetCursorPos", "Ptr", point)
         mouseX := NumGet(point, 0, "Int")
         mouseY := NumGet(point, 4, "Int")
-        ShowApplicationWindow(this.gui, "x" (mouseX + 10) " y"
-            (mouseY + 20) " NoActivate AutoSize")
+        ShowApplicationWindow(this.gui, "x" (mouseX + appearance.OffsetX)
+            " y" (mouseY + appearance.OffsetY) " NoActivate AutoSize")
     }
 
-    ResizeTextControl(text) {
+    ResizeTextControl(text, maxTextWidthDip := 440) {
         deviceContext := DllCall("user32\GetDC", "Ptr", this.textControl.Hwnd, "Ptr")
         if !deviceContext
             return
@@ -143,7 +192,7 @@ class DarkTooltipWindow extends ManagedWindow {
             try dpi := DllCall("user32\GetDpiForWindow", "Ptr", this.gui.Hwnd, "UInt")
             if !dpi
                 dpi := 96
-            maxWidthPx := Round(440 * dpi / 96)
+            maxWidthPx := Round(maxTextWidthDip * dpi / 96)
             naturalWidthPx := 1
             Loop Parse, text, "`n", "`r" {
                 lineText := A_LoopField != "" ? A_LoopField : " "
@@ -188,5 +237,6 @@ class DarkTooltipWindow extends ManagedWindow {
         this.Hide()
         this.DestroyGui()
         this.textControl := ""
+        this.appearanceKey := ""
     }
 }

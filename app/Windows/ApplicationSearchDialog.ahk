@@ -112,7 +112,8 @@ class ApplicationSearchDialog extends ManagedWindow {
             this.searchLabel, 17, 0, 0, "Text", "Window")
         this.searchLabelPresenter.SetItems([{
             Text: "",
-            IconPath: GetApplicationAssetPath("ui-icons\lucide\search.svg")
+            IconPath: GetApplicationAssetPath("ui-icons\lucide\search.svg"),
+            IconColorRole: "SearchIcon"
         }], Tr("搜索："))
         searchInput := AddCenteredSingleLineEdit(this.gui, this.searchInputX,
             15, 700 - this.searchInputX - 20, 25, "", "",
@@ -331,8 +332,12 @@ class ApplicationSearchDialog extends ManagedWindow {
             row += 1
             if (row != this.hoverRow) {
                 this.hoverRow := row
-                this.tooltip.Show(Tr("名称：{1}`n真实路径：{2}",
-                    this.lv.GetText(row, 1), this.lv.GetText(row, 2)))
+                tooltipText := Tr("名称：{1}`n真实路径：{2}",
+                    this.lv.GetText(row, 1), this.lv.GetText(row, 2))
+                if UiThemeService.IsDark()
+                    this.tooltip.Show(tooltipText)
+                else
+                    this.tooltip.Schedule(tooltipText)
             }
         } else if (this.hoverRow != 0) {
             this.hoverRow := 0

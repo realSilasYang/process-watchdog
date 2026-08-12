@@ -153,6 +153,11 @@ class UiThemeService {
         return palette.Has(key) ? palette[key] : "000000"
     }
 
+    static HasColor(name) {
+        palette := this.IsDark() ? this.DarkPalette() : this.LightPalette()
+        return palette.Has(String(name))
+    }
+
     static DarkPalette() {
         palette := Map()
         palette.CaseSense := "On"
@@ -166,10 +171,27 @@ class UiThemeService {
             ["Add", "3F6B5B"], ["Delete", "6B4B4B"], ["DeleteDisabled", "554B4B"],
             ["Pause", "6B6244"], ["PauseDisabled", "555148"],
             ["Tooltip", "202020"], ["TooltipText", "E5E5E5"], ["ReadonlyText", "D8D8D8"],
+            ["HoverPreview", "202020"], ["HoverPreviewText", "E5E5E5"],
             ["DisabledText", "B8BAB9"], ["ButtonText", "FFFFFF"],
             ["ToolbarText", "FFFFFF"],
             ["DisabledButtonText", "D8D8D8"],
-            ["TabText", "E5E5E5"], ["TabActiveText", "FFFFFF"]
+            ["TabText", "E5E5E5"], ["TabActiveText", "FFFFFF"],
+            ; SVG 语义色的深色值与现有资源一致；只有浅色主题需要使用
+            ; 更深的同类颜色，避免图标在近白表面和蓝灰工具栏上失去轮廓。
+            ["SettingsIcon", "BABABC"], ["HelpIcon", "23A9F2"],
+            ["AboutIcon", "B9A3FF"], ["SearchIcon", "1EA596"],
+            ["BrowseIcon", "93A8EA"], ["UpdateIcon", "878DF9"],
+            ["DonationIcon", "F78FB3"], ["LogsIcon", "5DD4E8"],
+            ["AutomationIcon", "B9A3FF"], ["DisplayIcon", "4EA1FF"],
+            ["LanguageIcon", "4EA1FF"], ["FontIcon", "43C97B"],
+            ["ThemeIcon", "F0A020"], ["StartupIcon", "B4875A"],
+            ["MonitoringIcon", "69D19A"], ["SuccessIcon", "03C078"],
+            ["DangerIcon", "EF4444"], ["StrongDangerIcon", "FF9A9A"],
+            ["WarningIcon", "FBBF24"], ["PauseIcon", "F4A71D"],
+            ["WaitingIcon", "A0B7FF"], ["QueryIcon", "E9C08C"],
+            ["RelocationIcon", "5DD4E8"], ["UnknownIcon", "858585"],
+            ["InitializingIcon", "0F7EE7"],
+            ["PermissionIcon", "A16207"], ["SafeStartIcon", "5F9B0D"]
         ]
             palette[pair[1]] := pair[2]
         return palette
@@ -190,10 +212,26 @@ class UiThemeService {
             ["Add", "4B7F6B"], ["Delete", "A95F5F"], ["DeleteDisabled", "787676"],
             ["Pause", "8C7138"], ["PauseDisabled", "777671"],
             ["Tooltip", "F8FAFC"], ["TooltipText", "1E293B"], ["ReadonlyText", "334155"],
+            ["HoverPreview", "E2E8F0"], ["HoverPreviewText", "0F172A"],
             ["DisabledText", "667085"], ["ButtonText", "FFFFFF"],
             ["ToolbarText", "334155"],
             ["DisabledButtonText", "FFFFFF"],
-            ["TabText", "334155"], ["TabActiveText", "FFFFFF"]
+            ["TabText", "334155"], ["TabActiveText", "FFFFFF"],
+            ["SettingsIcon", "475569"], ["HelpIcon", "0369A1"],
+            ["AboutIcon", "5B21B6"], ["SearchIcon", "0F766E"],
+            ["BrowseIcon", "1D4ED8"], ["UpdateIcon", "4338CA"],
+            ["DonationIcon", "BE185D"], ["LogsIcon", "0E7490"],
+            ["AutomationIcon", "5B21B6"], ["DisplayIcon", "0369A1"],
+            ["LanguageIcon", "1D4ED8"], ["FontIcon", "15803D"],
+            ["ThemeIcon", "B45309"], ["StartupIcon", "92400E"],
+            ["MonitoringIcon", "15803D"], ["SuccessIcon", "157A50"],
+            ["DangerIcon", "C23B3B"], ["StrongDangerIcon", "C23B3B"],
+            ["WarningIcon", "B45309"], ["PauseIcon", "B45309"],
+            ["WaitingIcon", "1D4ED8"], ["QueryIcon", "92400E"],
+            ["RelocationIcon", "0E7490"], ["UnknownIcon", "526170"],
+            ["InitializingIcon", "0369A1"],
+            ; 这两种原色在深浅背景下均达到非文本图形所需对比度，保留不变。
+            ["PermissionIcon", "A16207"], ["SafeStartIcon", "5F9B0D"]
         ]
             palette[pair[1]] := pair[2]
         return palette

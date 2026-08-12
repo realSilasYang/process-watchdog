@@ -36,7 +36,8 @@ class BatchOutputLogNoticeWindow extends ManagedWindow {
                     UiThemeService.Color("Surface"), "")
             RegisterHoverButton(this.iconBadge,
                 UiThemeService.Color("Surface"))
-            SetButtonLucideIcon(this.iconBadge, "file-clock.svg", 24, 0)
+            SetButtonLucideIcon(this.iconBadge, "file-clock.svg", 24, 0,
+                "theme:WaitingIcon")
             SetRegisteredButtonEnabled(this.iconBadge, false)
 
             textX := 82

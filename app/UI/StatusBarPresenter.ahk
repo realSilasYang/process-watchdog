@@ -68,23 +68,30 @@ class SvgStatusBarPresenter {
         }
     }
 
-    GetIcon(svgPath, dpi) {
+    GetIcon(svgPath, dpi, tintColor := "") {
         try svgPath := String(svgPath)
         catch
             return false
         if svgPath == "" || !FileExist(svgPath) || DirExist(svgPath)
             return false
-        if this.svgSnapshots.Has(svgPath)
-            return this.svgSnapshots[svgPath]
+        tintColor := Trim(String(tintColor))
+        cacheKey := svgPath Chr(31) dpi Chr(31) StrUpper(tintColor)
+        if this.svgSnapshots.Has(cacheKey)
+            return this.svgSnapshots[cacheKey]
         targetPixels := Max(1, Round(this.iconSizeDip * dpi / 96))
         renderSize := Max(64, Min(512, targetPixels * 4))
         snapshot := App.svgRenderer.RenderFile(svgPath, dpi, renderSize)
+        if snapshot && tintColor != "" {
+            tintedSnapshot := TintButtonIconSnapshot(snapshot, tintColor)
+            if tintedSnapshot
+                snapshot := tintedSnapshot
+        }
         image := snapshot ? {
             Width: snapshot.Width,
             Height: snapshot.Height,
             Pixels: snapshot.Pixels
         } : false
-        this.svgSnapshots[svgPath] := image
+        this.svgSnapshots[cacheKey] := image
         return image
     }
 
@@ -192,7 +199,13 @@ class SvgStatusBarPresenter {
                         height, dpi)
                     x += Max(1, Round(9 * dpi / 96))
                 }
-                image := this.GetIcon(item.IconPath, dpi)
+                ; 深色主题继续使用 SVG 自带颜色；语义色只修正浅色表面的对比度。
+                iconColor := !UiThemeService.IsDark()
+                    && item.HasOwnProp("IconColorRole")
+                    && UiThemeService.HasColor(item.IconColorRole)
+                    ? UiThemeService.Color(item.IconColorRole)
+                    : (item.HasOwnProp("IconColor") ? item.IconColor : "")
+                image := this.GetIcon(item.IconPath, dpi, iconColor)
                 if image {
                     iconY := Floor((height - layout.IconSize) / 2)
                     RoundedButtonRenderer.DrawPixelImage(memoryDc, image,

@@ -124,10 +124,12 @@ class AboutWindow extends ManagedWindow {
                     this.projectButton]
                 RegisterHoverButton(button, UiThemeService.Color("Toolbar"))
             SetButtonLucideIcon(this.checkUpdateButton,
-                "refresh-cw-action.svg", 15, 7)
+                "refresh-cw-action.svg", 15, 7, "theme:UpdateIcon")
             SetButtonSvgIcon(this.projectButton,
-                GetApplicationAssetPath("ui-icons\external-link.svg"), 14, 7)
-            SetButtonLucideIcon(this.donationButton, "heart.svg", 15, 7)
+                GetApplicationAssetPath("ui-icons\external-link.svg"), 14, 7,
+                "theme:BrowseIcon")
+            SetButtonLucideIcon(this.donationButton, "heart.svg", 15, 7,
+                "theme:DonationIcon")
             SetButtonTooltip(this.projectButton, Tr("点个 star 吧~"))
             SetButtonTooltip(this.donationButton,
                 Tr("快揭不开锅了（≥Д≤）"))

@@ -541,6 +541,8 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             Tr("停止策略"), Tr("日志")]
         expectedTabIcons := ["monitor.svg", "rocket.svg", "activity.svg",
             "octagon-x.svg", "logs.svg"]
+        expectedTabIconRoles := ["DisplayIcon", "StartupIcon",
+            "MonitoringIcon", "StrongDangerIcon", "LogsIcon"]
         AssertLocalizedWindow(settingsDialog.tabButtons.Length == 5
             && settingsDialog.tabControls.Length == 5,
             language " 设置窗口没有严格收敛为五个选项卡")
@@ -553,7 +555,17 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             AssertLocalizedWindow(tabButtonState.HasOwnProp("buttonImage")
                 && tabButtonState.buttonImage.sourcePath
                     == GetApplicationAssetPath("ui-icons\lucide\"
-                        expectedTabIcons[tabIndex]),
+                        expectedTabIcons[tabIndex])
+                && tabButtonState.buttonImage.tintMode == "theme"
+                && tabButtonState.buttonImage.tintRole
+                    == expectedTabIconRoles[tabIndex]
+                && tabButtonState.buttonImage.resolvedTint
+                    == (UiThemeService.IsDark()
+                        ? "source"
+                        : tabIndex == 1
+                        ? UiThemeService.Color("TabActiveText")
+                        : UiThemeService.Color(
+                            expectedTabIconRoles[tabIndex])),
                 language " 设置窗口选项卡缺少匹配语义的 SVG 图标："
                     tabIndex)
         }
@@ -651,20 +663,27 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
                 == settingsDialog.layout.DisplayField.Width
             && displayControlWidth < settingsDialog.layout.ContentWidth,
             language " 显示页值控件仍占用近乎完整的正文宽度")
-        displayIconPaths := Map()
+        displayIconStates := Map()
         for displayControl in settingsDialog.tabControls[1] {
             if !App.uiInteractions.HasButton(displayControl.Hwnd)
                 continue
             displayControlState := App.uiInteractions.GetButton(
                 displayControl.Hwnd)
             if displayControlState.HasOwnProp("buttonImage")
-                displayIconPaths[displayControlState.buttonImage.sourcePath]
-                    := true
+                displayIconStates[displayControlState.buttonImage.sourcePath]
+                    := displayControlState.buttonImage
         }
-        for displayIconName in ["languages.svg", "type.svg", "palette.svg"] {
-            AssertLocalizedWindow(displayIconPaths.Has(
-                GetApplicationAssetPath("ui-icons\lucide\"
-                    displayIconName)),
+        displayIconRoles := Map("languages.svg", "LanguageIcon",
+            "type.svg", "FontIcon", "palette.svg", "ThemeIcon")
+        for displayIconName, displayIconRole in displayIconRoles {
+            displayIconPath := GetApplicationAssetPath(
+                "ui-icons\lucide\" displayIconName)
+            AssertLocalizedWindow(displayIconStates.Has(displayIconPath)
+                && displayIconStates[displayIconPath].tintRole
+                    == displayIconRole
+                && displayIconStates[displayIconPath].resolvedTint
+                    == (UiThemeService.IsDark()
+                        ? "source" : UiThemeService.Color(displayIconRole)),
                 language " 显示设置缺少匹配语义的 SVG 图标："
                     displayIconName)
         }
@@ -1246,10 +1265,13 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             && updateButtonState.buttonImage.sourcePath
                 == GetApplicationAssetPath(
                     "ui-icons\lucide\refresh-cw-action.svg")
+            && updateButtonState.buttonImage.tintRole == "UpdateIcon"
             && donationButtonState.buttonImage.sourcePath
                 == GetApplicationAssetPath("ui-icons\lucide\heart.svg")
+            && donationButtonState.buttonImage.tintRole == "DonationIcon"
             && projectButtonState.buttonImage.sourcePath
                 == GetApplicationAssetPath("ui-icons\external-link.svg")
+            && projectButtonState.buttonImage.tintRole == "BrowseIcon"
             && donationButtonState.tooltipText
                 == Tr("快揭不开锅了（≥Д≤）")
             && projectButtonState.tooltipText == Tr("点个 star 吧~"),
@@ -1268,11 +1290,38 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             language " 关于窗口按钮没有按检查更新、打赏、开源地址排列")
 
         tooltipDialog := DarkTooltipWindow()
+        tooltipAppearance := tooltipDialog.GetPresentationConfig()
+        AssertLocalizedWindow(
+            tooltipAppearance.PaddingX == 12
+            && tooltipAppearance.PaddingY == 8
+            && tooltipAppearance.OffsetY == 20
+            && (UiThemeService.IsDark()
+                ? tooltipAppearance.Background
+                    == UiThemeService.Color("Tooltip")
+                    && tooltipAppearance.Text
+                        == UiThemeService.Color("TooltipText")
+                    && tooltipAppearance.FontSize == 9
+                    && tooltipAppearance.MaxTextWidth == 440
+                    && tooltipAppearance.DelayMs == 500
+                    && tooltipAppearance.OffsetX == 10
+                    && tooltipAppearance.ExtendedStyle == ""
+                : tooltipAppearance.Background == "E2E8F0"
+                    && tooltipAppearance.Text == "0F172A"
+                    && tooltipAppearance.FontSize == 10
+                    && tooltipAppearance.MaxTextWidth == 420
+                    && tooltipAppearance.DelayMs == 350
+                    && tooltipAppearance.OffsetX == 12
+                    && InStr(tooltipAppearance.ExtendedStyle,
+                        "E0x08000020")),
+            language " 悬停预览参数没有按当前主题完整配置")
         tooltipDialog.HandleMouseMove(0, 0, Win32.WM_MOUSEMOVE,
             aboutDialog.projectButton.Hwnd)
         Sleep(550)
         AssertLocalizedWindow(tooltipDialog.IsOpen()
-            && tooltipDialog.textControl.Text == Tr("点个 star 吧~"),
+            && tooltipDialog.textControl.Text == Tr("点个 star 吧~")
+            && (UiThemeService.IsDark()
+                || (WinGetExStyle("ahk_id " tooltipDialog.gui.Hwnd)
+                    & 0x08000020) == 0x08000020),
             language " 开源地址按钮悬浮后没有显示 star 提示")
         tooltipDialog.Close()
         tooltipDialog := ""
@@ -1438,6 +1487,8 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
                 && addWindow.search.searchLabelPresenter.items[1].IconPath
                     == GetApplicationAssetPath(
                         "ui-icons\lucide\search.svg")
+                && addWindow.search.searchLabelPresenter.items[1]
+                    .IconColorRole == "SearchIcon"
                 && addWindow.search.listHeader.Columns.Length == 3
                 && addWindow.search.listHeader.Columns[3].Column == 3
                 && addWindow.search.listHeader.Columns[3].Label
@@ -2076,15 +2127,18 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             && supportGuideState.buttonImage.sourcePath
                 == GetApplicationAssetPath(
                     "ui-icons\lucide\book-open.svg")
+            && supportGuideState.buttonImage.tintRole == "BrowseIcon"
             && !supportLogState.HasOwnProp("buttonIcon")
             && supportLogState.HasOwnProp("buttonImage")
             && supportLogState.buttonImage.sourcePath
                 == GetApplicationAssetPath("ui-icons\lucide\logs.svg")
+            && supportLogState.buttonImage.tintRole == "LogsIcon"
             && !supportFeedbackState.HasOwnProp("buttonIcon")
             && supportFeedbackState.HasOwnProp("buttonImage")
             && supportFeedbackState.buttonImage.sourcePath
                 == GetApplicationAssetPath(
                     "ui-icons\lucide\message-square-text.svg")
+            && supportFeedbackState.buttonImage.tintRole == "AboutIcon"
             && supportFeedbackState.HasOwnProp("tooltipText")
             && supportFeedbackState.tooltipText == Tr("找作者对线"),
             language " 帮助窗口 SVG 图标或反馈按钮提示状态错误")
@@ -2152,8 +2206,24 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             "DonationWindow")
         AssertLocalizedWindow(donationDialog.qrPictures.Length == 2,
             language " 打赏窗口没有加载两张二维码")
+        expectedDonationQrSuffix := UiThemeService.IsDark()
+            ? "-界面.png" : "-浅色界面.png"
+        expectedDonationQrPaths := [
+            GetApplicationAssetPath("donate\微信个人收款码"
+                expectedDonationQrSuffix),
+            GetApplicationAssetPath("donate\支付宝个人收款码"
+                expectedDonationQrSuffix)
+        ]
+        AssertLocalizedWindow(
+            donationDialog.qrPictures[1].Value
+                == expectedDonationQrPaths[1]
+            && donationDialog.qrPictures[2].Value
+                == expectedDonationQrPaths[2],
+            language " 打赏窗口没有使用与当前主题匹配的二维码")
         AssertLocalizedWindow(donationDialog.qrLabels.Length == 2
-            && donationDialog.messageText,
+            && donationDialog.messageText
+            && donationDialog.messageText.Text
+                == Tr("如果小助手为您节省了恢复程序的时间，欢迎通过下方二维码打赏作者！`n请选择扶贫方式（≥Д≤）"),
             language " 打赏窗口缺少说明或支付方式标签")
         donationClientRect := GetWindowClientRect(donationDialog.gui.Hwnd)
         donationMessageRect := GetControlClientRect(
@@ -2174,14 +2244,23 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
             donationDialog.gui.Hwnd, "UInt")
         if !donationDpi
             donationDpi := 96
+        expectedDonationWindowWidth := LocalizationService.UsesCompactLayout()
+            ? 500 : 680
         expectedDonationQrSize := LocalizationService.UsesCompactLayout()
             ? 180 : 190
         measuredDonationMessageHeight := MeasureWrappedControlTextHeight(
             donationDialog.messageText.Hwnd,
             donationDialog.messageText.Text, donationMessageRect.Width)
-        AssertLocalizedWindow(measuredDonationMessageHeight
+        AssertLocalizedWindow(
+            Abs(donationClientRect.Width
+                - Round(expectedDonationWindowWidth * donationDpi / 96)) <= 2
+            && measuredDonationMessageHeight
                 <= donationMessageRect.Height + 2
             && donationLabelRects[1].Top > donationMessageRect.Bottom
+            && donationLabelRects[1].Top - donationMessageRect.Bottom
+                >= Round(8 * donationDpi / 96)
+            && donationLabelRects[1].Top - donationMessageRect.Bottom
+                <= Round(12 * donationDpi / 96)
             && donationLabelRects[1].Top == donationLabelRects[2].Top
             && donationPictureRects[1].Top >= donationLabelRects[1].Bottom
                 + Round(3 * donationDpi / 96)
@@ -2202,11 +2281,23 @@ RunOneLocalizedWindowPass(language, previewEnvironment := false,
         donationDialog.Close()
 
         tooltipDialog := DarkTooltipWindow()
-        tooltipDialog.Show("First line`nSecond line`n")
+        tooltipAppearance := tooltipDialog.GetPresentationConfig()
+        longTooltipText := "First line`nSecond line`n"
+            . "A deliberately long hover preview line that must wrap before "
+            . "the configured maximum text width instead of expanding forever."
+        tooltipDialog.Show(longTooltipText "`n")
         WinHide("ahk_id " tooltipDialog.gui.Hwnd)
-        AssertLocalizedWindow(tooltipDialog.textControl.Text
-            == "First line`nSecond line",
-            language " 悬浮提示没有裁掉末尾空白行")
+        tooltipTextRect := GetControlClientRect(
+            tooltipDialog.textControl.Hwnd, tooltipDialog.gui.Hwnd)
+        tooltipDpi := DllCall("user32\GetDpiForWindow", "Ptr",
+            tooltipDialog.gui.Hwnd, "UInt")
+        if !tooltipDpi
+            tooltipDpi := 96
+        AssertLocalizedWindow(
+            tooltipDialog.textControl.Text == longTooltipText
+            && tooltipTextRect.Width
+                <= Round(tooltipAppearance.MaxTextWidth * tooltipDpi / 96) + 2,
+            language " 悬停提示没有裁掉末尾空白行或限制自动换行宽度")
         tooltipDialog.Close()
 
         AssertLocalizedWindow(App.uiInteractions.Buttons.Count == 0

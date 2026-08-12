@@ -69,35 +69,43 @@ UpdateStatsUI() {
         {Text: ResolveMainStatsLabel(Tr("统计：运行"), "统计：运行",
                 "运行中") colon running,
             IconPath: GetApplicationAssetPath(
-                "ui-icons\lucide\circle-check-big.svg")},
+                "ui-icons\lucide\circle-check-big.svg"),
+            IconColorRole: "SuccessIcon"},
         {Text: ResolveMainStatsLabel(Tr("统计：暂停"), "统计：暂停",
                 "已暂停") colon paused,
             IconPath: GetApplicationAssetPath(
-                "ui-icons\lucide\circle-pause.svg")},
+                "ui-icons\lucide\circle-pause.svg"),
+            IconColorRole: "PauseIcon"},
         {Text: ResolveMainStatsLabel(Tr("统计：停止"), "统计：停止",
                 "已停止") colon stopped,
-            IconPath: GetApplicationAssetPath("ui-icons\lucide\ban.svg")},
+            IconPath: GetApplicationAssetPath("ui-icons\lucide\ban.svg"),
+            IconColorRole: "DangerIcon"},
         {Text: ResolveMainStatsLabel(Tr("统计：恢复"), "统计：恢复",
                 "恢复中") colon pending,
             IconPath: GetApplicationAssetPath(
-                "ui-icons\lucide\hourglass.svg")},
+                "ui-icons\lucide\hourglass.svg"),
+            IconColorRole: "InitializingIcon"},
         {Text: ResolveMainStatsLabel(Tr("统计：升级"), "统计：升级",
                 "升级中") colon updating,
             IconPath: GetApplicationAssetPath(
-                "ui-icons\lucide\refresh-cw.svg")},
+                "ui-icons\lucide\refresh-cw.svg"),
+            IconColorRole: "UpdateIcon"},
         {Text: ResolveMainStatsLabel(Tr("统计：失效"), "统计：失效",
                 "已失效") colon invalid,
             IconPath: GetApplicationAssetPath(
-                "ui-icons\lucide\circle-x.svg")},
+                "ui-icons\lucide\circle-x.svg"),
+            IconColorRole: "DangerIcon"},
         {Text: ResolveMainStatsLabel(Tr("统计：总计"), "统计：总计",
                 "总计") colon total,
             IconPath: GetApplicationAssetPath(
-                "ui-icons\lucide\target.svg"), SeparatorBefore: true}
+                "ui-icons\lucide\target.svg"),
+            IconColorRole: "DisplayIcon", SeparatorBefore: true}
     ]
     if App.appsDirty {
         statusItems.Push({Text: Tr("配置未保存"),
             IconPath: GetApplicationAssetPath(
-                "ui-icons\lucide\triangle-alert.svg")})
+                "ui-icons\lucide\triangle-alert.svg"),
+            IconColorRole: "WarningIcon"})
     }
     statsStr := ""
     for index, item in statusItems {

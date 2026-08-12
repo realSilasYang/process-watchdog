@@ -45,10 +45,12 @@ class SupportInfoWindow extends ManagedWindow {
                 RegisterHoverButton(button, UiThemeService.Color("Toolbar"))
                 SetButtonTextColor(button, UiThemeService.Color("ToolbarText"))
             }
-            SetButtonLucideIcon(this.guideButton, "book-open.svg", 16, 7)
-            SetButtonLucideIcon(this.logButton, "logs.svg", 16, 7)
+            SetButtonLucideIcon(this.guideButton, "book-open.svg", 16, 7,
+                "theme:BrowseIcon")
+            SetButtonLucideIcon(this.logButton, "logs.svg", 16, 7,
+                "theme:LogsIcon")
             SetButtonLucideIcon(this.feedbackButton,
-                "message-square-text.svg", 16, 7)
+                "message-square-text.svg", 16, 7, "theme:AboutIcon")
             SetButtonTooltip(this.feedbackButton, Tr("找作者对线"))
             RegisterButtonClick(this.guideButton,
                 ObjBindMethod(this, "OpenGuide"), ButtonFeedbackMode.Dismissive)
