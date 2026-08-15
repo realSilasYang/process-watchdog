@@ -808,6 +808,18 @@ foreach ($determinismRequirement in @(
         throw "Release build is missing a cross-runtime determinism boundary: $determinismRequirement"
     }
 }
+$releaseVerifierSource = Get-Content -LiteralPath (Join-Path $projectRoot `
+    'tools\verify-release.ps1') -Raw -Encoding UTF8
+foreach ($stateIsolationRequirement in @(
+        'function Assert-NoLocalWatchdogState',
+        'Get-ChildItem -LiteralPath $Root -Recurse -Force -File',
+        'function Assert-EmptyPackagedWatchlistExample',
+        "@('Apps', 'Maintenance', 'Display', 'Launch'",
+        "'Identity', 'Recovery')")) {
+    if (-not $releaseVerifierSource.Contains($stateIsolationRequirement)) {
+        throw "Release verification is missing local-rule isolation: $stateIsolationRequirement"
+    }
+}
 $archiveWriterSource = Get-Content -LiteralPath (Join-Path $projectRoot `
     'tools\new-release-archive.ps1') -Raw -Encoding UTF8
 foreach ($archiveRequirement in @(

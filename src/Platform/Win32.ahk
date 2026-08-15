@@ -16,6 +16,7 @@ class Win32 {
     static WM_DRAWITEM := 0x002B
     static WM_MEASUREITEM := 0x002C
     static WM_NCDESTROY := 0x0082
+    static WM_ACTIVATE := 0x0006
     static WM_NCHITTEST := 0x0084
     static WM_SETREDRAW := 0x000B
     static WM_GETFONT := 0x0031
@@ -33,6 +34,7 @@ class Win32 {
     static WM_LBUTTONUP := 0x0202
     static WM_LBUTTONDBLCLK := 0x0203
     static WM_RBUTTONDOWN := 0x0204
+    static WM_MOUSEWHEEL := 0x020A
     static WM_CAPTURECHANGED := 0x0215
     static WM_MOUSELEAVE := 0x02A3
     static WM_DPICHANGED := 0x02E0
@@ -43,10 +45,13 @@ class Win32 {
     static CDDS_PREPAINT := 0x00000001
     static CDDS_ITEMPREPAINT := 0x00010001
     static CDDS_ITEMPOSTPAINT := 0x00010002
+    static CDDS_SUBITEM := 0x00020000
     static CDRF_DODEFAULT := 0x00000000
+    static CDRF_SKIPDEFAULT := 0x00000004
     static CDRF_NOTIFYPOSTPAINT := 0x00000010
     static CDRF_NOTIFYITEMDRAW := 0x00000020
     static CDIS_SELECTED := 0x0001
+    static CDIS_FOCUS := 0x0010
     static CBN_DROPDOWN := 7
     static CBN_CLOSEUP := 8
     static CB_GETDROPPEDCONTROLRECT := 0x0152
@@ -70,7 +75,12 @@ class Win32 {
     static LVM_GETHEADER := 0x101F
     static LVM_GETIMAGELIST := 0x1002
     static LVM_HITTEST := 0x1012
+    static LVM_SCROLL := 0x1014
     static LVM_REDRAWITEMS := 0x1015
+    static LVM_GETTOPINDEX := 0x1027
+    static LVM_GETITEMRECT := 0x100E
+    static LVM_GETSUBITEMRECT := 0x1038
+    static LVIR_BOUNDS := 0
     static LVM_SETITEMSTATE := 0x102B
     static LVM_GETITEMSTATE := 0x102C
     static LVM_SETCOLUMNORDERARRAY := 0x103A

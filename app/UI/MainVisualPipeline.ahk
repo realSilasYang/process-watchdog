@@ -40,12 +40,68 @@ class ApplicationWindowPresenter {
             && !RegExMatch(showOptions, "i)(^|\s)Hide(?:\s|$)")
             showOptions := Trim("Hide " showOptions)
         guiObj.Show(showOptions)
+        if !RegExMatch(showOptions, "i)(^|\s)Hide(?:\s|$)")
+            RefreshRoundedButtonsAfterShow(guiObj)
         return true
     }
 }
 
 ShowApplicationWindow(guiObj, options := "") {
     return ApplicationWindowPresenter.Show(guiObj, options)
+}
+
+RefreshRoundedButtonsAfterShow(guiObj) {
+    if !IsObject(guiObj)
+        return false
+    try rootHwnd := guiObj.Hwnd
+    catch
+        return false
+    if !rootHwnd || !IsSet(App) || !IsObject(App.uiInteractions)
+        return false
+    return RedrawVisibleRoundedButtonsForWindow(rootHwnd)
+}
+
+RedrawVisibleRoundedButtonsForWindow(rootHwnd) {
+    if !rootHwnd || !IsSet(App) || !IsObject(App.uiInteractions)
+        return false
+    redrawnAny := false
+    for buttonHwnd, state in App.uiInteractions.Buttons {
+        if !buttonHwnd || !DllCall("user32\IsWindow", "Ptr", buttonHwnd,
+                "Int")
+            continue
+        try isRounded := state.HasOwnProp("roundedOwnerDraw")
+            && state.roundedOwnerDraw
+        catch
+            isRounded := false
+        if !isRounded
+            continue
+        ancestor := DllCall("user32\GetAncestor", "Ptr", buttonHwnd,
+            "UInt", 2, "Ptr")
+        if ancestor != rootHwnd
+            continue
+        if !DllCall("user32\IsWindowVisible", "Ptr", buttonHwnd, "Int")
+            continue
+        RedrawRoundedButton(buttonHwnd)
+        redrawnAny := true
+    }
+    return redrawnAny
+}
+
+OnApplicationWindowActivated(wParam, lParam, message, hwnd) {
+    if (wParam & 0xFFFF) == 0 || !hwnd
+        return
+    rootHwnd := DllCall("user32\GetAncestor", "Ptr", hwnd,
+        "UInt", 2, "Ptr")
+    if !rootHwnd
+        rootHwnd := hwnd
+    processId := 0
+    DllCall("user32\GetWindowThreadProcessId", "Ptr", rootHwnd,
+        "UInt*", &processId, "UInt")
+    if processId != DllCall("kernel32\GetCurrentProcessId", "UInt")
+        return
+    ; 任务栏还原和其它实例唤起不会经过 Gui.Show。激活消息到达时同步刷新
+    ; 当前窗口的可见 owner-draw 按钮，避免它们等到首次鼠标移动才获得重绘。
+    RedrawVisibleRoundedButtonsForWindow(rootHwnd)
 }
 
 InitializeApplicationWindow(guiObj, fontOptions := "s10",
@@ -2318,6 +2374,126 @@ SetMainListSubItemIcon(row, iconIndex) {
     if updated
         ScheduleMainListNativeSurfaceRefresh()
     return updated
+}
+
+DrawMainListSubItem(listView, notification) {
+    subItemOffset := A_PtrSize == 8 ? 88 : 56
+    column := NumGet(notification, subItemOffset, "Int") + 1
+    if column != MainWindow.SequenceColumn
+        return ""
+    return DrawMainSequenceSubItem(listView, notification)
+}
+
+DrawMainSequenceSubItem(listView, notification) {
+    itemSpecOffset := A_PtrSize == 8 ? 56 : 36
+    row := NumGet(notification, itemSpecOffset, "UPtr") + 1
+    if row < 1 || row > listView.GetCount()
+        return Win32.CDRF_SKIPDEFAULT
+    cellRect := GetMainListSubItemRect(listView, row,
+        MainWindow.SequenceColumn)
+    hdcOffset := A_PtrSize == 8 ? 32 : 16
+    hdc := NumGet(notification, hdcOffset, "Ptr")
+    if !IsObject(cellRect) || !hdc
+        return Win32.CDRF_SKIPDEFAULT
+
+    text := listView.GetText(row, MainWindow.SequenceColumn)
+    path := listView.GetText(row, 3)
+    colorKey := GetMainSequenceColorKey(path)
+    if colorKey == ""
+        return Win32.CDRF_DODEFAULT
+    font := SendMessage(Win32.WM_GETFONT, 0, 0, listView.Hwnd)
+    previousFont := font ? DllCall("gdi32\SelectObject", "Ptr", hdc,
+        "Ptr", font, "Ptr") : 0
+    previousBkMode := DllCall("gdi32\SetBkMode", "Ptr", hdc,
+        "Int", 1, "Int")
+    previousTextColor := DllCall("gdi32\SetTextColor", "Ptr", hdc,
+        "UInt", ColorRefFromHex(UiThemeService.Color("Text")), "UInt")
+    try {
+        extent := RoundedButtonRenderer.MeasureText(hdc, text)
+        dpi := DllCall("user32\GetDpiForWindow", "Ptr", listView.Hwnd,
+            "UInt")
+        if !dpi
+            dpi := 96
+        dotSize := Max(4, Round(MainWindow.SequenceDotDiameterDip
+            * dpi / 96))
+        selectionInset := Max(2, Round(
+            ListViewSelectionPresenter.HorizontalInsetDip * dpi / 96))
+        cellWidth := cellRect.Right - cellRect.Left
+        textLeft := cellRect.Left
+            + Max(0, Floor((cellWidth - extent.Width) / 2))
+        dotLeft := cellRect.Left + selectionInset
+        dotTop := cellRect.Top + Max(0, Floor(
+            (cellRect.Bottom - cellRect.Top - dotSize) / 2))
+        brush := DllCall("gdi32\CreateSolidBrush", "UInt",
+            ColorRefFromHex(MainSequenceColorPalette.Color(colorKey)), "Ptr")
+        if brush {
+            previousBrush := DllCall("gdi32\SelectObject", "Ptr", hdc,
+                "Ptr", brush, "Ptr")
+            nullPen := DllCall("gdi32\GetStockObject", "Int", 8, "Ptr")
+            previousPen := nullPen ? DllCall("gdi32\SelectObject", "Ptr",
+                hdc, "Ptr", nullPen, "Ptr") : 0
+            try DllCall("gdi32\Ellipse", "Ptr", hdc,
+                "Int", dotLeft, "Int", dotTop,
+                "Int", dotLeft + dotSize, "Int", dotTop + dotSize)
+            finally {
+                if previousPen
+                    DllCall("gdi32\SelectObject", "Ptr", hdc, "Ptr",
+                        previousPen, "Ptr")
+                if previousBrush
+                    DllCall("gdi32\SelectObject", "Ptr", hdc, "Ptr",
+                        previousBrush, "Ptr")
+                DllCall("gdi32\DeleteObject", "Ptr", brush)
+            }
+        }
+        if text != "" {
+            textRect := Buffer(16, 0)
+            NumPut("Int", textLeft, textRect, 0)
+            NumPut("Int", cellRect.Top, textRect, 4)
+            NumPut("Int", Min(cellRect.Right,
+                textLeft + extent.Width), textRect, 8)
+            NumPut("Int", cellRect.Bottom, textRect, 12)
+            DllCall("user32\DrawTextW", "Ptr", hdc, "Str", text,
+                "Int", StrLen(text), "Ptr", textRect,
+                "UInt", 0x00000824, "Int")
+        }
+    } finally {
+        DllCall("gdi32\SetTextColor", "Ptr", hdc,
+            "UInt", previousTextColor)
+        DllCall("gdi32\SetBkMode", "Ptr", hdc,
+            "Int", previousBkMode)
+        if previousFont
+            DllCall("gdi32\SelectObject", "Ptr", hdc, "Ptr",
+                previousFont, "Ptr")
+    }
+    return Win32.CDRF_SKIPDEFAULT
+}
+
+GetMainListSubItemRect(listView, row, column) {
+    if !IsObject(listView) || !listView.Hwnd || row < 1 || column < 1
+        return ""
+    rect := Buffer(16, 0)
+    NumPut("Int", 0, rect, 0)
+    NumPut("Int", column - 1, rect, 4)
+    if !SendMessage(Win32.LVM_GETSUBITEMRECT, row - 1, rect.Ptr, ,
+            listView.Hwnd)
+        return ""
+    return {
+        Left: NumGet(rect, 0, "Int"),
+        Top: NumGet(rect, 4, "Int"),
+        Right: NumGet(rect, 8, "Int"),
+        Bottom: NumGet(rect, 12, "Int")
+    }
+}
+
+GetMainSequenceColorKey(path) {
+    path := NormalizeTargetPath(path)
+    if path == "" || !App.appStates.Has(path)
+        return ""
+    stateObj := App.appStates[path]
+    if !stateObj.HasOwnProp("DisplayConfig")
+        return ""
+    display := App.displayConfigCodec.Normalize(stateObj.DisplayConfig)
+    return display.SequenceColor
 }
 
 SetMainListStatus(row, statusText) {

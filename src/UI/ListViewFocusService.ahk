@@ -6,6 +6,23 @@ class ListViewFocusService {
     static Handled := 1
     static SuppressDefault := 2
 
+    static PrepareContextSelection(listView, item) {
+        if !IsObject(listView) || !listView.Hwnd
+                || item < 1 || item > listView.GetCount()
+            return false
+        itemIsSelected := (SendMessage(Win32.LVM_GETITEMSTATE, item - 1,
+            Win32.LVIS_SELECTED, listView.Hwnd) & Win32.LVIS_SELECTED) != 0
+        ; 右键已选行时保留整个多选集合，供批量命令使用；右键未选行时
+        ; 才切换为单选，避免命令误作用于此前的选择。
+        if !itemIsSelected {
+            listView.Modify(0, "-Select")
+            listView.Modify(item, "Select Focus Vis")
+        } else {
+            listView.Modify(item, "Focus Vis")
+        }
+        return itemIsSelected
+    }
+
     static HandleBlankPointerDown(listView, rootHwnd, pointerHwnd, lParam,
         pointerMessage, passiveSurfaceHwnds := "") {
         ; 标题栏按钮、标题栏拖动和窗口边框都使用非客户区鼠标消息。

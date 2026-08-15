@@ -13,7 +13,7 @@
 
 ;@Ahk2Exe-SetName 进程守护小助手
 ;@Ahk2Exe-SetDescription 进程、脚本和快捷方式守护工具
-;@Ahk2Exe-SetVersion 2.0.13.0
+;@Ahk2Exe-SetVersion 2.1.0.0
 ;@Ahk2Exe-SetCopyright Copyright (c) 2026 进程守护小助手 contributors
 ;@Ahk2Exe-SetMainIcon assets\app\watchdog.ico
 
@@ -131,6 +131,7 @@ OnMessage(Win32.WM_MEASUREITEM, OnMeasureApplicationControl)
 OnMessage(Win32.WM_DRAWITEM, OnDrawApplicationControl)
 OnMessage(Win32.WM_SETFOCUS, OnRoundedButtonFocusChanged)
 OnMessage(Win32.WM_KILLFOCUS, OnRoundedButtonFocusChanged)
+OnMessage(Win32.WM_ACTIVATE, OnApplicationWindowActivated)
 OnMessage(Win32.WM_SETCURSOR, OnSetCursor)
 OnMessage(Win32.WM_LBUTTONDOWN, OnGlobalPointerDown)
 OnMessage(Win32.WM_LBUTTONUP, OnGlobalPointerUp)
@@ -165,10 +166,12 @@ ApplySystemThemeChange(*) {
     }
 }
 /*
- * 守护进程检查、计划任务和按管理员身份启动目标都需要提升权限。
- * 当前实例未提升时，只负责用相同参数请求 UAC 后退出，不继续创建运行态资源。
+ * 默认以管理员身份运行，以便完整读取进程信息并执行需要提升权限的守护操作。
+ * 用户关闭该设置后，小助手和自启任务均沿用当前用户令牌，受系统权限边界约束。
  */
-if not A_IsAdmin {
+startupRunAsAdministrator := true
+try startupRunAsAdministrator := App.runtimeSettingsService.Load().RunAsAdministrator
+if startupRunAsAdministrator && !A_IsAdmin {
     try {
         relaunchArguments := ""
         for relaunchArgument in A_Args
@@ -268,7 +271,8 @@ ManagedWindow.ConfigureLifecycle(ManagedWindowLifecycle({
     RestoreInteractions: RestoreHoveredButton,
     HideTransientWindows: HideManagedWindowTransientWindows,
     UnregisterControls: UnregisterGuiControls,
-    ReleaseIcons: ReleaseWindowIcons
+    ReleaseIcons: ReleaseWindowIcons,
+    RefreshAfterShow: RefreshRoundedButtonsAfterShow
 }, WindowHierarchy))
 ; 所有短生命周期 GUI 都由模块实例持有，窗口销毁后由类负责清空引用。
 global GuiModules := GuiModuleRegistry(Main.gui)
@@ -276,6 +280,8 @@ global GuiModules := GuiModuleRegistry(Main.gui)
 ; 首次运行只创建带就地注释的设置分区，不预设任何守护对象。
 App.runtimeSettingsService.EnsureExists()
 App.runtimeSettingsService.Apply(App, App.runtimeSettingsService.Load())
+if A_IsAdmin
+    try SynchronizeWatchdogTaskElevation(App.runAsAdministrator)
 CleanupBatchLogs()
 
 ; 先读取持久化布局再创建控件，避免首次显示时从默认尺寸跳变到用户保存的尺寸。
@@ -382,7 +388,8 @@ Main.lv.ModifyCol(3, 0) ; 隐藏路径辅助列
 Main.lv.ModifyCol(4, "Center 48")
 Main.lv.ModifyCol(5, 0) ; 隐藏状态语义排序键
 Main.listProjection.ApplyColumnOrder(Main.lv)
-Main.listSelectionPresenter := ListViewSelectionPresenter(Main.lv)
+Main.listSelectionPresenter := ListViewSelectionPresenter(Main.lv, "",
+    DrawMainListSubItem)
 Main.listHeader := ListViewPseudoHeader(Main.gui, Main.lv, [
     {Column: 4, Label: Tr("序号"), Align: "Center", SortOptions: "Integer",
         SkipAscending: true},
@@ -401,6 +408,7 @@ Main.listHeader := ListViewPseudoHeader(Main.gui, Main.lv, [
 LayoutMainListHeader(App.savedWidth)
 
 SetDarkListView(Main.lv.Hwnd)
+InitializeMainListSmoothScroll()
 
 Main.statsText := Main.gui.Add("Text", "x10 y" (App.savedHeight - 20)
     " w" (App.savedWidth - 20)
@@ -509,32 +517,38 @@ RefreshMainCommandState(forceRefresh := false) {
 Main.lv.OnNotify(-109, LV_ItemDrag)
 
 LV_ItemDrag(ctrl, lParam) {
+    Main.listDragActive := true
+    StopMainListSmoothScroll(true)
     ; 循环等待释放鼠标左键，期间向 ListView 发送 LVM_SETINSERTMARK 消息绘制插入目标的辅助线
-    Loop {
-        if !GetKeyState("LButton", "P")
-            break
+    try {
+        Loop {
+            if !GetKeyState("LButton", "P")
+                break
 
-        pt := Buffer(8)
-        DllCall("user32\GetCursorPos", "Ptr", pt)
-        DllCall("user32\ScreenToClient", "Ptr", ctrl.Hwnd, "Ptr", pt)
+            pt := Buffer(8)
+            DllCall("user32\GetCursorPos", "Ptr", pt)
+            DllCall("user32\ScreenToClient", "Ptr", ctrl.Hwnd, "Ptr", pt)
 
-        hitInfo := Buffer(24, 0)
-        NumPut("Int", NumGet(pt, 0, "Int"), hitInfo, 0)
-        NumPut("Int", NumGet(pt, 4, "Int"), hitInfo, 4)
-        targetRow := SendMessage(0x1012, 0, hitInfo.Ptr, ctrl.Hwnd) ; LVM_HITTEST：按客户区坐标定位列表行。
+            hitInfo := Buffer(24, 0)
+            NumPut("Int", NumGet(pt, 0, "Int"), hitInfo, 0)
+            NumPut("Int", NumGet(pt, 4, "Int"), hitInfo, 4)
+            targetRow := SendMessage(0x1012, 0, hitInfo.Ptr,
+                ctrl.Hwnd) ; LVM_HITTEST：按客户区坐标定位列表行。
 
-        insertMark := Buffer(16, 0)
-        NumPut("UInt", 16, insertMark, 0)
-        if (targetRow >= 0) {
-            NumPut("UInt", 0, insertMark, 4)
-            NumPut("Int", targetRow, insertMark, 8)
-        } else {
-            NumPut("Int", -1, insertMark, 8)
+            insertMark := Buffer(16, 0)
+            NumPut("UInt", 16, insertMark, 0)
+            if (targetRow >= 0) {
+                NumPut("UInt", 0, insertMark, 4)
+                NumPut("Int", targetRow, insertMark, 8)
+            } else {
+                NumPut("Int", -1, insertMark, 8)
+            }
+            SendMessage(0x10A6, 0, insertMark.Ptr,
+                ctrl.Hwnd) ; LVM_SETINSERTMARK：更新拖拽插入标记。
+
+            Sleep 20
         }
-        SendMessage(0x10A6, 0, insertMark.Ptr, ctrl.Hwnd) ; LVM_SETINSERTMARK：更新拖拽插入标记。
-
-        Sleep 20
-    }
+    } finally Main.listDragActive := false
 
     ; 拖拽结束：清除插入方向的辅助标记线
     insertMark := Buffer(16, 0)
@@ -634,7 +648,7 @@ ConfigureMainContextMenu(isAdmin := false, maintenanceEnabled := false,
     contextMenu.Add(Tr("✒️ 编辑完整路径（F2）"),
         (*) => TriggerEdit(Main.lv, Main.contextTargetRow))
     contextMenu.Add(Tr("📂 打开所在位置"), OpenFileLocation)
-    contextMenu.Add(Tr("🎨 自定义名称和图标"), OpenDisplaySettings)
+    contextMenu.Add(Tr("🏷️ 自定义名称和图标"), OpenDisplaySettings)
     contextMenu.Add(Tr("⚙️ 进程识别与启动设置"), OpenEnvSettings)
     adminLabel := FormatContextMenuToggleLabel(
         Tr("🛡️ 以管理员身份运行"), isAdmin)
@@ -645,7 +659,6 @@ ConfigureMainContextMenu(isAdmin := false, maintenanceEnabled := false,
     if !maintenanceSupported
         contextMenu.Disable(maintenanceLabel)
     if batchLogSupported {
-        contextMenu.Add()
         contextMenu.Add(Tr("📄 查看批处理输出日志"), OpenProcessLog)
     }
     ; 所有开关状态都显示在右侧，不再为原生左侧勾选栏预留空白。
@@ -655,6 +668,7 @@ ConfigureMainContextMenu(isAdmin := false, maintenanceEnabled := false,
         Main.contextMenu := contextMenu
     return contextMenu
 }
+
 BuildMainContextPopupItems(isAdmin := false, maintenanceEnabled := false,
     maintenanceSupported := true, batchLogSupported := false) {
     items := [
@@ -663,7 +677,7 @@ BuildMainContextPopupItems(isAdmin := false, maintenanceEnabled := false,
         {Text: Tr("✒️ 编辑完整路径（F2）"),
             Action: (*) => TriggerEdit(Main.lv, Main.contextTargetRow)},
         {Text: Tr("📂 打开所在位置"), Action: OpenFileLocation},
-        {Text: Tr("🎨 自定义名称和图标"), Action: OpenDisplaySettings},
+        {Text: Tr("🏷️ 自定义名称和图标"), Action: OpenDisplaySettings},
         {Text: Tr("⚙️ 进程识别与启动设置"), Action: OpenEnvSettings},
         {Text: Tr("🛡️ 以管理员身份运行"), Check: isAdmin,
             Action: ToggleRunAsAdmin},
@@ -671,10 +685,14 @@ BuildMainContextPopupItems(isAdmin := false, maintenanceEnabled := false,
             Action: OpenMaintenanceSettings, Enabled: maintenanceSupported}
     ]
     if batchLogSupported {
-        items.Push({Separator: true})
         items.Push({Text: Tr("📄 查看批处理输出日志"),
             Action: OpenProcessLog})
     }
+    selectedPaths := CaptureSelectedWatchPaths(true)
+    items.Push({ColorPalette: true, Text: Tr("设置序号圆点"),
+        IconName: "palette.svg", IconColorRole: "ThemeIcon",
+        SelectedColor: GetCommonMainSequenceColor(selectedPaths),
+        Action: SetSelectedMainSequenceColor})
     return items
 }
 ConfigureMainContextMenu()
@@ -1499,6 +1517,14 @@ if App.checkUpdatesOnStartup
     SetTimer(CheckForApplicationUpdate.Bind("", false), -1500)
 
 ReloadScript(*) {
+    return ReloadScriptCore(false)
+}
+
+ReloadScriptElevated(*) {
+    return ReloadScriptCore(true)
+}
+
+ReloadScriptCore(runElevated := false) {
     HideMainGui(true)
     previousCritical := A_IsCritical
     reloadMarkerWritten := false
@@ -1519,7 +1545,7 @@ ReloadScript(*) {
         currentPid := DllCall("kernel32\GetCurrentProcessId", "UInt")
         handoffCommand := BuildReloadHandoffCommand(currentPid, A_IsCompiled,
             A_AhkPath, A_ScriptFullPath)
-        Run(handoffCommand, A_ScriptDir)
+        Run((runElevated ? "*RunAs " : "") handoffCommand, A_ScriptDir)
     } catch as reloadErr {
         App.reloadInProgress := false
         if reloadMarkerWritten

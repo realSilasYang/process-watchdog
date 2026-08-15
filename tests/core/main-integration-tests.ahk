@@ -132,12 +132,105 @@ RunWatchPathTransitionSnapshotTests() {
     }
 }
 
+WaitForMainListScroll(expectedTopIndex, timeoutMs := 1500) {
+    global Main
+    deadline := A_TickCount + timeoutMs
+    while A_TickCount < deadline {
+        topIndex := SendMessage(Win32.LVM_GETTOPINDEX, 0, 0, Main.lv.Hwnd)
+        if topIndex == expectedTopIndex && !Main.pendingListScrollLines
+            return true
+        Sleep(10)
+    }
+    return false
+}
+
+RunMainListSmoothScrollIntegrationTests() {
+    global Main
+    testGui := Gui("+ToolWindow -Caption")
+    listView := testGui.Add("ListView", "w320 h210 Report -Hdr",
+        ["守护对象"])
+    Loop 40
+        listView.Add(, "条目 " A_Index)
+    listView.ModifyCol(1, 280)
+    Main := {
+        lv: listView,
+        listWheelSubclassCallback: 0,
+        listWheelSubclassAttached: false,
+        listWheelCallback: 0,
+        listWheelRegistered: false,
+        smoothListScrollTimer: AdvanceMainListSmoothScroll,
+        pendingListScrollLines: 0,
+        listWheelDeltaRemainder: 0,
+        lastSmoothListScrollIntervalMs: 0,
+        smoothListTimerResolutionActive: false,
+        listDragActive: false
+    }
+    testGui.Show("x-32000 y-32000 w340 h230 NoActivate")
+    try {
+        if !InitializeMainListSmoothScroll()
+                || !Main.listWheelRegistered
+                || !Main.listWheelSubclassAttached {
+            throw Error("主列表惯性滚动没有完整注册滚轮消息与控件子类")
+        }
+        listRect := Buffer(16, 0)
+        if !DllCall("user32\GetWindowRect", "Ptr", listView.Hwnd,
+                "Ptr", listRect, "Int")
+            throw Error("无法读取惯性滚动测试列表位置")
+        insideX := NumGet(listRect, 0, "Int") + 4
+        insideY := NumGet(listRect, 4, "Int") + 4
+        insidePoint := ((insideY & 0xFFFF) << 16) | (insideX & 0xFFFF)
+        outsidePoint := (((insideY - 40) & 0xFFFF) << 16)
+            | ((insideX - 40) & 0xFFFF)
+        if !IsMainListScreenPoint(insidePoint)
+                || IsMainListScreenPoint(outsidePoint)
+                || SignedMainListWord(0xFFFF) != -1 {
+            throw Error("主列表滚轮屏幕坐标命中或有符号坐标解析错误")
+        }
+
+        if !QueueMainListSmoothScroll(3)
+                || Main.pendingListScrollLines != 2
+                || !WaitForMainListScroll(3) {
+            throw Error("主列表惯性滚动没有逐行消耗滚动队列")
+        }
+        fastInterval := Main.lastSmoothListScrollIntervalMs
+        if fastInterval < MainWindow.SmoothScrollFastIntervalMs
+                || fastInterval > MainWindow.SmoothScrollSlowIntervalMs {
+            throw Error("主列表惯性滚动间隔超出加减速边界")
+        }
+
+        if !QueueMainListSmoothScroll(4)
+                || Main.pendingListScrollLines != 3
+                || !QueueMainListSmoothScroll(-3)
+                || Main.pendingListScrollLines != -2
+                || !WaitForMainListScroll(1) {
+            throw Error("主列表反向滚轮手势没有立即丢弃旧方向动量")
+        }
+
+        SendMessage(Win32.LVM_SCROLL, 0,
+            -100 * GetMainListRowHeightPixels(), listView.Hwnd)
+        StopMainListSmoothScroll(true)
+        if QueueMainListSmoothScroll(-2)
+                || Main.pendingListScrollLines
+                || Main.smoothListTimerResolutionActive {
+            throw Error("主列表滚动到达顶部后没有停止队列和计时器精度")
+        }
+    } finally {
+        ShutdownMainListSmoothScroll()
+        testGui.Destroy()
+    }
+    if Main.listWheelRegistered || Main.listWheelSubclassAttached
+            || Main.listWheelCallback || Main.listWheelSubclassCallback {
+        throw Error("主列表惯性滚动资源没有对称注销")
+    }
+}
+
 RunMainIntegrationTests() {
     global App
     ; 本用例校验中文界面的全角标点契约，不依赖执行测试的 Windows 语言。
     LocalizationService.Configure("zh-CN")
     App := ApplicationState()
     RunWatchPathTransitionSnapshotTests()
+    RunMainListSmoothScrollIntegrationTests()
     maintenanceSink := SnapshotDeliveryTestSink()
     guardSink := SnapshotDeliveryTestSink()
     originalMaintenanceCoordinator := App.maintenanceCoordinator

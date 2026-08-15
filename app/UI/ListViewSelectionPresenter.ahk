@@ -7,8 +7,10 @@ class ListViewSelectionPresenter {
     static VerticalInsetDip := 2
     static RadiusDip := 7
 
-    __New(listView, radiusDip := "") {
+    __New(listView, radiusDip := "", subItemDrawCallback := "") {
         this.listView := listView
+        this.subItemDrawCallback := IsObject(subItemDrawCallback)
+            ? subItemDrawCallback : ""
         try this.radiusDip := radiusDip == ""
             ? ListViewSelectionPresenter.RadiusDip
             : Max(2, Integer(radiusDip))
@@ -31,6 +33,7 @@ class ListViewSelectionPresenter {
                 this.notifyCallback, -1)
         this.attached := false
         this.listView := ""
+        this.subItemDrawCallback := ""
         this.notifyCallback := ""
         this.nativeRefreshCallback := ""
     }
@@ -87,24 +90,60 @@ class ListViewSelectionPresenter {
         drawStage := NumGet(lParam, drawStageOffset, "UInt")
         if drawStage == Win32.CDDS_PREPAINT
             return Win32.CDRF_NOTIFYITEMDRAW
+        if drawStage == (Win32.CDDS_ITEMPREPAINT | Win32.CDDS_SUBITEM) {
+            if IsObject(this.subItemDrawCallback) {
+                result := this.subItemDrawCallback.Call(listView, lParam)
+                if result != "" {
+                    itemStateOffset := A_PtrSize == 8 ? 64 : 40
+                    itemState := NumGet(lParam, itemStateOffset, "UInt")
+                    if this.IsNotificationItemSelected(listView, lParam,
+                            itemState)
+                        this.MaskSelectedRow(listView, lParam)
+                }
+                return result
+            }
+            return
+        }
         if drawStage != Win32.CDDS_ITEMPREPAINT
             && drawStage != Win32.CDDS_ITEMPOSTPAINT
             return
 
         itemStateOffset := A_PtrSize == 8 ? 64 : 40
         itemState := NumGet(lParam, itemStateOffset, "UInt")
-        if !this.IsNotificationItemSelected(listView, lParam, itemState)
-            return
         if drawStage == Win32.CDDS_ITEMPREPAINT
-            return Win32.CDRF_NOTIFYPOSTPAINT
+                && itemState & Win32.CDIS_FOCUS {
+            itemState &= ~Win32.CDIS_FOCUS
+            NumPut("UInt", itemState, lParam, itemStateOffset)
+        }
+        selected := this.IsNotificationItemSelected(listView, lParam,
+            itemState)
+        if drawStage == Win32.CDDS_ITEMPREPAINT {
+            flags := IsObject(this.subItemDrawCallback)
+                ? Win32.CDRF_NOTIFYITEMDRAW : Win32.CDRF_DODEFAULT
+            return selected && !IsObject(this.subItemDrawCallback)
+                ? flags | Win32.CDRF_NOTIFYPOSTPAINT : flags
+        }
+        if !selected
+            return
 
+        this.MaskSelectedRow(listView, lParam)
+        return Win32.CDRF_DODEFAULT
+    }
+
+    MaskSelectedRow(listView, lParam) {
+        itemSpecOffset := A_PtrSize == 8 ? 56 : 36
+        itemIndex := NumGet(lParam, itemSpecOffset, "UPtr")
+        rowRect := Buffer(16, 0)
+        NumPut("Int", Win32.LVIR_BOUNDS, rowRect, 0)
+        if !SendMessage(Win32.LVM_GETITEMRECT, itemIndex, rowRect.Ptr,
+                listView.Hwnd)
+            return false
         hdcOffset := A_PtrSize == 8 ? 32 : 16
-        rectOffset := A_PtrSize == 8 ? 40 : 20
         hdc := NumGet(lParam, hdcOffset, "Ptr")
-        left := NumGet(lParam, rectOffset, "Int")
-        top := NumGet(lParam, rectOffset + 4, "Int")
-        right := NumGet(lParam, rectOffset + 8, "Int")
-        bottom := NumGet(lParam, rectOffset + 12, "Int")
+        left := NumGet(rowRect, 0, "Int")
+        top := NumGet(rowRect, 4, "Int")
+        right := NumGet(rowRect, 8, "Int")
+        bottom := NumGet(rowRect, 12, "Int")
         windowDpi := DllCall("user32\GetDpiForWindow", "Ptr",
             listView.Hwnd, "UInt")
         if !windowDpi
@@ -119,11 +158,10 @@ class ListViewSelectionPresenter {
             * windowDpi / 96))
         ; 原生绘制完成后只擦除圆角外侧区域：图标、管理员叠层、状态图标、
         ; 文字、拖拽插入标记和系统选中配色均保持公共控件的原始实现。
-        RoundedButtonRenderer.MaskOutsideRoundedRectangle(hdc,
+        return RoundedButtonRenderer.MaskOutsideRoundedRectangle(hdc,
             left, top, right, bottom,
             left + horizontalInset, top + verticalInset,
             right - horizontalInset, bottom - verticalInset,
             UiThemeService.Color("Surface"), radius)
-        return Win32.CDRF_DODEFAULT
     }
 }

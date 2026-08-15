@@ -30,6 +30,7 @@ class SettingsWindow extends ManagedWindow {
         this.intervalEdit := ""
         this.retryLabel := ""
         this.retryEdit := ""
+        this.runAsAdministratorCheck := ""
         this.showAtStartupCheck := ""
         this.checkUpdatesOnStartupCheck := ""
         this.recursiveImportCheck := ""
@@ -357,7 +358,7 @@ class SettingsWindow extends ManagedWindow {
         this.gui.SetFont("norm s10 c" UiThemeService.Color("Text"),
             layout.FontName)
 
-        ; 启动与系统集成集中在页面顶部，保留标签按钮组与双复选框的紧凑结构。
+        ; 启动与系统集成集中在页面顶部，保留标签按钮组与三项启动偏好的紧凑结构。
         this.shortcutLabel := this.AddTabControl(2, this.gui.Add("Text",
             "x" layout.ContentX " y70 h28 0x200 BackgroundTrans",
             Tr("桌面与开始菜单快捷方式")))
@@ -400,21 +401,29 @@ class SettingsWindow extends ManagedWindow {
                 UiThemeService.Color("Toolbar") " c"
                 UiThemeService.Color("ToolbarText"), "…"))
         startupChecks := []
-        this.checkUpdatesOnStartupCheck := this.AddTabControl(2,
+        this.runAsAdministratorCheck := this.AddTabControl(2,
             this.gui.Add("CheckBox", "x0 y144 h24 c"
+                UiThemeService.Color("Text"),
+                Tr("以管理员身份运行")))
+        startupChecks.Push(this.runAsAdministratorCheck)
+        this.runAsAdministratorCheck.Value :=
+            App.runAsAdministrator ? 1 : 0
+        this.checkUpdatesOnStartupCheck := this.AddTabControl(2,
+            this.gui.Add("CheckBox", "x0 y176 h24 c"
                 UiThemeService.Color("Text"),
                 Tr("启动时检查小助手更新")))
         startupChecks.Push(this.checkUpdatesOnStartupCheck)
         this.checkUpdatesOnStartupCheck.Value :=
             App.checkUpdatesOnStartup ? 1 : 0
         this.showAtStartupCheck := this.AddTabControl(2,
-            this.gui.Add("CheckBox", "x0 y176 h24 c"
+            this.gui.Add("CheckBox", "x0 y208 h24 c"
                 UiThemeService.Color("Text"),
                 Tr("启动时显示主窗口")))
         startupChecks.Push(this.showAtStartupCheck)
         this.showAtStartupCheck.Value := App.showAtStartup ? 1 : 0
         layout.StartupChecks := this.CenterSettingsControlGroup(startupChecks)
-        for checkControl in [this.checkUpdatesOnStartupCheck,
+        for checkControl in [this.runAsAdministratorCheck,
+                this.checkUpdatesOnStartupCheck,
                 this.showAtStartupCheck] {
             SetDarkControl(checkControl.Hwnd)
             RegisterHandCursorControl(checkControl)
@@ -836,6 +845,9 @@ class SettingsWindow extends ManagedWindow {
             Theme: this.themeValues[this.themeDropDown.Value],
             ShowAtStartup: this.showAtStartupCheck
                 ? this.showAtStartupCheck.Value != 0 : App.showAtStartup,
+            RunAsAdministrator: this.runAsAdministratorCheck
+                ? this.runAsAdministratorCheck.Value != 0
+                : App.runAsAdministrator,
             CheckUpdatesOnStartup: this.checkUpdatesOnStartupCheck
                 ? this.checkUpdatesOnStartupCheck.Value != 0
                 : App.checkUpdatesOnStartup,
@@ -889,6 +901,8 @@ class SettingsWindow extends ManagedWindow {
         languageChanged := savedSettings.UiLanguage != priorUiLanguage
         fontChanged := savedSettings.UiFont != priorUiFont
         themeChanged := savedSettings.Theme != priorUiTheme
+        elevationSettingChanged := savedSettings.RunAsAdministrator
+            != priorSettings.RunAsAdministrator
         displayChanged := languageChanged || fontChanged || themeChanged
         if displayChanged {
             try ApplyDisplaySettingsHot(savedSettings.UiLanguage,
@@ -909,6 +923,10 @@ class SettingsWindow extends ManagedWindow {
                     rollbackDetail := Tr("；恢复配置失败：{1}",
                         TrDiagnostic(rollbackError.Message))
                 App.runtimeSettingsService.Apply(App, savedSettings)
+                if elevationSettingChanged
+                    ApplyRuntimeElevationSettingChange(
+                        priorSettings.RunAsAdministrator,
+                        savedSettings.RunAsAdministrator)
                 if App.checkInterval != priorCheckInterval
                     App.guardRuntime.RestartMonitorTimer()
                 while (App.logMessages.Length > App.logMaxEntries)
@@ -926,6 +944,10 @@ class SettingsWindow extends ManagedWindow {
         }
 
         App.runtimeSettingsService.Apply(App, savedSettings)
+        if elevationSettingChanged
+            ApplyRuntimeElevationSettingChange(
+                priorSettings.RunAsAdministrator,
+                savedSettings.RunAsAdministrator)
         while (App.logMessages.Length > App.logMaxEntries)
             App.logMessages.Pop()
         if App.checkInterval != priorCheckInterval
@@ -949,7 +971,9 @@ class SettingsWindow extends ManagedWindow {
             this.taskButton.Text := Tr("开启")
             iconName := "play.svg"
             iconColorRole := "SuccessIcon"
-        } else if IsOwnedWatchdogTask(task) {
+        } else if IsOwnedWatchdogTask(task)
+                && WatchdogTaskRunLevelMatches(task,
+                    App.runAsAdministrator) {
             this.taskButton.Text := Tr("关闭")
             iconName := "power.svg"
             iconColorRole := "StrongDangerIcon"
@@ -1012,6 +1036,7 @@ class SettingsWindow extends ManagedWindow {
         this.intervalEdit := ""
         this.retryLabel := ""
         this.retryEdit := ""
+        this.runAsAdministratorCheck := ""
         this.showAtStartupCheck := ""
         this.checkUpdatesOnStartupCheck := ""
         this.recursiveImportCheck := ""

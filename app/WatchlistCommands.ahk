@@ -183,6 +183,62 @@ CaptureSelectedWatchPaths(includeContextTarget := false) {
     return paths
 }
 
+GetCommonMainSequenceColor(paths) {
+    if Type(paths) != "Array" || !paths.Length
+        return ""
+    commonKey := ""
+    for index, path in paths {
+        key := GetMainSequenceColorKey(path)
+        if index == 1
+            commonKey := key
+        else if key != commonKey
+            return ""
+    }
+    return commonKey
+}
+
+SetSelectedMainSequenceColor(colorKey, *) {
+    paths := CaptureSelectedWatchPaths(true)
+    if !paths.Length
+        return false
+    requestedKey := StrLower(Trim(String(colorKey)))
+    colorKey := MainSequenceColorPalette.NormalizeKey(requestedKey)
+    if requestedKey != "" && colorKey == ""
+        return false
+    return QueueGuardMutation(SetSelectedMainSequenceColorCore.Bind(
+        paths.Clone(), colorKey))
+}
+
+SetSelectedMainSequenceColorCore(paths, colorKey) {
+    undoState := CaptureAppConfigState()
+    changedPaths := []
+    for path in paths {
+        if !App.appStates.Has(path)
+            continue
+        stateObj := App.appStates[path]
+        display := stateObj.HasOwnProp("DisplayConfig")
+            ? App.displayConfigCodec.Normalize(stateObj.DisplayConfig)
+            : App.displayConfigCodec.CreateDefault()
+        if display.SequenceColor == colorKey
+            continue
+        display.SequenceColor := colorKey
+        stateObj.DisplayConfig := display
+        changedPaths.Push(path)
+        row := FindRow(path)
+        if row > 0 && Main.HasOwnProp("listSelectionPresenter")
+                && IsObject(Main.listSelectionPresenter)
+            Main.listSelectionPresenter.RefreshItem(row)
+    }
+    if !changedPaths.Length
+        return false
+    CommitUndoState(undoState,
+        CreateAppHistoryAction("display", changedPaths[1]))
+    if !SaveAppsToIni()
+        return false
+    LogMsg(Tr("已更新主窗口显示设置：{1}", Tr("设置序号圆点")))
+    return true
+}
+
 ToggleItemPause(*) {
     paths := CaptureSelectedWatchPaths()
     if !paths.Length
@@ -619,8 +675,9 @@ CommitUndoState(beforeState, action := "") {
 CloneRuntimeSettingsHistoryState(settings) {
     clone := {}
     for propertyName in ["UiLanguage", "UiFont", "Theme", "CheckInterval",
-            "RetrySequence", "ShowAtStartup", "CheckUpdatesOnStartup",
-            "RecursiveBatchImport", "LogMaxEntries", "LogDirectory",
+            "RetrySequence", "ShowAtStartup", "RunAsAdministrator",
+            "CheckUpdatesOnStartup", "RecursiveBatchImport", "LogMaxEntries",
+            "LogDirectory",
             "LogRetentionDays", "ClearLogsOnStartup", "GracefulStopSeconds",
             "CtrlCWaitSeconds", "AllowForceTerminate"]
         clone.%propertyName% := settings.%propertyName%
@@ -636,6 +693,7 @@ GetRuntimeSettingsHistoryFields(beforeState, afterState) {
         {Property: "UiFont", Label: "界面内容字体："},
         {Property: "Theme", Label: "主题："},
         {Property: "ShowAtStartup", Label: "启动时显示主窗口"},
+        {Property: "RunAsAdministrator", Label: "以管理员身份运行"},
         {Property: "CheckUpdatesOnStartup", Label: "启动时检查小助手更新"},
         {Property: "CheckInterval", Label: "进程状态检查间隔（毫秒）："},
         {Property: "RetrySequence", Label: "崩溃自动重启延迟序列（秒）："},
@@ -668,14 +726,33 @@ CommitRuntimeSettingsUndoState(beforeState, afterState) {
         CreateAppHistoryAction("runtime-settings", "", fields))
 }
 
+ApplyRuntimeElevationSettingChange(previousValue, nextValue) {
+    previousValue := !!previousValue
+    nextValue := !!nextValue
+    if previousValue == nextValue
+        return false
+    if A_IsAdmin || !nextValue {
+        try SynchronizeWatchdogTaskElevation(nextValue)
+        catch as taskElevationError
+            LogMsg(Tr("计划任务操作失败：{1}",
+                TrDiagnostic(taskElevationError.Message)))
+    }
+    if nextValue && !A_IsAdmin
+        SetTimer(ReloadScriptElevated, -1)
+    return true
+}
+
 ApplyRuntimeSettingsSnapshot(settings) {
     priorInterval := App.checkInterval
+    priorRunAsAdministrator := App.runAsAdministrator
     displayChanged := settings.UiLanguage != App.uiLanguage
         || settings.UiFont != App.uiFont || settings.Theme != App.uiTheme
     if displayChanged
         ApplyDisplaySettingsHot(settings.UiLanguage, settings.UiFont,
             settings.Theme)
     App.runtimeSettingsService.Apply(App, settings)
+    ApplyRuntimeElevationSettingChange(priorRunAsAdministrator,
+        App.runAsAdministrator)
     while (App.logMessages.Length > App.logMaxEntries)
         App.logMessages.Pop()
     if App.checkInterval != priorInterval

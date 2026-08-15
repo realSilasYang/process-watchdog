@@ -49,8 +49,11 @@ class VietnameseStrings {
             "`; AppN 与 [Apps] 中同名的守护对象一一对应，值为软件升级保护的 <HEX> 编码结构。",
                 "`; Mỗi mục AppN tương ứng với mục cùng tên trong [Apps]. Giá trị của nó là cấu trúc bảo vệ khi cập nhật được mã hóa theo dạng <HEX>.")
         catalog.Set(
-            "`; AppN 与 [Apps] 中同名的守护对象一一对应；留空时使用目标自身的名称和图标。",
-                "`; Mỗi mục AppN tương ứng với mục cùng tên trong [Apps]. Mục để trống sẽ dùng tên và biểu tượng của chính đích.")
+            "`; AppN 与 [Apps] 中同名的守护对象一一对应；三个字段依次为名称、图标路径和圆点颜色。",
+                "`; Mỗi mục AppN tương ứng với mục cùng tên trong [Apps]. Ba trường lần lượt là tên, đường dẫn biểu tượng và màu chấm.")
+        catalog.Set(
+            "`; 名称与图标路径使用 <HEX> 编码；全部留空时使用目标自身信息且不显示圆点。",
+                "`; Tên và đường dẫn biểu tượng dùng mã hóa <HEX>. Khi tất cả đều trống, thông tin của chính đích sẽ được dùng và không hiển thị chấm.")
         catalog.Set(
             "`; CheckInterval：状态检查间隔，单位为毫秒，范围 500～86400000。",
                 "`; CheckInterval: khoảng thời gian kiểm tra trạng thái, tính bằng mili giây`; phạm vi 500～86400000.")
@@ -100,11 +103,14 @@ class VietnameseStrings {
             "`; ShowAtStartup：启动后是否显示主窗口。",
                 "`; ShowAtStartup: có hiển thị cửa sổ chính sau khi khởi động hay không.")
         catalog.Set(
+            "`; RunAsAdministrator：小助手启动时是否请求管理员权限；计划任务使用相同权限级别。",
+                "`; RunAsAdministrator: có yêu cầu quyền quản trị viên khi khởi động hay không`; tác vụ đã lên lịch dùng cùng mức quyền.")
+        catalog.Set(
             "`; UiLanguage：界面语言；auto 表示跟随系统，也可填写受支持的语言代码。",
                 "`; UiLanguage: ngôn ngữ giao diện`; auto nghĩa là theo hệ thống, hoặc có thể nhập mã ngôn ngữ được hỗ trợ.")
         catalog.Set(
-            "`; 仅保存主窗口显示名称和图标来源，不参与进程识别、启动或升级保护。",
-                "`; Chỉ lưu tên hiển thị và nguồn biểu tượng trên cửa sổ chính`; không ảnh hưởng đến nhận diện tiến trình, khởi chạy hay bảo vệ khi cập nhật.")
+            "`; 仅保存主窗口显示名称、图标来源和序号圆点颜色，不参与进程识别、启动或升级保护。",
+                "`; Chỉ lưu tên hiển thị, nguồn biểu tượng và màu chấm số thứ tự`; không ảnh hưởng đến nhận diện tiến trình, khởi chạy hay bảo vệ khi cập nhật.")
         catalog.Set(
             "`; 内部字段包括 Enabled、RootIsCustom、DetectionSeconds、StableSeconds、MaxWaitSeconds、InstallRoot 和 Actor。",
                 "`; Các trường nội bộ gồm Enabled, RootIsCustom, DetectionSeconds, StableSeconds, MaxWaitSeconds, InstallRoot và Actor.")
@@ -1507,8 +1513,8 @@ class VietnameseStrings {
             "🌿 环境变量：{1} 项`n",
                 "🌿 Biến môi trường: {1} mục`n")
         catalog.Set(
-            "🎨 自定义名称和图标",
-                "🎨 Tên và biểu tượng tùy chỉnh")
+            "🏷️ 自定义名称和图标",
+                "🏷️ Tên và biểu tượng tùy chỉnh")
         catalog.Set(
             "📁 工作目录：{1}`n",
                 "📁 Thư mục làm việc: {1}`n")
@@ -1764,6 +1770,16 @@ class VietnameseStrings {
         catalog.Set("冲突", "Xung đột")
         catalog.Set("浏览", "Duyệt")
         catalog.Set("监控配置", "Cấu hình giám sát")
+        catalog.Set("以管理员身份运行", "Chạy với quyền quản trị viên")
+        catalog.Set("设置序号圆点", "Đặt chấm số thứ tự")
+        catalog.Set("清除圆点颜色", "Xóa màu chấm")
+        catalog.Set("雾松绿", "Xanh thông sương")
+        catalog.Set("青灰蓝", "Xanh xám")
+        catalog.Set("薰衣草紫", "Tím oải hương")
+        catalog.Set("烟粉", "Hồng khói")
+        catalog.Set("浅琥珀", "Hổ phách nhạt")
+        catalog.Set("静谧青", "Xanh ngọc dịu")
+        catalog.Set("珍珠灰", "Xám ngọc trai")
         catalog.Set("管理员运行状态", "Chạy với quyền quản trị")
         catalog.Set("调整守护顺序", "Sắp xếp lại danh sách giám sát")
         catalog.Set("编辑完整路径", "Chỉnh sửa đường dẫn đầy đủ")

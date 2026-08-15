@@ -249,3 +249,53 @@ class UiThemeService {
         return this.IsDark() ? "DarkMode_Explorer" : "Explorer"
     }
 }
+
+class MainSequenceColorPalette {
+    static Presets() {
+        return [
+            {Key: "sage", Name: "雾松绿"},
+            {Key: "mist", Name: "青灰蓝"},
+            {Key: "lavender", Name: "薰衣草紫"},
+            {Key: "rose", Name: "烟粉"},
+            {Key: "amber", Name: "浅琥珀"},
+            {Key: "teal", Name: "静谧青"},
+            {Key: "pearl", Name: "珍珠灰"}
+        ]
+    }
+
+    static NormalizeKey(key) {
+        key := StrLower(Trim(String(key)))
+        for preset in this.Presets() {
+            if preset.Key == key
+                return key
+        }
+        return ""
+    }
+
+    static Color(key) {
+        key := this.NormalizeKey(key)
+        if key == ""
+            return UiThemeService.Color("Surface")
+        palette := UiThemeService.IsDark() ? this.DarkColors()
+            : this.LightColors()
+        return palette[key]
+    }
+
+    static DarkColors() {
+        static colors := Map(
+            "sage", "496B59", "mist", "41647D",
+            "lavender", "62567D", "rose", "7A5060",
+            "amber", "76633F", "teal", "3F6D70",
+            "pearl", "5D5E58")
+        return colors
+    }
+
+    static LightColors() {
+        static colors := Map(
+            "sage", "D8EBDD", "mist", "D9E9F5",
+            "lavender", "E5DDF3", "rose", "F1DDE2",
+            "amber", "F2E5C8", "teal", "D5EBEA",
+            "pearl", "E4E5E1")
+        return colors
+    }
+}

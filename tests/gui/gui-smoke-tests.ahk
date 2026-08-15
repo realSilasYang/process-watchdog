@@ -80,6 +80,19 @@ class GuiSmokeListViewSelectionPresenter extends ListViewSelectionPresenter {
     }
 }
 
+class GuiSmokeSubItemDrawProbe {
+    count := 0
+
+    Draw(listView, notification) {
+        subItemOffset := A_PtrSize == 8 ? 88 : 56
+        column := NumGet(notification, subItemOffset, "Int") + 1
+        if column != 4
+            return ""
+        this.count++
+        return Win32.CDRF_DODEFAULT
+    }
+}
+
 AssertGuiSmoke(condition, message) {
     if !condition
         throw Error(message)
@@ -185,7 +198,9 @@ try {
     list := owner.Add("ListView",
         "x16 y82 w380 h120 Report +LV0x10002 -Hdr Background252526 cFFFFFF",
         ["Name", "State", "Path", "Sequence", "StatusKey"])
-    listSelectionPresenter := GuiSmokeListViewSelectionPresenter(list)
+    subItemDrawProbe := GuiSmokeSubItemDrawProbe()
+    listSelectionPresenter := GuiSmokeListViewSelectionPresenter(list, "",
+        ObjBindMethod(subItemDrawProbe, "Draw"))
     list.ModifyCol(1, 220)
     list.ModifyCol(2, 110)
     list.ModifyCol(3, 0)
@@ -508,6 +523,28 @@ try {
         "Clicking a ListView item was mistaken for a blank surface")
     ReportGuiSmokeStage("main-list-blank-focus")
 
+    list.Modify(0, "-Select -Focus")
+    list.Modify(1, "Select Focus")
+    list.Modify(2, "Select")
+    preservedContextSelection :=
+        ListViewFocusService.PrepareContextSelection(list, 1)
+    AssertGuiSmoke(preservedContextSelection
+            && list.GetNext(0) == 1 && list.GetNext(1) == 2
+            && list.GetNext(2) == 0
+            && list.GetNext(0, "Focused") == 1,
+        "Right-clicking a selected row collapsed the multi-selection")
+    list.Modify(0, "-Select -Focus")
+    list.Modify(1, "Select Focus")
+    replacedContextSelection :=
+        ListViewFocusService.PrepareContextSelection(list, 2)
+    AssertGuiSmoke(!replacedContextSelection
+            && list.GetNext(0) == 2 && list.GetNext(2) == 0
+            && list.GetNext(0, "Focused") == 2,
+        "Right-clicking an unselected row retained the previous selection")
+    list.Modify(0, "-Select -Focus")
+    list.Modify(1, "Select Focus")
+    ReportGuiSmokeStage("main-list-context-selection")
+
     AssertGuiSmoke(DllCall("user32\IsWindow", "Ptr", owner.Hwnd, "Int"),
         "Owner GUI handle was not created")
     dpi := DllCall("user32\GetDpiForWindow", "Ptr", owner.Hwnd, "UInt")
@@ -515,6 +552,8 @@ try {
     ReportGuiSmokeStage("surface-before-redraw")
     DllCall("user32\RedrawWindow", "Ptr", owner.Hwnd, "Ptr", 0,
         "Ptr", 0, "UInt", Win32.RDW_LAYOUT_REFRESH, "Int")
+    AssertGuiSmoke(subItemDrawProbe.count > 0,
+        "Visible ListView did not dispatch sequence subitem drawing")
     ReportGuiSmokeStage("surface-after-redraw")
     ownerDc := DllCall("user32\GetDC", "Ptr", owner.Hwnd, "Ptr")
     actionDc := DllCall("user32\GetDC", "Ptr", actionButton.Hwnd, "Ptr")
@@ -575,10 +614,15 @@ try {
         A_PtrSize == 8 ? 24 : 12)
     NumPut("UPtr", 0, selectionNotification,
         A_PtrSize == 8 ? 56 : 36)
+    selectionStateOffset := A_PtrSize == 8 ? 64 : 40
+    NumPut("UInt", Win32.CDIS_SELECTED | Win32.CDIS_FOCUS,
+        selectionNotification, selectionStateOffset)
     AssertGuiSmoke((SendMessage(Win32.LVM_GETITEMSTATE, 0,
             Win32.LVIS_SELECTED, list.Hwnd) & Win32.LVIS_SELECTED) != 0
         && listSelectionPresenter.HandleCustomDraw(list,
-            selectionNotification.Ptr) == Win32.CDRF_NOTIFYPOSTPAINT,
+            selectionNotification.Ptr) == Win32.CDRF_NOTIFYITEMDRAW
+        && !(NumGet(selectionNotification, selectionStateOffset, "UInt")
+            & Win32.CDIS_FOCUS),
         "ListView lost rounded selection when focus moved to a context menu")
     ReportGuiSmokeStage("selection-before-redraw")
     DllCall("user32\RedrawWindow", "Ptr", list.Hwnd, "Ptr", 0,

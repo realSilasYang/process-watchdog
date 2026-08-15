@@ -12,9 +12,14 @@ class MainContextPopupWindow {
     static CheckSlotDip := 18
     static CheckGapDip := 8
     static CheckInsetDip := 16
-    static SeparatorHeight := 8
     static WindowRadiusDip := 9
     static RowRadiusDip := 6
+    static ColorLabelHeight := 18
+    static ColorSectionTopGap := 6
+    static SwatchSize := 24
+    static SwatchGap := 6
+    static SwatchTopGap := 8
+    static SelectedMarkFontSize := 13
 
     __New(ownerGui) {
         this.OwnerGui := ownerGui
@@ -74,13 +79,13 @@ class MainContextPopupWindow {
         y := MainContextPopupWindow.Padding
         contentWidth := this.WindowWidth
             - MainContextPopupWindow.Padding * 2
+        this.SwatchButtons := []
+        this.ColorLabel := ""
+        this.ColorLabelIcon := ""
         for item in items {
-            if item.HasOwnProp("Separator") && item.Separator {
-                this.Gui.Add("Text", "x" MainContextPopupWindow.Padding
-                    " y" (y + MainContextPopupWindow.SeparatorHeight // 2)
-                    " w" contentWidth " h1 Background"
-                    UiThemeService.Color("Divider"), "")
-                y += MainContextPopupWindow.SeparatorHeight
+            if item.HasOwnProp("ColorPalette") && item.ColorPalette {
+                this.AddColorPalette(item, &y, contentWidth, menuColor,
+                    textColor)
                 continue
             }
             enabled := !(item.HasOwnProp("Enabled") && !item.Enabled)
@@ -129,6 +134,115 @@ class MainContextPopupWindow {
             + MainContextPopupWindow.Padding
     }
 
+    AddColorPalette(item, &y, contentWidth, menuColor, textColor) {
+        y += MainContextPopupWindow.ColorSectionTopGap
+        label := this.Gui.Add("Text", "x-10000 y" y " w1 h"
+            MainContextPopupWindow.ColorLabelHeight
+            " Center 0x200 Background" menuColor " c" textColor, item.Text)
+        label.SetFont("s10 norm bold",
+            LocalizationService.GetLanguageSystemUiFontName())
+        iconSize := 18
+        iconGap := 6
+        textWidth := Min(Max(1, contentWidth - iconSize - iconGap),
+            this.MeasureControlTextWidthDip(label, item.Text) + 2)
+        headingWidth := iconSize + iconGap + textWidth
+        headingX := MainContextPopupWindow.Padding
+            + Max(0, Floor((contentWidth - headingWidth) / 2))
+        label.Move(headingX + iconSize + iconGap, y, textWidth,
+            MainContextPopupWindow.ColorLabelHeight)
+        iconControl := this.Gui.Add("Text", "x" headingX " y" y " w"
+            iconSize " h" MainContextPopupWindow.ColorLabelHeight
+            " Center 0x200 Background" menuColor, "")
+        RegisterHoverButton(iconControl, menuColor, menuColor, menuColor,
+            textColor, "center", 0)
+        try iconControl.Opt("-0x10000")
+        if App.uiInteractions.HasButton(iconControl.Hwnd) {
+            iconState := App.uiInteractions.GetButton(iconControl.Hwnd)
+            iconState.parentColor := menuColor
+            iconState.noFocus := true
+            iconName := item.HasOwnProp("IconName")
+                ? item.IconName : "palette.svg"
+            iconColorRole := item.HasOwnProp("IconColorRole")
+                    && UiThemeService.HasColor(item.IconColorRole)
+                ? item.IconColorRole : "ThemeIcon"
+            SetButtonLucideIcon(iconControl, iconName, iconSize, 0,
+                "theme:" iconColorRole)
+            SetRegisteredButtonEnabled(iconControl, false)
+        }
+        this.ColorLabel := label
+        this.ColorLabelIcon := iconControl
+        y += MainContextPopupWindow.ColorLabelHeight
+            + MainContextPopupWindow.SwatchTopGap
+
+        presets := MainSequenceColorPalette.Presets()
+        swatchRowWidth := (presets.Length + 1)
+            * MainContextPopupWindow.SwatchSize
+            + presets.Length * MainContextPopupWindow.SwatchGap
+        startX := MainContextPopupWindow.Padding
+            + Max(0, Floor((contentWidth - swatchRowWidth) / 2))
+        selectedColor := item.HasOwnProp("SelectedColor")
+            ? MainSequenceColorPalette.NormalizeKey(item.SelectedColor) : ""
+        for index, preset in presets
+            this.AddColorSwatch(startX, y, index - 1, preset.Key,
+                selectedColor, item.Action, this.GetPresetTooltip(preset.Key))
+        this.AddColorSwatch(startX, y, presets.Length, "", selectedColor,
+            item.Action, Tr("清除圆点颜色"))
+        y += MainContextPopupWindow.SwatchSize
+    }
+
+    AddColorSwatch(startX, y, index, presetKey, selectedColor, action,
+            tooltipText) {
+        menuColor := UiThemeService.Color("Menu")
+        colorKey := MainSequenceColorPalette.NormalizeKey(presetKey)
+        color := colorKey == "" ? menuColor
+            : MainSequenceColorPalette.Color(colorKey)
+        mark := colorKey == "" ? "✕"
+            : (colorKey == selectedColor ? "✓" : "")
+        x := startX + index * (MainContextPopupWindow.SwatchSize
+            + MainContextPopupWindow.SwatchGap)
+        button := this.Gui.Add("Text", "x" x " y" y " w"
+            MainContextPopupWindow.SwatchSize " h"
+            MainContextPopupWindow.SwatchSize
+            " Center 0x200 Background" color " c"
+            UiThemeService.Color("Text"), mark)
+        button.SetFont("s" MainContextPopupWindow.SelectedMarkFontSize
+            " norm bold",
+            LocalizationService.GetLanguageSystemUiFontName())
+        RegisterHoverButton(button, color, color, color,
+            colorKey == "" ? UiThemeService.Color("MutedText")
+                : UiThemeService.Color("Text"), "center", 0)
+        try button.Opt("-0x10000")
+        if App.uiInteractions.HasButton(button.Hwnd) {
+            state := App.uiInteractions.GetButton(button.Hwnd)
+            state.parentColor := menuColor
+            state.radiusDip := 5
+            state.noFocus := true
+            if colorKey == ""
+                SetButtonClearMark(button, 16, 2)
+            RedrawRoundedButton(button.Hwnd)
+        }
+        SetButtonTooltip(button, tooltipText)
+        if IsObject(action)
+            RegisterButtonClick(button,
+                ObjBindMethod(this, "InvokeColorAction", action, colorKey),
+                ButtonFeedbackMode.Dismissive)
+        this.SwatchButtons.Push({Control: button, Key: colorKey})
+        return button
+    }
+
+    GetPresetTooltip(presetKey) {
+        switch MainSequenceColorPalette.NormalizeKey(presetKey) {
+            case "sage": return Tr("雾松绿")
+            case "mist": return Tr("青灰蓝")
+            case "lavender": return Tr("薰衣草紫")
+            case "rose": return Tr("烟粉")
+            case "amber": return Tr("浅琥珀")
+            case "teal": return Tr("静谧青")
+            case "pearl": return Tr("珍珠灰")
+            default: return Tr("清除圆点颜色")
+        }
+    }
+
     ResolveWindowWidth(items) {
         maxTextWidth := 0
         hasCheckSlot := false
@@ -144,8 +258,6 @@ class MainContextPopupWindow {
                     "Ptr") : 0
             try {
                 for item in items {
-                    if item.HasOwnProp("Separator") && item.Separator
-                        continue
                     maxTextWidth := Max(maxTextWidth,
                         this.MeasureTextWidth(hdc, item.Text))
                     if item.HasOwnProp("Check")
@@ -172,6 +284,17 @@ class MainContextPopupWindow {
         measuredWidth := MainContextPopupWindow.Padding * 2
             + MainContextPopupWindow.TextInsetDip + textWidthDip
             + checkWidthDip
+        swatchCount := MainSequenceColorPalette.Presets().Length
+        for item in items {
+            if item.HasOwnProp("ColorPalette") && item.ColorPalette {
+                swatchWidth := (swatchCount + 1)
+                    * MainContextPopupWindow.SwatchSize
+                    + swatchCount * MainContextPopupWindow.SwatchGap
+                measuredWidth := Max(measuredWidth,
+                    MainContextPopupWindow.Padding * 2 + swatchWidth)
+                break
+            }
+        }
         minWidth := MainContextPopupWindow.MinWindowWidth
         maxWidth := MainContextPopupWindow.MaxWindowWidth
         return Min(Max(measuredWidth, minWidth), maxWidth)
@@ -186,13 +309,37 @@ class MainContextPopupWindow {
         return 0
     }
 
+    MeasureControlTextWidthDip(control, text) {
+        hdc := DllCall("user32\GetDC", "Ptr", control.Hwnd, "Ptr")
+        if !hdc
+            return 0
+        font := DllCall("user32\SendMessageW", "Ptr", control.Hwnd,
+            "UInt", Win32.WM_GETFONT, "Ptr", 0, "Ptr", 0, "Ptr")
+        previousFont := font ? DllCall("gdi32\SelectObject", "Ptr", hdc,
+            "Ptr", font, "Ptr") : 0
+        try {
+            pixelWidth := this.MeasureTextWidth(hdc, text)
+            dpi := DllCall("user32\GetDpiForWindow", "Ptr", control.Hwnd,
+                "UInt")
+            if !dpi
+                dpi := 96
+            return Round(pixelWidth * 96 / dpi)
+        } finally {
+            if previousFont
+                DllCall("gdi32\SelectObject", "Ptr", hdc,
+                    "Ptr", previousFont)
+            DllCall("user32\ReleaseDC", "Ptr", control.Hwnd, "Ptr", hdc)
+        }
+    }
+
     Hide(*) {
         try SetTimer(this.VisibilityTimer, 0)
         try OnMessage(Win32.WM_LBUTTONDOWN, this.PointerDownCallback, 0)
         try OnMessage(Win32.WM_RBUTTONDOWN, this.PointerDownCallback, 0)
         try OnMessage(Win32.WM_NCLBUTTONDOWN, this.PointerDownCallback, 0)
-        if IsObject(this.Gui) && this.Gui.Hwnd {
-            try UnregisterGuiControls(this.Gui.Hwnd)
+        popupHwnd := this.GetGuiHwnd()
+        if popupHwnd {
+            try UnregisterGuiControls(popupHwnd)
             try this.Gui.Destroy()
         }
         this.Gui := ""
@@ -214,30 +361,50 @@ class MainContextPopupWindow {
         action.Call()
     }
 
+    InvokeColorAction(action, colorKey, *) {
+        this.Hide()
+        action.Call(colorKey)
+    }
+
     OnPointerDown(wParam, lParam, msg, hwnd) {
         if !this.IsVisible() || !hwnd
             return
+        popupHwnd := this.GetGuiHwnd()
+        if !popupHwnd
+            return
         rootHwnd := DllCall("user32\GetAncestor", "Ptr", hwnd,
             "UInt", 2, "Ptr") ; 取根窗口句柄（GA_ROOT）
-        if rootHwnd != this.Gui.Hwnd
+        if rootHwnd != popupHwnd
             this.Hide()
     }
 
     MonitorVisibility(*) {
-        if !this.IsVisible() {
+        popupHwnd := this.GetGuiHwnd()
+        if this.Disposed || !popupHwnd
+                || !DllCall("user32\IsWindowVisible", "Ptr", popupHwnd,
+                    "Int") {
             SetTimer(this.VisibilityTimer, 0)
             return
         }
         foregroundHwnd := DllCall("user32\GetForegroundWindow", "Ptr")
         if foregroundHwnd != this.OwnerGui.Hwnd
-                && foregroundHwnd != this.Gui.Hwnd
+                && foregroundHwnd != popupHwnd
             this.Hide()
     }
 
     IsVisible() {
-        return !this.Disposed && IsObject(this.Gui) && this.Gui.Hwnd
-            && DllCall("user32\IsWindowVisible", "Ptr", this.Gui.Hwnd,
+        popupHwnd := this.GetGuiHwnd()
+        return !this.Disposed && popupHwnd
+            && DllCall("user32\IsWindowVisible", "Ptr", popupHwnd,
                 "Int") != 0
+    }
+
+    GetGuiHwnd() {
+        if !IsObject(this.Gui)
+            return 0
+        try return this.Gui.Hwnd
+        catch
+            return 0
     }
 
     ConstrainToWorkArea(&x, &y, width, height) {

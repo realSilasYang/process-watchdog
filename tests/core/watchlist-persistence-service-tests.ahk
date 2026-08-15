@@ -29,22 +29,24 @@ class WatchlistPersistenceMaintenanceCodec {
 
 class WatchlistPersistenceDisplayCodec {
     CreateDefault() {
-        return {Name: "", IconPath: ""}
+        return {Name: "", IconPath: "", SequenceColor: ""}
     }
 
     Deserialize(value) {
         parts := StrSplit(value, "|")
         return {Name: IniFieldCodec.Decode(parts[1]),
-            IconPath: IniFieldCodec.Decode(parts[2])}
+            IconPath: IniFieldCodec.Decode(parts[2]),
+            SequenceColor: parts.Length == 3 ? parts[3] : ""}
     }
 
     Serialize(config) {
         return IniFieldCodec.Encode(config.Name) "|"
-            . IniFieldCodec.Encode(config.IconPath)
+            . IniFieldCodec.Encode(config.IconPath) "|" config.SequenceColor
     }
 
     IsDefault(config) {
         return config.Name == "" && config.IconPath == ""
+            && config.SequenceColor == ""
     }
 }
 
@@ -97,7 +99,8 @@ CreateWatchlistPersistenceState(path, name := "") {
         ContentHash: "A" . Format("{:063}", 0),
         ContentSize: 4096,
         Maintenance: {Value: "M:" path},
-        Display: {Name: name, IconPath: name == "" ? "" : path}
+        Display: {Name: name, IconPath: name == "" ? "" : path,
+            SequenceColor: name == "" ? "" : "sage"}
     }
 }
 
@@ -163,7 +166,8 @@ RunWatchlistPersistenceServiceTests() {
             && records[1].Args == "--中文"
             && records[1].RuntimePath == A_AhkPath
             && records[1].RuntimeArgs == "/ErrorStdOut"
-            && records[1].Display.Name == "自定义",
+            && records[1].Display.Name == "自定义"
+            && records[1].Display.SequenceColor == "",
             "有效守护对象的关联配置加载错误")
         AssertWatchlistPersistence(records[1].ContentSize == 128
             && records[1].ContentHash == "B" . Format("{:063}", 0)
@@ -208,6 +212,8 @@ RunWatchlistPersistenceServiceTests() {
         saved := service.Save([firstPath, firstPath], appStates,
             loaded.RecoveryEntries)
         appEntries := repository.ReadSectionEntries("Apps")
+        savedDisplayParts := StrSplit(
+            repository.Read("Display", "App1", ""), "|")
         AssertWatchlistPersistence(saved.SavedCount == 2
             && saved.OrderedPaths.Length == 2
             && InStr(appEntries[1].Value, firstPath)
@@ -215,6 +221,8 @@ RunWatchlistPersistenceServiceTests() {
             && StrSplit(appEntries[1].Value, "|").Length == 9
             && repository.ReadSectionEntries("Maintenance").Length == 2
             && repository.ReadSectionEntries("Display").Length == 1
+            && savedDisplayParts.Length == 3
+            && savedDisplayParts[3] == "sage"
             && repository.ReadSectionEntries("Launch").Length == 2
             && repository.ReadSectionEntries("Identity").Length == 2
             && repository.ReadSectionEntries("Recovery").Length == 8
@@ -235,6 +243,7 @@ RunWatchlistPersistenceServiceTests() {
             && !reloaded.NeedsIdentitySave
             && reloadedRecords[1].ContentSize == 4096
             && reloadedRecords[1].ContentHash == "A" . Format("{:063}", 0)
+            && reloadedRecords[1].Display.SequenceColor == "sage"
             && reloaded.RecoveryEntries.Length == 8,
             "服务保存的当前格式无法无损重新加载")
     } finally {

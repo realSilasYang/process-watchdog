@@ -120,6 +120,7 @@ FormatRuntimeErrorDetails(runtimeError) {
 
 ShutdownApplicationUi(*) {
     try SetTimer(UpdateCountdownUI, 0)
+    try ShutdownMainListSmoothScroll()
     try ShutdownContextMenuPresenter()
     if IsSet(App) {
         dpiRebuildTimer := App.iconResources.CancelDpiRebuild()

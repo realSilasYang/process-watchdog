@@ -180,9 +180,13 @@ class CustomDisplayDialog extends ManagedWindow {
     SaveTransaction() {
         if !this.IsOpen() || !this.state
             return
+        priorDisplay := this.state.HasOwnProp("DisplayConfig")
+            ? App.displayConfigCodec.Normalize(this.state.DisplayConfig)
+            : App.displayConfigCodec.CreateDefault()
         nextDisplay := App.displayConfigCodec.Normalize({
             Name: this.nameEdit.Value,
-            IconPath: this.iconEdit.Value
+            IconPath: this.iconEdit.Value,
+            SequenceColor: priorDisplay.SequenceColor
         })
         if (nextDisplay.IconPath != ""
             && !CustomIconSourceExists(nextDisplay.IconPath)) {
@@ -196,9 +200,6 @@ class CustomDisplayDialog extends ManagedWindow {
                 Tr("不支持的图标格式"), "Error", this.gui)
             return
         }
-        priorDisplay := this.state.HasOwnProp("DisplayConfig")
-            ? App.displayConfigCodec.Normalize(this.state.DisplayConfig)
-            : App.displayConfigCodec.CreateDefault()
         if App.displayConfigCodec.Equals(priorDisplay, nextDisplay) {
             if App.appsDirty && !SaveAppsToIni() {
                 ShowDarkMsgBoxDeferred(Tr("保存显示设置失败，请查看运行日志。"),

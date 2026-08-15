@@ -49,8 +49,11 @@ class JapaneseStrings {
             "`; AppN 与 [Apps] 中同名的守护对象一一对应，值为软件升级保护的 <HEX> 编码结构。",
                 "`; 各 AppN は [Apps] 内の同名項目に対応し、値にはアップデート保護設定が <HEX> 形式で格納されます。")
         catalog.Set(
-            "`; AppN 与 [Apps] 中同名的守护对象一一对应；留空时使用目标自身的名称和图标。",
-                "`; 各 AppN は [Apps] 内の同名項目に対応します。空の場合は対象自身の名前とアイコンが使われます。")
+            "`; AppN 与 [Apps] 中同名的守护对象一一对应；三个字段依次为名称、图标路径和圆点颜色。",
+                "`; 各 AppN は [Apps] 内の同名項目に対応します。3 つのフィールドは名前、アイコンのパス、ドットの色です。")
+        catalog.Set(
+            "`; 名称与图标路径使用 <HEX> 编码；全部留空时使用目标自身信息且不显示圆点。",
+                "`; 名前とアイコンのパスは <HEX> でエンコードされます。すべて空の場合は対象自身の情報を使用し、ドットは表示しません。")
         catalog.Set(
             "`; CheckInterval：状态检查间隔，单位为毫秒，范围 500～86400000。",
                 "`; CheckInterval: 状態を確認する間隔（ミリ秒）。範囲は 500～86400000 です。")
@@ -100,11 +103,14 @@ class JapaneseStrings {
             "`; ShowAtStartup：启动后是否显示主窗口。",
                 "`; ShowAtStartup: 起動後にメインウィンドウを表示するかどうか。")
         catalog.Set(
+            "`; RunAsAdministrator：小助手启动时是否请求管理员权限；计划任务使用相同权限级别。",
+                "`; RunAsAdministrator: 起動時に管理者権限を要求するかどうか。タスク スケジューラも同じ権限レベルを使用します。")
+        catalog.Set(
             "`; UiLanguage：界面语言；auto 表示跟随系统，也可填写受支持的语言代码。",
                 "`; UiLanguage: 表示言語。auto はシステムに従います。対応する言語コードを指定することもできます。")
         catalog.Set(
-            "`; 仅保存主窗口显示名称和图标来源，不参与进程识别、启动或升级保护。",
-                "`; メイン画面に表示する名前とアイコンの参照元だけを保存します。プロセスの識別、起動、アップデート保護には影響しません。")
+            "`; 仅保存主窗口显示名称、图标来源和序号圆点颜色，不参与进程识别、启动或升级保护。",
+                "`; メイン画面に表示する名前、アイコンの参照元、番号ドットの色だけを保存します。プロセスの識別、起動、アップデート保護には影響しません。")
         catalog.Set(
             "`; 内部字段包括 Enabled、RootIsCustom、DetectionSeconds、StableSeconds、MaxWaitSeconds、InstallRoot 和 Actor。",
                 "`; 内部フィールド: Enabled、RootIsCustom、DetectionSeconds、StableSeconds、MaxWaitSeconds、InstallRoot、Actor。")
@@ -1507,8 +1513,8 @@ class JapaneseStrings {
             "🌿 环境变量：{1} 项`n",
                 "🌿 環境変数: {1} 件`n")
         catalog.Set(
-            "🎨 自定义名称和图标",
-                "🎨 名前とアイコンをカスタマイズ")
+            "🏷️ 自定义名称和图标",
+                "🏷️ 名前とアイコンをカスタマイズ")
         catalog.Set(
             "📁 工作目录：{1}`n",
                 "📁 作業フォルダー: {1}`n")
@@ -1764,6 +1770,16 @@ class JapaneseStrings {
         catalog.Set("冲突", "競合")
         catalog.Set("浏览", "参照")
         catalog.Set("监控配置", "監視設定")
+        catalog.Set("以管理员身份运行", "管理者として実行")
+        catalog.Set("设置序号圆点", "番号ドットを設定")
+        catalog.Set("清除圆点颜色", "ドットの色を消去")
+        catalog.Set("雾松绿", "霞松緑")
+        catalog.Set("青灰蓝", "青灰色")
+        catalog.Set("薰衣草紫", "ラベンダー")
+        catalog.Set("烟粉", "くすみピンク")
+        catalog.Set("浅琥珀", "淡い琥珀")
+        catalog.Set("静谧青", "静かな青緑")
+        catalog.Set("珍珠灰", "パールグレー")
         catalog.Set("管理员运行状态", "管理者として実行")
         catalog.Set("调整守护顺序", "監視順序を変更")
         catalog.Set("编辑完整路径", "フルパスを編集")

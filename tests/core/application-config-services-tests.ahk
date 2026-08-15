@@ -56,6 +56,7 @@ RunApplicationConfigServiceTests() {
             && repository.Read("Settings", "Theme", "") == "auto"
             && repository.Read("Settings", "RecursiveBatchImport", "") == "1"
             && repository.Read("Settings", "CheckUpdatesOnStartup", "") == "1"
+            && repository.Read("Settings", "RunAsAdministrator", "") == "1"
             && repository.Read("Settings", "PreferEverything", "") == ""
             && repository.Read("Settings", "NativeScanTimeoutSeconds", "") == ""
             && repository.Read("Settings", "EverythingMaxResults", "") == "",
@@ -76,7 +77,8 @@ RunApplicationConfigServiceTests() {
             {Key: "RetrySequence", Value: "broken"},
             {Key: "LogDirectory", Value: "   "},
             {Key: "GracefulStopSeconds", Value: 999},
-            {Key: "ShowAtStartup", Value: "invalid"}
+            {Key: "ShowAtStartup", Value: "invalid"},
+            {Key: "RunAsAdministrator", Value: "invalid"}
         ])
         loaded := settingsService.Load()
         AssertApplicationConfig(loaded.UiLanguage == "auto"
@@ -87,7 +89,8 @@ RunApplicationConfigServiceTests() {
             && loaded.RetryDelayArray.Length == 3
             && loaded.LogDirectory == defaultLogDirectory
             && loaded.GracefulStopSeconds == 3
-            && !loaded.ShowAtStartup,
+            && !loaded.ShowAtStartup
+            && loaded.RunAsAdministrator,
             "损坏或越界的运行参数没有逐字段回退默认值")
 
         candidate := settingsService.CreateDefaults()
@@ -101,6 +104,7 @@ RunApplicationConfigServiceTests() {
         candidate.Theme := "light"
         candidate.RetrySequence := "1, 2"
         candidate.ShowAtStartup := true
+        candidate.RunAsAdministrator := false
         candidate.CheckUpdatesOnStartup := false
         candidate.LogDirectory := " D:\Logs "
         saved := settingsService.Save(candidate)
@@ -113,9 +117,11 @@ RunApplicationConfigServiceTests() {
             && runtime.retryDelayArray.Length == 2
             && runtime.retryDelayArray[2] == 2000
             && runtime.showAtStartup
+            && !runtime.runAsAdministrator
             && !runtime.checkUpdatesOnStartup
             && runtime.logDirectory == "D:\Logs"
-            && repository.Read("Settings", "UiLanguage", "") == "ja-JP",
+            && repository.Read("Settings", "UiLanguage", "") == "ja-JP"
+            && repository.Read("Settings", "RunAsAdministrator", "") == "0",
             "有效运行参数没有统一校验、保存并应用到运行态")
 
         originalFont := repository.Read("Settings", "UiFont", "")

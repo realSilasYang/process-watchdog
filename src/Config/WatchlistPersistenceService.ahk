@@ -142,9 +142,9 @@ class WatchlistPersistenceService {
         if displayValues.Has(appEntry.Key) {
             displayValue := displayValues[appEntry.Key]
             displayParts := StrSplit(displayValue, "|")
-            if (displayParts.Length != 2)
+            if (displayParts.Length != 2 && displayParts.Length != 3)
                 throw this.CreateLoadError("Display", "整条展示配置",
-                    "字段数量应为 2，实际为 " displayParts.Length)
+                    "字段数量应为 2 或 3，实际为 " displayParts.Length)
             this.ValidateEncodedField(displayParts[1], "自定义名称", true,
                 "Display")
             this.ValidateEncodedField(displayParts[2], "自定义图标", true,

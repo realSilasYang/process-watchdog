@@ -49,8 +49,11 @@ class FrenchStrings {
             "`; AppN 与 [Apps] 中同名的守护对象一一对应，值为软件升级保护的 <HEX> 编码结构。",
                 "`; Chaque AppN correspond à l'élément du même nom dans [Apps] `; sa valeur contient la structure de protection des mises à jour encodée au format <HEX>.")
         catalog.Set(
-            "`; AppN 与 [Apps] 中同名的守护对象一一对应；留空时使用目标自身的名称和图标。",
-                "`; Chaque AppN correspond à l'élément du même nom dans [Apps] `; un élément vide utilise le nom et l'icône de la cible.")
+            "`; AppN 与 [Apps] 中同名的守护对象一一对应；三个字段依次为名称、图标路径和圆点颜色。",
+                "`; Chaque AppN correspond à l'élément du même nom dans [Apps]. Les trois champs sont le nom, le chemin de l'icône et la couleur du point.")
+        catalog.Set(
+            "`; 名称与图标路径使用 <HEX> 编码；全部留空时使用目标自身信息且不显示圆点。",
+                "`; Le nom et le chemin de l'icône utilisent l'encodage <HEX>. Si tous les champs sont vides, les informations de la cible sont utilisées sans afficher de point.")
         catalog.Set(
             "`; CheckInterval：状态检查间隔，单位为毫秒，范围 500～86400000。",
                 "`; CheckInterval : intervalle de vérification de l'état, en millisecondes `; plage de 500 à 86400000.")
@@ -100,11 +103,14 @@ class FrenchStrings {
             "`; ShowAtStartup：启动后是否显示主窗口。",
                 "`; ShowAtStartup : indique s'il faut afficher la fenêtre principale après le démarrage.")
         catalog.Set(
+            "`; RunAsAdministrator：小助手启动时是否请求管理员权限；计划任务使用相同权限级别。",
+                "`; RunAsAdministrator : indique si l'assistant demande les droits d'administrateur au démarrage `; la tâche planifiée utilise le même niveau de privilège.")
+        catalog.Set(
             "`; UiLanguage：界面语言；auto 表示跟随系统，也可填写受支持的语言代码。",
                 "`; UiLanguage : langue de l'interface `; auto suit la langue du système, mais un code de langue pris en charge peut aussi être indiqué.")
         catalog.Set(
-            "`; 仅保存主窗口显示名称和图标来源，不参与进程识别、启动或升级保护。",
-                "`; Enregistre uniquement le nom affiché et la source de l'icône dans la fenêtre principale `; n'intervient pas dans l'identification du processus, le lancement ni la protection des mises à jour.")
+            "`; 仅保存主窗口显示名称、图标来源和序号圆点颜色，不参与进程识别、启动或升级保护。",
+                "`; Enregistre uniquement le nom affiché, la source de l'icône et la couleur du point de numéro `; n'intervient pas dans l'identification du processus, le lancement ni la protection des mises à jour.")
         catalog.Set(
             "`; 内部字段包括 Enabled、RootIsCustom、DetectionSeconds、StableSeconds、MaxWaitSeconds、InstallRoot 和 Actor。",
                 "`; Les champs internes comprennent Enabled, RootIsCustom, DetectionSeconds, StableSeconds, MaxWaitSeconds, InstallRoot et Actor.")
@@ -1507,8 +1513,8 @@ class FrenchStrings {
             "🌿 环境变量：{1} 项`n",
                 "🌿 Variables d'environnement : {1}`n")
         catalog.Set(
-            "🎨 自定义名称和图标",
-                "🎨 Personnaliser le nom et l'icône")
+            "🏷️ 自定义名称和图标",
+                "🏷️ Personnaliser le nom et l'icône")
         catalog.Set(
             "📁 工作目录：{1}`n",
                 "📁 Répertoire de travail : {1}`n")
@@ -1702,6 +1708,16 @@ class FrenchStrings {
         catalog.Set("冲突", "Conflit")
         catalog.Set("浏览", "Parcourir")
         catalog.Set("监控配置", "Configuration de la surveillance")
+        catalog.Set("以管理员身份运行", "Exécuter en tant qu’administrateur")
+        catalog.Set("设置序号圆点", "Définir le point du numéro")
+        catalog.Set("清除圆点颜色", "Effacer la couleur du point")
+        catalog.Set("雾松绿", "Vert pin brumeux")
+        catalog.Set("青灰蓝", "Bleu-gris")
+        catalog.Set("薰衣草紫", "Lavande")
+        catalog.Set("烟粉", "Rose poudré")
+        catalog.Set("浅琥珀", "Ambre clair")
+        catalog.Set("静谧青", "Bleu sarcelle doux")
+        catalog.Set("珍珠灰", "Gris perle")
         catalog.Set("管理员运行状态", "Exécution en tant qu’administrateur")
         catalog.Set("调整守护顺序", "Réorganiser la liste de surveillance")
         catalog.Set("编辑完整路径", "Modifier le chemin complet")

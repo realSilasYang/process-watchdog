@@ -5,6 +5,7 @@
 ; 损坏十六进制、非法 UTF-8、缺字段和越界数值必须显式失败，不能被当成空配置。
 
 #Include ..\..\src\Config\IniFieldCodec.ahk
+#Include ..\..\src\UI\UiThemeService.ahk
 #Include ..\..\src\Config\DisplayConfigCodec.ahk
 #Include ..\..\src\Config\MaintenanceConfigCodec.ahk
 #Include ..\..\src\Maintenance\MaintenanceActorMatcher.ahk
@@ -89,7 +90,8 @@ RunDisplayConfigCodecTests() {
         ConfigCodecPathsEquivalent)
     defaultConfig := codec.CreateDefault()
     AssertConfigCodec(defaultConfig.Name == ""
-        && defaultConfig.IconPath == "" && codec.IsDefault(defaultConfig),
+        && defaultConfig.IconPath == "" && defaultConfig.SequenceColor == ""
+        && codec.IsDefault(defaultConfig),
         "显示配置默认值错误")
 
     longName := ""
@@ -104,14 +106,18 @@ RunDisplayConfigCodecTests() {
     AssertConfigCodec(normalized.IconPath == "C:\图标\应用|新版.ico",
         "显示图标路径没有规范化")
 
-    display := {Name: "中文|名称", IconPath: "C:\图标\新版|应用.ico"}
+    display := {Name: "中文|名称", IconPath: "C:\图标\新版|应用.ico",
+        SequenceColor: "sage"}
     encoded := codec.Serialize(display)
     decoded := codec.Deserialize(encoded)
     AssertConfigCodec(decoded.Name == display.Name
-        && decoded.IconPath == display.IconPath,
+        && decoded.IconPath == display.IconPath
+        && decoded.SequenceColor == "sage"
+        && StrSplit(encoded, "|").Length == 3,
         "包含 Unicode 或竖线的显示配置没有无损往返")
     AssertConfigCodec(codec.Equals(display, {
-        Name: "中文|名称", IconPath: "c:/图标/新版|应用.ico"}),
+        Name: "中文|名称", IconPath: "c:/图标/新版|应用.ico",
+        SequenceColor: "SAGE"}),
         "显示配置没有按等价路径比较")
     AssertConfigCodec(!codec.Equals(display, {
         Name: "其他名称", IconPath: display.IconPath}),
@@ -121,7 +127,16 @@ RunDisplayConfigCodecTests() {
     clone.Name := "已修改"
     AssertConfigCodec(display.Name == "中文|名称",
         "显示配置克隆仍与源对象共享状态")
-    damaged := codec.Deserialize("one|two|three")
+    legacy := codec.Deserialize(IniFieldCodec.Encode("旧名称") "|"
+        IniFieldCodec.Encode("C:\旧图标.ico"))
+    AssertConfigCodec(legacy.Name == "旧名称"
+        && legacy.IconPath == "C:\旧图标.ico"
+        && legacy.SequenceColor == "",
+        "旧版两字段显示配置没有保持兼容")
+    invalidColor := codec.Normalize({SequenceColor: "not-a-preset"})
+    AssertConfigCodec(invalidColor.SequenceColor == "",
+        "未知序号圆点颜色没有安全回退")
+    damaged := codec.Deserialize("one|two|three|four")
     AssertConfigCodec(codec.IsDefault(damaged),
         "字段数量损坏的显示配置没有回退默认值")
 }

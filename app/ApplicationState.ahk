@@ -20,6 +20,7 @@ class ApplicationState {
         this.retrySequence := "1, 10, 60"
         this.retryDelayArray := []
         this.showAtStartup := false
+        this.runAsAdministrator := true
         this.checkUpdatesOnStartup := true
         this.recursiveBatchImport := true
         this.logMaxEntries := 500

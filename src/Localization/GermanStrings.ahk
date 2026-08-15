@@ -49,8 +49,11 @@ class GermanStrings {
             "`; AppN 与 [Apps] 中同名的守护对象一一对应，值为软件升级保护的 <HEX> 编码结构。",
                 "`; Jeder AppN-Eintrag entspricht dem gleichnamigen Eintrag unter [Apps]`; sein Wert enthält die als <HEX> codierte Struktur für den Update-Schutz.")
         catalog.Set(
-            "`; AppN 与 [Apps] 中同名的守护对象一一对应；留空时使用目标自身的名称和图标。",
-                "`; Jeder AppN-Eintrag entspricht dem gleichnamigen Eintrag unter [Apps]`; leere Einträge verwenden Name und Symbol des Ziels.")
+            "`; AppN 与 [Apps] 中同名的守护对象一一对应；三个字段依次为名称、图标路径和圆点颜色。",
+                "`; Jeder AppN-Eintrag entspricht dem gleichnamigen Eintrag unter [Apps]. Die drei Felder sind Name, Symbolpfad und Punktfarbe.")
+        catalog.Set(
+            "`; 名称与图标路径使用 <HEX> 编码；全部留空时使用目标自身信息且不显示圆点。",
+                "`; Name und Symbolpfad verwenden die <HEX>-Kodierung. Sind alle Felder leer, werden die Zielinformationen verwendet und kein Punkt angezeigt.")
         catalog.Set(
             "`; CheckInterval：状态检查间隔，单位为毫秒，范围 500～86400000。",
                 "`; CheckInterval: Intervall der Statusprüfung in Millisekunden`; Bereich 500 bis 86400000.")
@@ -100,11 +103,14 @@ class GermanStrings {
             "`; ShowAtStartup：启动后是否显示主窗口。",
                 "`; ShowAtStartup: Legt fest, ob das Hauptfenster nach dem Start angezeigt wird.")
         catalog.Set(
+            "`; RunAsAdministrator：小助手启动时是否请求管理员权限；计划任务使用相同权限级别。",
+                "`; RunAsAdministrator: Legt fest, ob die Anwendung beim Start Administratorrechte anfordert`; die geplante Aufgabe verwendet dieselbe Berechtigungsstufe.")
+        catalog.Set(
             "`; UiLanguage：界面语言；auto 表示跟随系统，也可填写受支持的语言代码。",
                 "`; UiLanguage: Sprache der Benutzeroberfläche`; auto übernimmt die Systemsprache, alternativ kann ein unterstützter Sprachcode eingetragen werden.")
         catalog.Set(
-            "`; 仅保存主窗口显示名称和图标来源，不参与进程识别、启动或升级保护。",
-                "`; Speichert nur den im Hauptfenster angezeigten Namen und die Symbolquelle`; beeinflusst weder Prozesserkennung noch Start oder Update-Schutz.")
+            "`; 仅保存主窗口显示名称、图标来源和序号圆点颜色，不参与进程识别、启动或升级保护。",
+                "`; Speichert nur den im Hauptfenster angezeigten Namen, die Symbolquelle und die Nummernpunktfarbe`; beeinflusst weder Prozesserkennung noch Start oder Update-Schutz.")
         catalog.Set(
             "`; 内部字段包括 Enabled、RootIsCustom、DetectionSeconds、StableSeconds、MaxWaitSeconds、InstallRoot 和 Actor。",
                 "`; Zu den internen Feldern gehören Enabled, RootIsCustom, DetectionSeconds, StableSeconds, MaxWaitSeconds, InstallRoot und Actor.")
@@ -1507,8 +1513,8 @@ class GermanStrings {
             "🌿 环境变量：{1} 项`n",
                 "🌿 Umgebungsvariablen: {1}`n")
         catalog.Set(
-            "🎨 自定义名称和图标",
-                "🎨 Name und Symbol anpassen")
+            "🏷️ 自定义名称和图标",
+                "🏷️ Name und Symbol anpassen")
         catalog.Set(
             "📁 工作目录：{1}`n",
                 "📁 Arbeitsverzeichnis: {1}`n")
@@ -1702,6 +1708,16 @@ class GermanStrings {
         catalog.Set("冲突", "Konflikt")
         catalog.Set("浏览", "Durchsuchen")
         catalog.Set("监控配置", "Überwachungskonfiguration")
+        catalog.Set("以管理员身份运行", "Als Administrator ausführen")
+        catalog.Set("设置序号圆点", "Nummernpunkt festlegen")
+        catalog.Set("清除圆点颜色", "Punktfarbe löschen")
+        catalog.Set("雾松绿", "Nebliges Kieferngrün")
+        catalog.Set("青灰蓝", "Blaugrau")
+        catalog.Set("薰衣草紫", "Lavendel")
+        catalog.Set("烟粉", "Altrosa")
+        catalog.Set("浅琥珀", "Heller Bernstein")
+        catalog.Set("静谧青", "Ruhiges Türkis")
+        catalog.Set("珍珠灰", "Perlgrau")
         catalog.Set("管理员运行状态", "Als Administrator ausführen")
         catalog.Set("调整守护顺序", "Überwachungsliste neu anordnen")
         catalog.Set("编辑完整路径", "Vollständigen Pfad bearbeiten")
