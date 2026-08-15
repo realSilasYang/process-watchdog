@@ -35,7 +35,11 @@ O projeto oferece interface clara e escura, recuperação automática, proteçã
 # Visão geral da interface
 
 <p align="center">
-  <img src="images/process-watchdog-overview.png" alt="Janela principal do Process Watchdog Assistant" width="100%">
+  <img src="images/process-watchdog-overview.png" alt="Janela principal escura do Process Watchdog Assistant" width="100%">
+</p>
+
+<p align="center">
+  <img src="images/process-watchdog-overview-light.png" alt="Janela principal do Process Watchdog Assistant" width="100%">
 </p>
 
 A janela principal reúne a ordem dos alvos monitorados, o ícone do aplicativo, o nome, os requisitos de privilégio e o estado atual. A barra de comandos oferece Adicionar, Excluir, Pausar, Configurações, Ajuda e Sobre; Ajuda abre o manual, o log de execução ou a página de comentários, enquanto Sobre reúne versão, ambiente, atualizações, projeto e Doar. A barra inferior resume os alvos em execução, recuperação, atualização, pausa e falha, enquanto o log mostra as evidências por trás de cada estado anormal.

@@ -35,7 +35,11 @@ Das Projekt bietet eine helle und dunkle Oberfläche, automatische Wiederherstel
 # Oberflächenübersicht
 
 <p align="center">
-  <img src="images/process-watchdog-overview.png" alt="Hauptfenster von Process Watchdog Assistant" width="100%">
+  <img src="images/process-watchdog-overview.png" alt="Dunkles Hauptfenster von Process Watchdog Assistant" width="100%">
+</p>
+
+<p align="center">
+  <img src="images/process-watchdog-overview-light.png" alt="Hauptfenster von Process Watchdog Assistant" width="100%">
 </p>
 
 Das Hauptfenster zeigt Reihenfolge, Anwendungssymbol, Namen, Rechteanforderung und aktuellen Status aller überwachten Ziele. Die Befehlsleiste bietet Hinzufügen, Löschen, Pausieren, Einstellungen, Hilfe und Info; Hilfe führt zu Handbuch, Laufzeitprotokoll oder Feedback, während Info Version, Laufzeit, Updates, Projekt und Spenden bündelt. Die untere Leiste fasst laufende, wiederherzustellende, aktualisierte, pausierte und fehlgeschlagene Ziele zusammen. Das Protokoll erläutert die Belege hinter ungewöhnlichen Zuständen.

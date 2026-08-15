@@ -35,7 +35,11 @@ Process Watchdog Assistant は、現在の Windows デスクトップ セッシ�
 # 画面概要
 
 <p align="center">
-  <img src="images/process-watchdog-overview.png" alt="プロセス監視アシスタントのメイン画面" width="100%">
+  <img src="images/process-watchdog-overview.png" alt="プロセス監視アシスタントのダークテーマ画面" width="100%">
+</p>
+
+<p align="center">
+  <img src="images/process-watchdog-overview-light.png" alt="プロセス監視アシスタントのメイン画面" width="100%">
 </p>
 
 メイン画面には監視対象の順序、アプリアイコン、名前、権限要件、現在の状態がまとまっています。コマンドバーには追加、削除、一時停止、設定、ヘルプ、バージョン情報があり、ヘルプから使用説明、実行ログ、フィードバックを選べます。バージョン情報にはバージョン、実行環境、更新、プロジェクト、寄付の各操作がまとまっています。下部には実行中、復旧中、更新中、一時停止、失敗の件数が表示され、異常状態の判定根拠は実行ログで確認できます。

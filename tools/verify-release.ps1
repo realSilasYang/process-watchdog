@@ -169,6 +169,7 @@ $requiredPaths = @(
     'docs\project\THIRD_PARTY_NOTICES.md',
     'docs\project\THIRD_PARTY_NOTICES.en.md',
     'docs\images\process-watchdog-overview.png',
+    'docs\images\process-watchdog-overview-light.png',
     'docs\en\quick-start.md',
     'docs\en\versioning.md',
     'docs\en\installation.md',

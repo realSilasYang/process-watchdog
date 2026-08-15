@@ -35,7 +35,11 @@ Incluye interfaz clara y oscura, recuperación automática, protección durante 
 # Vista general de la interfaz
 
 <p align="center">
-  <img src="images/process-watchdog-overview.png" alt="Ventana principal de Process Watchdog Assistant" width="100%">
+  <img src="images/process-watchdog-overview.png" alt="Ventana principal oscura de Process Watchdog Assistant" width="100%">
+</p>
+
+<p align="center">
+  <img src="images/process-watchdog-overview-light.png" alt="Ventana principal de Process Watchdog Assistant" width="100%">
 </p>
 
 La ventana principal reúne el orden de los objetivos supervisados, el icono, el nombre, los requisitos de privilegios y el estado actual. La barra de comandos ofrece Añadir, Eliminar, Pausar, Ajustes, Ayuda y Acerca de; Ayuda permite abrir el manual, el registro de ejecución o la página de comentarios, mientras que Acerca de reúne versión, entorno, actualizaciones, proyecto y Donar. La barra inferior resume los destinos en ejecución, recuperación, actualización, pausa y error, y el registro muestra las pruebas que justifican cada estado anómalo.
