@@ -49,8 +49,11 @@ class KoreanStrings {
             "`; AppN 与 [Apps] 中同名的守护对象一一对应，值为软件升级保护的 <HEX> 编码结构。",
                 "`; 각 AppN 항목은 [Apps]의 같은 이름 항목에 대응하며, 값에는 <HEX>로 인코딩된 업데이트 보호 구조가 저장됩니다.")
         catalog.Set(
-            "`; AppN 与 [Apps] 中同名的守护对象一一对应；留空时使用目标自身的名称和图标。",
-                "`; 각 AppN 항목은 [Apps]의 같은 이름 항목에 대응합니다. 비어 있으면 대상 자체의 이름과 아이콘을 사용합니다.")
+            "`; AppN 与 [Apps] 中同名的守护对象一一对应；三个字段依次为名称、图标路径和圆点颜色。",
+                "`; 각 AppN 항목은 [Apps]의 같은 이름 항목에 대응합니다. 세 필드는 이름, 아이콘 경로, 점 색상입니다.")
+        catalog.Set(
+            "`; 名称与图标路径使用 <HEX> 编码；全部留空时使用目标自身信息且不显示圆点。",
+                "`; 이름과 아이콘 경로는 <HEX>로 인코딩됩니다. 모두 비어 있으면 대상 자체 정보를 사용하고 점은 표시하지 않습니다.")
         catalog.Set(
             "`; CheckInterval：状态检查间隔，单位为毫秒，范围 500～86400000。",
                 "`; CheckInterval: 상태 확인 간격(밀리초)이며, 범위는 500～86400000입니다.")
@@ -100,11 +103,14 @@ class KoreanStrings {
             "`; ShowAtStartup：启动后是否显示主窗口。",
                 "`; ShowAtStartup: 시작 후 메인 창을 표시할지 여부입니다.")
         catalog.Set(
+            "`; RunAsAdministrator：小助手启动时是否请求管理员权限；计划任务使用相同权限级别。",
+                "`; RunAsAdministrator: 시작할 때 관리자 권한을 요청할지 여부입니다. 예약 작업도 같은 권한 수준을 사용합니다.")
+        catalog.Set(
             "`; UiLanguage：界面语言；auto 表示跟随系统，也可填写受支持的语言代码。",
                 "`; UiLanguage: 인터페이스 언어입니다. auto는 시스템 언어를 따르며, 지원되는 언어 코드를 직접 지정할 수도 있습니다.")
         catalog.Set(
-            "`; 仅保存主窗口显示名称和图标来源，不参与进程识别、启动或升级保护。",
-                "`; 메인 창에 표시할 이름과 아이콘 원본만 저장합니다. 프로세스 식별, 실행, 업데이트 보호에는 영향을 주지 않습니다.")
+            "`; 仅保存主窗口显示名称、图标来源和序号圆点颜色，不参与进程识别、启动或升级保护。",
+                "`; 메인 창에 표시할 이름, 아이콘 원본, 번호 점 색상만 저장합니다. 프로세스 식별, 실행, 업데이트 보호에는 영향을 주지 않습니다.")
         catalog.Set(
             "`; 内部字段包括 Enabled、RootIsCustom、DetectionSeconds、StableSeconds、MaxWaitSeconds、InstallRoot 和 Actor。",
                 "`; 내부 필드에는 Enabled, RootIsCustom, DetectionSeconds, StableSeconds, MaxWaitSeconds, InstallRoot, Actor가 포함됩니다.")
@@ -1507,8 +1513,8 @@ class KoreanStrings {
             "🌿 环境变量：{1} 项`n",
                 "🌿 환경 변수: {1}개`n")
         catalog.Set(
-            "🎨 自定义名称和图标",
-                "🎨 이름과 아이콘 사용자 지정")
+            "🏷️ 自定义名称和图标",
+                "🏷️ 이름과 아이콘 사용자 지정")
         catalog.Set(
             "📁 工作目录：{1}`n",
                 "📁 작업 폴더: {1}`n")
@@ -1764,6 +1770,16 @@ class KoreanStrings {
         catalog.Set("冲突", "충돌")
         catalog.Set("浏览", "찾아보기")
         catalog.Set("监控配置", "모니터링 설정")
+        catalog.Set("以管理员身份运行", "관리자 권한으로 실행")
+        catalog.Set("设置序号圆点", "번호 점 설정")
+        catalog.Set("清除圆点颜色", "점 색상 지우기")
+        catalog.Set("雾松绿", "안개 소나무색")
+        catalog.Set("青灰蓝", "청회색")
+        catalog.Set("薰衣草紫", "라벤더")
+        catalog.Set("烟粉", "더스티 로즈")
+        catalog.Set("浅琥珀", "연한 호박색")
+        catalog.Set("静谧青", "차분한 청록")
+        catalog.Set("珍珠灰", "펄 그레이")
         catalog.Set("管理员运行状态", "관리자 권한으로 실행")
         catalog.Set("调整守护顺序", "모니터링 순서 변경")
         catalog.Set("编辑完整路径", "전체 경로 편집")

@@ -29,6 +29,10 @@ class FakeManagedWindowCallbacks {
     ReleaseIcons(hwnd) {
         this.Events.Push("icons:" hwnd)
     }
+
+    RefreshAfterShow(guiObj) {
+        this.Events.Push("refresh:" guiObj.Hwnd)
+    }
 }
 
 class FakeManagedGui {
@@ -165,7 +169,8 @@ RunManagedWindowTests() {
         HideTransientWindows: ObjBindMethod(callbacks,
             "HideTransientWindows"),
         UnregisterControls: ObjBindMethod(callbacks, "UnregisterControls"),
-        ReleaseIcons: ObjBindMethod(callbacks, "ReleaseIcons")
+        ReleaseIcons: ObjBindMethod(callbacks, "ReleaseIcons"),
+        RefreshAfterShow: ObjBindMethod(callbacks, "RefreshAfterShow")
     }, hierarchy, ObjBindMethod(factory, "Create"),
         ObjBindMethod(factory, "IsWindow"))
     ManagedWindow.ConfigureLifecycle(lifecycle)
@@ -188,7 +193,8 @@ RunManagedWindowTests() {
     hierarchy.Locked := false
     AssertManagedWindow(window.ShowExisting()
         && hierarchy.PrepareRestoreCount == 2
-        && factory.Created[1].ShowCount == 1,
+        && factory.Created[1].ShowCount == 1
+        && events[events.Length] == "refresh:200",
         "未锁定的既有窗口没有恢复显示")
 
     destroyStart := events.Length + 1

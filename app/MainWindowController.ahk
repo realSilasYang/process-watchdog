@@ -134,6 +134,247 @@ ResumeMainListResizeRedraw(suspended) {
         "Ptr", 0, "UInt", Win32.RDW_CONTROL_REFRESH, "Int") != 0
 }
 
+InitializeMainListSmoothScroll() {
+    if !IsSet(Main) || !IsObject(Main.lv) || !Main.lv.Hwnd
+        return false
+    if !Main.listWheelRegistered {
+        Main.listWheelCallback := HandleMainListMouseWheel
+        OnMessage(Win32.WM_MOUSEWHEEL, Main.listWheelCallback)
+        Main.listWheelRegistered := true
+    }
+    if Main.listWheelSubclassAttached
+        return true
+    Main.listWheelSubclassCallback := CallbackCreate(
+        MainListWheelSubclassProc, "", 6)
+    attached := !!DllCall("comctl32\SetWindowSubclass", "Ptr",
+        Main.lv.Hwnd, "Ptr", Main.listWheelSubclassCallback,
+        "UPtr", MainWindow.ListWheelSubclassId, "UPtr", 0, "Int")
+    if attached {
+        Main.listWheelSubclassAttached := true
+        return true
+    }
+    CallbackFree(Main.listWheelSubclassCallback)
+    Main.listWheelSubclassCallback := 0
+    return false
+}
+
+MainListWheelSubclassProc(hwnd, message, wParam, lParam, subclassId,
+        referenceData) {
+    try {
+        if message == Win32.WM_MOUSEWHEEL && !Main.listDragActive {
+            ProcessMainListWheelDelta(SignedMainListWord(wParam >> 16))
+            return 0
+        }
+        if message == Win32.WM_LBUTTONDOWN
+                || message == Win32.WM_KEYDOWN
+            StopMainListSmoothScroll(true)
+        if message == Win32.WM_NCDESTROY
+            Main.listWheelSubclassAttached := false
+    } catch {
+        ; 原生回调边界不得接收 AHK 异常。
+    }
+    return DllCall("comctl32\DefSubclassProc", "Ptr", hwnd,
+        "UInt", message, "UPtr", wParam, "Ptr", lParam, "Ptr")
+}
+
+ShutdownMainListSmoothScroll() {
+    if !IsSet(Main)
+        return false
+    StopMainListSmoothScroll(true)
+    if Main.listWheelRegistered {
+        try OnMessage(Win32.WM_MOUSEWHEEL, Main.listWheelCallback, 0)
+        Main.listWheelRegistered := false
+        Main.listWheelCallback := 0
+    }
+    if Main.listWheelSubclassAttached && Main.lv && Main.lv.Hwnd
+            && DllCall("user32\IsWindow", "Ptr", Main.lv.Hwnd, "Int") {
+        DllCall("comctl32\RemoveWindowSubclass", "Ptr", Main.lv.Hwnd,
+            "Ptr", Main.listWheelSubclassCallback, "UPtr",
+            MainWindow.ListWheelSubclassId, "Int")
+    }
+    Main.listWheelSubclassAttached := false
+    if Main.listWheelSubclassCallback {
+        CallbackFree(Main.listWheelSubclassCallback)
+        Main.listWheelSubclassCallback := 0
+    }
+    return true
+}
+
+HandleMainListMouseWheel(wParam, lParam, msg, hwnd) {
+    if !IsSet(Main) || Main.listDragActive
+            || !IsMainListScreenPoint(lParam, hwnd)
+        return
+    return ProcessMainListWheelDelta(SignedMainListWord(wParam >> 16))
+}
+
+IsMainListScreenPoint(lParam, messageHwnd := 0) {
+    if !IsSet(Main) || !IsObject(Main.lv) || !Main.lv.Hwnd
+            || !DllCall("user32\IsWindow", "Ptr", Main.lv.Hwnd, "Int")
+        return false
+    if messageHwnd == Main.lv.Hwnd && !lParam
+        return true
+    screenX := SignedMainListWord(lParam)
+    screenY := SignedMainListWord(lParam >> 16)
+    rect := Buffer(16, 0)
+    if !DllCall("user32\GetWindowRect", "Ptr", Main.lv.Hwnd,
+            "Ptr", rect, "Int")
+        return false
+    return screenX >= NumGet(rect, 0, "Int")
+        && screenX < NumGet(rect, 8, "Int")
+        && screenY >= NumGet(rect, 4, "Int")
+        && screenY < NumGet(rect, 12, "Int")
+}
+
+ProcessMainListWheelDelta(wheelDelta) {
+    if !wheelDelta
+        return 0
+    scrollLines := GetMainListSystemWheelScrollLines()
+    if !scrollLines {
+        StopMainListSmoothScroll(true)
+        return 0
+    }
+    if Main.listWheelDeltaRemainder
+            && (Main.listWheelDeltaRemainder > 0) != (wheelDelta > 0)
+        Main.listWheelDeltaRemainder := 0
+    Main.listWheelDeltaRemainder += wheelDelta
+    wheelNotches := Main.listWheelDeltaRemainder > 0
+        ? Floor(Main.listWheelDeltaRemainder / MainWindow.WheelDelta)
+        : Ceil(Main.listWheelDeltaRemainder / MainWindow.WheelDelta)
+    if wheelNotches {
+        Main.listWheelDeltaRemainder -= wheelNotches
+            * MainWindow.WheelDelta
+        QueueMainListSmoothScroll(-wheelNotches * scrollLines)
+    }
+    return 0
+}
+
+GetMainListSystemWheelScrollLines() {
+    scrollLines := 0
+    if !DllCall("user32\SystemParametersInfoW", "UInt", 0x0068,
+            "UInt", 0, "UInt*", &scrollLines, "UInt", 0, "Int")
+        return 3
+    if scrollLines != 0xFFFFFFFF
+        return Max(0, Integer(scrollLines))
+    clientRect := Buffer(16, 0)
+    if !DllCall("user32\GetClientRect", "Ptr", Main.lv.Hwnd,
+            "Ptr", clientRect, "Int")
+        return 1
+    clientHeight := NumGet(clientRect, 12, "Int")
+    visibleLines := Floor(clientHeight / GetMainListRowHeightPixels())
+    return Max(1, visibleLines - 1)
+}
+
+GetMainListRowHeightPixels() {
+    if Main.lv.GetCount() > 0 {
+        rowRect := Buffer(16, 0)
+        NumPut("Int", 0, rowRect, 0)
+        if SendMessage(Win32.LVM_GETITEMRECT, 0, rowRect.Ptr,
+                Main.lv.Hwnd) {
+            height := NumGet(rowRect, 12, "Int")
+                - NumGet(rowRect, 4, "Int")
+            if height > 0
+                return height
+        }
+    }
+    dpi := DllCall("user32\GetDpiForWindow", "Ptr", Main.lv.Hwnd, "UInt")
+    return Max(20, Round(28 * (dpi ? dpi : 96) / 96))
+}
+
+QueueMainListSmoothScroll(lines) {
+    try lines := Integer(lines)
+    catch
+        return false
+    if !lines
+        return false
+    BeginMainListTimerResolution()
+    if Main.pendingListScrollLines
+            && (Main.pendingListScrollLines > 0) != (lines > 0) {
+        SetTimer(Main.smoothListScrollTimer, 0)
+        Main.pendingListScrollLines := 0
+    }
+    maximum := MainWindow.SmoothScrollMaximumQueuedLines
+    Main.pendingListScrollLines := Max(-maximum,
+        Min(maximum, Main.pendingListScrollLines + lines))
+    return AdvanceMainListSmoothScroll()
+}
+
+AdvanceMainListSmoothScroll(*) {
+    if !IsSet(Main) || Main.listDragActive
+            || !Main.pendingListScrollLines || !Main.lv || !Main.lv.Hwnd
+            || !DllCall("user32\IsWindow", "Ptr", Main.lv.Hwnd, "Int")
+            || !DllCall("user32\IsWindowVisible", "Ptr", Main.lv.Hwnd,
+                "Int") {
+        StopMainListSmoothScroll()
+        return false
+    }
+    direction := Main.pendingListScrollLines > 0 ? 1 : -1
+    before := SendMessage(Win32.LVM_GETTOPINDEX, 0, 0, Main.lv.Hwnd)
+    SendMessage(Win32.LVM_SCROLL, 0,
+        direction * GetMainListRowHeightPixels(), Main.lv.Hwnd)
+    after := SendMessage(Win32.LVM_GETTOPINDEX, 0, 0, Main.lv.Hwnd)
+    if after == before {
+        StopMainListSmoothScroll()
+        return false
+    }
+    Main.pendingListScrollLines -= direction
+    if Main.pendingListScrollLines
+        ScheduleNextMainListSmoothScroll()
+    else
+        StopMainListSmoothScroll()
+    return true
+}
+
+ScheduleNextMainListSmoothScroll() {
+    remainingLines := Abs(Main.pendingListScrollLines)
+    accelerationRange := Max(1,
+        MainWindow.SmoothScrollAccelerationLines - 1)
+    speedRatio := Min(1, Max(0,
+        (remainingLines - 1) / accelerationRange))
+    easedSpeed := 1 - ((1 - speedRatio) * (1 - speedRatio))
+    interval := Round(MainWindow.SmoothScrollSlowIntervalMs
+        - (MainWindow.SmoothScrollSlowIntervalMs
+            - MainWindow.SmoothScrollFastIntervalMs) * easedSpeed)
+    Main.lastSmoothListScrollIntervalMs := interval
+    SetTimer(Main.smoothListScrollTimer, -interval)
+    return interval
+}
+
+BeginMainListTimerResolution() {
+    if Main.smoothListTimerResolutionActive
+        return true
+    try Main.smoothListTimerResolutionActive := DllCall(
+        "winmm\timeBeginPeriod", "UInt",
+        MainWindow.SmoothScrollTimerResolutionMs, "UInt") == 0
+    catch
+        Main.smoothListTimerResolutionActive := false
+    return Main.smoothListTimerResolutionActive
+}
+
+EndMainListTimerResolution() {
+    if !Main.smoothListTimerResolutionActive
+        return false
+    Main.smoothListTimerResolutionActive := false
+    try DllCall("winmm\timeEndPeriod", "UInt",
+        MainWindow.SmoothScrollTimerResolutionMs, "UInt")
+    return true
+}
+
+StopMainListSmoothScroll(resetWheelRemainder := false) {
+    if !IsSet(Main)
+        return false
+    try SetTimer(Main.smoothListScrollTimer, 0)
+    Main.pendingListScrollLines := 0
+    EndMainListTimerResolution()
+    if resetWheelRemainder
+        Main.listWheelDeltaRemainder := 0
+    return true
+}
+
+SignedMainListWord(value) {
+    value &= 0xFFFF
+    return value & 0x8000 ? value - 0x10000 : value
+}
+
 ; 缩放只调整命令栏、列表和可见列，不改变图标逻辑尺寸或隐藏身份列。
 GuiResized(GuiObj, MinMax, Width, Height) {
     if (MinMax == -1)
@@ -170,16 +411,7 @@ ShowContextMenu(GuiCtrlObj, Item, IsRightClick, X, Y) {
     if (Item <= 0)
         return
     Main.contextTargetRow := Item
-    ; 右键未选中的行时将其设为唯一选中项，避免菜单误作用于旧选择。
-    selectedRow := Main.lv.GetNext(0)
-    hasAdditionalSelection := selectedRow
-        && Main.lv.GetNext(selectedRow) > 0
-    if selectedRow != Item || hasAdditionalSelection {
-        Main.lv.Modify(0, "-Select")
-        Main.lv.Modify(Item, "Select Focus Vis")
-    } else {
-        Main.lv.Modify(Item, "Focus Vis")
-    }
+    ListViewFocusService.PrepareContextSelection(Main.lv, Item)
     path := Main.lv.GetText(Item, 3)
     if !App.appStates.Has(path) {
         Main.contextTargetRow := 0

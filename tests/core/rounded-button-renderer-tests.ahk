@@ -64,6 +64,79 @@ AssertRoundedButtonSurfaceColor(color) {
     }
 }
 
+AssertCenteredClearMark() {
+    width := 24
+    height := 24
+    testGui := Gui("+ToolWindow")
+    button := testGui.Add("Text", "w24 h24", "✕")
+    state := {
+        ctrl: button,
+        normal: "000000",
+        current: "000000",
+        parentColor: "000000",
+        textColor: "FFFFFF",
+        textAlign: "center",
+        textInsetDip: 0,
+        clearMarkSizeDip: 16,
+        clearMarkStrokeDip: 2
+    }
+    screenDc := DllCall("user32\GetDC", "Ptr", 0, "Ptr")
+    targetDc := screenDc ? DllCall("gdi32\CreateCompatibleDC",
+        "Ptr", screenDc, "Ptr") : 0
+    targetBitmap := targetDc ? DllCall("gdi32\CreateCompatibleBitmap",
+        "Ptr", screenDc, "Int", width, "Int", height, "Ptr") : 0
+    previousBitmap := 0
+    try {
+        AssertRoundedButtonRenderer(screenDc && targetDc && targetBitmap,
+            "无法创建清除标记像素验证画布")
+        previousBitmap := DllCall("gdi32\SelectObject", "Ptr", targetDc,
+            "Ptr", targetBitmap, "Ptr")
+        AssertRoundedButtonRenderer(
+            RoundedButtonRenderer.Draw(targetDc, width, height, state),
+            "无法绘制清除标记")
+
+        minimumX := width
+        minimumY := height
+        maximumX := -1
+        maximumY := -1
+        visiblePixels := 0
+        Loop height {
+            y := A_Index - 1
+            Loop width {
+                x := A_Index - 1
+                if DllCall("gdi32\GetPixel", "Ptr", targetDc,
+                        "Int", x, "Int", y, "UInt") == 0
+                    continue
+                minimumX := Min(minimumX, x)
+                minimumY := Min(minimumY, y)
+                maximumX := Max(maximumX, x)
+                maximumY := Max(maximumY, y)
+                visiblePixels++
+            }
+        }
+        centerX := (minimumX + maximumX) / 2
+        centerY := (minimumY + maximumY) / 2
+        AssertRoundedButtonRenderer(visiblePixels > 0
+                && Abs(centerX - width / 2) <= 1
+                && Abs(centerY - height / 2) <= 1,
+            "清除标记的可见边界没有与按钮几何中心对齐")
+        AssertRoundedButtonRenderer(minimumX >= 2 && minimumY >= 2
+                && maximumX <= width - 3 && maximumY <= height - 3,
+            "清除标记没有保留稳定的四周留白")
+    } finally {
+        if previousBitmap
+            DllCall("gdi32\SelectObject", "Ptr", targetDc,
+                "Ptr", previousBitmap)
+        if targetBitmap
+            DllCall("gdi32\DeleteObject", "Ptr", targetBitmap)
+        if targetDc
+            DllCall("gdi32\DeleteDC", "Ptr", targetDc)
+        if screenDc
+            DllCall("user32\ReleaseDC", "Ptr", 0, "Ptr", screenDc)
+        try testGui.Destroy()
+    }
+}
+
 AssertRoundedSelectionMask() {
     screenDc := DllCall("user32\GetDC", "Ptr", 0, "Ptr")
     targetDc := screenDc ? DllCall("gdi32\CreateCompatibleDC",
@@ -574,6 +647,7 @@ RunRoundedButtonRendererTests() {
     UiThemeService.Configure("light")
     AssertRoundedButtonSurfaceColor(UiThemeService.Color("DeleteDisabled"))
     AssertRoundedButtonSurfaceColor(UiThemeService.Color("PauseDisabled"))
+    AssertCenteredClearMark()
     AssertRoundedSelectionMask()
     AssertRoundedButtonSvgImage()
     AssertLeadingCommandSymbolGeometry()

@@ -114,7 +114,7 @@ RunConfigRepositoryTests() {
         repository.ReplaceSections([{Name: "Display", Entries: [
             {Key: "App1", Value: "name|icon"}]}])
         iniText := FileRead(configPath, "UTF-16")
-        displayComment := "; 仅保存主窗口显示名称和图标来源"
+        displayComment := "; 仅保存主窗口显示名称、图标来源和序号圆点颜色"
         AssertConfigRepository(RegExMatch(iniText,
             "m)^\[Display\]\R\Q" displayComment "\E")
             && StrSplit(iniText, displayComment).Length == 2,

@@ -503,12 +503,14 @@ HandleApplicationUpdateCheckResult(result, interactive := false,
 
 
 ; 计划任务使用 COM 接口读取和写入，操作前先确认同名任务确实属于当前脚本。
-GetWatchdogTask() {
+GetWatchdogTask(rootFolder := "") {
     try {
-        service := ComObject("Schedule.Service")
-        service.Connect()
-        folder := service.GetFolder("\")
-        return folder.GetTask("进程守护小助手")
+        if !rootFolder {
+            service := ComObject("Schedule.Service")
+            service.Connect()
+            rootFolder := service.GetFolder("\")
+        }
+        return rootFolder.GetTask("进程守护小助手")
     } catch {
         return ""
     }
@@ -522,6 +524,31 @@ IsOwnedWatchdogTask(task) {
     } catch {
         return false
     }
+}
+
+WatchdogTaskRunLevelMatches(task, runAsAdministrator := true) {
+    if !task
+        return false
+    try return Integer(task.Definition.Principal.RunLevel)
+        == (runAsAdministrator ? 1 : 0)
+    catch
+        return false
+}
+
+SynchronizeWatchdogTaskElevation(runAsAdministrator := true) {
+    service := ComObject("Schedule.Service")
+    service.Connect()
+    rootFolder := service.GetFolder("\")
+    task := GetWatchdogTask(rootFolder)
+    if !task || !IsProjectWatchdogTask(task)
+        return false
+    if WatchdogTaskRunLevelMatches(task, runAsAdministrator)
+        return true
+    taskDefinition := task.Definition
+    taskDefinition.Principal.RunLevel := runAsAdministrator ? 1 : 0
+    rootFolder.RegisterTaskDefinition("进程守护小助手", taskDefinition,
+        6, "", "", 3)
+    return true
 }
 
 IsProjectWatchdogTask(task) {
@@ -560,9 +587,11 @@ ToggleTask(ownerGui := "", *) {
         service.Connect()
         rootFolder := service.GetFolder("\")
 
-        existingTask := GetWatchdogTask()
+        existingTask := GetWatchdogTask(rootFolder)
         taskOwnedByCurrentEntry := existingTask
             && IsOwnedWatchdogTask(existingTask)
+            && WatchdogTaskRunLevelMatches(existingTask,
+                App.runAsAdministrator)
         taskOwnedByProject := existingTask
             && IsProjectWatchdogTask(existingTask)
         if (existingTask && !taskOwnedByProject) {
@@ -613,15 +642,19 @@ ToggleTask(ownerGui := "", *) {
             }
             action.WorkingDirectory := A_ScriptDir
 
-            ; 使用当前交互用户令牌并请求最高权限，与应用正常启动时的权限要求一致。
+            ; 使用当前交互用户令牌，并与应用设置保持相同的运行权限。
             principal := taskDef.Principal
-            principal.RunLevel := 1  ; 1 即 TASK_RUNLEVEL_HIGHEST，使用最高可用权限。
+            principal.RunLevel := App.runAsAdministrator ? 1 : 0
+                ; 1 即 TASK_RUNLEVEL_HIGHEST，0 使用普通用户令牌。
             principal.LogonType := 3 ; 3 即 TASK_LOGON_INTERACTIVE_TOKEN，使用交互用户令牌。
 
             ; 参数 6 表示创建或更新；前面的所有权检查保证这里不会覆盖别人的同名任务。
             rootFolder.RegisterTaskDefinition("进程守护小助手", taskDef, 6, "", "", 3)
 
-            LogMsg(Tr("已创建最高权限的开机自启计划任务（Win10 配置，适配笔记本）。"))
+            if App.runAsAdministrator
+                LogMsg(Tr("已创建最高权限的开机自启计划任务（Win10 配置，适配笔记本）。"))
+            else
+                LogMsg(Tr("开启") "：" Tr("进程守护小助手 - 开机自启守护程序"))
         }
 
         UpdateTaskButtonStatus()

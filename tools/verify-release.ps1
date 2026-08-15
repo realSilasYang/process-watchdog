@@ -25,6 +25,54 @@ $version = (Get-Content -LiteralPath (Join-Path $projectRoot 'VERSION') `
 $sourceToolLock = Get-Content -LiteralPath $ResolvedToolchainPath `
     -Raw -Encoding UTF8 | ConvertFrom-Json
 $autoHotkeySourceRelativePath = "licenses\sources\AutoHotkey-$($sourceToolLock.tools.autoHotkey.version)-source.zip"
+
+function Assert-NoLocalWatchdogState {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Root,
+        [Parameter(Mandatory = $true)]
+        [string]$PackageLabel
+    )
+
+    $forbiddenNames = @('watchdog.ini', 'watchdog.maintenance.ini')
+    $matches = @(Get-ChildItem -LiteralPath $Root -Recurse -Force -File |
+        Where-Object { $_.Name -in $forbiddenNames })
+    if ($matches.Count -gt 0) {
+        $rootPrefix = [System.IO.Path]::GetFullPath($Root).TrimEnd('\') + '\'
+        $relativePaths = @($matches | ForEach-Object {
+            $_.FullName.Substring($rootPrefix.Length)
+        }) -join ', '
+        throw "$PackageLabel contains local runtime state: $relativePaths"
+    }
+}
+
+function Assert-EmptyPackagedWatchlistExample {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Root,
+        [Parameter(Mandatory = $true)]
+        [string]$PackageLabel
+    )
+
+    $examplePath = Join-Path $Root 'config\watchdog.example.ini'
+    if (-not (Test-Path -LiteralPath $examplePath -PathType Leaf)) {
+        throw "$PackageLabel is missing config/watchdog.example.ini."
+    }
+    $exampleText = Get-Content -LiteralPath $examplePath -Raw -Encoding Unicode
+    foreach ($sectionName in @('Apps', 'Maintenance', 'Display', 'Launch',
+            'Identity', 'Recovery')) {
+        $sectionPattern = '(?ms)^\[' + [regex]::Escape($sectionName) +
+            '\]\s*\r?\n(?<Body>.*?)(?=^\[|\z)'
+        $sectionMatch = [regex]::Match($exampleText, $sectionPattern)
+        if (-not $sectionMatch.Success) {
+            throw "$PackageLabel example is missing [$sectionName]."
+        }
+        if ($sectionMatch.Groups['Body'].Value -match
+                '(?m)^\s*[^;\s][^=\r\n]*=') {
+            throw "$PackageLabel example contains local records in [$sectionName]."
+        }
+    }
+}
 $mainScript = Get-ChildItem -LiteralPath $projectRoot -Filter '*.ahk' -File |
     Where-Object { $_.Name -notlike '_*' } |
     Select-Object -First 1
@@ -147,11 +195,9 @@ foreach ($relativePath in $requiredPaths) {
         throw "Release package is missing: $relativePath"
     }
 }
-foreach ($forbiddenPath in @('watchdog.ini', 'watchdog.maintenance.ini')) {
-    if (Test-Path -LiteralPath (Join-Path $packageRoot $forbiddenPath)) {
-        throw "Release package contains local runtime state: $forbiddenPath"
-    }
-}
+Assert-NoLocalWatchdogState -Root $packageRoot -PackageLabel 'Release package'
+Assert-EmptyPackagedWatchlistExample -Root $packageRoot `
+    -PackageLabel 'Release package'
 foreach ($obsoletePath in @(
         'README.en.md', 'CHANGELOG.en.md', 'watchdog.ico',
         'watchdog.example.ini', 'docs\development')) {
@@ -430,8 +476,10 @@ foreach ($relativePath in @(
 if (Get-ChildItem -LiteralPath $sourceRoot -File -Filter '*.exe') {
     throw 'Source release package contains a root executable.'
 }
-foreach ($forbiddenPath in @('watchdog.ini', 'watchdog.maintenance.ini',
-        '.git', '.tools', 'dist')) {
+Assert-NoLocalWatchdogState -Root $sourceRoot -PackageLabel 'Source release'
+Assert-EmptyPackagedWatchlistExample -Root $sourceRoot `
+    -PackageLabel 'Source release'
+foreach ($forbiddenPath in @('.git', '.tools', 'dist')) {
     if (Test-Path -LiteralPath (Join-Path $sourceRoot $forbiddenPath)) {
         throw "Source release contains local or generated state: $forbiddenPath"
     }

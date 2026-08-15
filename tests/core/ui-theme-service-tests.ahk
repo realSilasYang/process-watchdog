@@ -99,6 +99,18 @@ RunUiThemeServiceTests() {
         && ThemeColorSaturation(UiThemeService.Color("PauseDisabled"))
             < ThemeColorSaturation(UiThemeService.Color("Pause")) * 0.1,
         "浅色主题的删除／暂停不可用色没有明显灰化")
+    sequenceKeys := []
+    for preset in MainSequenceColorPalette.Presets() {
+        sequenceKeys.Push(preset.Key)
+        AssertUiTheme(MainSequenceColorPalette.NormalizeKey(
+                StrUpper(preset.Key)) == preset.Key
+            && RegExMatch(MainSequenceColorPalette.Color(preset.Key),
+                "^[0-9A-F]{6}$"),
+            "浅色序号圆点预设无效：" preset.Key)
+    }
+    AssertUiTheme(sequenceKeys.Length == 7
+        && MainSequenceColorPalette.NormalizeKey("unknown") == "",
+        "序号圆点色板数量或无效值回退错误")
 
     UiThemeService.Configure("dark")
     AssertUiTheme(UiThemeService.GetRequestedTheme() == "dark"
@@ -121,6 +133,9 @@ RunUiThemeServiceTests() {
         && UiThemeService.Color("HoverPreviewText")
             == UiThemeService.Color("TooltipText"),
         "新增浅色悬停预览适配改变了深色提示配色")
+    for preset in MainSequenceColorPalette.Presets()
+        AssertUiTheme(RegExMatch(MainSequenceColorPalette.Color(preset.Key),
+            "^[0-9A-F]{6}$"), "深色序号圆点预设无效：" preset.Key)
     AssertUiTheme(!UiThemeService.HandleSystemSettingChange(),
         "固定主题仍响应了系统主题变化")
 

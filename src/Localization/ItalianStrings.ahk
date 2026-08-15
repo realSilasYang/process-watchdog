@@ -49,8 +49,11 @@ class ItalianStrings {
             "`; AppN 与 [Apps] 中同名的守护对象一一对应，值为软件升级保护的 <HEX> 编码结构。",
                 "`; Ogni AppN corrisponde all'elemento omonimo in [Apps]`; il valore contiene la struttura di protezione degli aggiornamenti codificata come <HEX>.")
         catalog.Set(
-            "`; AppN 与 [Apps] 中同名的守护对象一一对应；留空时使用目标自身的名称和图标。",
-                "`; Ogni AppN corrisponde all'elemento omonimo in [Apps]`; gli elementi vuoti usano il nome e l'icona della destinazione.")
+            "`; AppN 与 [Apps] 中同名的守护对象一一对应；三个字段依次为名称、图标路径和圆点颜色。",
+                "`; Ogni AppN corrisponde all'elemento omonimo in [Apps]. I tre campi sono nome, percorso dell'icona e colore del punto.")
+        catalog.Set(
+            "`; 名称与图标路径使用 <HEX> 编码；全部留空时使用目标自身信息且不显示圆点。",
+                "`; Il nome e il percorso dell'icona usano la codifica <HEX>. Se tutti i campi sono vuoti, vengono usate le informazioni della destinazione e non viene mostrato alcun punto.")
         catalog.Set(
             "`; CheckInterval：状态检查间隔，单位为毫秒，范围 500～86400000。",
                 "`; CheckInterval: intervallo di controllo dello stato in millisecondi`; valori da 500 a 86400000.")
@@ -100,11 +103,14 @@ class ItalianStrings {
             "`; ShowAtStartup：启动后是否显示主窗口。",
                 "`; ShowAtStartup: indica se mostrare la finestra principale dopo l'avvio.")
         catalog.Set(
+            "`; RunAsAdministrator：小助手启动时是否请求管理员权限；计划任务使用相同权限级别。",
+                "`; RunAsAdministrator: indica se richiedere i privilegi di amministratore all'avvio`; l'attività pianificata usa lo stesso livello di privilegi.")
+        catalog.Set(
             "`; UiLanguage：界面语言；auto 表示跟随系统，也可填写受支持的语言代码。",
                 "`; UiLanguage: lingua dell'interfaccia`; auto segue il sistema, ma è anche possibile specificare un codice lingua supportato.")
         catalog.Set(
-            "`; 仅保存主窗口显示名称和图标来源，不参与进程识别、启动或升级保护。",
-                "`; Salva solo il nome visualizzato e l'origine dell'icona nella finestra principale`; non influisce sul riconoscimento del processo, sull'avvio o sulla protezione degli aggiornamenti.")
+            "`; 仅保存主窗口显示名称、图标来源和序号圆点颜色，不参与进程识别、启动或升级保护。",
+                "`; Salva solo il nome visualizzato, l'origine dell'icona e il colore del punto numerico`; non influisce sul riconoscimento del processo, sull'avvio o sulla protezione degli aggiornamenti.")
         catalog.Set(
             "`; 内部字段包括 Enabled、RootIsCustom、DetectionSeconds、StableSeconds、MaxWaitSeconds、InstallRoot 和 Actor。",
                 "`; I campi interni includono Enabled, RootIsCustom, DetectionSeconds, StableSeconds, MaxWaitSeconds, InstallRoot e Actor.")
@@ -1507,8 +1513,8 @@ class ItalianStrings {
             "🌿 环境变量：{1} 项`n",
                 "🌿 Variabili d'ambiente: {1}`n")
         catalog.Set(
-            "🎨 自定义名称和图标",
-                "🎨 Personalizza nome e icona")
+            "🏷️ 自定义名称和图标",
+                "🏷️ Personalizza nome e icona")
         catalog.Set(
             "📁 工作目录：{1}`n",
                 "📁 Directory di lavoro: {1}`n")
@@ -1702,6 +1708,16 @@ class ItalianStrings {
         catalog.Set("冲突", "Conflitto")
         catalog.Set("浏览", "Sfoglia")
         catalog.Set("监控配置", "Configurazione del monitoraggio")
+        catalog.Set("以管理员身份运行", "Esegui come amministratore")
+        catalog.Set("设置序号圆点", "Imposta punto numerico")
+        catalog.Set("清除圆点颜色", "Cancella colore del punto")
+        catalog.Set("雾松绿", "Verde pino nebbia")
+        catalog.Set("青灰蓝", "Blu grigiastro")
+        catalog.Set("薰衣草紫", "Lavanda")
+        catalog.Set("烟粉", "Rosa polvere")
+        catalog.Set("浅琥珀", "Ambra chiara")
+        catalog.Set("静谧青", "Verde acqua tenue")
+        catalog.Set("珍珠灰", "Grigio perla")
         catalog.Set("管理员运行状态", "Esecuzione come amministratore")
         catalog.Set("调整守护顺序", "Riordina elenco di monitoraggio")
         catalog.Set("编辑完整路径", "Modifica percorso completo")

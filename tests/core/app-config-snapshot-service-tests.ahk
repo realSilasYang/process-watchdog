@@ -5,6 +5,7 @@
 ; 覆盖展示配置和后来学习到的升级证据，防止撤销旧操作时覆盖新运行态。
 
 #Include ..\..\src\Config\IniFieldCodec.ahk
+#Include ..\..\src\UI\UiThemeService.ahk
 #Include ..\..\src\Config\DisplayConfigCodec.ahk
 #Include ..\..\src\Config\MaintenanceConfigCodec.ahk
 #Include ..\..\src\Config\AppConfigSnapshotService.ahk
@@ -96,13 +97,15 @@ RunAppConfigSnapshotServiceTests() {
         ResolvedTargetManual: false,
         MaintenanceConfig: CreateAppConfigMaintenance(true, "C:\Apps",
             ["installer.exe"]),
-        DisplayConfig: {Name: "产品", IconPath: "C:/Icons/Product.ico"}
+        DisplayConfig: {Name: "产品", IconPath: "C:/Icons/Product.ico",
+            SequenceColor: "teal"}
     }
     snapshot := service.CreateSnapshot(shortcutPath, stateObj)
     AssertAppConfigSnapshot(snapshot.Path == shortcutPath
         && snapshot.ResolvedTarget == "C:\Apps\Product.exe"
         && snapshot.RuntimePath == "C:\Python\python.exe"
         && snapshot.RuntimeArgs == "-I -u"
+        && snapshot.Display.SequenceColor == "teal"
         && snapshot.Maintenance.Enabled
         && snapshot.Display.IconPath == "C:\Icons\Product.ico",
         "快捷方式快照没有结合真实目标保留升级保护或规范化路径")

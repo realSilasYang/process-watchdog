@@ -211,7 +211,7 @@ RunLocalizationTests() {
         "批量导入文件夹时递归扫描子目录", "窗口程序关闭等待（秒）：",
         "命令行程序退出等待（秒）：", "运行日志内存上限（条）：",
         "批处理日志保留时间（天）：", "批处理日志保存目录：", "内容字体：",
-        "使用默认", "自定义显示", "🎨 自定义名称和图标…",
+        "使用默认", "自定义显示", "🏷️ 自定义名称和图标…",
         "🔄 软件升级保护…",
         "立即检查更新",
         "• “关于”页可控制是否在启动时后台检查新版，也可随时手动检查。检查过程不会阻塞主界面。",
@@ -228,7 +228,7 @@ RunLocalizationTests() {
     ; 会打开后续窗口的菜单项也不添加字面省略号。逐目录检查译文，避免只改中文键
     ; 后其它语言仍保留三个点或省略号。
     for catalog in LocalizationService.GetAllTranslationCatalogs() {
-        for menuKey in ["🎨 自定义名称和图标", "🔄 软件升级保护设置"] {
+        for menuKey in ["🏷️ 自定义名称和图标", "🔄 软件升级保护设置"] {
             AssertLocalization(catalog.Has(menuKey)
                 && !RegExMatch(catalog[menuKey], "(?:…|\.\.\.)$"),
                 "右键菜单译文仍含末尾省略号：" menuKey)

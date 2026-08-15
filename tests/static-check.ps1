@@ -254,11 +254,15 @@ if (-not $source.Contains('FormatContextMenuToggleLabel(label, checked)') -or
     $failures.Add('Main context menu must use a no-activate rounded popup without triggering native Menu.Show focus loss')
 }
 if (-not $mainSource.Contains('#Include app\UI\ListViewSelectionPresenter.ahk') -or
-    -not $mainSource.Contains('Main.listSelectionPresenter := ListViewSelectionPresenter(Main.lv)') -or
+    $mainSource -notmatch
+        'Main\.listSelectionPresenter\s*:=\s*ListViewSelectionPresenter\(Main\.lv,\s*"",\s*DrawMainListSubItem\)' -or
     -not $listViewSelectionPresenterSource.Contains('Win32.NM_CUSTOMDRAW') -or
     -not $listViewSelectionPresenterSource.Contains('Win32.CDDS_ITEMPREPAINT') -or
     -not $listViewSelectionPresenterSource.Contains('Win32.CDDS_ITEMPOSTPAINT') -or
     -not $listViewSelectionPresenterSource.Contains('Win32.CDRF_NOTIFYPOSTPAINT') -or
+    -not $listViewSelectionPresenterSource.Contains('Win32.CDIS_FOCUS') -or
+    -not $listViewSelectionPresenterSource.Contains(
+        'itemState &= ~Win32.CDIS_FOCUS') -or
     -not $listViewSelectionPresenterSource.Contains('Win32.LVM_GETITEMSTATE') -or
     -not $listViewSelectionPresenterSource.Contains('Win32.LVIS_SELECTED') -or
     -not $listViewSelectionPresenterSource.Contains('ScheduleNativeSurfaceRefresh(delayMs := 15)') -or
@@ -270,8 +274,14 @@ if (-not $mainSource.Contains('#Include app\UI\ListViewSelectionPresenter.ahk') 
     $listViewSelectionPresenterSource.Contains('SetDCBrushColor') -or
     -not $mainVisualPipelineSource.Contains('ScheduleMainListNativeSurfaceRefresh(delayMs := 15)') -or
     -not $source.Contains('Main.listSelectionPresenter.RefreshItem(Item)') -or
-    -not $source.Contains('Main.lv.Modify(Item, "Select Focus Vis")') -or
-    -not $source.Contains('Main.lv.Modify(Item, "Focus Vis")') -or
+    -not $mainWindowControllerSource.Contains(
+        'ListViewFocusService.PrepareContextSelection(Main.lv, Item)') -or
+    -not $listViewFocusServiceSource.Contains(
+        'itemIsSelected := (SendMessage(Win32.LVM_GETITEMSTATE, item - 1,') -or
+    -not $listViewFocusServiceSource.Contains(
+        'listView.Modify(item, "Select Focus Vis")') -or
+    -not $listViewFocusServiceSource.Contains(
+        'listView.Modify(item, "Focus Vis")') -or
     $source.Contains('PrepareMainListContextPointerDown') -or
     $source.Contains('ShowPreparedMainListContextMenu') -or
     $source.Contains('Main.listSelectionPresenter.ScheduleNativeSurfaceRefresh(35)') -or
@@ -286,7 +296,7 @@ if (-not $mainWindowControllerSource.Contains('IsExplorerDefaultFileManager()') 
     $failures.Add('Open File Location must use Explorer selection only when Explorer is the default file manager, otherwise open the directory through the default handler')
 }
 foreach ($obsoleteContextMenuText in @(
-    '🎨 自定义名称和图标…',
+    '🏷️ 自定义名称和图标…',
     '🔄 软件升级保护…'
 )) {
     if ($productionSource.Contains($obsoleteContextMenuText)) {
@@ -883,8 +893,6 @@ for ($lineIndex = 0; $lineIndex -lt $iniLines.Count; $lineIndex++) {
 }
 
 $forbiddenSymbols = @(
-    'SmoothScroll',
-    'ScrollListViewByWheel',
     'WM_PRINTCLIENT',
     'MaintenanceBeforeFingerprint',
     'MaintenanceStableSince',
@@ -2336,12 +2344,23 @@ $mainContextOrderPattern =
     'contextMenu\.Add\(Tr\("⏹️ 结束运行"\), EndSelectedApp\)[\s\S]{0,200}' +
     'Tr\("✒️ 编辑完整路径（F2）"\)[\s\S]{0,180}' +
     'contextMenu\.Add\(Tr\("📂 打开所在位置"\), OpenFileLocation\)[\s\S]{0,220}' +
-    'Tr\("🎨 自定义名称和图标"\)[\s\S]{0,180}' +
+    'Tr\("🏷️ 自定义名称和图标"\)[\s\S]{0,180}' +
     'Tr\("⚙️ 进程识别与启动设置"\)[\s\S]{0,220}' +
     'Tr\("🛡️ 以管理员身份运行"\)[\s\S]{0,260}' +
     'Tr\("🔄 软件升级保护设置"\)'
+$mainPopupPalettePattern =
+    'BuildMainContextPopupItems\([\s\S]{0,1800}' +
+    '\{ColorPalette:\s*true,[\s\S]{0,120}' +
+    'IconName:\s*"palette\.svg"[\s\S]{0,80}IconColorRole:\s*"ThemeIcon"'
 if ($mainSource -notmatch $mainContextOrderPattern -or
-    $mainSource -notmatch '\{Text: Tr\("🔄 重新启动"\), Action: RestartSelectedApp\}[\s\S]{0,140}\{Text: Tr\("⏹️ 结束运行"\), Action: EndSelectedApp\}[\s\S]{0,180}\{Text: Tr\("✒️ 编辑完整路径（F2）"\)[\s\S]{0,180}\{Text: Tr\("📂 打开所在位置"\), Action: OpenFileLocation\}') {
+    $mainSource -notmatch $mainPopupPalettePattern -or
+    $mainContextPopupWindowSource -notmatch 'iconSize\s*:=\s*18' -or
+    $mainContextPopupWindowSource -notmatch
+        'SetButtonLucideIcon\(iconControl,[\s\S]{0,180}"theme:" iconColorRole\)' -or
+    $mainContextPopupWindowSource -match 'SetButtonLucideIcon\(rowButton' -or
+    $mainContextPopupWindowSource -match 'Separator' -or
+    $mainSource -match 'items\.Push\(\{Separator:\s*true\}\)' -or
+    $mainSource -match 'if batchLogSupported\s*\{\s*contextMenu\.Add\(\)') {
     $failures.Add('Main context menu must preserve the requested restart, stop, edit, location, display, launch, admin, and maintenance order')
 }
 if ($configRepositorySource -notmatch 'ReadSectionEntries\(sectionName\)[\s\S]{0,700}entries\.Push\(') {
@@ -3451,7 +3470,7 @@ $reloadValidation = $reloadSource.IndexOf('BuildReloadValidationCommand(', [Syst
 $reloadWait = $reloadSource.IndexOf('RunWait(', [System.StringComparison]::Ordinal)
 $reloadMarker = $reloadSource.IndexOf('WriteValue("Settings", "ShowAfterReload", 1)', [System.StringComparison]::Ordinal)
 $reloadHandoff = $reloadSource.IndexOf('BuildReloadHandoffCommand(', [System.StringComparison]::Ordinal)
-$reloadLaunch = $reloadSource.IndexOf('Run(handoffCommand', [System.StringComparison]::Ordinal)
+$reloadLaunch = $reloadSource.IndexOf('Run((runElevated ? "*RunAs " : "") handoffCommand', [System.StringComparison]::Ordinal)
 $reloadCatch = $reloadSource.IndexOf('} catch as reloadErr {', [System.StringComparison]::Ordinal)
 $reloadShutdown = $reloadSource.LastIndexOf('ShutdownApplication()', [System.StringComparison]::Ordinal)
 $reloadExit = $reloadSource.LastIndexOf('ExitApp()', [System.StringComparison]::Ordinal)
@@ -3464,11 +3483,19 @@ if ($reloadValidation -lt 0 -or
     $reloadShutdown -le $reloadCatch -or
     $reloadExit -le $reloadShutdown -or
     -not $reloadSource.Contains('Critical("On")') -or
+    -not $reloadSource.Contains('ReloadScriptElevated(*)') -or
+    -not $reloadSource.Contains('ReloadScriptCore(runElevated := false)') -or
     -not $reloadSource.Contains('reloadMarkerWritten := false') -or
     -not $reloadSource.Contains('App.reloadInProgress := true') -or
     $reloadSource.Contains('ReleaseApplicationMutex()') -or
     $reloadSource.Contains('ShutdownApplicationResources()')) {
     $failures.Add('Reload must validate first and hand off the mutex without an unlocked live-instance window')
+}
+if ($appModuleSource -notmatch
+        'if\s+nextValue\s*&&\s*!A_IsAdmin\s*[\r\n]+\s*SetTimer\(ReloadScriptElevated,\s*-1\)' -or
+    $appModuleSource -match
+        'if\s+nextValue\s*&&\s*!A_IsAdmin\s*[\r\n]+\s*SetTimer\(ReloadScript,\s*-1\)') {
+    $failures.Add('Enabling administrator mode must request elevation before the current instance exits')
 }
 if ($source -notmatch 'BuildReloadValidationCommand\(interpreterPath, scriptPath\)\s*\{[\s\S]{0,180}QuoteCommandLineArgument\(interpreterPath\)\s*\.\s*" /ErrorStdOut "\s*\.\s*QuoteCommandLineArgument\(scriptPath\)\s*\.\s*" --startup-validation"' -or
     $source -notmatch 'BuildReloadHandoffCommand\(currentPid, compiled, interpreterPath, scriptPath\)\s*\{[\s\S]{0,420}QuoteCommandLineArgument\(interpreterPath\)\s*\.\s*" "\s*\.\s*QuoteCommandLineArgument\(scriptPath\)\s*\.\s*" --reload-handoff "\s*\.\s*currentPid') {

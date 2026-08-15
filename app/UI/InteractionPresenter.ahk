@@ -608,6 +608,11 @@ class RoundedButtonRenderer {
             dpi := DllCall("user32\GetDpiForWindow", "Ptr", state.ctrl.Hwnd, "UInt")
             if !dpi
                 dpi := 96
+            if state.HasOwnProp("clearMarkSizeDip") {
+                this.DrawCenteredClearMark(hdc, width, height, state,
+                    textColor, dpi)
+                return
+            }
             horizontalInsetDip := state.HasOwnProp("textInsetDip")
                 ? state.textInsetDip : 4
             horizontalInset := Max(3, Round(horizontalInsetDip * dpi / 96))
@@ -800,6 +805,67 @@ class RoundedButtonRenderer {
                 DllCall("gdi32\SelectObject", "Ptr", hdc, "Ptr", previousFont, "Ptr")
             if iconFont
                 DllCall("gdi32\DeleteObject", "Ptr", iconFont)
+        }
+    }
+
+    static DrawCenteredClearMark(hdc, width, height, state, color, dpi) {
+        if !hdc || width <= 0 || height <= 0 || !this.EnsureStarted()
+            return false
+        stroke := Max(1.0, state.clearMarkStrokeDip * dpi / 96)
+        offset := stroke / (2.0 * Sqrt(2.0))
+        edgeInset := Max(2.0, 2.0 * dpi / 96)
+        maximumSize := Max(1.0, Min(width, height)
+            - 2.0 * (edgeInset + offset + 1.0))
+        size := Min(maximumSize, Max(4.0,
+            state.clearMarkSizeDip * dpi / 96))
+        halfSize := size / 2.0
+        centerX := width / 2.0
+        centerY := height / 2.0
+        graphics := 0
+        brush := 0
+        firstStroke := Buffer(32, 0)
+        secondStroke := Buffer(32, 0)
+        NumPut("Float", centerX - halfSize - offset,
+            "Float", centerY - halfSize + offset,
+            "Float", centerX + halfSize - offset,
+            "Float", centerY + halfSize + offset,
+            "Float", centerX + halfSize + offset,
+            "Float", centerY + halfSize - offset,
+            "Float", centerX - halfSize + offset,
+            "Float", centerY - halfSize - offset, firstStroke)
+        NumPut("Float", centerX + halfSize - offset,
+            "Float", centerY - halfSize - offset,
+            "Float", centerX - halfSize - offset,
+            "Float", centerY + halfSize - offset,
+            "Float", centerX - halfSize + offset,
+            "Float", centerY + halfSize + offset,
+            "Float", centerX + halfSize + offset,
+            "Float", centerY - halfSize + offset, secondStroke)
+        try {
+            if DllCall("gdiplus\GdipCreateFromHDC", "Ptr", hdc,
+                    "Ptr*", &graphics, "UInt") || !graphics
+                return false
+            if DllCall("gdiplus\GdipCreateSolidFill", "UInt",
+                    this.ColorToArgb(color), "Ptr*", &brush, "UInt") || !brush
+                return false
+            DllCall("gdiplus\GdipSetSmoothingMode", "Ptr", graphics,
+                "Int", 4)
+            DllCall("gdiplus\GdipSetPixelOffsetMode", "Ptr", graphics,
+                "Int", 4)
+            firstStatus := DllCall("gdiplus\GdipFillPolygon", "Ptr", graphics,
+                "Ptr", brush, "Ptr", firstStroke, "Int", 4,
+                "Int", 0, "UInt")
+            secondStatus := DllCall("gdiplus\GdipFillPolygon", "Ptr", graphics,
+                "Ptr", brush, "Ptr", secondStroke, "Int", 4,
+                "Int", 0, "UInt")
+            return firstStatus == 0 && secondStatus == 0
+        } catch {
+            return false
+        } finally {
+            if brush
+                DllCall("gdiplus\GdipDeleteBrush", "Ptr", brush)
+            if graphics
+                DllCall("gdiplus\GdipDeleteGraphics", "Ptr", graphics)
         }
     }
 
@@ -1797,6 +1863,27 @@ SetButtonLeadingTextSlot(ctrl, slotDip := 20, gapDip := 4,
     state.leadingTextSlotDip := slotDip
     state.leadingTextGapDip := gapDip
     state.leadingTextVisualSizeDip := visualSizeDip
+    RedrawRoundedButton(hWnd)
+    return true
+}
+
+; 字体排版框并不等于叉号的可见边界。清除标记由按钮绘制器按控件几何中心
+; 画两条斜线，避免字体、语言或 DPI 改变时产生垂直基线偏移。
+SetButtonClearMark(ctrl, sizeDip := 16, strokeDip := 2) {
+    try hWnd := ctrl.Hwnd
+    catch
+        return false
+    if !App.uiInteractions.HasButton(hWnd)
+        return false
+    state := App.uiInteractions.GetButton(hWnd)
+    if !state.HasOwnProp("roundedOwnerDraw") || !state.roundedOwnerDraw
+        return false
+    try {
+        state.clearMarkSizeDip := Max(4, sizeDip + 0)
+        state.clearMarkStrokeDip := Max(1, strokeDip + 0)
+    } catch {
+        return false
+    }
     RedrawRoundedButton(hWnd)
     return true
 }

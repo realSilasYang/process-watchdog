@@ -256,8 +256,9 @@ class WatchdogConfigRepository {
                 this.Text("; 内部字段包括 Enabled、RootIsCustom、DetectionSeconds、StableSeconds、MaxWaitSeconds、InstallRoot 和 Actor。"),
                 this.Text("; 建议通过“软件升级保护”界面修改，不要直接编辑编码内容。")]},
             {Name: "Display", Lines: [
-                this.Text("; 仅保存主窗口显示名称和图标来源，不参与进程识别、启动或升级保护。"),
-                this.Text("; AppN 与 [Apps] 中同名的守护对象一一对应；留空时使用目标自身的名称和图标。")]},
+                this.Text("; 仅保存主窗口显示名称、图标来源和序号圆点颜色，不参与进程识别、启动或升级保护。"),
+                this.Text("; AppN 与 [Apps] 中同名的守护对象一一对应；三个字段依次为名称、图标路径和圆点颜色。"),
+                this.Text("; 名称与图标路径使用 <HEX> 编码；全部留空时使用目标自身信息且不显示圆点。")]},
             {Name: "Launch", Lines: [
                 this.Text("; AppN 与 [Apps] 中同名的守护对象一一对应，依次保存启动程序或解释器路径及其参数。"),
                 this.Text("; 两个字段均为 <HEX> 编码；留空时由小助手按目标类型使用默认启动方式。")]},
@@ -303,6 +304,8 @@ class WatchdogConfigRepository {
                 this.Text("; RecursiveBatchImport：批量导入文件夹时是否递归扫描子目录。")]},
             {Section: "Settings", Key: "ShowAtStartup", Lines: [
                 this.Text("; ShowAtStartup：启动后是否显示主窗口。")]},
+            {Section: "Settings", Key: "RunAsAdministrator", Lines: [
+                this.Text("; RunAsAdministrator：小助手启动时是否请求管理员权限；计划任务使用相同权限级别。")]},
             {Section: "Layout", Key: "GuiH", Lines: [
                 this.Text("; GuiH：主窗口高度，按 96 DPI 逻辑像素保存。")]},
             {Section: "Layout", Key: "Col1W", Lines: [

@@ -30,6 +30,8 @@ class RuntimeSettingsService {
                 defaults.RetrySequence),
             ShowAtStartup: this.Repository.ReadBool("Settings",
                 "ShowAtStartup", defaults.ShowAtStartup),
+            RunAsAdministrator: this.Repository.ReadBool("Settings",
+                "RunAsAdministrator", defaults.RunAsAdministrator),
             CheckUpdatesOnStartup: this.Repository.ReadBool("Settings",
                 "CheckUpdatesOnStartup", defaults.CheckUpdatesOnStartup),
             RecursiveBatchImport: this.Repository.ReadBool("Settings",
@@ -87,6 +89,7 @@ class RuntimeSettingsService {
         runtime.retrySequence := settings.RetrySequence
         runtime.retryDelayArray := this.CloneArray(settings.RetryDelayArray)
         runtime.showAtStartup := !!settings.ShowAtStartup
+        runtime.runAsAdministrator := !!settings.RunAsAdministrator
         runtime.checkUpdatesOnStartup := !!settings.CheckUpdatesOnStartup
         runtime.recursiveBatchImport := !!settings.RecursiveBatchImport
         runtime.logMaxEntries := settings.LogMaxEntries
@@ -113,6 +116,8 @@ class RuntimeSettingsService {
                 500, 86400000),
             RetrySequence: this.RequireText(settings, "RetrySequence"),
             ShowAtStartup: this.RequireBoolean(settings, "ShowAtStartup"),
+            RunAsAdministrator: this.RequireBoolean(settings,
+                "RunAsAdministrator"),
             CheckUpdatesOnStartup: this.RequireBoolean(settings,
                 "CheckUpdatesOnStartup"),
             RecursiveBatchImport: this.RequireBoolean(settings,
@@ -147,6 +152,7 @@ class RuntimeSettingsService {
             RetrySequence: "1, 10, 60",
             RetryDelayArray: [1000, 10000, 60000],
             ShowAtStartup: false,
+            RunAsAdministrator: true,
             CheckUpdatesOnStartup: true,
             RecursiveBatchImport: true,
             LogMaxEntries: 500,
@@ -171,6 +177,8 @@ class RuntimeSettingsService {
             entries.Push({Key: "ShowAfterReload", Value: 0})
         entries.Push(
             {Key: "ShowAtStartup", Value: settings.ShowAtStartup ? 1 : 0},
+            {Key: "RunAsAdministrator",
+                Value: settings.RunAsAdministrator ? 1 : 0},
             {Key: "CheckUpdatesOnStartup",
                 Value: settings.CheckUpdatesOnStartup ? 1 : 0},
             {Key: "RecursiveBatchImport",

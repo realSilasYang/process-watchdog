@@ -759,7 +759,7 @@ AssertContextMenuPresentation() {
         && lastMeasure.Height >= outerPaddedItemHeight
         && normalModel.First && !normalModel.Last
         && lastModel.Last && !lastModel.First
-        && separatorPresentationValid
+        && separatorPosition < 0 && separatorPresentationValid
         && fontHeight >= Round(
             ContextMenuPresenter.FontSizePt * dpi / 72) - 1
         && normalDraw.Result == 1 && selectedDraw.Result == 1
@@ -822,14 +822,14 @@ AssertContextMenuToggleLayout() {
         && GetDisplayHotSwitchMenuText(Main.contextMenu, 3)
             == Tr("📂 打开所在位置")
         && GetDisplayHotSwitchMenuText(Main.contextMenu, 4)
-            == Tr("🎨 自定义名称和图标")
+            == Tr("🏷️ 自定义名称和图标")
         && GetDisplayHotSwitchMenuText(Main.contextMenu, 5)
             == Tr("⚙️ 进程识别与启动设置")
         && GetDisplayHotSwitchMenuText(Main.contextMenu, 6)
             == Tr("🛡️ 以管理员身份运行") "`t✓"
         && GetDisplayHotSwitchMenuText(Main.contextMenu, 7)
             == Tr("🔄 软件升级保护设置") "`t✓"
-        && GetDisplayHotSwitchMenuText(Main.contextMenu, 9)
+        && GetDisplayHotSwitchMenuText(Main.contextMenu, 8)
             == Tr("📄 查看批处理输出日志"),
         "右键菜单顺序、靠右勾号或批处理日志项不正确")
 
@@ -1102,7 +1102,10 @@ RunDisplayHotSwitchTests() {
     App := ApplicationState()
     processId := DllCall("kernel32\GetCurrentProcessId", "UInt")
     configPath := A_Temp "\watchdog-display-hot-switch-" processId ".ini"
+    maintenanceJournalPath := A_Temp "\watchdog-display-hot-switch-" processId ".maintenance.ini"
     try FileDelete(configPath)
+    try FileDelete(maintenanceJournalPath)
+    App.maintenanceJournalPath := maintenanceJournalPath
     repository := WatchdogConfigRepository(configPath, "", Tr,
         LocalizationService.GetAllTranslationCatalogs())
     repository.ReplaceSections([{Name: "Settings", Entries: [
@@ -1191,20 +1194,48 @@ RunDisplayHotSwitchTests() {
         AssertDisplayHotSwitch(focusedBeforePopup == Main.lv.Hwnd,
             "右键浮层测试前 ListView 没有获得焦点")
         popupItems := BuildMainContextPopupItems(false, false, true, false)
-        AssertDisplayHotSwitch(popupItems.Length == 8
+        AssertDisplayHotSwitch(popupItems.Length == 9
                 && popupItems[1].Text == Tr("🔄 重新启动")
                 && popupItems[2].Text == Tr("⏹️ 结束运行")
                 && popupItems[3].Text == Tr("✒️ 编辑完整路径（F2）")
                 && popupItems[4].Text == Tr("📂 打开所在位置")
+                && popupItems[5].Text == Tr("🏷️ 自定义名称和图标")
                 && popupItems[6].Text == Tr("⚙️ 进程识别与启动设置")
-                && popupItems[7].Text == Tr("🛡️ 以管理员身份运行"),
-            "主列表右键浮层顶部命令没有按指定顺序切换为英文")
+                && popupItems[7].Text == Tr("🛡️ 以管理员身份运行")
+                && popupItems[8].Text == Tr("🔄 软件升级保护设置")
+                && popupItems[9].ColorPalette
+                && popupItems[9].Text == Tr("设置序号圆点")
+                && popupItems[9].IconName == "palette.svg"
+                && popupItems[9].IconColorRole == "ThemeIcon",
+            "主列表右键浮层命令或序号色板没有按指定结构切换为英文")
+        for item in popupItems
+            AssertDisplayHotSwitch(!item.HasOwnProp("Separator"),
+                "主列表右键浮层仍包含分隔条目")
+        Loop 8
+            AssertDisplayHotSwitch(!popupItems[A_Index].HasOwnProp("IconName"),
+                "普通右键菜单项不应使用 Lucide 图标：" A_Index)
         AssertDisplayHotSwitch(Main.contextPopup.Show(popupItems),
             "主列表右键浮层没有显示")
         Sleep(50)
         AssertDisplayHotSwitch(Main.contextPopup.IsVisible()
                 && DllCall("user32\GetFocus", "Ptr") == focusedBeforePopup,
             "主列表右键浮层不应抢走 ListView 焦点")
+        paletteIconState := App.uiInteractions.GetButton(
+            Main.contextPopup.ColorLabelIcon.Hwnd)
+        AssertDisplayHotSwitch(IsObject(paletteIconState)
+                && paletteIconState.HasOwnProp("buttonImage"),
+            "设置序号圆点标题没有创建调色盘图像状态")
+        expectedPaletteTint := ResolveButtonImageTintColor(
+            paletteIconState, paletteIconState.buttonImage)
+        AssertDisplayHotSwitch(paletteIconState.buttonImage.sourcePath
+                    == GetApplicationAssetPath(
+                        "ui-icons\lucide\palette.svg")
+                && paletteIconState.buttonImage.sizeDip == 18
+                && paletteIconState.buttonImage.tintMode == "theme"
+                && paletteIconState.buttonImage.tintRole == "ThemeIcon"
+                && paletteIconState.buttonImage.resolvedTint
+                    == expectedPaletteTint,
+            "设置序号圆点标题没有按当前主题渲染调色盘图标")
         Main.contextPopup.Hide()
         AssertDisplayHotSwitch(stateObj.State == "⏳ Retry in 7 seconds"
             && stateObj.StatusKind == GuardStatusKind.RetryCountdown
@@ -1354,5 +1385,6 @@ RunDisplayHotSwitchTests() {
             OnMeasureApplicationControl, 0)
         try OnMessage(Win32.WM_DRAWITEM, OnDrawApplicationControl, 0)
         try FileDelete(configPath)
+        try FileDelete(maintenanceJournalPath)
     }
 }

@@ -9,7 +9,7 @@ class DisplayConfigCodec {
     }
 
     CreateDefault() {
-        return {Name: "", IconPath: ""}
+        return {Name: "", IconPath: "", SequenceColor: ""}
     }
 
     Normalize(config) {
@@ -20,6 +20,9 @@ class DisplayConfigCodec {
             normalized.Name := SubStr(Trim(String(config.Name)), 1, 120)
         if config.HasOwnProp("IconPath")
             normalized.IconPath := this.NormalizeTargetPath.Call(config.IconPath)
+        if config.HasOwnProp("SequenceColor")
+            normalized.SequenceColor := MainSequenceColorPalette.NormalizeKey(
+                config.SequenceColor)
         return normalized
     }
 
@@ -32,17 +35,20 @@ class DisplayConfigCodec {
         second := this.Normalize(secondConfig)
         return first.Name == second.Name
             && this.PathsEquivalent.Call(first.IconPath, second.IconPath)
+            && first.SequenceColor == second.SequenceColor
     }
 
     IsDefault(config) {
         normalized := this.Normalize(config)
         return normalized.Name == "" && normalized.IconPath == ""
+            && normalized.SequenceColor == ""
     }
 
     Serialize(config) {
         normalized := this.Normalize(config)
         return IniFieldCodec.Encode(normalized.Name) "|"
-            . IniFieldCodec.Encode(normalized.IconPath)
+            . IniFieldCodec.Encode(normalized.IconPath) "|"
+            . normalized.SequenceColor
     }
 
     Deserialize(encodedValue) {
@@ -50,10 +56,12 @@ class DisplayConfigCodec {
         if (encodedValue == "")
             return config
         parts := StrSplit(encodedValue, "|")
-        if (parts.Length != 2)
+        if (parts.Length != 2 && parts.Length != 3)
             return config
         config.Name := IniFieldCodec.Decode(parts[1])
         config.IconPath := IniFieldCodec.Decode(parts[2])
+        if parts.Length == 3
+            config.SequenceColor := parts[3]
         return this.Normalize(config)
     }
 }

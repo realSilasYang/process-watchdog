@@ -7,6 +7,41 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.1.0] - 2026-08-15
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides preferred and fallback fonts that must be installed into Windows first; it is not required to run the application.
+- **`process-watchdog-2.1.0-source.zip` (complete source edition):** Includes the AHK source, modules, tests, and documentation without fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64 locally.
+- **`process-watchdog-2.1.0-windows-x64.zip` (complete portable edition, recommended):** Includes the EXE, documentation, licenses, and required runtime resources without fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([official latest version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application search; the bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### ✨ Added
+
+- **Configurable administrator mode for the assistant:** The Startup page now includes “Run as administrator.” It remains enabled by default; disabling it runs the assistant with the current user token, while enabling it again performs a safe UAC handoff and synchronizes existing or newly created scheduled tasks to the same privilege level.
+- **Batch sequence-dot colors:** The main-list context popup offers seven dark/light theme colors plus a clear action. Right-clicking an already selected row preserves the multi-selection so one color can be applied to several monitored targets at once. Dot colors affect display only, never process matching, launching, or update protection.
+- **Dynamic inertial main-list scrolling:** Wheel input accelerates and decelerates according to input speed for smoother continuous movement. Reordering, window teardown, and list boundaries stop the motion promptly and restore the system timer resolution.
+
+---
+
+### 🚀 Improvements
+
+- **More compact and stable context menu:** Ordinary commands again use localized Emoji text and all separators are removed. Only “Set sequence dot” uses the enlarged theme-colored palette icon; the popup retains its no-activate behavior, rounded hover background, and right-aligned check marks.
+- **Natural multi-selection behavior:** Right-clicking a selected row no longer collapses the current multi-selection, while right-clicking an unselected row still selects only that row. Selected rows no longer show the native focus rectangle, and sequence dots are rendered through the list subitem drawing pipeline.
+- **Stronger release-state isolation:** Portable and source packages recursively reject `watchdog.ini` and `watchdog.maintenance.ini`, and verify that the monitored-app, maintenance, display, launch, identity, and recovery sections of the example configuration contain no local records.
+
+---
+
+### 🐛 Fixed
+
+- **Buttons render immediately after a window is recalled:** Restoring from the taskbar, recalling the app from another instance, or showing a child window again refreshes rounded buttons immediately instead of requiring the pointer to pass over each control.
+- **Context-popup teardown no longer reads an invalid window:** Closing the popup snapshots and validates its native handle so timers and pointer callbacks cannot access an already destroyed GUI and repeatedly raise “Gui has no window.”
+- **Centered clear-dot mark:** The clear button now draws its cross from the control's geometric center, independent of font, language, or DPI baselines.
+
+---
+
 ## 🎉 Version [2.0.13] - 2026-08-13
 
 ### 📦 Release Assets

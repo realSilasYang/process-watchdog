@@ -49,8 +49,11 @@ class TraditionalTaiwanStrings {
             "`; AppN 与 [Apps] 中同名的守护对象一一对应，值为软件升级保护的 <HEX> 编码结构。",
                 "`; 每個 AppN 與 [Apps] 內的同名項目一一對應，其值是軟體更新保護的 <HEX> 編碼結構。")
         catalog.Set(
-            "`; AppN 与 [Apps] 中同名的守护对象一一对应；留空时使用目标自身的名称和图标。",
-                "`; 每個 AppN 與 [Apps] 內的同名項目一一對應；留空的項目會使用目標本身的名稱和圖示。")
+            "`; AppN 与 [Apps] 中同名的守护对象一一对应；三个字段依次为名称、图标路径和圆点颜色。",
+                "`; 每個 AppN 與 [Apps] 內的同名項目一一對應；三個欄位依序為名稱、圖示路徑與圓點顏色。")
+        catalog.Set(
+            "`; 名称与图标路径使用 <HEX> 编码；全部留空时使用目标自身信息且不显示圆点。",
+                "`; 名稱與圖示路徑使用 <HEX> 編碼；全部留空時會使用目標本身的資訊，且不顯示圓點。")
         catalog.Set(
             "`; CheckInterval：状态检查间隔，单位为毫秒，范围 500～86400000。",
                 "`; CheckInterval：狀態檢查間隔，單位為毫秒，範圍 500～86400000。")
@@ -100,11 +103,14 @@ class TraditionalTaiwanStrings {
             "`; ShowAtStartup：启动后是否显示主窗口。",
                 "`; ShowAtStartup：啟動後是否顯示主視窗。")
         catalog.Set(
+            "`; RunAsAdministrator：小助手启动时是否请求管理员权限；计划任务使用相同权限级别。",
+                "`; RunAsAdministrator：小助手啟動時是否要求系統管理員權限；排程工作會使用相同權限層級。")
+        catalog.Set(
             "`; UiLanguage：界面语言；auto 表示跟随系统，也可填写受支持的语言代码。",
                 "`; UiLanguage：介面語言；auto 表示跟隨系統，也可填寫支援的語言代碼。")
         catalog.Set(
-            "`; 仅保存主窗口显示名称和图标来源，不参与进程识别、启动或升级保护。",
-                "`; 只儲存主視窗顯示名稱和圖示來源，不參與處理程序識別、啟動或更新保護。")
+            "`; 仅保存主窗口显示名称、图标来源和序号圆点颜色，不参与进程识别、启动或升级保护。",
+                "`; 只儲存主視窗顯示名稱、圖示來源與序號圓點顏色，不參與處理程序識別、啟動或更新保護。")
         catalog.Set(
             "`; 内部字段包括 Enabled、RootIsCustom、DetectionSeconds、StableSeconds、MaxWaitSeconds、InstallRoot 和 Actor。",
                 "`; 內部欄位包括 Enabled、RootIsCustom、DetectionSeconds、StableSeconds、MaxWaitSeconds、InstallRoot 和 Actor。")
@@ -1507,8 +1513,8 @@ class TraditionalTaiwanStrings {
             "🌿 环境变量：{1} 项`n",
                 "🌿 環境變數：{1} 項`n")
         catalog.Set(
-            "🎨 自定义名称和图标",
-                "🎨 自訂名稱和圖示")
+            "🏷️ 自定义名称和图标",
+                "🏷️ 自訂名稱和圖示")
         catalog.Set(
             "📁 工作目录：{1}`n",
                 "📁 工作目錄：{1}`n")
@@ -1764,6 +1770,16 @@ class TraditionalTaiwanStrings {
         catalog.Set("冲突", "衝突")
         catalog.Set("浏览", "瀏覽")
         catalog.Set("监控配置", "監控設定")
+        catalog.Set("以管理员身份运行", "以系統管理員身分執行")
+        catalog.Set("设置序号圆点", "設定序號圓點")
+        catalog.Set("清除圆点颜色", "清除圓點顏色")
+        catalog.Set("雾松绿", "霧松綠")
+        catalog.Set("青灰蓝", "青灰藍")
+        catalog.Set("薰衣草紫", "薰衣草紫")
+        catalog.Set("烟粉", "煙粉")
+        catalog.Set("浅琥珀", "淺琥珀")
+        catalog.Set("静谧青", "靜謐青")
+        catalog.Set("珍珠灰", "珍珠灰")
         catalog.Set("管理员运行状态", "以系統管理員身分執行")
         catalog.Set("调整守护顺序", "調整監控順序")
         catalog.Set("编辑完整路径", "編輯完整路徑")
