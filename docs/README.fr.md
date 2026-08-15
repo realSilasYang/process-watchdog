@@ -35,7 +35,11 @@ Le projet propose une interface claire ou sombre, le rétablissement automatique
 # Aperçu de l’interface
 
 <p align="center">
-  <img src="images/process-watchdog-overview.png" alt="Fenêtre principale de Process Watchdog Assistant" width="100%">
+  <img src="images/process-watchdog-overview.png" alt="Fenêtre principale sombre de Process Watchdog Assistant" width="100%">
+</p>
+
+<p align="center">
+  <img src="images/process-watchdog-overview-light.png" alt="Fenêtre principale de Process Watchdog Assistant" width="100%">
 </p>
 
 La fenêtre principale réunit l’ordre des cibles surveillées, l’icône, le nom, les privilèges requis et l’état courant. La barre de commandes propose Ajouter, Supprimer, Suspendre, Réglages, Aide et À propos ; Aide ouvre le mode d’emploi, le journal d’exécution ou la page de retours, tandis qu’À propos regroupe version, environnement, mises à jour, projet et Donner. La barre inférieure récapitule les cibles actives, en rétablissement, en mise à jour, suspendues ou en échec, tandis que le journal expose les indices à l’origine de chaque état anormal.

@@ -35,7 +35,11 @@
 # 화면 개요
 
 <p align="center">
-  <img src="images/process-watchdog-overview.png" alt="프로세스 감시 도우미 기본 창" width="100%">
+  <img src="images/process-watchdog-overview.png" alt="프로세스 감시 도우미 어두운 기본 창" width="100%">
+</p>
+
+<p align="center">
+  <img src="images/process-watchdog-overview-light.png" alt="프로세스 감시 도우미 기본 창" width="100%">
 </p>
 
 기본 창은 감시 대상 순서, 앱 아이콘, 이름, 권한 요구 사항, 현재 상태를 한곳에 보여 줍니다. 명령 모음에는 추가, 삭제, 일시 중지, 설정, 도움말, 정보가 있으며, 도움말에서 사용 설명서, 실행 로그, 피드백 페이지를 선택할 수 있습니다. 정보에는 버전, 실행 환경, 업데이트, 프로젝트, 후원 작업이 모여 있습니다. 아래쪽에는 실행, 복구, 업데이트, 일시 중지, 실패 대상 수가 표시되고, 비정상 상태의 판단 근거는 실행 로그에서 확인할 수 있습니다.
