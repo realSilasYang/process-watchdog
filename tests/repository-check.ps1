@@ -63,6 +63,7 @@ $requiredFiles = @(
     'assets\fonts\README.md',
     'assets\fonts\README.en.md',
     'docs\images\process-watchdog-overview.png',
+    'docs\images\process-watchdog-overview-light.png',
     '.editorconfig',
     '.mailmap',
     '.github\CODEOWNERS',
@@ -193,8 +194,7 @@ if (Get-ChildItem -LiteralPath $projectRoot -File -Filter '_codex_*') {
 }
 foreach ($obsoletePath in @(
         'README.en.md', 'CHANGELOG.en.md', 'watchdog.ico',
-        'watchdog.example.ini', 'docs\development',
-        'docs\images\process-watchdog-overview-light.png')) {
+        'watchdog.example.ini', 'docs\development')) {
     if (Test-Path -LiteralPath (Join-Path $projectRoot $obsoletePath)) {
         throw "Obsolete repository location remains: $obsoletePath"
     }
@@ -580,13 +580,15 @@ foreach ($readmeDefinition in $localizedReadmes) {
             throw "Localized README is missing $requiredTopic`: $($readmeDefinition.Path)"
         }
     }
-    $overviewReferences = [regex]::Matches($readme,
+    $darkOverviewReferences = [regex]::Matches($readme,
         'process-watchdog-overview\.png')
-    if ($overviewReferences.Count -ne 1 -or
-        $readme.Contains('process-watchdog-overview-light.png') -or
+    $lightOverviewReferences = [regex]::Matches($readme,
+        'process-watchdog-overview-light\.png')
+    if ($darkOverviewReferences.Count -ne 1 -or
+        $lightOverviewReferences.Count -ne 1 -or
         $readme.Contains('media="(prefers-color-scheme:') -or
         $readme.Contains('<picture>')) {
-        throw "Localized README must use the single canonical overview image exactly once: $($readmeDefinition.Path)"
+        throw "Localized README must stack the canonical dark and light overview images exactly once each: $($readmeDefinition.Path)"
     }
 }
 
