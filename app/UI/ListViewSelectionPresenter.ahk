@@ -93,13 +93,6 @@ class ListViewSelectionPresenter {
         if drawStage == (Win32.CDDS_ITEMPREPAINT | Win32.CDDS_SUBITEM) {
             if IsObject(this.subItemDrawCallback) {
                 result := this.subItemDrawCallback.Call(listView, lParam)
-                if result != "" {
-                    itemStateOffset := A_PtrSize == 8 ? 64 : 40
-                    itemState := NumGet(lParam, itemStateOffset, "UInt")
-                    if this.IsNotificationItemSelected(listView, lParam,
-                            itemState)
-                        this.MaskSelectedRow(listView, lParam)
-                }
                 return result
             }
             return
@@ -120,8 +113,7 @@ class ListViewSelectionPresenter {
         if drawStage == Win32.CDDS_ITEMPREPAINT {
             flags := IsObject(this.subItemDrawCallback)
                 ? Win32.CDRF_NOTIFYITEMDRAW : Win32.CDRF_DODEFAULT
-            return selected && !IsObject(this.subItemDrawCallback)
-                ? flags | Win32.CDRF_NOTIFYPOSTPAINT : flags
+            return selected ? flags | Win32.CDRF_NOTIFYPOSTPAINT : flags
         }
         if !selected
             return

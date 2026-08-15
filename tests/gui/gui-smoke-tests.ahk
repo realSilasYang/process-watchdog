@@ -620,7 +620,9 @@ try {
     AssertGuiSmoke((SendMessage(Win32.LVM_GETITEMSTATE, 0,
             Win32.LVIS_SELECTED, list.Hwnd) & Win32.LVIS_SELECTED) != 0
         && listSelectionPresenter.HandleCustomDraw(list,
-            selectionNotification.Ptr) == Win32.CDRF_NOTIFYITEMDRAW
+            selectionNotification.Ptr)
+                == (Win32.CDRF_NOTIFYITEMDRAW
+                    | Win32.CDRF_NOTIFYPOSTPAINT)
         && !(NumGet(selectionNotification, selectionStateOffset, "UInt")
             & Win32.CDIS_FOCUS),
         "ListView lost rounded selection when focus moved to a context menu")
