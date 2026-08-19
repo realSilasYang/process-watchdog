@@ -1,6 +1,7 @@
 ; 项目使用的 Win32 常量与顶层窗口首次映射入口。
 ; 数值保持与 Windows SDK 一致；首次映射器只编排 DWM 调用与调用方回调，
 ; 不持有状态、句柄或内存资源。
+#Include ..\UI\UiScaleService.ahk
 
 class Win32 {
     static DWMWA_CLOAK := 13
@@ -35,6 +36,7 @@ class Win32 {
     static WM_LBUTTONDBLCLK := 0x0203
     static WM_RBUTTONDOWN := 0x0204
     static WM_MOUSEWHEEL := 0x020A
+    static WM_EXITSIZEMOVE := 0x0232
     static WM_CAPTURECHANGED := 0x0215
     static WM_MOUSELEAVE := 0x02A3
     static WM_DPICHANGED := 0x02E0
@@ -85,9 +87,18 @@ class Win32 {
     static LVM_GETITEMSTATE := 0x102C
     static LVM_SETCOLUMNORDERARRAY := 0x103A
     static LVM_GETCOLUMNORDERARRAY := 0x103B
+    static LVM_GETITEMW := 0x104B
     static LVM_SETITEMW := 0x104C
+    static LVM_INSERTGROUP := 0x1091
+    static LVM_SETGROUPINFO := 0x1093
+    static LVM_ENABLEGROUPVIEW := 0x109D
+    static LVM_REMOVEALLGROUPS := 0x10A0
+    static LVM_ISGROUPVIEWENABLED := 0x10AF
     static LVIF_STATE := 0x00000008
     static LVIF_IMAGE := 0x00000002
+    static LVIF_GROUPID := 0x00000100
+    static LVGF_HEADER := 0x00000001
+    static LVGF_GROUPID := 0x00000010
     static LVIS_FOCUSED := 0x00000001
     static LVIS_SELECTED := 0x00000002
     static LVIS_OVERLAYMASK := 0x00000F00
@@ -216,14 +227,23 @@ class FirstVisibleWindowPresenter {
         prepareVisibleSurface, refreshAfterShow := "") {
         keepHidden := this.OptionsKeepWindowHidden(showOptions)
         if keepHidden || firstVisibleCompleted {
-            guiObj.Show(showOptions)
+            guiObj.Show(UiScaleService.ScaleShowOptions(showOptions))
+            UiScaleService.ApplyWindow(guiObj)
+            uncloaked := true
+            ; DWM 可能在刚销毁的窗口句柄被复用时短暂保留应用 cloak。
+            ; 隐藏启动本身不需要 cloak，先清除它，避免首次可见提交被吞掉。
+            if keepHidden && (this.GetCloakState(guiObj.Hwnd)
+                    & Win32.DWM_CLOAKED_APP) {
+                uncloaked := this.SetCloaked(guiObj.Hwnd, false)
+                this.FlushComposition()
+            }
             if !keepHidden && IsObject(refreshAfterShow)
                 refreshAfterShow.Call()
             return {
                 Visible: !keepHidden,
                 FirstVisibleCompleted: !!firstVisibleCompleted,
                 CloakApplied: false,
-                Uncloaked: true
+                Uncloaked: uncloaked
             }
         }
 
@@ -234,7 +254,8 @@ class FirstVisibleWindowPresenter {
         Critical("On")
         try {
             cloakApplied := this.SetCloaked(guiObj.Hwnd, true)
-            guiObj.Show(showOptions)
+            guiObj.Show(UiScaleService.ScaleShowOptions(showOptions))
+            UiScaleService.ApplyWindow(guiObj)
             surfacePrepared := !IsObject(prepareVisibleSurface)
                 || !!prepareVisibleSurface.Call()
             this.FlushComposition()

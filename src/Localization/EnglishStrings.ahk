@@ -31,12 +31,6 @@ class EnglishStrings {
             "   ⚠️ 配置未保存",
                 "   ⚠️ Configuration not saved")
         catalog.Set(
-            "  --maintenance-begin `"目标完整路径`"    开始维护",
-                "  --maintenance-begin `"full target path`"    Begin maintenance")
-        catalog.Set(
-            "  --maintenance-end `"目标完整路径`"      结束维护",
-                "  --maintenance-end `"full target path`"      End maintenance")
-        catalog.Set(
             " 已保留并保存此前添加的 {1} 个守护对象。",
                 " {1} previously added monitored item(s) were retained and saved.")
         catalog.Set(
@@ -46,14 +40,8 @@ class EnglishStrings {
             "`; AllowForceTerminate：正常退出超时后是否允许强制结束进程。",
                 "`; AllowForceTerminate: whether the process may be forcibly terminated after the graceful-exit timeout.")
         catalog.Set(
-            "`; AppN 与 [Apps] 中同名的守护对象一一对应，值为软件升级保护的 <HEX> 编码结构。",
-                "`; Each AppN entry corresponds to the item with the same name in [Apps]. Its value is the <HEX>-encoded update-protection structure.")
-        catalog.Set(
             "`; AppN 与 [Apps] 中同名的守护对象一一对应；三个字段依次为名称、图标路径和圆点颜色。",
                 "`; Each AppN entry corresponds to the item with the same name in [Apps]. The three fields are the name, icon path, and dot color.")
-        catalog.Set(
-            "`; 名称与图标路径使用 <HEX> 编码；全部留空时使用目标自身信息且不显示圆点。",
-                "`; The name and icon path use <HEX> encoding. When all fields are empty, the target's own information is used and no dot is shown.")
         catalog.Set(
             "`; CheckInterval：状态检查间隔，单位为毫秒，范围 500～86400000。",
                 "`; CheckInterval: status-check interval in milliseconds`; valid range: 500-86400000.")
@@ -109,9 +97,6 @@ class EnglishStrings {
             "`; UiLanguage：界面语言；auto 表示跟随系统，也可填写受支持的语言代码。",
                 "`; UiLanguage: interface language`; auto follows the system language, or a supported language code may be specified.")
         catalog.Set(
-            "`; 仅保存主窗口显示名称、图标来源和序号圆点颜色，不参与进程识别、启动或升级保护。",
-                "`; Stores only the name, icon source, and sequence-dot color shown in the main window. It does not affect process matching, launching, or update protection.")
-        catalog.Set(
             "`; 内部字段包括 Enabled、RootIsCustom、DetectionSeconds、StableSeconds、MaxWaitSeconds、InstallRoot 和 Actor。",
                 "`; Internal fields: Enabled, RootIsCustom, DetectionSeconds, StableSeconds, MaxWaitSeconds, InstallRoot, and Actor.")
         catalog.Set(
@@ -120,9 +105,6 @@ class EnglishStrings {
         catalog.Set(
             "`; 布尔值使用 1 表示开启、0 表示关闭；<HEX> 内容由软件自动编码和解码。",
                 "`; Boolean values use 1 for enabled and 0 for disabled. <HEX> content is encoded and decoded automatically.")
-        catalog.Set(
-            "`; 建议通过“软件升级保护”界面修改，不要直接编辑编码内容。",
-                "`; Change these values through the Update Protection window instead of editing the encoded content directly.")
         catalog.Set(
             "`; 无法安全解析的监控记录会暂存于此，避免静默丢失；正常情况下无需手动修改。",
                 "`; Monitored-item records that cannot be parsed safely are retained here to prevent silent data loss. Manual changes are not normally required.")
@@ -160,9 +142,6 @@ class EnglishStrings {
             "• EXE 版更新完整编译包；Git 源码版仅在受跟踪文件无修改且可快速前进时更新；其他源码版使用源码发行包。",
                 "• The EXE edition updates from the complete compiled package. A Git source checkout updates only when its tracked files are unchanged and it can fast-forward to the release tag. Other source installations use the source release package.")
         catalog.Set(
-            "• 主界面的“日志”显示本次运行中的监控、重启、升级保护和操作记录，并会自动更新。",
-                "• Logs on the main window shows monitoring, restart, update-protection, and user-action records from the current session, and updates automatically.")
-        catalog.Set(
             "• 也可将文件或文件夹直接拖放到主列表；已经存在的守护对象不会重复添加。",
                 "• You can also drag files or folders directly onto the main list. Existing items will not be added again.")
         catalog.Set(
@@ -172,23 +151,11 @@ class EnglishStrings {
             "• 关闭主窗口后，小助手继续在托盘运行。托盘菜单可重新显示主界面、重新加载或退出程序。",
                 "• Closing the main window leaves the assistant running in the system tray. Use the tray menu to show the main window again, reload, or exit.")
         catalog.Set(
-            "• 升级等待超时或判断不正确时，可选择“结束升级等待并恢复守护”；恢复前仍会检查目标文件是否可以安全启动。",
-                "• If the update wait times out or was detected incorrectly, choose End Update Wait and Resume Monitoring. The target file is still checked for a safe start before monitoring resumes.")
-        catalog.Set(
             "• 单击选择守护对象；按住 Ctrl 或 Shift 可多选；拖动列表行可调整守护顺序。",
                 "• Click an item to select it. Hold Ctrl or Shift to select multiple items. Drag list rows to change the monitoring order.")
         catalog.Set(
             "• 双击守护对象或按 F2 可编辑完整路径。Delete 删除，Ctrl+Z 撤销，Ctrl+Shift+Z 或 Ctrl+Y 重做。",
                 "• Double-click an item or press F2 to edit its full path. Delete removes it, Ctrl+Z undoes, and Ctrl+Shift+Z or Ctrl+Y redoes.")
-        catalog.Set(
-            "• 发现新版后会先询问；确认后校验完整发行包，退出当前实例、替换受管文件并自动重启，不会覆盖个人配置和升级保护会话。",
-                "• When a new version is found, the assistant asks before proceeding. After confirmation, it verifies the complete release package, exits the current instance, replaces managed files, and restarts automatically without overwriting personal configuration or update-protection sessions.")
-        catalog.Set(
-            "• 可控的更新脚本可显式发送维护指令：",
-                "• Update scripts under your control can send explicit maintenance commands:")
-        catalog.Set(
-            "• 在守护对象右键菜单打开“软件升级保护”，可调整安装足迹目录、退出检测窗口、文件稳定等待和最长升级等待，也可清除已学习的更新程序特征。",
-                "• Open Update Protection from an item's context menu to adjust the installation directory, exit-detection window, file-stability wait, and maximum update wait, or to clear learned updater signatures.")
         catalog.Set(
             "• 多个守护对象状态一致时，“暂停”按钮会统一暂停或恢复；状态混合时会逐项反转。",
                 "• When all selected items have the same state, Pause pauses or resumes them together. With mixed states, each item is toggled individually.")
@@ -204,9 +171,6 @@ class EnglishStrings {
         catalog.Set(
             "• 日志：设置运行日志内存上限、批处理输出日志的保存目录、保留时间和启动时清理策略。",
                 "• Logs: configure the in-memory runtime-log limit, batch-output log directory, retention period, and startup cleanup policy.")
-        catalog.Set(
-            "• 暂停守护对象会取消它的重试和升级检测；恢复后会重新检查目标状态。",
-                "• Pausing an item cancels its retries and update detection. Its target state is checked again when monitoring resumes.")
         catalog.Set(
             "• 检测到目标停止后，会先确认状态，再按“重启等待序列”依次重试；连续失败时采用后续等待时间，避免频繁拉起。",
                 "• After detecting that a target has stopped, the assistant confirms its state and retries according to the Restart Delay Sequence. Later delays are used after repeated failures to prevent rapid restart loops.")
@@ -226,9 +190,6 @@ class EnglishStrings {
             "• 启动 / 监控：设置状态检查间隔、重启等待序列、启动后是否显示主窗口、是否检查小助手更新，以及文件夹批量导入是否递归。",
                 "• Startup / Monitoring: configure the status-check interval, restart delay sequence, whether to show the main window and check for assistant updates after startup, and whether folder batch import is recursive.")
         catalog.Set(
-            "• 确认升级后会暂缓自动拉起；相关活动结束且目标文件稳定后，会自动恢复守护。真实升级过程中识别到的更新程序特征会自动记录。",
-                "• After an update is confirmed, automatic restart is suspended. Monitoring resumes automatically after the related activity ends and the target files become stable. Updater signatures observed during real updates are learned automatically.")
-        catalog.Set(
             "• 程序：EXE、COM、MSC。",
                 "• Applications: EXE, COM, and MSC.")
         catalog.Set(
@@ -237,9 +198,6 @@ class EnglishStrings {
         catalog.Set(
             "• 脚本：AHK、Python、JavaScript、VBScript、PowerShell、批处理，以及 Ruby、Perl、PHP、Lua、JAR、Shell 等。",
                 "• Scripts: AHK, Python, JavaScript, VBScript, PowerShell, batch files, Ruby, Perl, PHP, Lua, JAR, Shell, and others.")
-        catalog.Set(
-            "• 软件升级保护默认关闭。需要时在守护对象右键菜单打开“软件升级保护”，勾选“自动识别升级并保护启动过程”并保存。",
-                "• Update protection is disabled by default. When needed, open Update Protection from the item's context menu, select Automatically detect updates and protect startup, and save.")
         catalog.Set(
             "• 选中守护对象后可暂停、恢复或删除。暂停只停止守护，不会关闭当前正在运行的目标。",
                 "• After selecting items, you can pause, resume, or delete them. Pausing stops only monitoring and does not close a target that is already running.")
@@ -253,29 +211,14 @@ class EnglishStrings {
             "⏳ 正在结束运行...",
                 "⏳ Stopping the target...")
         catalog.Set(
-            "⏳ 判断是否正在升级",
-                "⏳ Checking whether an update is in progress")
-        catalog.Set(
-            "⏳ 升级完成，准备恢复",
-                "⏳ Update complete`; preparing to resume")
-        catalog.Set(
             "⏳ 启动倒计时 {1} 秒",
                 "⏳ Starting in {1} seconds")
         catalog.Set(
             "⏳ 启动失败，稍后自动重试",
                 "⏳ Start failed`; retrying later")
         catalog.Set(
-            "⏳ 确认升级文件稳定",
-                "⏳ Confirming update-file stability")
-        catalog.Set(
-            "⏳ 确认升级文件稳定 {1}s",
-                "⏳ Confirming update-file stability {1}s")
-        catalog.Set(
             "⏳ 稍后自动重试 {1} 秒",
                 "⏳ Retrying automatically in {1} seconds")
-        catalog.Set(
-            "⏳ 等待安全启动条件",
-                "⏳ Waiting for safe-start conditions")
         catalog.Set(
             "⏳ 等待进程状态...",
                 "⏳ Waiting for process status...")
@@ -298,9 +241,6 @@ class EnglishStrings {
             "⚙️ 启动参数：{1}`n",
                 "⚙️ Launch arguments: {1}`n")
         catalog.Set(
-            "⚠️ 升级等待超时",
-                "⚠️ Update Wait Timed Out")
-        catalog.Set(
             "⚠️ 疑似停止",
                 "⚠️ Possibly Stopped")
         catalog.Set(
@@ -312,9 +252,6 @@ class EnglishStrings {
         catalog.Set(
             "✅ 运行中",
                 "✅ Running")
-        catalog.Set(
-            "✅ 运行：{1}   🚫 停止：{2}   ⏳ 恢复：{3}   🔄 升级：{4}   ⏸️ 暂停：{5}   ❌ 失效：{6}   ｜   🎯 总计：{7}",
-                "✅ Running: {1}   🚫 Stopped: {2}   ⏳ Recovering: {3}   🔄 Updating: {4}   ⏸️ Paused: {5}   ❌ Invalid: {6}   |   🎯 Total: {7}")
         catalog.Set(
             "✒️ 编辑完整路径（F2）",
                 "✒️ Edit Full Path（F2）")
@@ -346,14 +283,8 @@ class EnglishStrings {
             "一、快速上手",
                 "1. Quick Start")
         catalog.Set(
-            "七、软件升级保护",
-                "7. Update Protection")
-        catalog.Set(
             "三、主界面操作",
                 "3. Main Window")
-        catalog.Set(
-            "不允许的升级保护阶段转换：{1}",
-                "Disallowed update-protection phase transition: {1}")
         catalog.Set(
             "不支持的启动规格类型",
                 "Unsupported launch specification type")
@@ -382,9 +313,6 @@ class EnglishStrings {
             "代码热重载完毕，界面已恢复显示。",
                 "Hot reload completed and the window is visible again.")
         catalog.Set(
-            "仲裁期间捕获到升级活动",
-                "Update activity detected during arbitration")
-        catalog.Set(
             "使用说明",
                 "User Guide")
         catalog.Set(
@@ -393,9 +321,6 @@ class EnglishStrings {
         catalog.Set(
             "保存",
                 "Save")
-        catalog.Set(
-            "保存升级保护恢复状态失败：{1}",
-                "Failed to save update-protection recovery state: {1}")
         catalog.Set(
             "保存失败",
                 "Save Failed")
@@ -411,9 +336,6 @@ class EnglishStrings {
         catalog.Set(
             "保存设置失败，请查看运行日志。",
                 "Could not save settings. Check the runtime log for details.")
-        catalog.Set(
-            "保存软件升级保护设置失败，请查看运行日志。",
-                "Could not save update-protection settings. Check the runtime log for details.")
         catalog.Set(
             "保存运行参数失败：{1}",
                 "Failed to save runtime settings: {1}")
@@ -450,39 +372,6 @@ class EnglishStrings {
         catalog.Set(
             "刷新运行日志窗口失败，已暂停自动刷新：{1}",
                 "Failed to refresh the runtime-log window`; automatic refresh has been paused: {1}")
-        catalog.Set(
-            "升级保护仅支持具有有效完整路径的程序或脚本，安装足迹目录必须存在并包含目标文件。",
-                "Update protection requires an application or script with a valid full path. The installation directory must exist and contain the target file.")
-        catalog.Set(
-            "升级保护仍在进行",
-                "Update protection is still active")
-        catalog.Set(
-            "升级保护初始化时无法建立进程基线，将在下一轮重试。",
-                "Update protection could not establish a process baseline during initialization and will retry on the next cycle.")
-        catalog.Set(
-            "升级保护协调器未能初始化，核心守护不会启动。",
-                "The update-protection coordinator could not be initialized, so core monitoring will not start.")
-        catalog.Set(
-            "升级保护配置",
-                "Update-protection configuration")
-        catalog.Set(
-            "升级文件监听",
-                "Update file watcher")
-        catalog.Set(
-            "升级文件监听异常（{1}）：{2}",
-                "Update file watcher error（{1}）: {2}")
-        catalog.Set(
-            "升级文件监听异常：{1}",
-                "Update file watcher error: {1}")
-        catalog.Set(
-            "升级等待已超时",
-                "The update wait timed out")
-        catalog.Set(
-            "升级进程扫描",
-                "Update process scan")
-        catalog.Set(
-            "升级进程扫描异常：{1}",
-                "Update process scan error: {1}")
         catalog.Set(
             "参数错误",
                 "Parameter Error")
@@ -583,14 +472,8 @@ class EnglishStrings {
             "守护对象：",
                 "Watched Target:")
         catalog.Set(
-            "安全启动门暂缓启动：{1}（{2}）",
-                "The safe-start gate postponed launch: {1}（{2}）")
-        catalog.Set(
             "安装目录特征",
                 "Installation-directory signature")
-        catalog.Set(
-            "安装足迹目录：",
-                "Installation directory:")
         catalog.Set(
             "完整路径",
                 "Full Path")
@@ -631,9 +514,6 @@ class EnglishStrings {
             "进程守护小助手设置",
                 "Process Watchdog Assistant Settings")
         catalog.Set(
-            "尚未从真实升级过程学习到更新程序特征。",
-                "No updater signature has yet been learned from a real update.")
-        catalog.Set(
             "展示配置",
                 "Display configuration")
         catalog.Set(
@@ -642,9 +522,6 @@ class EnglishStrings {
         catalog.Set(
             "工作目录（CWD）：",
                 "Working directory（CWD）:")
-        catalog.Set(
-            "已从本次升级过程学习更新程序特征：{1}",
-                "Updater signatures learned during this update: {1}")
         catalog.Set(
             "已保存身份",
                 "Saved identity")
@@ -685,9 +562,6 @@ class EnglishStrings {
             "已导出本地诊断包：{1}",
                 "Local diagnostic bundle exported: {1}")
         catalog.Set(
-            "已恢复未完成的升级保护会话：{1}",
-                "Restored an unfinished update-protection session: {1}")
-        catalog.Set(
             "已撤销上一步操作。",
                 "Undid the previous action.")
         catalog.Set(
@@ -697,20 +571,11 @@ class EnglishStrings {
             "已更新守护对象路径。",
                 "The watched-target path was updated.")
         catalog.Set(
-            "已更新软件升级保护设置：{1}",
-                "Updated update-protection settings: {1}")
-        catalog.Set(
             "已添加 {1} 个守护对象。",
                 "Added {1} monitored item(s).")
         catalog.Set(
             "已用完快速重试，将每隔 {1} 秒继续尝试启动：{2}",
                 "Fast retries exhausted`; launch attempts will continue every {1} seconds: {2}")
-        catalog.Set(
-            "已自动学习的更新程序特征：",
-                "Automatically learned updater signatures:")
-        catalog.Set(
-            "已进入软件升级保护：{1}{2}",
-                "Update protection activated: {1}{2}")
         catalog.Set(
             "已重做操作。",
                 "Redid the action.")
@@ -756,24 +621,6 @@ class EnglishStrings {
         catalog.Set(
             "当前版本：{1}（源码版；本机 AutoHotkey {2} x64）",
                 "Current version: {1}（source edition`; local AutoHotkey {2} x64）")
-        catalog.Set(
-            "当前状态：升级活动已结束，正在确认程序文件稳定",
-                "Current status: update activity has ended`; confirming that program files are stable")
-        catalog.Set(
-            "当前状态：升级等待超时，需要确认后恢复",
-                "Current status: the update wait timed out and requires confirmation before resuming")
-        catalog.Set(
-            "当前状态：已从上次运行恢复未完成的升级保护",
-                "Current status: an unfinished update-protection session was restored from the previous run")
-        catalog.Set(
-            "当前状态：已暂停自动启动，正在等待升级完成",
-                "Current status: automatic launch is paused while the update completes")
-        catalog.Set(
-            "当前状态：显式升级维护已开始，正在等待结束命令",
-                "Current status: explicit update maintenance is active and waiting for the end command")
-        catalog.Set(
-            "当前状态：正在判断本次退出是否由升级引起",
-                "Current status: determining whether this exit was caused by an update")
         catalog.Set(
             "当前状态：正常守护",
                 "Current status: monitoring normally")
@@ -871,12 +718,6 @@ class EnglishStrings {
             "支持的程序与脚本",
                 "Supported Applications and Scripts")
         catalog.Set(
-            "收到显式维护开始命令",
-                "Received explicit maintenance-begin command")
-        catalog.Set(
-            "收到显式维护结束命令，开始执行安全恢复检查：{1}",
-                "Received explicit maintenance-end command`; beginning safe-resume checks: {1}")
-        catalog.Set(
             "整条展示配置",
                 "Complete display configuration")
         catalog.Set(
@@ -947,18 +788,6 @@ class EnglishStrings {
         catalog.Set("日志保存位置：", "Log file location:")
         catalog.Set("确定", "OK")
         catalog.Set(
-            "时间设置无效。`n`n退出检测窗口：2-120 秒`n文件稳定等待：2-300 秒`n最长升级等待：60-86400 秒，且必须大于稳定等待时间",
-                "One or more time settings are invalid.`n`nExit-detection window: 2-120 seconds`nFile stability wait: 2-300 seconds`nMaximum update wait: 60-86400 seconds and greater than the file stability wait")
-        catalog.Set(
-            "显式升级维护命令执行异常：{1}",
-                "Explicit update-maintenance command failed: {1}")
-        catalog.Set(
-            "显式升级维护命令未找到监控目标：{1}",
-                "The explicit update-maintenance command did not match a monitored target: {1}")
-        catalog.Set(
-            "显式升级维护命令被忽略，目标未启用升级保护：{1}",
-                "The explicit update-maintenance command was ignored because update protection is disabled for the target: {1}")
-        catalog.Set(
             "显示主界面",
                 "Show Main Window")
         catalog.Set(
@@ -995,23 +824,11 @@ class EnglishStrings {
             "更新检查返回了无法识别的状态：{1}",
                 "The update check returned an unrecognized status: {1}")
         catalog.Set(
-            "最长升级等待（秒）：",
-                "Maximum update wait（seconds）:")
-        catalog.Set(
-            "未发现升级活动（{1}，耗时 {2} 秒），恢复普通重启流程：{3}",
-                "No update activity was found（{1}, {2} seconds）`; resuming the normal restart flow: {3}")
-        catalog.Set(
-            "未发现升级活动（{1}，耗时 {2} 秒），目标仍不存在：{3}",
-                "No update activity was found（{1}, {2} seconds）`; the target is still missing: {3}")
-        catalog.Set(
             "未找到目标",
                 "No Target Found")
         catalog.Set(
             "未添加",
                 "Not Added")
-        catalog.Set(
-            "未知升级保护阶段",
-                "Unknown update-protection phase")
         catalog.Set(
             "未知守护阶段",
                 "Unknown monitoring phase")
@@ -1024,12 +841,6 @@ class EnglishStrings {
         catalog.Set(
             "未知错误",
                 "Unknown error")
-        catalog.Set(
-            "查看实时运行日志`n涵盖监控、重启、升级保护与操作记录",
-                "View the live runtime log`nIncludes monitoring, restart, update-protection, and user-action records")
-        catalog.Set(
-            "查看支持类型、操作方法、守护设置`n以及升级保护说明",
-                "View supported target types, controls, and monitoring settings`nIncludes update-protection guidance")
         catalog.Set(
             "核心守护",
                 "Core monitoring")
@@ -1136,9 +947,6 @@ class EnglishStrings {
             "用户指定",
                 "Specified by user")
         catalog.Set(
-            "用户结束了升级等待，重新执行安全启动检查：{1}",
-                "The user ended the update wait`; running safe-start checks again: {1}")
-        catalog.Set(
             "界面语言和字体已即时更新，无需重新启动小助手。",
                 "The interface language and font were updated immediately; the assistant does not need to restart.")
         catalog.Set(
@@ -1204,9 +1012,6 @@ class EnglishStrings {
             "目标文件已恢复，重新核对运行状态：{1}",
                 "The target file has returned`; checking its running state again: {1}")
         catalog.Set(
-            "目标文件缺失时检测到升级活动",
-                "Update activity detected while the target file was missing")
-        catalog.Set(
             "目标程序文件不存在",
                 "The target program file does not exist")
         catalog.Set(
@@ -1215,9 +1020,6 @@ class EnglishStrings {
         catalog.Set(
             "目标路径",
                 "Target path")
-        catalog.Set(
-            "目标退出时检测到升级信号",
-                "Update signal detected when the target exited")
         catalog.Set(
             "真实目标来源标记",
                 "Real-target source flag")
@@ -1279,9 +1081,6 @@ class EnglishStrings {
             "显示",
                 "Display")
         catalog.Set(
-            "结束升级等待并恢复守护",
-                "End Update Wait and Resume Monitoring")
-        catalog.Set(
             "编码损坏",
                 "The encoded value is damaged")
         catalog.Set(
@@ -1299,9 +1098,6 @@ class EnglishStrings {
         catalog.Set(
             "自动",
                 "Automatic")
-        catalog.Set(
-            "自动识别升级并保护启动过程",
-                "Automatically detect updates and protect startup")
         catalog.Set(
             "自动识别进程",
                 "Detect process automatically")
@@ -1348,9 +1144,6 @@ class EnglishStrings {
             "该真实进程已由其他守护对象守护。",
                 "Another monitored item already monitors this real process.")
         catalog.Set(
-            "该软件正在升级保护中。请等待升级完成，或在“软件升级保护”中结束等待后再结束运行。",
-                "Update protection is active for this application. Wait for the update to finish, or end the wait in Update Protection before stopping it.")
-        catalog.Set(
             "语义版本无效",
                 "The semantic version is invalid")
         catalog.Set(
@@ -1377,18 +1170,6 @@ class EnglishStrings {
         catalog.Set(
             "轮询间隔必须为 500-86400000 毫秒的正整数！",
                 "The polling interval must be a positive integer from 500 to 86400000 milliseconds.")
-        catalog.Set(
-            "软件升级保护",
-                "Update Protection")
-        catalog.Set(
-            "软件升级保护超过最长等待时间，需要用户确认后恢复：{1}",
-                "Update protection exceeded its maximum wait and requires user confirmation before resuming: {1}")
-        catalog.Set(
-            "软件升级完成，准备恢复启动：{1}",
-                "Application update complete`; preparing to resume launch: {1}")
-        catalog.Set(
-            "软件升级完成，已恢复正常守护：{1}",
-                "Application update complete`; normal monitoring resumed: {1}")
         catalog.Set(
             "载入中...",
                 "Loading...")
@@ -1524,6 +1305,19 @@ class EnglishStrings {
         catalog.Set(
             "📂 浏览文件夹...",
                 "📂 Browse for Folder...")
+        catalog.Set("获取正在运行的所有进程",
+            "Get all running processes")
+        catalog.Set("正在运行的进程", "Running Processes")
+        catalog.Set("应用", "Apps")
+        catalog.Set("后台进程", "Background processes")
+        catalog.Set("正在载入运行进程：{1}／{2}",
+            "Loading running processes: {1}/{2}")
+        catalog.Set("正在读取运行进程：{1}",
+            "Reading running processes: {1}")
+        catalog.Set("正在运行的程序：{1} 项",
+            "Running programs: {1}")
+        catalog.Set("无法读取正在运行的进程。",
+            "Unable to read running processes.")
         catalog.Set(
             "选择...",
                 "Select...")
@@ -1537,12 +1331,6 @@ class EnglishStrings {
             "🔄 反转状态",
                 "🔄 Toggle States")
         catalog.Set(
-            "🔄 恢复升级保护状态",
-                "🔄 Restore Update-protection State")
-        catalog.Set(
-            "🔄 显式升级维护中",
-                "🔄 Explicit Update Maintenance")
-        catalog.Set(
             "🔄 检查",
                 "🔄 Check")
         catalog.Set(
@@ -1551,12 +1339,6 @@ class EnglishStrings {
         catalog.Set(
             "🔄 等待程序文件恢复",
                 "🔄 Waiting for Program File to Return")
-        catalog.Set(
-            "🔄 软件升级中",
-                "🔄 Application Updating")
-        catalog.Set(
-            "🔄 软件升级保护设置",
-                "🔄 Update Protection Settings")
         catalog.Set(
             "⏹️ 结束运行",
                 "⏹️ Stop Target")
@@ -1731,7 +1513,6 @@ class EnglishStrings {
         catalog.Set("微信支付", "WeChat Pay")
         catalog.Set("支付宝", "Alipay")
         catalog.Set("二维码图片未找到", "QR code image not found")
-        catalog.Set("• 主界面的“帮助”可打开使用说明、本次运行日志或项目反馈页面；日志包含监控、重启、升级保护和操作记录，并会自动更新。", "• Open Help from the main window to view the user guide, this session's runtime log, or the project feedback page. The log includes monitoring, restarts, update protection, and user actions, and updates automatically.")
         catalog.Set("⚙️ 进程识别与启动设置", "⚙️ Process Identification and Launch Settings")
         catalog.Set("进程识别与启动设置", "Process Identification and Launch Settings")
         catalog.Set("进程识别", "Process identification")
@@ -1765,7 +1546,6 @@ class EnglishStrings {
         catalog.Set("配置暂未写入", "Configuration Not Yet Written")
         catalog.Set("已更新进程识别与启动设置：{1}", "Process identification and launch settings updated: {1}")
         catalog.Set("• 快捷方式：LNK、URL、APPREF-MS，包括可解析真实目标的 MSI 快捷方式。特殊快捷方式可在“进程识别与启动设置”中手动指定真实进程。", "• Shortcuts: LNK, URL, and APPREF-MS, including MSI shortcuts whose actual target can be resolved. For special shortcuts, specify the actual process manually under Process Identification and Launch Settings.")
-        catalog.Set("• 右键守护对象可自定义主窗口名称和图标，也可打开所在位置、结束运行、编辑路径、切换管理员运行、配置进程识别与启动设置及软件升级保护，并查看批处理输出日志。“结束运行”会同时暂停守护，目标不会被自动重新启动；要求管理员运行但当前权限不符时仍会显示警告。", "• Right-click an item to customize its main-window name and icon, open its location, stop the target, edit its path, toggle administrator launch, configure process identification, launch settings, and update protection, or view redirected batch-output logs. Stop Target also pauses monitoring, so the target is not started again automatically; a privilege mismatch still shows a warning.")
         catalog.Set("添加", "Add")
         catalog.Set("暂停", "Pause")
         catalog.Set("恢复", "Resume")
@@ -1778,7 +1558,6 @@ class EnglishStrings {
         catalog.Set("统计：运行", "Running")
         catalog.Set("统计：停止", "Stopped")
         catalog.Set("统计：恢复", "Recovering")
-        catalog.Set("统计：升级", "Updating")
         catalog.Set("统计：暂停", "Paused")
         catalog.Set("统计：失效", "Invalid")
         catalog.Set("统计：总计", "Total")
@@ -1874,8 +1653,6 @@ class EnglishStrings {
             "Content relocation cannot run because the previous file has no complete content fingerprint: {1}")
         catalog.Set("监测到目标文件缺失，内容迁移将在缺失状态稳定后开始扫描：{1}",
             "The target file is missing; content relocation will start scanning after the missing state is stable: {1}")
-        catalog.Set("内容迁移暂缓：目标正处于升级保护、维护恢复或近期启动信号保护中：{1}",
-            "Content relocation is paused because the target is under update protection, maintenance recovery, or recent launch-signal protection: {1}")
         catalog.Set("内容迁移候选已被拒绝：{1} -> {2}（候选不存在、扩展名不兼容、已被守护或与现有目标冲突）",
             "The content relocation candidate was rejected: {1} -> {2} (candidate missing, incompatible extension, already monitored, or conflicting with an existing target)")
         catalog.Set("内容迁移候选仍在本次忽略冷却期内：{1} -> {2}",
@@ -1902,23 +1679,19 @@ class EnglishStrings {
         catalog.Set("无", "None")
         catalog.Set("，另有 {1} 个", ", plus {1} more")
         catalog.Set("检测到内容一致的守护目标新位置，等待用户确认：{1} -> {2}", "A new location with matching content was detected`; awaiting confirmation: {1} -> {2}")
-        catalog.Set("升级期间检测到唯一同名新版本入口，等待用户确认：{1} -> {2}", "A unique same-named entry in a new version directory was detected during the upgrade`; awaiting confirmation: {1} -> {2}")
         catalog.Set("守护目标内容迁移识别异常：{1}", "Monitored-target content relocation detection error: {1}")
         catalog.Set("等待确认目标新位置", "Waiting to confirm the target's new location")
         catalog.Set("确认目标新位置", "Confirm New Target Location")
         catalog.Set("检测到守护目标可能已更名", "A monitored target may have been renamed")
         catalog.Set("小助手找到了与原文件内容完全一致的新路径。确认后将更新守护目标，名称、图标和启动设置保持不变。", "The assistant found a new path whose file content is an exact match. Confirming updates the monitored target while preserving its name, icon, and launch settings.")
-        catalog.Set("升级期间发现唯一同名新版本入口；已记录并持续校验候选 SHA-256。确认后将更新守护目标，名称、图标和启动设置保持不变。", "The only same-named entry in a new version directory was found during the upgrade. Its SHA-256 is recorded and rechecked. Confirming updates the monitored target without changing its name, icon, or launch settings.")
         catalog.Set("原路径：", "Previous path:")
         catalog.Set("新路径：", "New path:")
         catalog.Set("识别依据：", "Detection evidence: ")
         catalog.Set("内容完全一致 / SHA-256", "Exact content match / SHA-256")
-        catalog.Set("唯一同名新版本入口 / SHA-256", "Unique same-named version entry / SHA-256")
         catalog.Set("更新守护路径", "Update monitored path")
         catalog.Set("忽略", "Ignore")
         catalog.Set("更新已更名的守护目标", "Update renamed monitored target")
         catalog.Set("• 直接添加的程序或脚本本身或上级目录被更名、跨目录或跨磁盘移动后，小助手会按文件大小筛选并以 SHA-256 内容哈希确认新路径；即使移动发生在小助手关闭期间也能识别。", "• After a directly added program, script, or parent folder is renamed or moved across folders or drives, the assistant filters by file size and confirms the new path with a SHA-256 content hash, even when the move happened while the assistant was closed.")
-        catalog.Set("• 常规迁移不使用文件名、文件 ID 或目录监听作为判断依据。版本目录升级是受限例外：升级期间仅在同一父目录中存在唯一同名新版本入口时提出迁移，并记录、持续校验候选 SHA-256。发现多个候选、多个内容相同的副本或扫描未完整完成时不会猜测目标；确认后只更新守护路径，名称、图标和启动设置保持不变。", "• Regular relocation decisions do not use file names, file IDs, or directory watchers. Version-directory upgrades are a restricted exception: during an upgrade, relocation is proposed only when exactly one same-named entry exists in a new version directory under the same parent, and that candidate's SHA-256 is recorded and continuously verified. The assistant does not guess when multiple candidates or identical copies exist, or when a scan is incomplete. Confirming changes only the monitored path and preserves the name, icon, and launch settings.")
         catalog.Set("; AppN 与 [Apps] 中同名的直接文件目标一一对应，依次保存文件大小和 SHA-256 内容哈希。", "; Each AppN entry corresponds to the directly monitored file with the same name in [Apps] and stores its file size followed by its SHA-256 content hash.")
         catalog.Set("; 此节由小助手自动维护，用于在文件或目录改名、跨目录或跨磁盘移动后确认内容未变；请勿手动编辑。", "; The assistant maintains this section automatically to verify unchanged content after file or folder renames and moves across folders or drives. Do not edit it manually.")
         catalog.Set("Everything64.dll 已加载，但 Everything 后台实例未响应；正在尝试定位并启动 Everything 本体。",
@@ -1971,12 +1744,6 @@ class EnglishStrings {
             "The command line provides only a relative target path, so it cannot be matched reliably")
         catalog.Set("候选进程镜像路径不可访问",
             "The candidate process image path is inaccessible")
-        catalog.Set("发现多个版本目录包含同名入口，已暂停自动迁移：{1}",
-            "Multiple version directories contain an entry with the same name; automatic relocation is paused: {1}")
-        catalog.Set("版本目录迁移候选暂不可读取，将稍后重试：{1}",
-            "The version-directory relocation candidate is temporarily unreadable and will be retried later: {1}")
-        catalog.Set("版本目录迁移候选仍在本次忽略冷却期内：{1} -> {2}",
-            "The version-directory relocation candidate is still in this ignore cooldown: {1} -> {2}")
         catalog.Set("候选进程创建身份无法核对",
             "The candidate process creation identity cannot be verified")
         catalog.Set("存在多个候选进程，无法唯一确认",
@@ -1984,6 +1751,31 @@ class EnglishStrings {
         catalog.Set("目标探活规格无效",
             "The target probe specification is invalid")
         catalog.Set("🔄 重新启动", "🔄 Restart")
+        catalog.Set("🔔 停止后每次询问恢复", "🔔 Ask after a stop")
+        catalog.Set("立即恢复", "Restart now")
+        catalog.Set("等待 1 分钟", "Wait 1 minute")
+        catalog.Set("等待 3 分钟", "Wait 3 minutes")
+        catalog.Set("暂停守护", "Pause guarding")
+        catalog.Set("进程已停止", "Process stopped")
+        catalog.Set("进程守护小助手 事件提醒",
+            "Process Watchdog Assistant - Event Alert")
+        catalog.Set("监测到守护对象已停止：{1}`n请选择后续处理方式。",
+            "The monitored item has stopped: {1}`nChoose what to do next.")
+        catalog.Set("检测到目标已停止：{1}`n请选择后续处理方式。",
+            "The target has stopped: {1}`nChoose what to do next.")
+        catalog.Set("🔔 等待恢复选择...", "🔔 Waiting for your recovery choice...")
+        catalog.Set("检测到进程停止，等待恢复选择：{1}",
+            "The process stopped; waiting for a recovery choice: {1}")
+        catalog.Set("恢复选择弹窗创建失败：{1}",
+            "Could not show the recovery choice dialog: {1}")
+        catalog.Set("停止后询问恢复", "Ask after a stop")
+        catalog.Set("已开启停止后询问恢复：{1}",
+            "Recovery confirmation enabled after a stop: {1}")
+        catalog.Set("已关闭停止后询问恢复，改为静默恢复：{1}",
+            "Recovery confirmation disabled; silent recovery is used: {1}")
+        catalog.Set("已选择立即恢复：{1}", "Restarting now: {1}")
+        catalog.Set("已选择等待 {1} 分钟后恢复：{2}",
+            "Restarting after {1} minute(s): {2}")
         catalog.Set("点个 star 吧~", "Give us a little star~")
         catalog.Set("⏳ 停止原进程...", "⏳ Stopping the existing process...")
         catalog.Set("❌ 无法停止原进程", "❌ Could Not Stop Existing Process")
@@ -1991,10 +1783,12 @@ class EnglishStrings {
         catalog.Set("手动重启已取消，原进程未能停止：{1}", "Manual restart was cancelled because the existing process could not be stopped: {1}")
         catalog.Set("暂时无法查询进程状态，稍后重试手动重启：{1}", "Process status is temporarily unavailable. Manual restart will be retried later: {1}")
         catalog.Set("暂时无法重新启动", "Restart Temporarily Unavailable")
-        catalog.Set("该软件正在升级保护中。请等待升级完成，或在“软件升级保护”中结束等待后再重新启动。", "Update protection is active for this application. Wait for the update to finish, or end the wait in Update Protection before restarting it.")
         catalog.Set("• “重新启动”会先请求目标正常退出；超过设置时间后，是否强制终止由“停止策略”中的选项决定。", "• “Restart” first asks the target to exit normally. If the timeout expires, the option under “Stop Policy” determines whether it is forcibly terminated.")
         catalog.Set("查看版本、运行环境和项目入口", "View version, runtime, and project links")
         catalog.Set("找作者对线", "Talk to the author")
+        catalog.Set("界面缩放：", "Interface scale:")
+        catalog.Set("; UiScale：界面缩放百分比，支持 80、90、100、110、125、150、175、200。",
+            "; UiScale: interface scale percentage, supported values are 80, 90, 100, 110, 125, 150, 175, and 200.")
         return catalog
     }
 }

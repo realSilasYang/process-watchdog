@@ -2,7 +2,7 @@
 #Warn All, StdOut
 
 ; 验证共享工作门只允许一个后台操作进入，并能在异常后可靠释放。
-; 防止普通轮询与升级保护并发改写同一目标，也防止工作门永久卡住。
+; 防止普通轮询与重启验证并发改写同一目标，也防止工作门永久卡住。
 
 #Include ..\..\src\Core\GuardWorkGate.ahk
 #Include ..\..\src\Core\GuardMutationQueue.ahk

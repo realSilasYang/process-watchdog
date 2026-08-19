@@ -129,7 +129,7 @@ Assert-UpdateHelperTest ($localizedUpdateError -ceq
 $script:UiLanguage = 'zh-CN'
 $script:UpdateTextCatalog = $null
 
-foreach ($unsafePath in @('watchdog.ini', 'watchdog.maintenance.ini',
+foreach ($unsafePath in @('watchdog.ini',
         '..\outside.txt', 'C:\outside.txt')) {
     $rejected = $false
     try {
@@ -478,51 +478,32 @@ try {
         $validationError = $_
     }
 
-    # 正式新版可能在返回就绪信号前迁移两个配置。启动随后失败时，程序文件和
-    # 个人状态必须作为同一个更新事务恢复，且恢复内容必须逐字节一致。
+    # 正式新版可能在返回就绪信号前迁移主配置。启动随后失败时，个人状态
+    # 必须作为同一个更新事务恢复，且恢复内容必须逐字节一致。
     $watchdogConfigPath = Join-Path $installRoot 'watchdog.ini'
-    $maintenanceConfigPath = Join-Path $installRoot 'watchdog.maintenance.ini'
-    Set-Content -LiteralPath $maintenanceConfigPath -Encoding Unicode `
-        -Value "[Sessions]`r`nApp1=original"
     $originalWatchdogSignature = Get-FileByteSignature $watchdogConfigPath
-    $originalMaintenanceSignature = `
-        Get-FileByteSignature $maintenanceConfigPath
     $personalStateSnapshot = New-PersonalStateSnapshot
     Set-Content -LiteralPath $watchdogConfigPath -Encoding Unicode `
         -Value '[Settings] migrated=true'
-    Set-Content -LiteralPath $maintenanceConfigPath -Encoding Unicode `
-        -Value '[Sessions] migrated=true'
     Restore-PersonalStateSnapshot $personalStateSnapshot $validationError
-    Assert-UpdateHelperTest (
-        (Get-FileByteSignature $watchdogConfigPath) -ceq `
-            $originalWatchdogSignature -and
-        (Get-FileByteSignature $maintenanceConfigPath) -ceq `
-            $originalMaintenanceSignature) `
-        '启动失败后两个个人配置没有逐字节恢复。'
+    Assert-UpdateHelperTest ((Get-FileByteSignature $watchdogConfigPath) -ceq `
+            $originalWatchdogSignature) '启动失败后主配置没有逐字节恢复。'
     Assert-UpdateHelperTest (-not (Test-Path -LiteralPath `
             $personalStateSnapshot.BackupRoot)) `
         '个人配置恢复成功后快照目录没有清理。'
 
-    # 同时覆盖旧版没有维护配置、新版新建该文件，以及新版错误地把主配置路径
-    # 变成目录的边界。恢复必须删除新增状态并重建原来的普通文件。
-    Remove-Item -LiteralPath $maintenanceConfigPath -Force
+    # 同时覆盖新版错误地把主配置路径变成目录的边界。
     $personalStateSnapshot = New-PersonalStateSnapshot
     Remove-Item -LiteralPath $watchdogConfigPath -Force
     New-Item -ItemType Directory -Path $watchdogConfigPath | Out-Null
     Set-Content -LiteralPath (Join-Path $watchdogConfigPath 'unexpected.txt') `
         -Encoding UTF8 -Value 'new-version state'
-    Set-Content -LiteralPath $maintenanceConfigPath -Encoding UTF8 `
-        -Value '[Sessions] newly-created=true'
     Restore-PersonalStateSnapshot $personalStateSnapshot $validationError
     Assert-UpdateHelperTest (
         (Test-Path -LiteralPath $watchdogConfigPath -PathType Leaf) -and
         (Get-FileByteSignature $watchdogConfigPath) -ceq `
             $originalWatchdogSignature) `
         '个人配置路径类型变化后没有恢复为原文件。'
-    Assert-UpdateHelperTest (-not (Test-Path -LiteralPath `
-            $maintenanceConfigPath)) `
-        '新版创建的个人配置在回滚后没有删除。'
-
     $personalStateSnapshot = New-PersonalStateSnapshot
     Assert-UpdateHelperTest (Test-Path -LiteralPath `
             $personalStateSnapshot.BackupRoot -PathType Container) `
@@ -551,9 +532,6 @@ try {
     Set-Item -LiteralPath function:Test-UpdatedApplication -Value {
         Set-Content -LiteralPath (Join-Path $script:InstallRoot `
             'watchdog.ini') -Encoding Unicode -Value '[Settings] migrated=true'
-        Set-Content -LiteralPath (Join-Path $script:InstallRoot `
-            'watchdog.maintenance.ini') -Encoding Unicode `
-            -Value '[Sessions] newly-created=true'
         throw 'simulated full-start failure'
     }
     $integratedRollbackObserved = $false
@@ -575,8 +553,7 @@ try {
             -match 'old entry') 'Invoke-Apply 失败后旧入口没有恢复。'
     Assert-UpdateHelperTest (
         (Get-FileByteSignature $watchdogConfigPath) -ceq `
-            $originalWatchdogSignature -and
-        -not (Test-Path -LiteralPath $maintenanceConfigPath)) `
+            $originalWatchdogSignature) `
         'Invoke-Apply 失败后个人状态没有恢复。'
     Assert-UpdateHelperTest (@(Get-ChildItem -LiteralPath $installRoot -Force |
             Where-Object { $_.Name -like '.process-watchdog-*-backup-*' }

@@ -45,11 +45,11 @@ class HistoryToastWindow {
         ; WS_EX_NOACTIVATE 保持主窗口焦点，WS_EX_LAYERED 只用于整窗口淡入淡出。
         this.gui := Gui("-Caption +ToolWindow +AlwaysOnTop +E0x08080000")
         this.gui.BackColor := UiThemeService.Color("Tooltip")
-        this.gui.MarginX := 14
-        this.gui.MarginY := 9
-        this.gui.SetFont("s9 bold c" UiThemeService.Color("TooltipText"),
+        this.gui.MarginX := 15
+        this.gui.MarginY := 10
+        this.gui.SetFont("s10 bold c" UiThemeService.Color("TooltipText"),
             LocalizationService.GetLanguageSystemUiFontName())
-        this.textControl := this.gui.Add("Text", "x14 y9 w1 h1 Left Background"
+        this.textControl := this.gui.Add("Text", "x15 y10 w1 h1 Left Background"
             UiThemeService.Color("Tooltip") " c"
             UiThemeService.Color("TooltipText"), "")
         if (VerCompare(A_OSVersion, "10.0.22000") >= 0)
@@ -69,10 +69,16 @@ class HistoryToastWindow {
         wasVisible := DllCall("user32\IsWindowVisible", "Ptr",
             this.gui.Hwnd, "Int") != 0
         this.textControl.Text := text
+        this.textControl.SetFont("s10 bold c" UiThemeService.Color("TooltipText"),
+            LocalizationService.GetLanguageSystemUiFontName())
+        ForgetApplicationWindowControls(this.gui)
         if !this.LayoutText(text, &windowWidthDip, &windowHeightDip)
             return false
-        this.gui.Show((wasVisible ? "" : "Hide ")
-            "NoActivate w" windowWidthDip " h" windowHeightDip)
+        showOptions := UiScaleService.ScaleShowOptions(
+            (wasVisible ? "" : "Hide ") "NoActivate w" windowWidthDip
+                " h" windowHeightDip)
+        this.gui.Show(showOptions)
+        UiScaleService.ApplyWindow(this.gui)
         this.ApplyRoundedRegion()
         if !this.GetTargetBounds(&targetX, &targetY, &toastWidth,
                 &toastHeight, &windowDpi) {
@@ -95,6 +101,7 @@ class HistoryToastWindow {
             this.HideNow()
             return false
         }
+        UiScaleService.ApplyWindow(this.gui)
         this.BeginAnimation("show", startY, targetY, startAlpha, 255, 160)
         return true
     }
@@ -111,10 +118,10 @@ class HistoryToastWindow {
         if !windowDpi
             windowDpi := 96
         clientWidthPx := NumGet(mainRect, 8, "Int")
-        maximumWindowWidthDip := Min(480,
+        maximumWindowWidthDip := Min(520,
             Max(120, Floor(clientWidthPx * 96 / windowDpi) - 24))
         maximumTextWidthPx := Max(1,
-            Round((maximumWindowWidthDip - 28) * windowDpi / 96))
+            Round((maximumWindowWidthDip - 30) * windowDpi / 96))
 
         deviceContext := DllCall("user32\GetDC", "Ptr",
             this.textControl.Hwnd, "Ptr")
@@ -146,9 +153,9 @@ class HistoryToastWindow {
             textHeightPx := Max(1, NumGet(measureRect, 12, "Int"))
             textWidthDip := Max(1, Ceil(textWidthPx * 96 / windowDpi))
             textHeightDip := Max(1, Ceil(textHeightPx * 96 / windowDpi))
-            this.textControl.Move(14, 9, textWidthDip, textHeightDip)
-            windowWidthDip := textWidthDip + 28
-            windowHeightDip := textHeightDip + 18
+            this.textControl.Move(15, 10, textWidthDip, textHeightDip)
+            windowWidthDip := textWidthDip + 30
+            windowHeightDip := textHeightDip + 20
             return true
         } finally {
             if previousFont
@@ -379,6 +386,7 @@ class HistoryToastWindow {
             guiObj := this.gui
             this.gui := ""
             this.textControl := ""
+            try UiScaleService.ReleaseWindow(guiObj.Hwnd)
             try guiObj.Destroy()
         }
     }

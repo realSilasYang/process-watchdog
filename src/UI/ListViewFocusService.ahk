@@ -14,11 +14,29 @@ class ListViewFocusService {
             Win32.LVIS_SELECTED, listView.Hwnd) & Win32.LVIS_SELECTED) != 0
         ; 右键已选行时保留整个多选集合，供批量命令使用；右键未选行时
         ; 才切换为单选，避免命令误作用于此前的选择。
-        if !itemIsSelected {
-            listView.Modify(0, "-Select")
-            listView.Modify(item, "Select Focus Vis")
-        } else {
-            listView.Modify(item, "Focus Vis")
+        redrawSuspended := false
+        try {
+            ; Modify 会分别触发选中和焦点的原生重绘。两次中间帧可能暴露
+            ; 系统矩形选中底色，尤其是首次右键目标行尚未经过自绘回调时。
+            ; 暂停期间只更新状态，恢复后由一次整控件刷新提交圆角终态。
+            DllCall("user32\SendMessageW", "Ptr", listView.Hwnd,
+                "UInt", Win32.WM_SETREDRAW, "Ptr", false, "Ptr", 0, "Ptr")
+            redrawSuspended := true
+            if !itemIsSelected {
+                listView.Modify(0, "-Select")
+                listView.Modify(item, "Select Focus Vis")
+            } else {
+                listView.Modify(item, "Focus Vis")
+            }
+        } finally {
+            if redrawSuspended {
+                DllCall("user32\SendMessageW", "Ptr", listView.Hwnd,
+                    "UInt", Win32.WM_SETREDRAW, "Ptr", true, "Ptr", 0,
+                    "Ptr")
+                DllCall("user32\RedrawWindow", "Ptr", listView.Hwnd,
+                    "Ptr", 0, "Ptr", 0,
+                    "UInt", Win32.RDW_CONTROL_REFRESH, "Int")
+            }
         }
         return itemIsSelected
     }

@@ -13,7 +13,7 @@
 
 ;@Ahk2Exe-SetName 进程守护小助手
 ;@Ahk2Exe-SetDescription 进程、脚本和快捷方式守护工具
-;@Ahk2Exe-SetVersion 2.1.0.0
+;@Ahk2Exe-SetVersion 2.1.1.0
 ;@Ahk2Exe-SetCopyright Copyright (c) 2026 进程守护小助手 contributors
 ;@Ahk2Exe-SetMainIcon assets\app\watchdog.ico
 
@@ -38,7 +38,6 @@
 #Include src\UI\UiThemeService.ahk
 #Include src\Config\IniFieldCodec.ahk
 #Include src\Config\DisplayConfigCodec.ahk
-#Include src\Config\MaintenanceConfigCodec.ahk
 #Include src\Config\AppConfigSnapshotService.ahk
 #Include src\Config\RuntimeSettingsService.ahk
 #Include src\Config\WindowLayoutService.ahk
@@ -48,7 +47,6 @@
 #Include src\Update\ApplicationUpdateService.ahk
 #Include src\Core\GuardTypes.ahk
 #Include src\Core\GuardStateMachine.ahk
-#Include src\Maintenance\MaintenanceStateMachine.ahk
 #Include src\Core\GuardWorkGate.ahk
 #Include src\Core\GuardMutationQueue.ahk
 #Include src\Core\WatchdogScheduler.ahk
@@ -61,9 +59,6 @@
 #Include src\Execution\TargetLauncher.ahk
 #Include src\Execution\TargetStopper.ahk
 #Include src\Execution\EverythingRuntimeService.ahk
-#Include src\Maintenance\MaintenanceActorMatcher.ahk
-#Include src\Maintenance\MaintenanceSessionCodec.ahk
-#Include src\Maintenance\MaintenanceCoordinator.ahk
 #Include src\Inspection\ProcessInspector.ahk
 #Include src\Inspection\ProcessSnapshotIndex.ahk
 #Include src\Inspection\ProcessSnapshotService.ahk
@@ -102,7 +97,6 @@
 #Include app\MainWindowController.ahk
 #Include app\GuiModuleRegistry.ahk
 #Include app\Windows\CustomDisplayDialog.ahk
-#Include app\Windows\MaintenanceSettingsDialog.ahk
 #Include app\Windows\EnvironmentSettingsDialog.ahk
 #Include app\Windows\AddItemDialog.ahk
 #Include app\Windows\SettingsWindow.ahk
@@ -124,6 +118,8 @@ LocalizationService.ConfigureUiFont(LocalizationService.ReadConfiguredUiFont(
     A_ScriptDir "\watchdog.ini"))
 UiThemeService.Configure(UiThemeService.ReadConfiguredTheme(
     A_ScriptDir "\watchdog.ini"))
+UiScaleService.Configure(UiScaleService.ReadConfiguredScale(
+    A_ScriptDir "\watchdog.ini"))
 global App := ApplicationState()
 
 ; 按钮绘制与鼠标分发必须早于权限提示框安装，确保启动失败界面同样可操作。
@@ -144,7 +140,7 @@ OnMessage(Win32.WM_SETTINGCHANGE, OnSystemSettingChange)
 OnMessage(Win32.AHK_NOTIFYICON, OnTrayNotification)
 OnExit(ShutdownApplication)
 
-if ProcessMaintenanceCommandClient()
+if ProcessWorkerCommandClient()
     ExitApp()
 
 OnSystemSettingChange(*) {
@@ -185,8 +181,8 @@ if startupRunAsAdministrator && !A_IsAdmin {
 }
 
 /*
- * 命名互斥锁是唯一的单实例裁决依据。普通重复启动只激活现有主窗口；重载接班和
- * 后台维护命令则先把请求交给原实例，避免两个守护循环短暂并行。
+ * 命名互斥锁是唯一的单实例裁决依据。普通重复启动只激活现有主窗口；重载接班
+ * 则先把请求交给原实例，避免两个守护循环短暂并行。
  */
 startupHandoffPid := GetReloadHandoffPid()
 if startupHandoffPid
@@ -200,23 +196,7 @@ if !App.mutexHandle {
 if startupMutexExists {
     DetectHiddenWindows(True)
     existingWindow := FindRunningApplicationWindow()
-    if (!existingWindow
-        && App.maintenanceCoordinator.PendingCommands.Length) {
-        Loop 30 {
-            Sleep(100)
-            existingWindow := FindRunningApplicationWindow()
-            if existingWindow
-                break
-        }
-    }
     if existingWindow {
-        if App.maintenanceCoordinator.PendingCommands.Length {
-            while App.maintenanceCoordinator.PendingCommands.Length {
-                SendMaintenanceCopyData(existingWindow,
-                    App.maintenanceCoordinator.PendingCommands.RemoveAt(1))
-            }
-            ExitApp()
-        }
         existingWindowSelector := "ahk_id " existingWindow
         if WinExist(existingWindowSelector) {
             ; 窗口可能在每一步之间因重载而退出，因此显式指定 HWND 并分别容错。
@@ -308,13 +288,16 @@ ConfigureMainCommandButtonMetrics() {
     Main.commandButtonRightMargin := 10
 }
 
-GetMainCommandButtonPositions(clientWidth) {
-    aboutX := clientWidth - Main.commandButtonRightMargin
-        - Main.aboutButtonWidth
-    supportX := aboutX - Main.commandButtonGap
-        - Main.supportButtonWidth
-    settingsX := supportX - Main.commandButtonGap
-        - Main.settingsButtonWidth
+GetMainCommandButtonPositions(clientWidth, scaled := false) {
+    factor := scaled ? UiScaleService.GetFactor() : 1
+    margin := Main.commandButtonRightMargin * factor
+    gap := Main.commandButtonGap * factor
+    aboutWidth := Main.aboutButtonWidth * factor
+    supportWidth := Main.supportButtonWidth * factor
+    settingsWidth := Main.settingsButtonWidth * factor
+    aboutX := clientWidth - margin - aboutWidth
+    supportX := aboutX - gap - supportWidth
+    settingsX := supportX - gap - settingsWidth
     return {Settings: settingsX, Support: supportX, About: aboutX}
 }
 
@@ -367,8 +350,8 @@ Main.gui.SetFont("s12 c" UiThemeService.Color("Text"),
 
 ; 内部列保持名称、状态、路径、序号和状态语义排序键，显示顺序另设为
 ; 序号、名称、状态。两个隐藏列分别承担稳定身份和本地化无关的状态排序。
-Main.lv := Main.gui.Add("ListView", "x10 y88 w" (App.savedWidth - 20)
-    " h" (App.savedHeight - 113) " Background"
+Main.lv := Main.gui.Add("ListView", "x10 y92 w" (App.savedWidth - 20)
+    " h" (App.savedHeight - 117) " Background"
     UiThemeService.Color("Surface") " c" UiThemeService.Color("Text")
     " Report +LV0x10002 -E0x200 +ReadOnly -HScroll -Hdr",
     [Tr("守护对象"), Tr("状态"), Tr("完整路径"), Tr("序号"), ""])
@@ -379,13 +362,14 @@ Main.lv.IL := Main.appIcons
 Main.gui.SetFont("s10 c" UiThemeService.Color("Text"),
     LocalizationService.GetUiFontName()) ; 恢复主窗口默认字号，避免后续控件继承列表字体。
 
-Main.lv.ModifyCol(1, App.savedColumn1)
+Main.lv.ModifyCol(1, UiScaleService.Scale(App.savedColumn1))
 statusColumnWidth := LocalizationService.UsesCompactLayout()
     ? 200
     : Min(Max(App.savedColumn2, 200), 220)
+statusColumnWidth := UiScaleService.Scale(statusColumnWidth)
 Main.lv.ModifyCol(2, statusColumnWidth)
 Main.lv.ModifyCol(3, 0) ; 隐藏路径辅助列
-Main.lv.ModifyCol(4, "Center 48")
+Main.lv.ModifyCol(4, "Center " UiScaleService.Scale(48))
 Main.lv.ModifyCol(5, 0) ; 隐藏状态语义排序键
 Main.listProjection.ApplyColumnOrder(Main.lv)
 Main.listSelectionPresenter := ListViewSelectionPresenter(Main.lv, "",
@@ -428,9 +412,26 @@ RegisterButtonClick(Main.btnAbout, ShowAbout)
 ; 选择变化只刷新命令状态，不重新投影列表或触发守护对象初始化。
 Main.lv.OnEvent("ItemSelect", OnLVSelectChange)
 Main.lv.OnEvent("ItemFocus", OnLVSelectChange)
+; 原生 LVN_ITEMCHANGED 是选中状态最终提交的唯一底层通知。AHK 的
+; ItemSelect/ItemFocus 事件在不同系统主题和键盘路径下可能只到达其中一个，
+; 因此同时监听底层通知，避免命令栏停留在上一次选择的状态。
+Main.lv.OnNotify(-101, OnMainListItemChanged)
 
 OnLVSelectChange(*) {
     RefreshMainCommandState()
+    ScheduleMainCommandStateRefresh()
+}
+
+OnMainListItemChanged(*) {
+    RefreshMainCommandState()
+    ScheduleMainCommandStateRefresh()
+}
+
+ScheduleMainCommandStateRefresh(*) {
+    ; 合并同一轮中 ItemSelect、ItemFocus 和 LVN_ITEMCHANGED 的重复通知，
+    ; 在原生控件完成状态提交后再读取选中集合。
+    static deferredRefresh := RefreshMainCommandState.Bind(true)
+    SetTimer(deferredRefresh, -1)
 }
 
 RefreshMainCommandState(forceRefresh := false) {
@@ -442,6 +443,7 @@ RefreshMainCommandState(forceRefresh := false) {
     firstState := -1 ; 用来记录第一个选中的状态
     allSameState := true
 
+    ; AutoHotkey v2 的 GetNext 默认返回选中行；仅查询焦点行时才传入 "Focused"。
     Loop {
         row := Main.lv.GetNext(row)
         if (row == 0)
@@ -450,7 +452,12 @@ RefreshMainCommandState(forceRefresh := false) {
         chkPath := Main.lv.GetText(row, 3)
         if App.appStates.Has(chkPath) {
             selCount++
-            currentState := App.appStates[chkPath].Enabled
+            stateObj := App.appStates[chkPath]
+            ; 列表状态以 Enabled 和 Paused 阶段共同决定。这样即使某个
+            ; 旧任务刚好留下“已暂停”阶段，命令按钮也不会错误显示“暂停”。
+            currentState := !(stateObj.Enabled
+                && stateObj.Phase != GuardPhase.Paused)
+                ? 0 : 1
             if (firstState == -1) {
                 firstState := currentState
             } else if (firstState != currentState) {
@@ -463,7 +470,11 @@ RefreshMainCommandState(forceRefresh := false) {
         newState := themeStatePrefix "active_"
             . (allSameState && firstState != -1
                 ? (firstState ? "pause" : "resume") : "reverse")
-        if (!forceRefresh && lastState == newState)
+        expectedText := allSameState && firstState != -1
+            ? (firstState ? Tr("⏸️ 暂停") : Tr("▶️ 恢复"))
+            : Tr("🔄 反转状态")
+        if (!forceRefresh && lastState == newState
+                && Main.btnPause.Text == expectedText)
             return
         lastState := newState
 
@@ -473,16 +484,7 @@ RefreshMainCommandState(forceRefresh := false) {
         SetHoverButtonColors(Main.btnPause, UiThemeService.Color("Pause"))
         SetButtonBackground(Main.btnDel, UiThemeService.Color("Delete"))
         SetButtonBackground(Main.btnPause, UiThemeService.Color("Pause"))
-        if (allSameState && firstState != -1) {
-            if (firstState) {
-                Main.btnPause.Text := Tr("⏸️ 暂停")
-            } else {
-                Main.btnPause.Text := Tr("▶️ 恢复")
-            }
-        } else {
-            ; 选中的守护对象里既有运行中的，也有暂停的，统一显示「反转状态」
-            Main.btnPause.Text := Tr("🔄 反转状态")
-        }
+        Main.btnPause.Text := expectedText
 
         Main.btnDel.Redraw()
         Main.btnPause.Redraw()
@@ -490,7 +492,9 @@ RefreshMainCommandState(forceRefresh := false) {
     }
 
     newState := themeStatePrefix "inactive"
-    if (!forceRefresh && lastState == newState)
+    expectedText := Tr("⏸️ 暂停")
+    if (!forceRefresh && lastState == newState
+            && Main.btnPause.Text == expectedText)
         return
     lastState := newState
 
@@ -504,7 +508,7 @@ RefreshMainCommandState(forceRefresh := false) {
         UiThemeService.Color("PauseDisabled"))
     SetButtonBackground(Main.btnDel, UiThemeService.Color("DeleteDisabled"))
     SetButtonBackground(Main.btnPause, UiThemeService.Color("PauseDisabled"))
-    Main.btnPause.Text := Tr("⏸️ 暂停")
+    Main.btnPause.Text := expectedText
     Main.btnDel.Redraw()
     Main.btnPause.Redraw()
 }
@@ -635,8 +639,7 @@ SuppressNativeMenuCheckGutter(menuObj) {
 
 ; 右键菜单在打开前根据当前行和展示配置动态刷新；语言切换仍复用同一原生句柄，
 ; 避免反复销毁带主题样式的菜单时累积 GDI 资源。
-ConfigureMainContextMenu(isAdmin := false, maintenanceEnabled := false,
-    maintenanceSupported := true, batchLogSupported := false) {
+ConfigureMainContextMenu(isAdmin := false, batchLogSupported := false) {
     if Main.contextMenu is Menu {
         contextMenu := Main.contextMenu
         ContextMenuPresenter.Detach(contextMenu.Handle)
@@ -653,11 +656,8 @@ ConfigureMainContextMenu(isAdmin := false, maintenanceEnabled := false,
     adminLabel := FormatContextMenuToggleLabel(
         Tr("🛡️ 以管理员身份运行"), isAdmin)
     contextMenu.Add(adminLabel, ToggleRunAsAdmin)
-    maintenanceLabel := FormatContextMenuToggleLabel(
-        Tr("🔄 软件升级保护设置"), maintenanceEnabled)
-    contextMenu.Add(maintenanceLabel, OpenMaintenanceSettings)
-    if !maintenanceSupported
-        contextMenu.Disable(maintenanceLabel)
+    contextMenu.Add(FormatContextMenuToggleLabel(
+        Tr("🔔 停止后每次询问恢复"), false), ToggleAskBeforeRestart)
     if batchLogSupported {
         contextMenu.Add(Tr("📄 查看批处理输出日志"), OpenProcessLog)
     }
@@ -669,8 +669,8 @@ ConfigureMainContextMenu(isAdmin := false, maintenanceEnabled := false,
     return contextMenu
 }
 
-BuildMainContextPopupItems(isAdmin := false, maintenanceEnabled := false,
-    maintenanceSupported := true, batchLogSupported := false) {
+BuildMainContextPopupItems(isAdmin := false, batchLogSupported := false,
+    askBeforeRestart := false) {
     items := [
         {Text: Tr("🔄 重新启动"), Action: RestartSelectedApp},
         {Text: Tr("⏹️ 结束运行"), Action: EndSelectedApp},
@@ -681,8 +681,8 @@ BuildMainContextPopupItems(isAdmin := false, maintenanceEnabled := false,
         {Text: Tr("⚙️ 进程识别与启动设置"), Action: OpenEnvSettings},
         {Text: Tr("🛡️ 以管理员身份运行"), Check: isAdmin,
             Action: ToggleRunAsAdmin},
-        {Text: Tr("🔄 软件升级保护设置"), Check: maintenanceEnabled,
-            Action: OpenMaintenanceSettings, Enabled: maintenanceSupported}
+        {Text: Tr("🔔 停止后每次询问恢复"), Check: askBeforeRestart,
+            Action: ToggleAskBeforeRestart},
     ]
     if batchLogSupported {
         items.Push({Text: Tr("📄 查看批处理输出日志"),
@@ -742,6 +742,15 @@ RefreshMainWindowDisplay() {
     Main.btnSet.Text := Tr("设置")
     Main.btnSupport.Text := Tr("帮助")
     Main.btnAbout.Text := Tr("关于")
+    SetButtonLeadingTextSlot(Main.btnAdd, 20, 4)
+    SetButtonLeadingTextSlot(Main.btnPause, 20, 4)
+    SetButtonLeadingTextSlot(Main.btnDel, 20, 4)
+    SetButtonLucideIcon(Main.btnSet, "settings.svg", 15, 6,
+        "theme:SettingsIcon")
+    SetButtonLucideIcon(Main.btnSupport, "circle-question-mark.svg", 15, 6,
+        "theme:HelpIcon")
+    SetButtonLucideIcon(Main.btnAbout, "circle-info.svg", 15, 6,
+        "theme:AboutIcon")
 
     ConfigureMainCommandButtonMetrics()
     Main.gui.GetClientPos(,, &clientWidth)
@@ -763,11 +772,14 @@ RefreshMainWindowDisplay() {
     UpdateStatsUI()
     if IsObject(Main.contextPopup)
         Main.contextPopup.Hide()
+    if IsObject(Main.contextPopup)
+        try Main.contextPopup.RebuildTemplate()
     ConfigureMainContextMenu()
     ConfigureTrayMenu()
     for button in [Main.btnAdd, Main.btnDel, Main.btnPause,
             Main.btnSet, Main.btnSupport, Main.btnAbout]
         button.Redraw()
+    UiScaleService.RescaleWindowFonts(Main.gui)
 }
 
 RefreshMainWindowTheme() {
@@ -809,13 +821,14 @@ RefreshMainWindowTheme() {
 }
 
 ApplyDisplaySettingsHot(requestedLanguage, requestedFont,
-    requestedTheme := "") {
+    requestedTheme := "", requestedScale := 100) {
     global GuiModules
 
     oldRequestedLanguage := LocalizationService.GetRequestedLanguage()
     oldActualLanguage := LocalizationService.GetLanguage()
     oldRequestedFont := LocalizationService.GetRequestedUiFont()
     oldRequestedTheme := UiThemeService.GetRequestedTheme()
+    oldRequestedScale := UiScaleService.GetRequested()
     oldStateTexts := CaptureMainStateTexts()
     oldModules := GuiModules
     modulesReplaced := false
@@ -826,11 +839,15 @@ ApplyDisplaySettingsHot(requestedLanguage, requestedFont,
         LocalizationService.ConfigureUiFont(requestedFont)
         UiThemeService.Configure(requestedTheme == ""
             ? oldRequestedTheme : requestedTheme)
+        UiScaleService.Configure(requestedScale)
         newActualLanguage := LocalizationService.GetLanguage()
         App.uiLanguage := LocalizationService.GetRequestedLanguage()
         App.uiFont := LocalizationService.GetRequestedUiFont()
         App.uiTheme := UiThemeService.GetRequestedTheme()
+        App.uiScale := UiScaleService.GetRequested()
         App.applicationUpdateService.UiLanguage := newActualLanguage
+        ResizeMainWindowForUiScale(oldRequestedScale, App.uiScale)
+        RefreshMainImageListForUiScale(oldRequestedScale, App.uiScale)
 
         TranslateMainStateTexts(oldActualLanguage, newActualLanguage)
         RefreshMainWindowDisplay()
@@ -853,9 +870,11 @@ ApplyDisplaySettingsHot(requestedLanguage, requestedFont,
             LocalizationService.Configure(oldRequestedLanguage)
             LocalizationService.ConfigureUiFont(oldRequestedFont)
             UiThemeService.Configure(oldRequestedTheme)
+            UiScaleService.Configure(oldRequestedScale)
             App.uiLanguage := oldRequestedLanguage
             App.uiFont := oldRequestedFont
             App.uiTheme := oldRequestedTheme
+            App.uiScale := oldRequestedScale
             App.applicationUpdateService.UiLanguage := oldActualLanguage
             RestoreMainStateTexts(oldStateTexts)
             RefreshMainWindowDisplay()
@@ -882,15 +901,6 @@ OpenEnvSettings(*) {
     GuiModules.environment.Show(path, App.appStates[path])
 }
 
-OpenMaintenanceSettings(*) {
-    if (Main.contextTargetRow == 0)
-        return
-    path := Main.lv.GetText(Main.contextTargetRow, 3)
-    if !App.appStates.Has(path)
-        return
-    GuiModules.maintenance.Show(path, App.appStates[path])
-}
-
 OpenDisplaySettings(*) {
     if (Main.contextTargetRow == 0)
         return
@@ -912,6 +922,7 @@ DestroyIconHandles(iconHandles, retainedHandle1 := 0, retainedHandle2 := 0) {
 }
 
 ReleaseWindowIcons(hWnd) {
+    try UiScaleService.ReleaseWindow(hWnd)
     iconHandles := App.iconResources.TakeWindowIcons(hWnd)
     if !iconHandles
         return
@@ -1022,8 +1033,7 @@ ToggleRunAsAdminCore(paths) {
             priorPhase := stateObj.Phase
             stateObj.CancelScheduledTasks()
             stateObj.RunAsAdmin := !(stateObj.HasOwnProp("RunAsAdmin") ? stateObj.RunAsAdmin : 0)
-            if (stateObj.Enabled
-                && !App.maintenanceCoordinator.IsBlocking(stateObj)) {
+            if stateObj.Enabled {
                 stateObj.ResetGuardAttemptState()
                 if StateProcessIdentityIsValid(path, stateObj) {
                     UpdateRunningState(path, stateObj,
@@ -1068,16 +1078,11 @@ BeginManualStopRequests(paths) {
     App.editSessionId++
     changedPaths := []
     requests := []
-    blockedAny := false
     undoState := ""
     for path in paths {
         if !App.appStates.Has(path)
             continue
         stateObj := App.appStates[path]
-        if App.maintenanceCoordinator.IsBlocking(stateObj) {
-            blockedAny := true
-            continue
-        }
         if stateObj.ManualStopRequested
             continue
         wasEnabled := !!stateObj.Enabled
@@ -1089,7 +1094,6 @@ BeginManualStopRequests(paths) {
         stateObj.Enabled := 0
         stateObj.CancelScheduledTasks()
         stateObj.ResetGuardAttemptState()
-        try App.maintenanceCoordinator.CleanupTarget(path, stateObj, false)
         operationGeneration := stateObj.Generation
         stateObj.ManualStopRequested := true
         stateObj.Pending := true
@@ -1102,7 +1106,6 @@ BeginManualStopRequests(paths) {
     }
 
     if changedPaths.Length {
-        App.maintenanceCoordinator.SaveJournal()
         CommitUndoState(undoState,
             CreateAppHistoryAction("toggle-pause", changedPaths))
         SaveAppsToIni()
@@ -1119,10 +1122,6 @@ BeginManualStopRequests(paths) {
         }
     }
 
-    if blockedAny {
-        ShowDarkMsgBoxDeferred(Tr("该软件正在升级保护中。请等待升级完成，或在“软件升级保护”中结束等待后再结束运行。"),
-            Tr("暂时无法结束运行"), "Info", Main.gui)
-    }
     if (paths.Length > 0) {
         OnLVSelectChange()
     }
@@ -1136,12 +1135,6 @@ PerformManualStop(path, expectedSupervisor, expectedGeneration,
             && App.appStates[path] == expectedSupervisor {
             expectedSupervisor.ManualStopRequested := false
         }
-        return
-    }
-    if App.maintenanceCoordinator.IsBlocking(expectedSupervisor) {
-        FinalizeManualStopFailure(path, expectedSupervisor,
-            expectedGeneration,
-            Tr("结束运行失败，目标进程未能停止：{1}", path))
         return
     }
     if !App.guardWorkGate.TryEnter() {
@@ -1245,12 +1238,6 @@ CompleteManualStopAfterStop(path, expectedSupervisor,
             expectedGeneration)
             return
         stateObj := expectedSupervisor
-        if App.maintenanceCoordinator.IsBlocking(stateObj) {
-            FinalizeManualStopFailure(path, stateObj,
-                expectedGeneration,
-                Tr("结束运行失败，目标进程未能停止：{1}", path))
-            return
-        }
         if !stopResult.Stopped {
             identityStatus := App.targetStopper.GetIdentityStatus(pid,
                 creationIdentity)
@@ -1268,8 +1255,7 @@ CompleteManualStopAfterStop(path, expectedSupervisor,
 
 FinalizeManualStop(path, stateObj, expectedGeneration) {
     if !App.guardRuntime.IsSupervisorCurrent(path, stateObj,
-            expectedGeneration) || stateObj.Enabled
-        || App.maintenanceCoordinator.IsBlocking(stateObj) {
+            expectedGeneration) || stateObj.Enabled {
         stateObj.ManualStopRequested := false
         stateObj.Pending := false
         stateObj.TargetStartTicks := 0
@@ -1347,7 +1333,7 @@ TryScheduleManualStopCallback(callback, path, stateObj,
 OnMessage(Win32.WM_KEYDOWN, Global_KeyDown)
 OnMessage(Win32.WM_MOVE, MainWindowMoved)
 OnMessage(Win32.WM_DPICHANGED, MainDpiChanged)
-OnMessage(Win32.WM_COPYDATA, ReceiveMaintenanceCopyData)
+OnMessage(Win32.WM_EXITSIZEMOVE, MainWindowResizeFinished)
 OnMessage(Win32.WM_SYSCOMMAND, OnManagedWindowSystemCommand)
 
 ShouldToggleMainListPause(wParam, lParam, ctrlDown, shiftDown, altDown) {
@@ -1355,6 +1341,26 @@ ShouldToggleMainListPause(wParam, lParam, ctrlDown, shiftDown, altDown) {
     ; 只接受首次按下，避免一次操作在暂停与恢复之间反复切换。
     return wParam == 32 && !(lParam & 0x40000000)
         && !ctrlDown && !shiftDown && !altDown
+}
+
+IsMainAddItemShortcut(wParam, ctrlDown, shiftDown, altDown, rootHwnd,
+        mainHwnd) {
+    return wParam == 78 && ctrlDown && !shiftDown && !altDown
+        && rootHwnd == mainHwnd
+}
+
+HandleMainAddItemShortcut(wParam, lParam, ctrlDown, shiftDown, altDown,
+        rootHwnd, mainHwnd, openAction := "") {
+    if !IsMainAddItemShortcut(wParam, ctrlDown, shiftDown, altDown,
+            rootHwnd, mainHwnd)
+        return false
+    if !(lParam & 0x40000000) {
+        if IsObject(openAction)
+            openAction.Call()
+        else
+            AddItem()
+    }
+    return true
 }
 
 Global_KeyDown(wParam, lParam, msg, hwnd) {
@@ -1383,18 +1389,26 @@ Global_KeyDown(wParam, lParam, msg, hwnd) {
         "Ptr")
     rootClass := ""
     try rootClass := WinGetClass("ahk_id " rootHwnd)
+    ctrlDown := GetKeyState("Ctrl", "P")
+    shiftDown := GetKeyState("Shift", "P")
+    altDown := GetKeyState("Alt", "P")
     ; OnMessage 只接收本进程窗口的消息；根窗口为 AutoHotkeyGUI 即可确认
     ; 来源属于小助手。这样所有下级窗口都共享应用历史，同时文本框仍保留
     ; 自身的字符级撤销与重做。
     if (rootClass == "AutoHotkeyGUI") {
-        if (wParam == 90 && GetKeyState("Ctrl", "P")) { ; Ctrl+Z 撤销，Ctrl+Shift+Z 重做。
-            if GetKeyState("Shift", "P")
+        if HandleMainAddItemShortcut(wParam, lParam, ctrlDown, shiftDown,
+                altDown,
+                rootHwnd, Main.gui.Hwnd) { ; Ctrl+N 新增守护对象。
+            return 0
+        }
+        if (wParam == 90 && ctrlDown) { ; Ctrl+Z 撤销，Ctrl+Shift+Z 重做。
+            if shiftDown
                 PerformRedo()
             else
                 PerformUndo()
             return 0
         }
-        if (wParam == 89 && GetKeyState("Ctrl", "P")) { ; Ctrl+Y 使用另一组常见按键执行重做。
+        if (wParam == 89 && ctrlDown) { ; Ctrl+Y 使用另一组常见按键执行重做。
             PerformRedo()
             return 0
         }
@@ -1411,9 +1425,6 @@ Global_KeyDown(wParam, lParam, msg, hwnd) {
 
     ; 只有列表本身持有焦点时，才把按键解释为列表级选择、删除或关闭操作。
     if (hwnd == Main.lv.Hwnd) {
-        ctrlDown := GetKeyState("Ctrl", "P")
-        shiftDown := GetKeyState("Shift", "P")
-        altDown := GetKeyState("Alt", "P")
         if (wParam == 32 && !ctrlDown && !shiftDown && !altDown) {
             if ShouldToggleMainListPause(wParam, lParam, ctrlDown,
                     shiftDown, altDown) && Main.lv.GetNext(0) > 0
@@ -1456,14 +1467,12 @@ Global_KeyDown(wParam, lParam, msg, hwnd) {
     }
 }
 
-; 从 INI 读取守护对象及对应的升级保护配置。
+; 从 INI 读取守护对象配置。
 LoadWatchlistFromConfig()
+App.savedHeight := GetSnappedMainWindowHeight(App.savedHeight)
 ; 控件从创建起采用不可用配色；列表载入后再按真实选择状态强制同步，
 ; 避免首次启动没有 ItemSelect 事件时仍残留可用色。
 RefreshMainCommandState(true)
-if !App.maintenanceCoordinator.Initialize()
-    LogMsg(Tr("升级保护协调器未能初始化，核心守护不会启动。"))
-
 UpdateTaskButtonStatus()
 
 Main.gui.OnEvent("Size", GuiResized)

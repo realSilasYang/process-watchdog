@@ -251,14 +251,10 @@ class WatchdogConfigRepository {
                 this.Text("; 每个 AppN 对应一个守护对象，九个字段使用竖线分隔。"),
                 this.Text("; 格式：启用状态｜管理员运行｜目标路径｜工作目录｜启动参数｜环境变量｜快捷方式真实目标｜手动目标标记｜快捷方式参数。"),
                 this.Text("; 布尔值使用 1 表示开启、0 表示关闭；<HEX> 内容由软件自动编码和解码。")]},
-            {Name: "Maintenance", Lines: [
-                this.Text("; AppN 与 [Apps] 中同名的守护对象一一对应，值为软件升级保护的 <HEX> 编码结构。"),
-                this.Text("; 内部字段包括 Enabled、RootIsCustom、DetectionSeconds、StableSeconds、MaxWaitSeconds、InstallRoot 和 Actor。"),
-                this.Text("; 建议通过“软件升级保护”界面修改，不要直接编辑编码内容。")]},
             {Name: "Display", Lines: [
-                this.Text("; 仅保存主窗口显示名称、图标来源和序号圆点颜色，不参与进程识别、启动或升级保护。"),
+                this.Text("; 仅保存主窗口显示名称、图标来源和序号圆点颜色，不参与进程识别或启动。"),
                 this.Text("; AppN 与 [Apps] 中同名的守护对象一一对应；三个字段依次为名称、图标路径和圆点颜色。"),
-                this.Text("; 名称与图标路径使用 <HEX> 编码；全部留空时使用目标自身信息且不显示圆点。")]},
+                this.Text("; 名称与图标路径使用 <HEX> 编码且留空时沿用目标信息；圆点留空或 none 表示不显示。")]},
             {Name: "Launch", Lines: [
                 this.Text("; AppN 与 [Apps] 中同名的守护对象一一对应，依次保存启动程序或解释器路径及其参数。"),
                 this.Text("; 两个字段均为 <HEX> 编码；留空时由小助手按目标类型使用默认启动方式。")]},
@@ -276,6 +272,8 @@ class WatchdogConfigRepository {
                 this.Text("; UiLanguage：界面语言；auto 表示跟随系统，也可填写受支持的语言代码。")]},
             {Section: "Settings", Key: "UiFont", Lines: [
                 this.Text("; UiFont：界面字体；auto 表示使用当前语言的默认字体，也可填写本机已安装字体名称。")]},
+            {Section: "Settings", Key: "UiScale", Lines: [
+                this.Text("; UiScale：界面缩放百分比，支持 80、90、100、110、125、150、175、200。")]},
             {Section: "Settings", Key: "Theme", Lines: [
                 this.Text("; Theme：界面主题；auto 表示跟随 Windows 系统，light 表示浅色，dark 表示深色。")]},
             {Section: "Settings", Key: "CheckInterval", Lines: [

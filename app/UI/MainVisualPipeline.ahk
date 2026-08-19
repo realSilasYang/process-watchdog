@@ -35,14 +35,39 @@ class ApplicationWindowPresenter {
     static Show(guiObj, options := "") {
         if !IsObject(guiObj)
             return false
-        showOptions := Trim(String(options))
+        showOptions := UiScaleService.ScaleShowOptions(options)
         if this.AutomationHidden
             && !RegExMatch(showOptions, "i)(^|\s)Hide(?:\s|$)")
             showOptions := Trim("Hide " showOptions)
         guiObj.Show(showOptions)
-        if !RegExMatch(showOptions, "i)(^|\s)Hide(?:\s|$)")
+        UiScaleService.ApplyWindow(guiObj)
+        if RegExMatch(showOptions, "i)(^|\s)AutoSize(?:\s|$)")
+            guiObj.Show(showOptions)
+        if !RegExMatch(showOptions, "i)(^|\s)Hide(?:\s|$)") {
             RefreshRoundedButtonsAfterShow(guiObj)
+            expectedHwnd := guiObj.Hwnd
+            SetTimer(ObjBindMethod(this, "RefreshPresentedWindow",
+                guiObj, expectedHwnd), -1)
+        }
         return true
+    }
+
+    static RefreshPresentedWindow(guiObj, expectedHwnd, *) {
+        if !IsObject(guiObj) || !expectedHwnd
+            return false
+        try currentHwnd := guiObj.Hwnd
+        catch
+            return false
+        if currentHwnd != expectedHwnd
+            || !DllCall("user32\IsWindow", "Ptr", expectedHwnd, "Int")
+            || !DllCall("user32\IsWindowVisible", "Ptr", expectedHwnd,
+                "Int")
+            return false
+        ; Show 返回时 Windows 偶尔尚未完成首帧布局。下一消息循环先让父窗口
+        ; 及子控件整体失效，再重绘 owner-draw 按钮，避免按钮停留为白色底块。
+        DllCall("user32\RedrawWindow", "Ptr", expectedHwnd, "Ptr", 0,
+            "Ptr", 0, "UInt", Win32.RDW_LAYOUT_REFRESH, "Int")
+        return RedrawVisibleRoundedButtonsForWindow(expectedHwnd)
     }
 }
 
@@ -190,6 +215,12 @@ CreateMainImageList(statusIconIndices) {
     if !dpi
         dpi := 96
     iconResources.UpdateMainIconMetrics(dpi)
+    if IsSet(UiScaleService) && UiScaleService.GetFactor() != 1 {
+        iconResources.MainIconPixelSize := UiScaleService.Scale(
+            iconResources.MainIconPixelSize)
+        iconResources.MainIconCellPixelSize := UiScaleService.Scale(
+            iconResources.MainIconCellPixelSize)
+    }
     iconSizeApplied := false
     try iconSizeApplied := DllCall("comctl32\ImageList_SetIconSize",
         "Ptr", imageList, "Int", iconResources.MainIconCellPixelSize,
@@ -1609,16 +1640,7 @@ StatusIconResourceFiles() {
         GuardStatusKind.ProgramMissing, "file-x-2.svg",
         GuardStatusKind.ScriptMissing, "file-code-2.svg",
         GuardStatusKind.RelocationPending, "repeat-2.svg",
-        GuardStatusKind.SafeStartWait, "shield-ellipsis.svg",
         GuardStatusKind.LaunchRetry, "rotate-ccw.svg",
-        GuardStatusKind.MaintenanceArbitrating,
-            "scan-search.svg",
-        GuardStatusKind.MaintenanceUpdating, "refresh-cw.svg",
-        GuardStatusKind.MaintenanceFileWaiting, "file-clock.svg",
-        GuardStatusKind.MaintenanceStabilizing,
-            "file-clock.svg",
-        GuardStatusKind.MaintenanceRecovering, "timer.svg",
-        GuardStatusKind.MaintenanceTimedOut, "triangle-alert-timeout.svg",
         GuardStatusKind.Unknown, "circle-info-unknown.svg"
     )
     return resourceFiles
@@ -1641,14 +1663,7 @@ StatusIconColorRoles() {
         GuardStatusKind.ProgramMissing, "DangerIcon",
         GuardStatusKind.ScriptMissing, "DangerIcon",
         GuardStatusKind.RelocationPending, "RelocationIcon",
-        GuardStatusKind.SafeStartWait, "SafeStartIcon",
         GuardStatusKind.LaunchRetry, "DangerIcon",
-        GuardStatusKind.MaintenanceArbitrating, "QueryIcon",
-        GuardStatusKind.MaintenanceUpdating, "UpdateIcon",
-        GuardStatusKind.MaintenanceFileWaiting, "WaitingIcon",
-        GuardStatusKind.MaintenanceStabilizing, "WaitingIcon",
-        GuardStatusKind.MaintenanceRecovering, "WaitingIcon",
-        GuardStatusKind.MaintenanceTimedOut, "DangerIcon",
         GuardStatusKind.Unknown, "UnknownIcon"
     )
     return colorRoles
@@ -2228,8 +2243,6 @@ GetMainStatusVisualKind(stateObj) {
         return GuardStatusKind.Unknown
     if !stateObj.Enabled || stateObj.Phase == GuardPhase.Paused
         return GuardStatusKind.Paused
-    if stateObj.MaintenanceMode == MaintenancePhase.TimedOut
-        return GuardStatusKind.MaintenanceTimedOut
     if stateObj.MissingSinceTicks
         && stateObj.StatusKind != GuardStatusKind.ProgramMissing
         && stateObj.StatusKind != GuardStatusKind.ScriptMissing
@@ -2242,14 +2255,6 @@ GetMainStatusVisualKind(stateObj) {
         return stateObj.StatusKind
     ; 兼容仅构造核心控制器、尚未发布首条展示状态的极早阶段。正式更新
     ; 都会显式携带 StatusKind，因此这里不会把不同用户状态重新合并。
-    if stateObj.MaintenanceMode == MaintenancePhase.Arbitrating
-        return GuardStatusKind.MaintenanceArbitrating
-    if stateObj.MaintenanceMode == MaintenancePhase.Updating
-        return GuardStatusKind.MaintenanceUpdating
-    if stateObj.MaintenanceMode == MaintenancePhase.Stabilizing
-        return GuardStatusKind.MaintenanceStabilizing
-    if stateObj.MaintenanceMode == MaintenancePhase.Recovering
-        return GuardStatusKind.MaintenanceRecovering
     switch stateObj.Phase {
         case GuardPhase.Running:
             return GuardStatusKind.Running
@@ -2278,7 +2283,6 @@ GetMainStatusSemanticPriority(statusKind) {
     ; 数值越小越靠前。具体异常先于未知异常，恢复与等待过程居中，暂停和
     ; 正常运行置后；排序完全依赖稳定语义键，不受界面语言或状态文案影响。
     static priorities := Map(
-        GuardStatusKind.MaintenanceTimedOut, 1,
         GuardStatusKind.PermissionMismatch, 2,
         GuardStatusKind.TargetMissing, 3,
         GuardStatusKind.ProgramMissing, 4,
@@ -2289,17 +2293,11 @@ GetMainStatusSemanticPriority(statusKind) {
         GuardStatusKind.CoolingDown, 9,
         GuardStatusKind.RetryCountdown, 10,
         GuardStatusKind.Unknown, 11,
-        GuardStatusKind.MaintenanceArbitrating, 20,
-        GuardStatusKind.MaintenanceUpdating, 21,
-        GuardStatusKind.MaintenanceFileWaiting, 22,
-        GuardStatusKind.MaintenanceStabilizing, 23,
-        GuardStatusKind.MaintenanceRecovering, 24,
-        GuardStatusKind.SafeStartWait, 30,
-        GuardStatusKind.WaitingObservation, 31,
-        GuardStatusKind.StartCountdown, 32,
-        GuardStatusKind.Starting, 33,
-        GuardStatusKind.Verifying, 34,
-        GuardStatusKind.Initializing, 35,
+        GuardStatusKind.WaitingObservation, 30,
+        GuardStatusKind.StartCountdown, 31,
+        GuardStatusKind.Starting, 32,
+        GuardStatusKind.Verifying, 33,
+        GuardStatusKind.Initializing, 34,
         GuardStatusKind.Paused, 40,
         GuardStatusKind.Running, 50)
     return priorities.Has(statusKind)
@@ -2493,7 +2491,11 @@ GetMainSequenceColorKey(path) {
     if !stateObj.HasOwnProp("DisplayConfig")
         return ""
     display := App.displayConfigCodec.Normalize(stateObj.DisplayConfig)
-    return display.SequenceColor
+    ; 空值表示沿用询问守护的默认绿点；none 是用户明确清除，不能再回退。
+    if display.SequenceColor == ""
+        return stateObj.HasOwnProp("AskBeforeRestart")
+            && stateObj.AskBeforeRestart ? "sage" : ""
+    return MainSequenceColorPalette.Resolve(display.SequenceColor)
 }
 
 SetMainListStatus(row, statusText) {

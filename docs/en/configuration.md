@@ -65,7 +65,7 @@ interface.
 The directory containing the real runtime entry determines the configuration location:
 
 - A portable `进程守护小助手.exe` and `进程守护小助手.ahk` in the same directory share
-  `watchdog.ini` and `watchdog.maintenance.ini`.
+  `watchdog.ini`.
 - In different directories, each form reads and writes its own local files;
   configurations are not synchronized automatically.
 - Both forms use exactly the same format. A machine-wide single-instance lock
@@ -75,8 +75,8 @@ The directory containing the real runtime entry determines the configuration loc
 - Same-directory coexistence is recommended only for temporary switching tests.
   EXE and source packages share release directories and one
   `update-manifest.json`, so they are not two independently auto-updatable
-  installations. Keep long-lived forms in separate directories and copy both
-  state files only after fully exiting the assistant when needed.
+  installations. Keep long-lived forms in separate directories and copy the
+  configuration only after fully exiting the assistant when needed.
 
 `CheckUpdatesOnStartup=1` checks for a new assistant version in a separate
 background process after startup. Set it to `0` to disable only the startup
@@ -91,9 +91,12 @@ Enabled|RunAsAdmin|Path|WorkDir|Args|EnvVars|ResolvedTarget|ResolvedTargetManual
 ```
 
 Except for booleans and the target path, text is encoded as `<HEX>`. Do not add
-field separators or edit encoded data by hand. `[Maintenance]`, `[Display]`,
-`[Launch]`, and `[Identity]` use the matching `AppN` key and are committed atomically with
+field separators or edit encoded data by hand. `[Display]`, `[Launch]`, and
+`[Identity]` use the matching `AppN` key and are committed atomically with
 `[Apps]`.
+
+The third `[Display]` field controls the sequence dot. An empty value or `none` hides the
+dot; a preset key selects a custom color.
 
 `[Launch]` exists for an item only when a custom launcher or runtime is set:
 
@@ -136,13 +139,11 @@ preserve these fields as part of the item snapshot.
 Exit the assistant, then copy:
 
 - `watchdog.ini`: settings, window layout, monitored items, launch environments,
-  update protection, and display customization.
-- `watchdog.maintenance.ini`: unfinished update-protection sessions only; it is
-  normally empty.
+  and display customization.
 
 When a write fails, the existing configuration remains intact and a low-frequency
 backoff retry is scheduled. Monitoring records that cannot be parsed, together
-with their related update and display values, are moved to `[Recovery]` for
+with their related display values, are moved to `[Recovery]` for
 manual review.
 
 ## Restore

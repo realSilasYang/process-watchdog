@@ -30,8 +30,7 @@ Der Prozessüberwachungs-Assistent richtet sich an Desktop-Anwendungen, Skripte 
 
 Der Assistent entscheidet nicht allein anhand des Prozessnamens, ob ein Ziel läuft. Er gleicht den vollständigen Pfad, die Erstellungsidentität des Prozesses, das tatsächliche Verknüpfungsziel und Befehlszeilenhinweise ab. Reichen die Belege nicht aus, wartet er auf die nächste Prüfung, statt einen unbekannten Zustand als Stopp zu behandeln.
 
-Das Projekt bietet eine helle und dunkle Oberfläche, automatische Wiederherstellung, Schutz während Softwareupdates, ein Laufzeitprotokoll, Rückgängig/Wiederholen, benutzerdefinierte Namen und Symbole sowie ein Windows-x64-Paket mit SPDX-SBOM, SHA-256-Prüfsummen und Build-Herkunftsnachweis.
-
+Das Projekt bietet eine helle und dunkle Oberfläche, automatische Wiederherstellung, ein Laufzeitprotokoll, Rückgängig/Wiederholen, benutzerdefinierte Namen und Symbole sowie ein Windows-x64-Paket mit SPDX-SBOM, SHA-256-Prüfsummen und Build-Herkunftsnachweis.
 # Oberflächenübersicht
 
 <p align="center">
@@ -42,7 +41,7 @@ Das Projekt bietet eine helle und dunkle Oberfläche, automatische Wiederherstel
   <img src="images/process-watchdog-overview-light.png" alt="Hauptfenster von Process Watchdog Assistant" width="100%">
 </p>
 
-Das Hauptfenster zeigt Reihenfolge, Anwendungssymbol, Namen, Rechteanforderung und aktuellen Status aller überwachten Ziele. Die Befehlsleiste bietet Hinzufügen, Löschen, Pausieren, Einstellungen, Hilfe und Info; Hilfe führt zu Handbuch, Laufzeitprotokoll oder Feedback, während Info Version, Laufzeit, Updates, Projekt und Spenden bündelt. Die untere Leiste fasst laufende, wiederherzustellende, aktualisierte, pausierte und fehlgeschlagene Ziele zusammen. Das Protokoll erläutert die Belege hinter ungewöhnlichen Zuständen.
+Das Hauptfenster zeigt Reihenfolge, Anwendungssymbol, Namen, Rechteanforderung und aktuellen Status aller überwachten Ziele. Die Befehlsleiste bietet Hinzufügen, Löschen, Pausieren, Einstellungen, Hilfe und Info; Hilfe führt zu Handbuch, Laufzeitprotokoll oder Feedback, während Info Version, Laufzeit, Updates, Projekt und Spenden bündelt. Die untere Leiste fasst laufende, wiederherzustellende, pausierte und fehlgeschlagene Ziele zusammen. Das Protokoll erläutert die Belege hinter ungewöhnlichen Zuständen.
 
 ## Wichtigste Funktionen
 
@@ -50,7 +49,6 @@ Das Hauptfenster zeigt Reihenfolge, Anwendungssymbol, Namen, Rechteanforderung u
 - Verwendet `Running`, `Stopped` und `Unknown`; ein unbekannter Zustand löst niemals blind einen Neustart aus.
 - Jedes Ziel besitzt eigenen Controller, eigene Generation und Aufgabentoken. Alte Rückrufe werden nach Pause, Löschen oder Pfadänderung sofort ungültig.
 - Administratorrechte können vorgeschrieben werden. Eine laufende Instanz mit unpassenden Rechten wird gemeldet; der nächste überwachte Start wird entsprechend erhöht ausgeführt.
-- Der Updateschutz ist standardmäßig aus. Nach Aktivierung verbindet er Updateprozesse, Eltern-Kind-Beziehungen, Aktivitäten im Installationsordner und Dateistabilität, bevor die Überwachung pausiert oder fortgesetzt wird.
 - Die Konfiguration wird atomar ersetzt. Nicht lesbare Datensätze werden nach `[Recovery]` verschoben, statt still verloren zu gehen.
 - Die Anwendungssuche verwendet ausschließlich den Everything-Dienst, ohne eingebaute Vollplattensuche und ohne Ergebnisgrenze. Große Ergebnismengen werden in kurzen Blöcken ergänzt, damit die Symbolgewinnung die Oberfläche nicht blockiert.
 - Unterstützt vereinfachtes Chinesisch, traditionelles Chinesisch für Hongkong, traditionelles Chinesisch für Taiwan, Englisch, Japanisch, Vietnamesisch, Koreanisch, Spanisch, Französisch, brasilianisches Portugiesisch, Russisch, Deutsch und Italienisch. Standardmäßig folgt die Oberfläche der Windows-Sprache, bei nicht unterstützten Sprachen wird Englisch verwendet; unter Anzeige ist eine manuelle Auswahl möglich. Sprache und Inhaltsschrift werden sofort im aktuellen Prozess angewendet, ohne Überwachungsaufgaben anzuhalten oder neu zu initialisieren.
@@ -72,7 +70,7 @@ Ein vollständiger GUI-Automatisierungslauf ist unter Windows 11 mit echten 200 
 ---
 
 **[Benutzerhandbuch](#benutzerhandbuch)**<br>
-[Installation](#1-installation-und-erster-start) · [Verwaltung](#2-ziele-hinzufügen-und-verwalten) · [Status](#3-status-und-wiederherstellung) · [Updates](#4-schutz-bei-updates) · [Einstellungen](#5-einstellungen) · [Protokolle](#6-protokolle-diagnose-und-datenschutz)
+[Installation](#1-installation-und-erster-start) · [Verwaltung](#2-ziele-hinzufügen-und-verwalten) · [Status](#3-status-und-wiederherstellung) · [Einstellungen](#4-einstellungen) · [Protokolle](#5-protokolle-diagnose-und-datenschutz)
 
 **[Entwicklerhandbuch](#entwicklerhandbuch)**<br>
 [Verzeichnisse](#1-verzeichnisse-und-zuständigkeiten) · [Korrektheit](#2-korrektheitsgrenzen) · [Prüfung](#3-prüfbefehle) · [Veröffentlichung](#4-veröffentlichung-und-mitarbeit)
@@ -95,7 +93,7 @@ Wenn Ihnen der Assistent Zeit bei der Fehlersuche oder Wiederherstellung von Anw
 2. Das portable ZIP läuft vollständig entpackt ohne separate AutoHotkey-Installation; das Quellcode-ZIP benötigt AutoHotkey v2 x64. Schriften müssen in Windows installiert werden, sind aber nicht zum Ausführen erforderlich; die Programmsuche benötigt zusätzlich die [neueste offizielle Everything-Version](https://www.voidtools.com/downloads/).
 3. Starten Sie `进程守护小助手.exe`. Die Anwendung fordert Administratorrechte an und zeigt je nach Einstellung das Hauptfenster oder bleibt im Infobereich.
 4. Wählen Sie „Hinzufügen“ oder ziehen Sie unterstützte Dateien in das Hauptfenster.
-5. Öffnen Sie das Protokoll, um die tatsächlich verwendeten Identitätsbelege, Statusprüfungen, Wiederherstellungsversuche und Updatesignale zu sehen.
+5. Öffnen Sie das Protokoll, um die tatsächlich verwendeten Identitätsbelege, Statusprüfungen, Wiederherstellungsversuche zu sehen.
 
 Für den Start aus dem Quellcode installieren Sie AutoHotkey v2 x64 und führen `进程守护小助手.ahk` aus. Wenn Sie das Repository mit Git klonen, installieren Sie zusätzlich Git LFS und führen `git lfs pull` aus, damit die vollständigen Schriftdateien statt der LFS-Zeiger geladen werden. Das einem Release beigefügte Quellcode-ZIP enthält diese Ressourcen bereits und benötigt Git LFS nicht. Offizielle Versionen enthalten die AutoHotkey-Laufzeit, die sämtliche Veröffentlichungstests bestanden hat; normale Benutzer benötigen keine separate Installation.
 
@@ -124,7 +122,7 @@ Das Schließen des Hauptfensters blendet es nur im Infobereich aus; die Überwac
 
 Ein Eintrag kann Einstiegspunkt, Arbeitsordner, Argumente und Administratoranforderung festlegen. Die LNK-Datei bleibt Startpunkt, während der tatsächliche Programmpfad getrennt zur Prozessidentifikation gespeichert wird. Eine vom Installationsprogramm angelegte indirekte Verknüpfung muss deshalb nicht manuell durch eine wechselnde interne EXE ersetzt werden.
 
-Das Kontextmenü öffnet den Speicherort, beendet das Ziel, ändert den Pfad, konfiguriert Prozesserkennung und Starteinstellungen, schaltet die Administratoranforderung um, richtet Updateschutz ein und passt Namen oder Symbol nur im Hauptfenster an. „Ausführung beenden“ pausiert zugleich die Überwachung, damit das Ziel nicht automatisch neu gestartet wird. Die Darstellung ändert weder Identität, Start noch Schutz. Sind bereits Standardwerte aktiv, ist das Zurücksetzen deaktiviert.
+Das Kontextmenü öffnet den Speicherort, beendet das Ziel, ändert den Pfad, konfiguriert Prozesserkennung und Starteinstellungen, schaltet die Administratoranforderung um und passt Namen oder Symbol nur im Hauptfenster an. „Ausführung beenden“ pausiert zugleich die Überwachung, damit das Ziel nicht automatisch neu gestartet wird. Die Darstellung ändert weder Identität noch Start. Sind bereits Standardwerte aktiv, ist das Zurücksetzen deaktiviert.
 
 Nur BAT- und CMD-Ziele zeigen zusätzlich den Befehl „Batch-Ausgabeprotokoll anzeigen“; bei anderen Zieltypen erscheint er nicht. Die eigenständige Protokolldatei wird nur angelegt, wenn der Assistent das Batch-Ziel tatsächlich startet und dessen Standardausgabe und Fehlerausgabe erfasst. Für einen bereits laufenden Batch-Prozess entsteht sie nicht automatisch.
 
@@ -140,26 +138,12 @@ Der Listenstatus beschreibt verfügbare Belege und den nächsten Schritt. Schlie
 | Läuft (Rechte stimmen nicht) | Die Instanz existiert, erfüllt aber die Administratoranforderung nicht |
 | Status wird geprüft / Möglicherweise gestoppt | Belege fehlen oder ein Ende wurde gerade erkannt; erneute Prüfung ohne Doppelstart |
 | Start / Wiederholungs-Countdown | Wiederherstellung ist bestätigt und der nächste Versuch folgt der Wartefolge |
-| Update / Stabilität wird geprüft | Automatischer Start wartet auf Aktivitätsende und stabile Dateien |
 | Pausiert | Automatische Prüfungen und Wiederherstellung sind pausiert, der Zielprozess bleibt geöffnet |
 | Gestoppt / Start fehlgeschlagen / Zeitüberschreitung | Wiederherstellung blieb erfolglos oder braucht Bestätigung; Belege und Grund stehen im Protokoll |
 
 Die Standardverzögerungen betragen 1, 10 und 60 Sekunden. Nach der schnellen Folge wird der letzte Wert wiederverwendet, um enge Startschleifen zu vermeiden. Löschen, Pausieren, Pfadänderung oder Rückgängig machen alte Aufgaben und asynchrone Ergebnisse ungültig.
 
-## 4. Schutz bei Updates
-
-Der Schutz ist standardmäßig aus und muss je Eintrag aktiviert werden:
-
-1. Rechtsklicken Sie das Ziel und öffnen Sie den Updateschutz.
-2. Aktivieren Sie automatische Erkennung und Startschutz.
-3. Prüfen Sie Installationsumfang, Ende-Erkennungsfenster, Stabilitätswartezeit und maximale Updatewartezeit.
-4. Speichern Sie und lassen Sie die Anwendung einmal normal ein echtes Update durchführen. Der Assistent kombiniert Updateprozesse, Eltern-Kind-Beziehungen, Ordneraktivität, Dateibenachrichtigungen und gelernte Merkmale, um den Schutzbeginn zu bestimmen.
-
-Nach Bestätigung bleibt der automatische Start ausgesetzt. Die normale Überwachung kehrt erst zurück, wenn die Aktivität endet und Dateien stabil sind. Läuft die Erkennung ab oder passt nicht zur Realität, verwenden Sie „Updatewartezeit beenden und Überwachung fortsetzen“. Die Sicherheit des Einstiegspunkts wird vor der Wiederherstellung erneut geprüft.
-
-Die Funktion ist weder universelles Installationsprogramm noch Windows-Dienstverwaltung. Prüfen Sie bei portablen Apps, externen Updatern oder ungewöhnlichen Startprogrammen zuerst das Protokoll und passen Sie anschließend Umfang und Regeln an.
-
-## 5. Einstellungen
+## 4. Einstellungen
 
 | Bereich | Optionen |
 | --- | --- |
@@ -171,13 +155,13 @@ Die Funktion ist weder universelles Installationsprogramm noch Windows-Dienstver
 
 Das Fenster prüft Zahlenbereiche. Kommentare in `watchdog.ini` stehen neben den passenden Abschnitten und Einstellungen; verwenden Sie bevorzugt die Oberfläche, damit codierte Felder unbeschädigt bleiben. Siehe [Konfiguration, Sicherung und Wiederherstellung](en/configuration.md).
 
-## 6. Protokolle, Diagnose und Datenschutz
+## 5. Protokolle, Diagnose und Datenschutz
 
 Im Laufzeitprotokoll können Text markiert und kopiert, das Fenster maximiert und seine Größe geändert werden. Bildlaufleisten erscheinen nur bei Bedarf und der Text ist nicht bearbeitbar.
 
 Bei schwierigen Problemen lässt sich aus dem Protokollfenster ein lokales Diagnosepaket exportieren. Es enthält Zusammenfassungen zu Anwendung, Windows, AutoHotkey, DPI, Ressourcenhandles, Überwachungsphase, Konfigurationswarnungen und aktuellem Protokoll, wird aber nie automatisch hochgeladen.
 
-Persönliche Einstellungen liegen im tatsächlichen Laufzeitordner in `watchdog.ini`, unvollständige Updatesitzungen in `watchdog.maintenance.ini`. Portable und Quellversion nutzen ihren jeweiligen Einstiegsordner. Git ignoriert beide Dateien; Releases liefern oder überschreiben sie nicht.
+Persönliche Einstellungen liegen im tatsächlichen Laufzeitordner in `watchdog.ini`. Portable und Quellversion nutzen ihren jeweiligen Einstiegsordner. Git ignoriert diese Datei; Releases liefern oder überschreiben sie nicht.
 
 Portable EXE und Quellversion teilen den Zustand nur im selben Ordner; die eigenständige EXE teilt keine Konfiguration mit Dateien neben dem heruntergeladenen Starter. Eine systemweite Einzelinstanzsperre verhindert parallele Ausführung. Verknüpfungen und geplante Aufgabe zeigen auf die zuletzt integrierte tatsächliche Laufzeitform. Siehe [Konfiguration, Sicherung und Wiederherstellung](en/configuration.md) und [Installation, Aktualisierung und Entfernung](en/installation.md).
 
@@ -198,7 +182,7 @@ process-watchdog/
 ├─ assets/                  Symbole, Spendenbilder und prozessintern geladene Schriften
 ├─ config/                  aktuelles Beispiel mit Kommentaren an den Einstellungen
 ├─ docs/                    Benutzer-, Architektur-, Sprach-, Bild- und Governance-Dokumente
-├─ src/                     Konfiguration, Kern, Diagnose, Ausführung, Prüfung, Updates, Plattform und UI
+├─ src/                     Konfiguration, Kern, Diagnose, Ausführung, Prüfung, Plattform und UI
 ├─ runtime/                 Hintergrund-Updatehelfer für EXE und Quellcode
 ├─ tests/                   Kern-, GUI-, Release- und Repositoryprüfungen
 ├─ third_party/             festgelegte DLLs, Lizenzen und Abhängigkeitslisten
@@ -213,7 +197,7 @@ Das Stammskript bindet nur Module ein, setzt Abhängigkeiten zusammen und starte
 - Zielidentität, Startpunkt und angepasste Darstellung sind unabhängig; Darstellungseinstellungen dürfen Überwachungsentscheidungen nicht ändern.
 - `Running`, `Stopped` und `Unknown` sind Ergebnisse externer Belege; Wiederherstellung beginnt nur nach bestätigtem Stopp.
 - Timer, Rückrufe, Beobachter, Arbeitsprozesse, Fenster und native Ressourcen benötigen einen idempotenten Bereinigungspfad.
-- Konfigurationsabbild, überwachte Ziele und Updateschutz werden in derselben Transaktion bestätigt; Tests dürfen persönliche `watchdog.ini` weder lesen noch überschreiben.
+- Konfigurationsabbild, überwachte Ziele werden in derselben Transaktion bestätigt; Tests dürfen persönliche `watchdog.ini` weder lesen noch überschreiben.
 - Der verworfene weiche Bildlauf mit GDI-Bildüberlagerung darf nicht zurückkehren; ListView und Protokoll behalten nativen Bildlauf.
 - Aussagen zu DPI, Symbolen, dunklem Modus, Hierarchie und Barrierefreiheit erfordern echte Windows-Prüfungen; Automatisierung ersetzt keine physische Matrix.
 

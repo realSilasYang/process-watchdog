@@ -3,6 +3,8 @@
 ; 迟到的工作器结果只能被丢弃，不能继续写入控件或重复提交撤销记录。
 
 class AddItemDialog extends ManagedWindow {
+    static ConfirmColor := "567D6F"
+
     __New(mainGui) {
         this.owner := mainGui
         this.edit := ""
@@ -74,8 +76,8 @@ class AddItemDialog extends ManagedWindow {
         hintHeight := isCompact ? 42 : 62
         inputY := hintY + hintHeight + 4
         batchStatusY := inputY + 29
-        this.normalActionButtonY := inputY + 36
-        this.batchActionButtonY := batchStatusY + 20
+        this.normalActionButtonY := inputY + 40
+        this.batchActionButtonY := batchStatusY + 24
         this.normalWindowHeight := this.normalActionButtonY + 41
         this.batchWindowHeight := this.batchActionButtonY + 41
         this.pathHint := this.gui.Add("Text", "x20 y" hintY " w" contentWidth
@@ -98,7 +100,7 @@ class AddItemDialog extends ManagedWindow {
         this.okButton := this.gui.Add("Text", "x" actionGroupX
             " y" this.normalActionButtonY " w" actionButtonWidth
             " h26 Center 0x200 Background"
-            UiThemeService.Color("Primary") " c"
+            AddItemDialog.ConfirmColor " c"
             UiThemeService.Color("ButtonText"), Tr("确 定"))
         this.cancelButton := this.gui.Add("Text", "x"
             (actionGroupX + actionButtonWidth + actionButtonGap)
@@ -108,7 +110,7 @@ class AddItemDialog extends ManagedWindow {
             UiThemeService.Color("ToolbarText"), Tr("取 消"))
         RegisterHoverButton(this.searchButton, UiThemeService.Color("Toolbar"))
         RegisterHoverButton(this.browseButton, UiThemeService.Color("Toolbar"))
-        RegisterHoverButton(this.okButton, UiThemeService.Color("Primary"))
+        RegisterHoverButton(this.okButton, AddItemDialog.ConfirmColor)
         RegisterHoverButton(this.cancelButton, UiThemeService.Color("Toolbar"))
         SetButtonLucideIcon(this.searchButton, "search.svg", 14, 6,
             "theme:SearchIcon")
@@ -129,10 +131,18 @@ class AddItemDialog extends ManagedWindow {
     }
 
     ShowBrowseMenu(*) {
+        browseMenu := this.BuildBrowseMenu()
+        browseMenu.Show()
+    }
+
+    BuildBrowseMenu() {
         browseMenu := Menu()
+        browseMenu.Add(Tr("获取正在运行的所有进程"),
+            ObjBindMethod(this.search, "ShowRunningProcesses"))
+        browseMenu.Add()
         browseMenu.Add(Tr("📄 浏览文件..."), ObjBindMethod(this, "BrowseFile"))
         browseMenu.Add(Tr("📂 浏览文件夹..."), ObjBindMethod(this, "BrowseDir"))
-        browseMenu.Show()
+        return browseMenu
     }
 
     BrowseFile(*) {
@@ -453,7 +463,7 @@ class AddItemDialog extends ManagedWindow {
                     if !this.IsBatchSessionCurrent(sessionId)
                         return
                     if RegisterApp(resolvedPath, 1, 0, resolvedWorkDir,
-                        "", "", "", "", false, shortcutArgs) {
+                        "", "", "", false, shortcutArgs) {
                         this.batchAddedCount++
                         this.batchAddedPaths.Push(resolvedPath)
                     }
@@ -632,7 +642,7 @@ class AddItemDialog extends ManagedWindow {
             return false
         undoState := CaptureAppConfigState()
         if !RegisterApp(normalizedPath, 1, 0, resolvedWorkDir, "", "", "",
-            "", false, shortcutArgs) {
+            false, shortcutArgs) {
             LogMsg(Tr("添加守护对象失败，已回滚内存状态：{1}",
                 normalizedPath))
             return false

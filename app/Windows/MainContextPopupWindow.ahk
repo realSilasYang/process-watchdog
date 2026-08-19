@@ -4,8 +4,9 @@
 
 class MainContextPopupWindow {
     static MinWindowWidth := 200
-    static MaxWindowWidth := 320
-    static ItemHeight := 30
+    static MaxWindowWidth := 340
+    static FontSize := 11
+    static ItemHeight := 32
     static ItemGap := 0
     static Padding := 6
     static TextInsetDip := 12
@@ -14,7 +15,7 @@ class MainContextPopupWindow {
     static CheckInsetDip := 16
     static WindowRadiusDip := 9
     static RowRadiusDip := 6
-    static ColorLabelHeight := 18
+    static ColorLabelHeight := 20
     static ColorSectionTopGap := 6
     static SwatchSize := 24
     static SwatchGap := 6
@@ -24,21 +25,41 @@ class MainContextPopupWindow {
     __New(ownerGui) {
         this.OwnerGui := ownerGui
         this.Gui := ""
+        this.SurfaceSignature := ""
+        this.RowButtons := []
+        this.SwatchButtons := []
+        this.CurrentItems := []
+        this.ColorAction := ""
+        this.ColorLabel := ""
+        this.ColorLabelIcon := ""
+        this.MeasureControl := ""
+        this.WindowWidthPx := 0
+        this.WindowHeightPx := 0
         this.Disposed := false
         this.VisibilityTimer := ObjBindMethod(this, "MonitorVisibility")
         this.PointerDownCallback := ObjBindMethod(this, "OnPointerDown")
+        try {
+            templateItems := this.CreateTemplateItems()
+            this.Build(templateItems)
+            this.SurfaceSignature := this.GetSurfaceSignature(templateItems)
+        } catch as buildError {
+            try this.Dispose()
+            throw buildError
+        }
     }
 
     Show(items) {
         if this.Disposed || !IsObject(items) || items.Length <= 0
             return false
         ownerFocus := DllCall("user32\GetFocus", "Ptr")
-        foregroundHwnd := DllCall("user32\GetForegroundWindow", "Ptr")
         this.Hide()
-        this.Build(items)
-        this.Gui.Show("Hide NoActivate w" this.WindowWidth
-            " h" this.WindowHeight)
-        this.ApplyRoundedRegion()
+        surfaceSignature := this.GetSurfaceSignature(items)
+        if !IsObject(this.Gui) || surfaceSignature != this.SurfaceSignature {
+            this.DestroySurface()
+            this.Build(items)
+            this.SurfaceSignature := surfaceSignature
+        }
+        this.UpdateSurface(items)
         point := Buffer(8, 0)
         if !DllCall("user32\GetCursorPos", "Ptr", point, "Int") {
             this.Hide()
@@ -46,42 +67,82 @@ class MainContextPopupWindow {
         }
         x := NumGet(point, 0, "Int")
         y := NumGet(point, 4, "Int") + 4
-        this.ConstrainToWorkArea(&x, &y, this.WindowWidth,
-            this.WindowHeight)
+        this.ConstrainToWorkArea(&x, &y, this.WindowWidthPx,
+            this.WindowHeightPx)
         shown := DllCall("user32\SetWindowPos", "Ptr", this.Gui.Hwnd,
-            "Ptr", -1, "Int", x, "Int", y, "Int", 0, "Int", 0,
-            "UInt", 0x0051, "Int") != 0 ; 不改尺寸、不激活并显示窗口
-        if shown {
-            if ownerFocus
-                    && DllCall("user32\IsWindow", "Ptr", ownerFocus, "Int")
-                    && DllCall("user32\GetFocus", "Ptr") != ownerFocus
-                DllCall("user32\SetFocus", "Ptr", ownerFocus, "Ptr")
-            OnMessage(Win32.WM_LBUTTONDOWN, this.PointerDownCallback)
-            OnMessage(Win32.WM_RBUTTONDOWN, this.PointerDownCallback)
-            OnMessage(Win32.WM_NCLBUTTONDOWN, this.PointerDownCallback)
-            SetTimer(this.VisibilityTimer, 50)
+            "Ptr", 0, "Int", x, "Int", y,
+            "Int", this.WindowWidthPx, "Int", this.WindowHeightPx,
+            "UInt", 0x0050, "Int") != 0 ; 不激活并显示窗口
+        if !shown {
+            try this.Gui.Hide()
+            return false
         }
+        UiScaleService.ApplyWindow(this.Gui)
+        OnMessage(Win32.WM_LBUTTONDOWN, this.PointerDownCallback)
+        OnMessage(Win32.WM_RBUTTONDOWN, this.PointerDownCallback)
+        OnMessage(Win32.WM_NCLBUTTONDOWN, this.PointerDownCallback)
+        SetTimer(this.VisibilityTimer, 50)
+        ; 显示 popup 后再归还 ListView 焦点，避免窗口映射过程覆盖此前的
+        ; 键盘焦点，同时保持右键菜单不激活自身。
+        if ownerFocus
+                && DllCall("user32\IsWindow", "Ptr", ownerFocus, "Int")
+                && DllCall("user32\GetFocus", "Ptr") != ownerFocus
+            DllCall("user32\SetFocus", "Ptr", ownerFocus, "Ptr")
         return shown
+    }
+
+    RebuildTemplate() {
+        if this.Disposed
+            return false
+        this.Hide()
+        this.DestroySurface()
+        templateItems := this.CreateTemplateItems()
+        this.Build(templateItems)
+        this.SurfaceSignature := this.GetSurfaceSignature(templateItems)
+        return true
+    }
+
+    CreateTemplateItems() {
+        return [
+            {Text: Tr("🔄 重新启动"), Action: RestartSelectedApp},
+            {Text: Tr("⏹️ 结束运行"), Action: EndSelectedApp},
+            {Text: Tr("✒️ 编辑完整路径（F2）"),
+                Action: (*) => TriggerEdit(Main.lv, Main.contextTargetRow)},
+            {Text: Tr("📂 打开所在位置"), Action: OpenFileLocation},
+            {Text: Tr("🏷️ 自定义名称和图标"), Action: OpenDisplaySettings},
+            {Text: Tr("⚙️ 进程识别与启动设置"), Action: OpenEnvSettings},
+            {Text: Tr("🛡️ 以管理员身份运行"), Check: false,
+                Action: ToggleRunAsAdmin},
+            {Text: Tr("🔔 停止后每次询问恢复"), Check: false,
+                Action: ToggleAskBeforeRestart},
+            {ColorPalette: true, Text: Tr("设置序号圆点"),
+                IconName: "palette.svg", IconColorRole: "ThemeIcon",
+                SelectedColor: "", Action: SetSelectedMainSequenceColor}
+        ]
     }
 
     Build(items) {
         menuColor := UiThemeService.Color("Menu")
         textColor := UiThemeService.Color("Text")
         hoverColor := UiThemeService.Color("MenuHover")
+        ; Owner 窗口本身已经保证浮层位于主窗口之上；不要设置
+        ; WS_EX_TOPMOST，否则主窗口隐藏后浮层可能仍压在其它应用之上。
         this.Gui := Gui("+Owner" this.OwnerGui.Hwnd
-            " -Caption +ToolWindow +AlwaysOnTop +E0x08000000")
+            " -Caption +ToolWindow +E0x08000000")
         this.Gui.BackColor := menuColor
         this.Gui.MarginX := 0
         this.Gui.MarginY := 0
-        this.Gui.SetFont("s10 c" textColor,
+        this.Gui.SetFont("s" MainContextPopupWindow.FontSize " c" textColor,
             LocalizationService.GetLanguageSystemUiFontName())
         this.WindowWidth := this.ResolveWindowWidth(items)
         y := MainContextPopupWindow.Padding
         contentWidth := this.WindowWidth
             - MainContextPopupWindow.Padding * 2
         this.SwatchButtons := []
+        this.RowButtons := []
         this.ColorLabel := ""
         this.ColorLabelIcon := ""
+        rowIndex := 0
         for item in items {
             if item.HasOwnProp("ColorPalette") && item.ColorPalette {
                 this.AddColorPalette(item, &y, contentWidth, menuColor,
@@ -90,18 +151,19 @@ class MainContextPopupWindow {
             }
             enabled := !(item.HasOwnProp("Enabled") && !item.Enabled)
             checkText := item.HasOwnProp("Check") && item.Check ? "✓" : ""
+            rowIndex++
             rowButton := this.Gui.Add("Text",
                 "x" MainContextPopupWindow.Padding " y" y
                 " w" contentWidth " h" MainContextPopupWindow.ItemHeight
                 " 0x200 Background" menuColor " c" textColor,
                 item.Text)
-            rowButton.SetFont("s10 norm",
+            rowButton.SetFont("s" MainContextPopupWindow.FontSize " norm",
                 LocalizationService.GetLanguageSystemUiFontName())
             RegisterHoverButton(rowButton, menuColor, hoverColor,
                 hoverColor, textColor, "left",
                 MainContextPopupWindow.TextInsetDip)
             ; 普通按钮默认使用粗体；菜单项恢复常规字重以贴近原生菜单。
-            rowButton.SetFont("s10 norm",
+            rowButton.SetFont("s" MainContextPopupWindow.FontSize " norm",
                 LocalizationService.GetLanguageSystemUiFontName())
             try rowButton.Opt("-0x10000")
             if App.uiInteractions.HasButton(rowButton.Hwnd) {
@@ -120,18 +182,42 @@ class MainContextPopupWindow {
                     buttonState.textColor := UiThemeService.Color("MutedText")
                 RedrawRoundedButton(rowButton.Hwnd)
             }
-            if enabled && item.HasOwnProp("Action") && IsObject(item.Action) {
-                RegisterButtonClick(rowButton,
-                    ObjBindMethod(this, "InvokeAction", item.Action),
-                    ButtonFeedbackMode.Dismissive)
-            } else {
-                SetRegisteredButtonEnabled(rowButton, false)
-            }
+            RegisterButtonClick(rowButton,
+                ObjBindMethod(this, "InvokeRowAction", rowIndex),
+                ButtonFeedbackMode.Dismissive)
+            SetRegisteredButtonEnabled(rowButton, enabled
+                && item.HasOwnProp("Action") && IsObject(item.Action))
+            this.RowButtons.Push(rowButton)
             y += MainContextPopupWindow.ItemHeight
                 + MainContextPopupWindow.ItemGap
         }
         this.WindowHeight := y - MainContextPopupWindow.ItemGap
             + MainContextPopupWindow.Padding
+        ; 只设置尚未映射的 HWND 尺寸和裁剪区域。Gui.Show 即使带 Hide
+        ; 也会创建可见表面，既会暴露左上角残片，也会制造首次打开闪帧。
+        if !this.PrepareUnmappedSurface()
+            throw Error("无法准备主列表右键浮层")
+    }
+
+    PrepareUnmappedSurface() {
+        if !IsObject(this.Gui) || !this.Gui.Hwnd
+            return false
+        windowDpi := DllCall("user32\GetDpiForWindow", "Ptr",
+            this.Gui.Hwnd, "UInt")
+        if !windowDpi
+            windowDpi := 96
+        this.WindowWidthPx := Max(1, Round(UiScaleService.Scale(
+            this.WindowWidth) * windowDpi / 96))
+        this.WindowHeightPx := Max(1, Round(UiScaleService.Scale(
+            this.WindowHeight) * windowDpi / 96))
+        ; 不含 SWP_SHOWWINDOW：窗口仍处于从未映射状态，但最终尺寸已经
+        ; 确定，因此圆角裁剪可以在唯一一次可见提交之前完成。
+        sized := DllCall("user32\SetWindowPos", "Ptr", this.Gui.Hwnd,
+            "Ptr", 0, "Int", 0, "Int", 0,
+            "Int", this.WindowWidthPx, "Int", this.WindowHeightPx,
+            "UInt", 0x0016, "Int") != 0
+            ; 不移动、不改变层级、不激活
+        return sized && this.ApplyRoundedRegion(false)
     }
 
     AddColorPalette(item, &y, contentWidth, menuColor, textColor) {
@@ -139,7 +225,7 @@ class MainContextPopupWindow {
         label := this.Gui.Add("Text", "x-10000 y" y " w1 h"
             MainContextPopupWindow.ColorLabelHeight
             " Center 0x200 Background" menuColor " c" textColor, item.Text)
-        label.SetFont("s10 norm bold",
+        label.SetFont("s" MainContextPopupWindow.FontSize " norm bold",
             LocalizationService.GetLanguageSystemUiFontName())
         iconSize := 18
         iconGap := 6
@@ -184,13 +270,13 @@ class MainContextPopupWindow {
             ? MainSequenceColorPalette.NormalizeKey(item.SelectedColor) : ""
         for index, preset in presets
             this.AddColorSwatch(startX, y, index - 1, preset.Key,
-                selectedColor, item.Action, this.GetPresetTooltip(preset.Key))
+                selectedColor, this.GetPresetTooltip(preset.Key))
         this.AddColorSwatch(startX, y, presets.Length, "", selectedColor,
-            item.Action, Tr("清除圆点颜色"))
+            Tr("清除圆点颜色"))
         y += MainContextPopupWindow.SwatchSize
     }
 
-    AddColorSwatch(startX, y, index, presetKey, selectedColor, action,
+    AddColorSwatch(startX, y, index, presetKey, selectedColor,
             tooltipText) {
         menuColor := UiThemeService.Color("Menu")
         colorKey := MainSequenceColorPalette.NormalizeKey(presetKey)
@@ -222,10 +308,9 @@ class MainContextPopupWindow {
             RedrawRoundedButton(button.Hwnd)
         }
         SetButtonTooltip(button, tooltipText)
-        if IsObject(action)
-            RegisterButtonClick(button,
-                ObjBindMethod(this, "InvokeColorAction", action, colorKey),
-                ButtonFeedbackMode.Dismissive)
+        RegisterButtonClick(button,
+            ObjBindMethod(this, "InvokeColorAction", colorKey),
+            ButtonFeedbackMode.Dismissive)
         this.SwatchButtons.Push({Control: button, Key: colorKey})
         return button
     }
@@ -243,11 +328,119 @@ class MainContextPopupWindow {
         }
     }
 
+    GetSurfaceSignature(items) {
+        dpi := DllCall("user32\GetDpiForWindow", "Ptr",
+            this.OwnerGui.Hwnd, "UInt")
+        if !dpi
+            dpi := 96
+        signature := dpi "|"
+            LocalizationService.GetLanguageSystemUiFontName() "|"
+            UiThemeService.GetActualTheme() "|"
+            UiThemeService.Color("Menu") "|"
+            UiThemeService.Color("MenuHover") "|"
+            UiThemeService.Color("Text") "|"
+            UiThemeService.Color("MutedText") "|"
+            UiThemeService.Color("ThemeIcon")
+        for item in items {
+            isPalette := item.HasOwnProp("ColorPalette")
+                && item.ColorPalette
+            itemText := item.HasOwnProp("Text") ? String(item.Text) : ""
+            ; 显式连接，避免 AHK 将跨行隐式连接误解析成 item.Text()。
+            signature .= Chr(31) . (isPalette ? "palette:" : "row:")
+                . itemText
+            if isPalette {
+                signature .= ":" (item.HasOwnProp("IconName")
+                    ? item.IconName : "palette.svg")
+            }
+        }
+        return signature
+    }
+
+    UpdateSurface(items) {
+        textColor := UiThemeService.Color("Text")
+        mutedColor := UiThemeService.Color("MutedText")
+        commandItems := []
+        paletteItem := ""
+        for item in items {
+            if item.HasOwnProp("ColorPalette") && item.ColorPalette
+                paletteItem := item
+            else
+                commandItems.Push(item)
+        }
+        if commandItems.Length != this.RowButtons.Length
+            return false
+
+        this.CurrentItems := commandItems
+        this.ColorAction := IsObject(paletteItem)
+                && paletteItem.HasOwnProp("Action")
+                && IsObject(paletteItem.Action)
+            ? paletteItem.Action : ""
+        for index, rowButton in this.RowButtons {
+            item := commandItems[index]
+            enabled := !(item.HasOwnProp("Enabled") && !item.Enabled)
+                && item.HasOwnProp("Action") && IsObject(item.Action)
+            if rowButton.Text != item.Text
+                rowButton.Text := item.Text
+            if App.uiInteractions.HasButton(rowButton.Hwnd) {
+                state := App.uiInteractions.GetButton(rowButton.Hwnd)
+                state.current := state.normal
+                state.textColor := enabled ? textColor : mutedColor
+                checkText := item.HasOwnProp("Check") && item.Check
+                    ? "✓" : ""
+                if state.rightText != checkText
+                    state.rightText := checkText
+            }
+            this.SetControlEnabled(rowButton, enabled)
+        }
+
+        if !IsObject(paletteItem)
+            return true
+
+        selectedColor := paletteItem.HasOwnProp("SelectedColor")
+            ? MainSequenceColorPalette.NormalizeKey(
+                paletteItem.SelectedColor) : ""
+        for swatch in this.SwatchButtons {
+            colorKey := swatch.Key
+            text := colorKey == "" ? "✕"
+                : (colorKey == selectedColor ? "✓" : "")
+            if swatch.Control.Text != text
+                swatch.Control.Text := text
+            if App.uiInteractions.HasButton(swatch.Control.Hwnd) {
+                swatchState := App.uiInteractions.GetButton(
+                    swatch.Control.Hwnd)
+                swatchState.current := swatchState.normal
+            }
+            SetButtonTooltip(swatch.Control,
+                colorKey == "" ? Tr("清除圆点颜色")
+                    : this.GetPresetTooltip(colorKey))
+            this.SetControlEnabled(swatch.Control,
+                IsObject(this.ColorAction))
+        }
+        return true
+    }
+
+    SetControlEnabled(control, enabled) {
+        enabled := !!enabled
+        try currentEnabled := !!control.Enabled
+        catch
+            return false
+        if currentEnabled == enabled
+            return true
+        try {
+            control.Enabled := enabled
+            return true
+        } catch {
+            return false
+        }
+    }
+
     ResolveWindowWidth(items) {
         maxTextWidth := 0
         hasCheckSlot := false
-        measure := this.Gui.Add("Text", "x-10000 y-10000 w1 h1", "")
-        measure.SetFont("s10 norm",
+        this.MeasureControl := this.Gui.Add("Text",
+            "x-10000 y-10000 w1 h1", "")
+        measure := this.MeasureControl
+        measure.SetFont("s" MainContextPopupWindow.FontSize " norm",
             LocalizationService.GetLanguageSystemUiFontName())
         hdc := DllCall("user32\GetDC", "Ptr", this.Gui.Hwnd, "Ptr")
         if hdc {
@@ -338,11 +531,48 @@ class MainContextPopupWindow {
         try OnMessage(Win32.WM_RBUTTONDOWN, this.PointerDownCallback, 0)
         try OnMessage(Win32.WM_NCLBUTTONDOWN, this.PointerDownCallback, 0)
         popupHwnd := this.GetGuiHwnd()
+        if popupHwnd && DllCall("user32\IsWindowVisible", "Ptr",
+                popupHwnd, "Int")
+            try this.Gui.Hide()
+        controls := this.RowButtons.Clone()
+        if IsObject(this.ColorLabelIcon)
+            controls.Push(this.ColorLabelIcon)
+        for swatch in this.SwatchButtons
+            controls.Push(swatch.Control)
+        for control in controls {
+            try controlHwnd := control.Hwnd
+            catch
+                continue
+            if !App.uiInteractions.HasButton(controlHwnd)
+                continue
+            CancelButtonReleaseReset(controlHwnd)
+            if App.uiInteractions.PressedButton == controlHwnd
+                CancelButtonPress()
+            App.uiInteractions.ClearHoveredButton(controlHwnd)
+            state := App.uiInteractions.GetButton(controlHwnd)
+            state.current := state.normal
+        }
+        return true
+    }
+
+    DestroySurface() {
+        popupHwnd := this.GetGuiHwnd()
         if popupHwnd {
             try UnregisterGuiControls(popupHwnd)
+            try UiScaleService.ReleaseWindow(popupHwnd)
             try this.Gui.Destroy()
         }
         this.Gui := ""
+        this.SurfaceSignature := ""
+        this.RowButtons := []
+        this.SwatchButtons := []
+        this.CurrentItems := []
+        this.ColorAction := ""
+        this.ColorLabel := ""
+        this.ColorLabelIcon := ""
+        this.MeasureControl := ""
+        this.WindowWidthPx := 0
+        this.WindowHeightPx := 0
         return true
     }
 
@@ -351,19 +581,30 @@ class MainContextPopupWindow {
             return
         this.Disposed := true
         this.Hide()
+        this.DestroySurface()
         this.VisibilityTimer := ""
         this.PointerDownCallback := ""
         this.OwnerGui := ""
     }
 
-    InvokeAction(action, *) {
+    InvokeRowAction(index, *) {
+        if index < 1 || index > this.CurrentItems.Length
+            return false
+        item := this.CurrentItems[index]
+        action := item.HasOwnProp("Action") && IsObject(item.Action)
+            ? item.Action : ""
         this.Hide()
-        action.Call()
+        if IsObject(action)
+            action.Call()
+        return IsObject(action)
     }
 
-    InvokeColorAction(action, colorKey, *) {
+    InvokeColorAction(colorKey, *) {
+        action := this.ColorAction
         this.Hide()
-        action.Call(colorKey)
+        if IsObject(action)
+            action.Call(colorKey)
+        return IsObject(action)
     }
 
     OnPointerDown(wParam, lParam, msg, hwnd) {
@@ -424,7 +665,7 @@ class MainContextPopupWindow {
         y := Min(Max(y, top + 4), Max(top + 4, bottom - height - 4))
     }
 
-    ApplyRoundedRegion() {
+    ApplyRoundedRegion(redraw := false) {
         if !IsObject(this.Gui) || !this.Gui.Hwnd
             return false
         windowRect := Buffer(16, 0)
@@ -447,7 +688,7 @@ class MainContextPopupWindow {
         if !region
             return false
         if !DllCall("user32\SetWindowRgn", "Ptr", this.Gui.Hwnd,
-                "Ptr", region, "Int", true, "Int") {
+                "Ptr", region, "Int", redraw, "Int") {
             DllCall("gdi32\DeleteObject", "Ptr", region)
             return false
         }

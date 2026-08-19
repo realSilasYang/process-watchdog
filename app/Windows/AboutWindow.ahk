@@ -52,15 +52,15 @@ class AboutWindow extends ManagedWindow {
                 "x" contentX " y70 w" contentWidth
                     " h30 Center 0x200 BackgroundTrans",
                 Tr("进程守护小助手"))
-            this.gui.SetFont("norm s9 c" UiThemeService.Color("MutedText"),
+            this.gui.SetFont("norm s10 c" UiThemeService.Color("MutedText"),
                 fontName)
             this.subtitle := this.gui.Add("Text",
                 "x" contentX " y106 w" contentWidth
-                    " h22 Center 0x200 BackgroundTrans",
+                    " h24 Center 0x200 BackgroundTrans",
                 Tr("持续守护重要程序与自动化任务，让日常工作稳定运行"))
 
             this.topDivider := this.gui.Add("Text",
-                "x" contentX " y140 w" contentWidth
+                "x" contentX " y142 w" contentWidth
                     " h1 Background" UiThemeService.Color("Divider"))
             infoCenterX := windowWidth // 2
             infoGap := compactLayout ? 14 : 20
@@ -72,26 +72,26 @@ class AboutWindow extends ManagedWindow {
             this.gui.SetFont("norm s10 c" UiThemeService.Color("MutedText"),
                 fontName)
             this.versionLabel := this.gui.Add("Text",
-                "x" contentX " y153 w" leftInfoWidth
+                "x" contentX " y155 w" leftInfoWidth
                     " h22 Center 0x200 BackgroundTrans", versionCaption)
             this.runtimeLabel := this.gui.Add("Text",
-                "x" rightInfoX " y153 w" rightInfoWidth
+                "x" rightInfoX " y155 w" rightInfoWidth
                     " h22 Center 0x200 BackgroundTrans", runtimeCaption)
             this.gui.SetFont("norm s11 c" UiThemeService.Color("Text"),
                 fontName)
             this.versionValue := this.gui.Add("Text",
-                "x" contentX " y180 w" leftInfoWidth
+                "x" contentX " y182 w" leftInfoWidth
                     " h28 Center 0x200 BackgroundTrans",
                 GetApplicationEditionSummary())
             this.runtimeValue := this.gui.Add("Text",
-                "x" rightInfoX " y180 w" rightInfoWidth
+                "x" rightInfoX " y182 w" rightInfoWidth
                     " h28 Center 0x200 BackgroundTrans",
                 GetAutoHotkeyRuntimeSummary())
             this.infoDivider := this.gui.Add("Text",
-                "x" infoCenterX " y153 w1 h55 Background"
+                "x" infoCenterX " y155 w1 h55 Background"
                     UiThemeService.Color("Divider"))
             this.bottomDivider := this.gui.Add("Text",
-                "x" contentX " y221 w" contentWidth
+                "x" contentX " y223 w" contentWidth
                     " h1 Background" UiThemeService.Color("Divider"))
 
             updateWidth := compactLayout ? 126 : 205
@@ -104,19 +104,19 @@ class AboutWindow extends ManagedWindow {
             this.gui.SetFont("bold s10 c" UiThemeService.Color("ToolbarText"),
                 LocalizationService.GetLanguageSystemUiFontName())
             this.checkUpdateButton := this.gui.Add("Text",
-                "x" actionX " y237 w" updateWidth
+                "x" actionX " y239 w" updateWidth
                     " h36 Center 0x200 Background"
                     UiThemeService.Color("Toolbar") " c"
                     UiThemeService.Color("ToolbarText"), Tr("检查更新"))
             this.donationButton := this.gui.Add("Text",
                 "x" (actionX + updateWidth + actionGap)
-                    " y237 w" donationWidth
+                    " y239 w" donationWidth
                     " h36 Center 0x200 Background"
                     UiThemeService.Color("Toolbar") " c"
                     UiThemeService.Color("ToolbarText"), Tr("打赏"))
             this.projectButton := this.gui.Add("Text",
                 "x" (actionX + updateWidth + donationWidth + actionGap * 2)
-                    " y237 w" projectWidth
+                    " y239 w" projectWidth
                     " h36 Center 0x200 Background"
                     UiThemeService.Color("Toolbar") " c"
                     UiThemeService.Color("ToolbarText"), Tr("开源地址"))
@@ -141,7 +141,7 @@ class AboutWindow extends ManagedWindow {
                 ObjBindMethod(this, "OpenDonation"))
             this.SetUpdateCheckActive(
                 App.applicationUpdateService.IsChecking())
-            ShowApplicationWindow(this.gui, "w" windowWidth " h291")
+            ShowApplicationWindow(this.gui, "w" windowWidth " h293")
         } catch as openErr {
             this.Close()
             throw openErr

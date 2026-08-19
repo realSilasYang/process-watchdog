@@ -14,8 +14,8 @@ actions on GitHub after repository creation and cannot be replaced by local test
 - The release EXE hash matches the EXE used for the long GUI soak; otherwise rerun the soak.
 - `tests/reproducible-build.ps1` produces identical portable ZIP, source ZIP,
   optional font ZIP, and SBOM hashes twice.
-- `git log --all --name-only` contains no personal configuration, maintenance sessions, or probes.
-- `watchdog.ini` and `watchdog.maintenance.ini` remain ignored and unchanged by hash.
+- `git log --all --name-only` contains no personal configuration or probes.
+- `watchdog.ini` remains ignored and unchanged by hash.
 - `VERSION` agrees with both changelogs, and the target version tag does not exist.
 - The changelog consolidates related commits and clearly states migrations,
   defaults, privilege changes, and required user actions.

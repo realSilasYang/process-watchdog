@@ -59,6 +59,22 @@ RunProcessInspectorTests() {
     AssertProcessInspector(autoHotkeySnapshot.Ready && currentScriptFound,
         "AutoHotkey 主窗口快照没有识别当前脚本")
 
+    titleProbe := Gui("+ToolWindow", "ProcessInspectorTitleProbe")
+    try {
+        titleProbe.Show("x-32000 y-32000 w80 h40 NoActivate")
+        visibleTitles := inspector.GetWindowTitles(currentPid)
+        visibleTitleMap := inspector.CaptureVisibleWindowTitleMap()
+        titleFound := false
+        for title in visibleTitles {
+            if title == "ProcessInspectorTitleProbe" {
+                titleFound := true
+                break
+            }
+        }
+        AssertProcessInspector(titleFound && visibleTitleMap.Has(currentPid),
+            "进程检查器没有读取可见顶层窗口标题")
+    } finally titleProbe.Destroy()
+
     deadPid := 0x7FFFFFFF
     while (deadPid > 0 && ProcessExist(deadPid))
         deadPid--
@@ -68,6 +84,8 @@ RunProcessInspectorTests() {
         "不存在的 PID 不应返回创建身份")
     AssertProcessInspector(inspector.GetElevationState(deadPid) == -1,
         "不存在的 PID 不应返回确定的提权状态")
+    AssertProcessInspector(inspector.GetWindowTitles(deadPid).Length == 0,
+        "不存在的 PID 不应返回窗口标题")
 }
 
 try {

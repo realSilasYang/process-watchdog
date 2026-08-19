@@ -1,5 +1,5 @@
 ; 单个守护目标的运行时所有者。
-; 控制器持有当前代际、守护阶段和已计划任务；暂停、删除、改路径或进入升级保护时
+; 控制器持有当前代际、守护阶段和已计划任务；暂停、删除或改路径时
 ; 会先使旧任务槽及快照握手失效，从根源上阻止迟到回调重新启动已经变化的目标。
 
 class TargetScheduledTask {
@@ -69,30 +69,6 @@ class TargetSupervisor {
         this.SnapshotReadyGeneration := 0
         this.Generation := 1
         this.OneShot := false
-        this.MaintenanceConfig := ""
-        this.MaintenanceStateMachine := MaintenanceStateMachine()
-        this.MaintenanceStartedTicks := 0
-        this.MaintenanceStartedAt := ""
-        this.MaintenanceLastActivityTicks := 0
-        this.MaintenanceRestartDueTicks := 0
-        this.MaintenanceBaselineFingerprint := ""
-        this.ArbitrationSnapshotRequestTicks := 0
-        this.ArbitrationSignalBaselineTicks := 0
-        this.MaintenanceFileChanged := false
-        this.ExplicitMaintenance := false
-        this.MaintenanceWatcherRoot := ""
-        this.MaintenanceWatcherPath := ""
-        this.KnownActorIdentities := Map()
-        this.TransientActorIdentities := Map()
-        this.LastActorSeenTicks := 0
-        this.MaintenanceActorCheckedTicks := 0
-        this.LastFileActivityTicks := 0
-        this.MaintenanceFingerprintCheckedTicks := 0
-        this.MaintenanceReadyCheckedTicks := 0
-        this.MaintenanceLastReady := true
-        this.SafetyFingerprint := ""
-        this.SafetyStableSince := 0
-        this.MaintenanceLearningCandidates := Map()
         this.MissingSinceTicks := 0
         this.RelocationPending := false
         this.ContentHash := ""
@@ -108,6 +84,10 @@ class TargetSupervisor {
         this.ManualRestartGeneration := 0
         this.ManualStopRequested := false
         this.StoppedEvidenceTicks := 0
+        this.AskBeforeRestart := false
+        this.StopPromptPending := false
+        this.StopPromptGeneration := 0
+        this.StopPromptTaskQueued := false
 
         if IsObject(initialValues) {
             for propertyName, propertyValue in initialValues.OwnProps()
@@ -125,17 +105,8 @@ class TargetSupervisor {
         get => this.StateMachine.Phase
     }
 
-    MaintenanceMode {
-        get => this.MaintenanceStateMachine.Phase
-        set => this.MaintenanceStateMachine.Transition(value)
-    }
-
     TransitionTo(nextPhase) {
         return this.StateMachine.Transition(nextPhase)
-    }
-
-    RestoreMaintenanceMode(restoredPhase) {
-        return this.MaintenanceStateMachine.Restore(restoredPhase)
     }
 
     CancelScheduledTasks(invalidateGeneration := true) {
@@ -146,6 +117,9 @@ class TargetSupervisor {
         this.RestartTask := ""
         this.VerifyTask := ""
         this.ClearSnapshotCoordination()
+        this.StopPromptPending := false
+        this.StopPromptGeneration := 0
+        this.StopPromptTaskQueued := false
         if invalidateGeneration
             this.Generation++
     }
@@ -164,6 +138,9 @@ class TargetSupervisor {
         this.ManualRestartGeneration := 0
         this.ManualStopRequested := false
         this.StoppedEvidenceTicks := 0
+        this.StopPromptPending := false
+        this.StopPromptGeneration := 0
+        this.StopPromptTaskQueued := false
     }
 
     BeginSnapshotWait(purpose, requestTicks, deadlineTicks,

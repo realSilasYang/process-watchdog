@@ -196,7 +196,7 @@ try {
     ownerEdit := owner.Add("Edit",
         "x16 y42 w260 h28 Background252526 cFFFFFF", "editable")
     list := owner.Add("ListView",
-        "x16 y82 w380 h120 Report +LV0x10002 -Hdr Background252526 cFFFFFF",
+        "x16 y84 w380 h118 Report +LV0x10002 -Hdr Background252526 cFFFFFF",
         ["Name", "State", "Path", "Sequence", "StatusKey"])
     subItemDrawProbe := GuiSmokeSubItemDrawProbe()
     listSelectionPresenter := GuiSmokeListViewSelectionPresenter(list, "",
@@ -222,6 +222,9 @@ try {
         RestoreColumn: 4,
         RestoreSortOptions: "Integer Center"
     })
+    AssertGuiSmoke(pseudoHeader.FontSize >= 11
+            && pseudoHeader.Height >= 32,
+        "Pseudo header retained a small font or insufficient row height")
     AssertGuiSmoke(pseudoHeader.SetBounds(16, 54, [48, 220, 110], 380),
         "Pseudo header bounds were not applied")
     for headerCell in pseudoHeader.Cells {
@@ -352,7 +355,7 @@ try {
         && GetGuiSmokePathOrder(list) == customPathOrder,
         "Pseudo header pointer third click did not restore custom order")
     semanticList := owner.Add("ListView",
-        "x410 y82 w1 h1 Report -Hdr", ["Name", "State", "Path",
+        "x410 y84 w1 h1 Report -Hdr", ["Name", "State", "Path",
             "Sequence", "StatusKey"])
     semanticList.ModifyCol(5, 0)
     semanticHeader := ListViewPseudoHeader(owner, semanticList, [
@@ -426,7 +429,8 @@ try {
         AssertGuiSmoke(headerRect.Left == expectedCellX
             && headerRect.Top == Round(54 * visibleScale)
             && headerRect.Right - headerRect.Left == expectedWidth
-            && headerRect.Bottom - headerRect.Top == Round(28 * visibleScale),
+            && headerRect.Bottom - headerRect.Top
+                == Round(pseudoHeader.Height * visibleScale),
             "Visible pseudo header deferred layout produced incorrect bounds")
         expectedCellX += expectedWidth
     }
@@ -435,13 +439,13 @@ try {
         "Visible pseudo header bounds were not restored")
     atomicNoopResult := AtomicControlLayout.Apply(owner, [
         {Control: pseudoHeader.Background, X: 16, Y: 54,
-            Width: 380, Height: 28},
+            Width: 380, Height: pseudoHeader.Height},
         {Control: pseudoHeader.Cells[1], X: 16, Y: 54,
-            Width: 48, Height: 28},
+            Width: 48, Height: pseudoHeader.Height},
         {Control: pseudoHeader.Cells[2], X: 64, Y: 54,
-            Width: 220, Height: 28},
+            Width: 220, Height: pseudoHeader.Height},
         {Control: pseudoHeader.Cells[3], X: 284, Y: 54,
-            Width: 110, Height: 28}
+            Width: 110, Height: pseudoHeader.Height}
     ], {ParentColor: "333333"})
     AssertGuiSmoke(atomicNoopResult.Status == AtomicControlLayout.Unchanged,
         "Unchanged atomic layout did not take its no-paint fast path")

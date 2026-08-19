@@ -1,6 +1,6 @@
 ﻿# 小助手自身更新的后台助手。
 # 检查模式只写入原子结果文件；应用模式等待主进程完整退出后再替换受管文件并重启。
-# 个人配置和维护会话从不进入更新清单，因此 EXE 与源码更新都不会覆盖用户状态。
+# 个人配置从不进入更新清单，因此 EXE 与源码更新都不会覆盖用户状态。
 
 [CmdletBinding()]
 param(
@@ -610,7 +610,7 @@ function Assert-ManagedRelativePath {
         throw (Get-UpdateText '更新清单包含不安全路径：{0}' `
             'Unsafe update path: {0}' @($RelativePath))
     }
-    if ($RelativePath -in @('watchdog.ini', 'watchdog.maintenance.ini')) {
+    if ($RelativePath -eq 'watchdog.ini') {
         throw (Get-UpdateText '更新清单试图覆盖个人配置：{0}' `
             'Update manifest attempted to manage personal state: {0}' `
             @($RelativePath))
@@ -745,7 +745,7 @@ function New-PersonalStateSnapshot {
     New-Item -ItemType Directory -Force -Path $backupRoot | Out-Null
     $items = [System.Collections.Generic.List[object]]::new()
     try {
-        foreach ($name in @('watchdog.ini', 'watchdog.maintenance.ini')) {
+        foreach ($name in @('watchdog.ini')) {
             $source = Join-Path $root $name
             $existed = Test-Path -LiteralPath $source -PathType Leaf
             if ($existed) {

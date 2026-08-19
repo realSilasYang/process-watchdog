@@ -6,7 +6,6 @@ class GuiModuleRegistry {
     __New(mainGui) {
         this.display := CustomDisplayDialog(mainGui)
         this.environment := EnvironmentSettingsDialog(mainGui)
-        this.maintenance := MaintenanceSettingsDialog(mainGui)
         this.log := LogWindow(mainGui)
         this.batchOutputLogNotice := BatchOutputLogNoticeWindow(mainGui)
         this.settings := SettingsWindow(mainGui)
@@ -45,7 +44,6 @@ class GuiModuleRegistry {
         try this.supportInfo.Close()
         try this.display.Close()
         try this.environment.Close()
-        try this.maintenance.Close()
         try this.tooltip.Close()
         try this.historyToast.Close()
         try this.targetRelocation.Shutdown()

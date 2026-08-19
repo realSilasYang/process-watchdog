@@ -366,6 +366,82 @@ class ShortcutTargetResolver {
             candidates, false)
     }
 
+    IsPathInsideRoot(path, rootPath) {
+        candidate := this.Callbacks.CanonicalPath.Call(path)
+        root := RTrim(this.Callbacks.CanonicalPath.Call(rootPath), "\")
+        return candidate != "" && root != ""
+            && InStr(candidate, root "\") == 1
+    }
+
+    IsEligibleResidentPath(candidatePath, launcherCanonical,
+        installRoot) {
+        candidateCanonical := this.Callbacks.CanonicalPath.Call(candidatePath)
+        if (candidateCanonical == ""
+            || candidateCanonical == launcherCanonical
+            || !this.IsPathInsideRoot(candidatePath, installRoot)) {
+            return false
+        }
+        SplitPath(candidatePath, &candidateName, , &candidateExtension)
+        return RegExMatch(candidateExtension, "i)^(?:exe|com)$")
+            && !this.IsAuxiliaryExecutableName(candidateName)
+    }
+
+    FindObservedResidentCandidate(launcherPath) {
+        SplitPath(launcherPath, , &installRoot, &launcherExtension)
+        if !RegExMatch(launcherExtension, "i)^(?:exe|com)$")
+            || installRoot == "" || !DirExist(installRoot) {
+            return ""
+        }
+        try snapshotIndex := this.ProcessSnapshots.GetIndex(30000)
+        catch
+            return ""
+        if !IsObject(snapshotIndex)
+            return ""
+        try evidence := snapshotIndex.CollectExecutablePathsInRoot(
+            installRoot)
+        catch
+            return ""
+        if !IsObject(evidence) || !evidence.HasOwnProp("Running")
+            || !evidence.HasOwnProp("Uncertain") {
+            return ""
+        }
+
+        launcherCanonical := this.Callbacks.CanonicalPath.Call(launcherPath)
+        candidates := Map()
+        candidates.CaseSense := "Off"
+        for candidatePath in evidence.Running {
+            candidateCanonical := this.Callbacks.CanonicalPath.Call(
+                candidatePath)
+            ; 启动器本身仍在运行时，快捷方式的直接身份仍然有效。
+            if candidateCanonical == launcherCanonical
+                return ""
+            if this.IsEligibleResidentPath(candidatePath,
+                launcherCanonical, installRoot) {
+                ; 快照路径本身是强进程证据，但只有磁盘目标仍可读取时才能
+                ; 持久化为下一次启动和探活使用的身份。
+                if !this.IsUsableTarget(candidatePath)
+                    return ""
+                candidates[candidateCanonical] := candidatePath
+            }
+        }
+        for candidatePath in evidence.Uncertain {
+            candidateCanonical := this.Callbacks.CanonicalPath.Call(
+                candidatePath)
+            if candidateCanonical == launcherCanonical
+                return ""
+            ; 另一个非辅助候选的创建身份无法复核时，唯一性并未成立。
+            if this.IsEligibleResidentPath(candidatePath,
+                launcherCanonical, installRoot) {
+                return ""
+            }
+        }
+        if candidates.Count != 1
+            return ""
+        for candidatePath in candidates
+            return candidates[candidatePath]
+        return ""
+    }
+
     ResolveEffective(path, allowMissing := false, &resolutionSource := "") {
         resolutionSource := ""
         msiTarget := this.ResolveMsiTarget(path)
@@ -395,6 +471,12 @@ class ShortcutTargetResolver {
                     resolutionSource := "安装目录特征"
                     return portableResident
                 }
+            }
+            observedResident := this.FindObservedResidentCandidate(
+                descriptor.TargetPath)
+            if observedResident != "" {
+                resolutionSource := "安装目录特征"
+                return observedResident
             }
             resolutionSource := "快捷方式目标"
             return descriptor.TargetPath

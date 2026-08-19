@@ -56,7 +56,7 @@ them in isolated temporary directories, and remove their temporary copies.
 - External GitHub Actions must be pinned to a full commit SHA with a major-version
   comment. Modified workflows must pass the pinned actionlint version. Official
   publication is manual from `main` only.
-- Never commit personal `watchdog.ini`, maintenance sessions, diagnostics,
+- Never commit personal `watchdog.ini`, diagnostics,
   private paths, arguments, credentials, build products, or temporary probes.
 
 ## Minimum validation
@@ -87,7 +87,7 @@ testing. State clearly which combinations remain untested.
 A pull request should explain the problem, user-visible result, key design,
 compatibility impact, commands actually run, and untested risks. Include a
 redacted screenshot or recording for UI work. For configuration work, describe
-the impact on `watchdog.ini`, `watchdog.maintenance.ini`, backup, and recovery.
+the impact on `watchdog.ini`, backup, and recovery.
 
 User-visible changes must update both README languages, both relevant user
 documents, and the changelog. Organize a release with the

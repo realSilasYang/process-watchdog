@@ -35,7 +35,6 @@ mismatch, or application shutdown rejects the entire result.
   directory-change evidence.
 - `src/Execution` centralizes external effects such as launch, window close,
   Ctrl+C, and staged termination.
-- `src/Maintenance` owns update-protection state, evidence matching, and session recovery.
 - `src/UI` owns ListView projection, icon resources, interaction registration,
   and window ownership.
 - `src/Diagnostics` creates local diagnostics without automatic upload.
@@ -92,15 +91,15 @@ restart/verification tokens. When restart preflight or launch verification lacks
 a fresh snapshot, it makes one asynchronous generation-bound request. A result
 may resume the task only when it belongs to that request and arrives before the
 finite deadline; permanently unreadable evidence is not treated as a transient
-wait. Pause, delete, launch- or probe-input changes, undo, maintenance protection,
-and shutdown advance the generation and clear the handshake. Re-adding the same
+wait. Pause, delete, launch- or probe-input changes, undo, and shutdown advance
+the generation and clear the handshake. Re-adding the same
 path cannot accept a callback from the previous controller.
 
 All targets share one `WatchdogScheduler`. A due-time min-heap and one resettable
 timer replace a permanent timer per item. Heap operations use short critical
 sections; business callbacks run in normal thread state. `GuardWorkGate`
-serializes main monitoring, updater scanning, directory events, and explicit
-maintenance. A busy gate briefly reschedules work without blocking the UI. The
+serializes main monitoring and restart verification. A busy gate briefly
+reschedules work without blocking the UI. The
 gate records current and recent owners, hold times, contention sources, and
 rate-limited sustained-contention warnings for diagnostic export.
 
@@ -108,32 +107,11 @@ After fast retries are exhausted, `RestartPolicy` continues at the final
 configured interval; successful probing resets the count. Controller ownership
 is rechecked before and after any launch or stop operation that can wait.
 
-## Update protection
+## Content relocation
 
-Update protection is disabled by default. When enabled it uses the `Normal`,
-`Arbitrating`, `Updating`, `Stabilizing`, `Recovering`, and `TimedOut` states. An
-updater needs evidence such as a full path, installation root, command line that
-references the root, or a target parent-child chain. Actor caches use PID plus
-creation identity, so PID reuse cannot extend protection.
-
-After an update that changes the target file, a scoped updater signature can be
-learned. Only the full path of a dedicated program inside the installation root
-can become permanent evidence; process names, global installer tools, temporary
-paths, and paths without a scope root cannot. When a shortcut target moves, the
-final installation root is resolved before learned signatures are checked.
-Unfinished sessions preserve confirmed transient updater identities and pending
-learning candidates atomically in `watchdog.maintenance.ini`, and are used only
-while a real unfinished state exists.
-
-Normal content relocation still requires the original exact size and complete
-SHA-256. When a direct-file target is under a recognized version directory,
-update protection may accept exactly one same-named entry under the same parent
-as a restricted candidate after a target-file change. The candidate's own
-SHA-256 is recorded and continuously verified, and relocation still requires
-user confirmation; ambiguity or an incomplete scan prevents migration. During
-update recovery only, an inaccessible process image may be accepted when the
-unique same-named process has the pre-update creation identity or recent-start
-evidence. Normal probing never enables this fallback.
+Content relocation always requires the original exact size and complete SHA-256,
+plus explicit user confirmation. Ambiguous candidates or incomplete scans never
+change the monitored path.
 
 ## Configuration and history
 
@@ -154,7 +132,7 @@ plain-source, or Git-source installation requires only its own applicable assets
 
 After the parent exits, the installer verifies SHA-256, canonical version, package
 kind, entry metadata, and the release manifest before replacing managed paths. A
-manifest may not include `watchdog.ini` or `watchdog.maintenance.ini`. Old and new
+manifest may not include `watchdog.ini`. Old and new
 manifests may change directory granularity; backups collapse their union to outermost
 paths. The current entry is copied to backup and remains available until one final
 same-directory atomic replacement after other paths are in place. The new entry must
@@ -164,7 +142,7 @@ assembly, and guard-timer startup, followed by a short stability observation. Be
 that normal start, the installer takes byte-accurate snapshots of both personal-state
 files. Timeout, early exit, a mismatched signal, or failure to start the core guard
 terminates the new process, restores old files or the prior Git commit, and restores
-the pre-start `watchdog.ini` and `watchdog.maintenance.ini` state, including removing
+the pre-start `watchdog.ini` state, including removing
 a file that did not previously exist. Both ordinary clones and Git worktrees require
 a clean tracked worktree and a fast-forward to the official tag.
 
@@ -176,15 +154,15 @@ Enabled|RunAsAdmin|Path|WorkDir|Args|EnvVars|ResolvedTarget|ResolvedTargetManual
 
 Boolean fields accept only `0` or `1`; non-empty text must decode losslessly. A
 wrong field count, legacy plain text, or damaged encoding is not registered as a
-target. Its original application, display, launch, content-identity, and update
+target. Its original application, display, launch, and content-identity
 values are moved to `[Recovery]`. The optional `[Launch]` section uses the
 matching `AppN` key for two independent `<HEX>` fields: runtime path and runtime
 arguments. The optional `[Identity]` section stores a direct file target's
 content baseline as `FileSize|SHA256`, allowing unchanged content to be
 confirmed after a file name, directory, or volume changes without treating file
 IDs or directory notifications as identity evidence. These sections are
-rewritten in the same atomic transaction as `[Apps]`, `[Maintenance]`,
-`[Display]`, and `[Recovery]`. This keeps the existing nine-field record stable
+rewritten in the same atomic transaction as `[Apps]`, `[Display]`, and
+`[Recovery]`. This keeps the existing nine-field record stable
 while ensuring ordering, undo, redo, and recovery never drop launch-environment
 or content-identity data.
 

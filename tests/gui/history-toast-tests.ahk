@@ -97,6 +97,15 @@ RunHistoryToastTests() {
         AssertHistoryToast(historyToast.textControl.Text
                 == "已撤销：添加守护对象：Smoke target",
             "历史气泡没有保留具体操作文字")
+        toastFontHandle := SendMessage(Win32.WM_GETFONT, 0, 0,
+            historyToast.textControl.Hwnd)
+        toastLogFont := Buffer(92, 0)
+        AssertHistoryToast(toastFontHandle
+                && DllCall("gdi32\GetObjectW", "Ptr", toastFontHandle, "Int",
+                    toastLogFont.Size, "Ptr", toastLogFont, "Int")
+                && Abs(NumGet(toastLogFont, 0, "Int"))
+                    >= Max(1, Floor(10 * dpi / 72)),
+            "历史气泡实际字号低于 10pt")
 
         ReportHistoryToastStage("layout")
         toastWindowRect := Buffer(16, 0)

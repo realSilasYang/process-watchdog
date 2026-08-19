@@ -64,7 +64,7 @@ body:
     id: compatibility
     attributes:
       label: 兼容性与数据影响
-      description: 请说明是否可能影响现有 watchdog.ini、守护语义、升级保护、撤销重做、管理员权限或系统集成。
+      description: 请说明是否可能影响现有 watchdog.ini、守护语义、停止后恢复策略、撤销重做、管理员权限或系统集成。
 
   - type: textarea
     id: notes

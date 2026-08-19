@@ -114,6 +114,55 @@ class SvgStatusBarPresenter {
             IconSize: iconSize, IconGap: iconGap}
     }
 
+    CalculateGapLayout(width, contentWidth, itemCount) {
+        gapCount := Max(0, Integer(itemCount) - 1)
+        if !gapCount
+            return {BaseGap: 0, ExtraGaps: 0}
+        available := Max(0, Integer(width) - Integer(contentWidth))
+        return {BaseGap: available // gapCount,
+            ExtraGaps: Mod(available, gapCount)}
+    }
+
+    MinimumGapPixels(dpi) {
+        return Max(0, Round(this.groupGapDip * dpi / 96))
+    }
+
+    GetMinimumWidthDip() {
+        if !this.hwnd || !DllCall("user32\IsWindow", "Ptr", this.hwnd,
+                "Int") || !this.items.Length
+            return 0
+        dpi := DllCall("user32\GetDpiForWindow", "Ptr", this.hwnd, "UInt")
+        if !dpi
+            dpi := 96
+        controlDc := DllCall("user32\GetDC", "Ptr", this.hwnd, "Ptr")
+        if !controlDc
+            return 0
+        measureDc := DllCall("gdi32\CreateCompatibleDC", "Ptr", controlDc,
+            "Ptr")
+        if !measureDc {
+            DllCall("user32\ReleaseDC", "Ptr", this.hwnd, "Ptr", controlDc)
+            return 0
+        }
+        previousFont := 0
+        try {
+            fontHandle := SendMessage(Win32.WM_GETFONT, 0, 0, this.hwnd)
+            if fontHandle
+                previousFont := DllCall("gdi32\SelectObject", "Ptr",
+                    measureDc, "Ptr", fontHandle, "Ptr")
+            layout := this.MeasureItems(measureDc, dpi, 0)
+            gapCount := Max(0, this.items.Length - 1)
+            requiredPixels := layout.TotalWidth
+                + this.MinimumGapPixels(dpi) * gapCount
+            return Ceil(requiredPixels * 96 / dpi)
+        } finally {
+            if previousFont
+                DllCall("gdi32\SelectObject", "Ptr", measureDc,
+                    "Ptr", previousFont, "Ptr")
+            DllCall("gdi32\DeleteDC", "Ptr", measureDc)
+            DllCall("user32\ReleaseDC", "Ptr", this.hwnd, "Ptr", controlDc)
+        }
+    }
+
     DrawSeparator(hdc, x, height, dpi) {
         pen := DllCall("gdi32\CreatePen", "Int", 0,
             "Int", Max(1, Round(dpi / 96)), "UInt",
@@ -176,17 +225,9 @@ class SvgStatusBarPresenter {
                 "UInt")
             if !dpi
                 dpi := 96
-            normalGap := Max(4, Round(this.groupGapDip * dpi / 96))
-            layout := this.MeasureItems(memoryDc, dpi, normalGap)
-            groupGap := normalGap
-            if layout.TotalWidth > width && this.items.Length > 1 {
-                minimumGap := Max(2, Round(5 * dpi / 96))
-                reducible := normalGap - minimumGap
-                neededPerGap := Ceil((layout.TotalWidth - width)
-                    / (this.items.Length - 1))
-                groupGap := normalGap - Min(reducible, neededPerGap)
-                layout := this.MeasureItems(memoryDc, dpi, groupGap)
-            }
+            layout := this.MeasureItems(memoryDc, dpi, 0)
+            gapLayout := this.CalculateGapLayout(width, layout.TotalWidth,
+                this.items.Length)
 
             x := 0
             for index, item in this.items {
@@ -221,8 +262,11 @@ class SvgStatusBarPresenter {
                     item.Text, "Int", -1, "Ptr", textRect,
                     "UInt", 0x00008824, "Int")
                 x += textExtent.Width
-                if index < this.items.Length
-                    x += groupGap
+                if index < this.items.Length {
+                    x += gapLayout.BaseGap
+                    if index <= gapLayout.ExtraGaps
+                        x++
+                }
             }
             DllCall("gdi32\BitBlt", "Ptr", hdc, "Int", 0, "Int", 0,
                 "Int", width, "Int", height, "Ptr", memoryDc,

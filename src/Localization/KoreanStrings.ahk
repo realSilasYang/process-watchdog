@@ -31,12 +31,6 @@ class KoreanStrings {
             "   ⚠️ 配置未保存",
                 "   ⚠️ 설정이 저장되지 않음")
         catalog.Set(
-            "  --maintenance-begin `"目标完整路径`"    开始维护",
-                "  --maintenance-begin `"대상의 전체 경로`"    유지 관리 시작")
-        catalog.Set(
-            "  --maintenance-end `"目标完整路径`"      结束维护",
-                "  --maintenance-end `"대상의 전체 경로`"      유지 관리 종료")
-        catalog.Set(
             " 已保留并保存此前添加的 {1} 个守护对象。",
                 " 이전에 추가한 모니터링 항목 {1}개를 유지하고 저장했습니다.")
         catalog.Set(
@@ -46,14 +40,8 @@ class KoreanStrings {
             "`; AllowForceTerminate：正常退出超时后是否允许强制结束进程。",
                 "`; AllowForceTerminate: 정상 종료 대기 시간이 지난 후 프로세스 강제 종료를 허용할지 여부입니다.")
         catalog.Set(
-            "`; AppN 与 [Apps] 中同名的守护对象一一对应，值为软件升级保护的 <HEX> 编码结构。",
-                "`; 각 AppN 항목은 [Apps]의 같은 이름 항목에 대응하며, 값에는 <HEX>로 인코딩된 업데이트 보호 구조가 저장됩니다.")
-        catalog.Set(
             "`; AppN 与 [Apps] 中同名的守护对象一一对应；三个字段依次为名称、图标路径和圆点颜色。",
                 "`; 각 AppN 항목은 [Apps]의 같은 이름 항목에 대응합니다. 세 필드는 이름, 아이콘 경로, 점 색상입니다.")
-        catalog.Set(
-            "`; 名称与图标路径使用 <HEX> 编码；全部留空时使用目标自身信息且不显示圆点。",
-                "`; 이름과 아이콘 경로는 <HEX>로 인코딩됩니다. 모두 비어 있으면 대상 자체 정보를 사용하고 점은 표시하지 않습니다.")
         catalog.Set(
             "`; CheckInterval：状态检查间隔，单位为毫秒，范围 500～86400000。",
                 "`; CheckInterval: 상태 확인 간격(밀리초)이며, 범위는 500～86400000입니다.")
@@ -109,9 +97,6 @@ class KoreanStrings {
             "`; UiLanguage：界面语言；auto 表示跟随系统，也可填写受支持的语言代码。",
                 "`; UiLanguage: 인터페이스 언어입니다. auto는 시스템 언어를 따르며, 지원되는 언어 코드를 직접 지정할 수도 있습니다.")
         catalog.Set(
-            "`; 仅保存主窗口显示名称、图标来源和序号圆点颜色，不参与进程识别、启动或升级保护。",
-                "`; 메인 창에 표시할 이름, 아이콘 원본, 번호 점 색상만 저장합니다. 프로세스 식별, 실행, 업데이트 보호에는 영향을 주지 않습니다.")
-        catalog.Set(
             "`; 内部字段包括 Enabled、RootIsCustom、DetectionSeconds、StableSeconds、MaxWaitSeconds、InstallRoot 和 Actor。",
                 "`; 내부 필드에는 Enabled, RootIsCustom, DetectionSeconds, StableSeconds, MaxWaitSeconds, InstallRoot, Actor가 포함됩니다.")
         catalog.Set(
@@ -120,9 +105,6 @@ class KoreanStrings {
         catalog.Set(
             "`; 布尔值使用 1 表示开启、0 表示关闭；<HEX> 内容由软件自动编码和解码。",
                 "`; 부울 값은 켜짐을 1, 꺼짐을 0으로 표시합니다. <HEX> 내용은 프로그램이 자동으로 인코딩하고 디코딩합니다.")
-        catalog.Set(
-            "`; 建议通过“软件升级保护”界面修改，不要直接编辑编码内容。",
-                "`; 인코딩된 내용을 직접 편집하지 말고 “업데이트 보호” 화면에서 변경하세요.")
         catalog.Set(
             "`; 无法安全解析的监控记录会暂存于此，避免静默丢失；正常情况下无需手动修改。",
                 "`; 안전하게 분석할 수 없는 모니터링 레코드는 조용히 유실되지 않도록 여기에 보관됩니다. 일반적으로 직접 수정할 필요가 없습니다.")
@@ -160,9 +142,6 @@ class KoreanStrings {
             "• EXE 版更新完整编译包；Git 源码版仅在受跟踪文件无修改且可快速前进时更新；其他源码版使用源码发行包。",
                 "• EXE 버전은 전체 컴파일 패키지로 업데이트합니다. Git 소스 버전은 추적 파일에 변경이 없고 릴리스 태그까지 fast-forward할 수 있을 때만 업데이트합니다. 다른 소스 설치는 소스 배포 패키지를 사용합니다.")
         catalog.Set(
-            "• 主界面的“日志”显示本次运行中的监控、重启、升级保护和操作记录，并会自动更新。",
-                "• 메인 창의 “로그”에는 현재 실행의 모니터링, 다시 시작, 업데이트 보호, 사용자 작업 기록이 표시되며 자동으로 갱신됩니다.")
-        catalog.Set(
             "• 也可将文件或文件夹直接拖放到主列表；已经存在的守护对象不会重复添加。",
                 "• 파일이나 폴더를 메인 목록으로 직접 끌어 놓을 수도 있습니다. 이미 있는 항목은 중복으로 추가되지 않습니다.")
         catalog.Set(
@@ -172,23 +151,11 @@ class KoreanStrings {
             "• 关闭主窗口后，小助手继续在托盘运行。托盘菜单可重新显示主界面、重新加载或退出程序。",
                 "• 메인 창을 닫아도 도우미는 시스템 트레이에서 계속 실행됩니다. 트레이 메뉴에서 메인 창 표시, 다시 로드 또는 종료를 선택할 수 있습니다.")
         catalog.Set(
-            "• 升级等待超时或判断不正确时，可选择“结束升级等待并恢复守护”；恢复前仍会检查目标文件是否可以安全启动。",
-                "• 업데이트 대기 시간이 초과되거나 잘못 감지된 경우 “업데이트 대기 종료 및 모니터링 재개”를 선택할 수 있습니다. 재개 전에도 대상 파일을 안전하게 시작할 수 있는지 확인합니다.")
-        catalog.Set(
             "• 单击选择守护对象；按住 Ctrl 或 Shift 可多选；拖动列表行可调整守护顺序。",
                 "• 클릭하여 항목을 선택합니다. Ctrl 또는 Shift를 누른 채 여러 항목을 선택할 수 있고, 목록 행을 끌어 모니터링 순서를 바꿀 수 있습니다.")
         catalog.Set(
             "• 双击守护对象或按 F2 可编辑完整路径。Delete 删除，Ctrl+Z 撤销，Ctrl+Shift+Z 或 Ctrl+Y 重做。",
                 "• 항목을 두 번 클릭하거나 F2를 눌러 전체 경로를 편집합니다. Delete로 삭제하고 Ctrl+Z로 실행 취소하며 Ctrl+Shift+Z 또는 Ctrl+Y로 다시 실행합니다.")
-        catalog.Set(
-            "• 发现新版后会先询问；确认后校验完整发行包，退出当前实例、替换受管文件并自动重启，不会覆盖个人配置和升级保护会话。",
-                "• 새 버전을 찾으면 먼저 확인을 요청합니다. 승인하면 전체 배포 패키지를 검증하고 현재 인스턴스를 종료한 뒤 관리 파일을 교체하고 자동으로 다시 시작합니다. 개인 설정과 업데이트 보호 세션은 덮어쓰지 않습니다.")
-        catalog.Set(
-            "• 可控的更新脚本可显式发送维护指令：",
-                "• 직접 관리하는 업데이트 스크립트에서는 명시적 유지 관리 명령을 보낼 수도 있습니다:")
-        catalog.Set(
-            "• 在守护对象右键菜单打开“软件升级保护”，可调整安装足迹目录、退出检测窗口、文件稳定等待和最长升级等待，也可清除已学习的更新程序特征。",
-                "• 항목의 오른쪽 클릭 메뉴에서 “업데이트 보호”를 열면 설치 폴더, 종료 감지 시간, 파일 안정 대기, 최대 업데이트 대기를 조정하거나 학습한 업데이트 프로그램 특징을 지울 수 있습니다.")
         catalog.Set(
             "• 多个守护对象状态一致时，“暂停”按钮会统一暂停或恢复；状态混合时会逐项反转。",
                 "• 선택한 모든 항목의 상태가 같으면 “일시 중지” 버튼으로 한꺼번에 일시 중지하거나 재개합니다. 상태가 섞여 있으면 항목별로 전환합니다.")
@@ -204,9 +171,6 @@ class KoreanStrings {
         catalog.Set(
             "• 日志：设置运行日志内存上限、批处理输出日志的保存目录、保留时间和启动时清理策略。",
                 "• 로그: 실행 로그의 메모리 보관 한도, 배치 출력 로그 폴더, 보관 기간, 시작 시 정리 방법을 설정합니다.")
-        catalog.Set(
-            "• 暂停守护对象会取消它的重试和升级检测；恢复后会重新检查目标状态。",
-                "• 항목을 일시 중지하면 해당 항목의 재시도와 업데이트 감지가 취소됩니다. 재개하면 대상 상태를 다시 확인합니다.")
         catalog.Set(
             "• 检测到目标停止后，会先确认状态，再按“重启等待序列”依次重试；连续失败时采用后续等待时间，避免频繁拉起。",
                 "• 대상 중지를 감지하면 상태를 확인한 뒤 “다시 시작 대기 순서”에 따라 차례로 재시도합니다. 연속 실패 시 뒤쪽 대기 시간을 사용하여 빠른 재시작 반복을 막습니다.")
@@ -226,9 +190,6 @@ class KoreanStrings {
             "• 启动 / 监控：设置状态检查间隔、重启等待序列、启动后是否显示主窗口、是否检查小助手更新，以及文件夹批量导入是否递归。",
                 "• 시작 / 모니터링: 상태 확인 간격, 다시 시작 대기 순서, 시작 후 메인 창 표시와 도우미 업데이트 확인 여부, 폴더 일괄 가져오기 시 재귀 검사 여부를 설정합니다.")
         catalog.Set(
-            "• 确认升级后会暂缓自动拉起；相关活动结束且目标文件稳定后，会自动恢复守护。真实升级过程中识别到的更新程序特征会自动记录。",
-                "• 업데이트를 확인하면 자동 시작을 잠시 멈춥니다. 관련 작업이 끝나고 대상 파일이 안정되면 모니터링을 자동으로 재개합니다. 실제 업데이트 중 확인한 업데이트 프로그램 특징은 자동으로 학습합니다.")
-        catalog.Set(
             "• 程序：EXE、COM、MSC。",
                 "• 앱: EXE, COM, MSC.")
         catalog.Set(
@@ -237,9 +198,6 @@ class KoreanStrings {
         catalog.Set(
             "• 脚本：AHK、Python、JavaScript、VBScript、PowerShell、批处理，以及 Ruby、Perl、PHP、Lua、JAR、Shell 等。",
                 "• 스크립트: AHK, Python, JavaScript, VBScript, PowerShell, 배치 파일, Ruby, Perl, PHP, Lua, JAR, Shell 등.")
-        catalog.Set(
-            "• 软件升级保护默认关闭。需要时在守护对象右键菜单打开“软件升级保护”，勾选“自动识别升级并保护启动过程”并保存。",
-                "• 업데이트 보호는 기본적으로 꺼져 있습니다. 필요하면 항목의 오른쪽 클릭 메뉴에서 “업데이트 보호”를 열고 “업데이트 자동 감지 및 시작 과정 보호”를 선택한 뒤 저장하세요.")
         catalog.Set(
             "• 选中守护对象后可暂停、恢复或删除。暂停只停止守护，不会关闭当前正在运行的目标。",
                 "• 항목을 선택하면 일시 중지, 재개 또는 삭제할 수 있습니다. 일시 중지는 모니터링만 멈추며 현재 실행 중인 대상을 종료하지 않습니다.")
@@ -253,29 +211,14 @@ class KoreanStrings {
             "⏳ 正在结束运行...",
                 "⏳ 대상 종료 중...")
         catalog.Set(
-            "⏳ 判断是否正在升级",
-                "⏳ 업데이트 중인지 확인 중")
-        catalog.Set(
-            "⏳ 升级完成，准备恢复",
-                "⏳ 업데이트 완료, 재개 준비 중")
-        catalog.Set(
             "⏳ 启动倒计时 {1} 秒",
                 "⏳ {1}초 후 시작")
         catalog.Set(
             "⏳ 启动失败，稍后自动重试",
                 "⏳ 시작 실패, 나중에 자동 재시도")
         catalog.Set(
-            "⏳ 确认升级文件稳定",
-                "⏳ 업데이트 후 파일 안정 상태 확인 중")
-        catalog.Set(
-            "⏳ 确认升级文件稳定 {1}s",
-                "⏳ 업데이트 후 파일 안정 상태 확인 중 {1}s")
-        catalog.Set(
             "⏳ 稍后自动重试 {1} 秒",
                 "⏳ {1}초 후 자동 재시도")
-        catalog.Set(
-            "⏳ 等待安全启动条件",
-                "⏳ 안전 시작 조건 대기 중")
         catalog.Set(
             "⏳ 等待进程状态...",
                 "⏳ 프로세스 상태 대기 중...")
@@ -298,9 +241,6 @@ class KoreanStrings {
             "⚙️ 启动参数：{1}`n",
                 "⚙️ 실행 인수: {1}`n")
         catalog.Set(
-            "⚠️ 升级等待超时",
-                "⚠️ 업데이트 대기 시간 초과")
-        catalog.Set(
             "⚠️ 疑似停止",
                 "⚠️ 중지된 것으로 의심됨")
         catalog.Set(
@@ -312,9 +252,6 @@ class KoreanStrings {
         catalog.Set(
             "✅ 运行中",
                 "✅ 실행 중")
-        catalog.Set(
-            "✅ 运行：{1}   🚫 停止：{2}   ⏳ 恢复：{3}   🔄 升级：{4}   ⏸️ 暂停：{5}   ❌ 失效：{6}   ｜   🎯 总计：{7}",
-                "✅ 실행: {1}   🚫 중지: {2}   ⏳ 복구: {3}   🔄 업데이트: {4}   ⏸️ 일시 중지: {5}   ❌ 무효: {6}   ｜   🎯 합계: {7}")
         catalog.Set(
             "✒️ 编辑完整路径（F2）",
                 "✒️ 전체 경로 편집（F2）")
@@ -346,14 +283,8 @@ class KoreanStrings {
             "一、快速上手",
                 "1. 빠른 시작")
         catalog.Set(
-            "七、软件升级保护",
-                "7. 업데이트 보호")
-        catalog.Set(
             "三、主界面操作",
                 "3. 메인 창 사용법")
-        catalog.Set(
-            "不允许的升级保护阶段转换：{1}",
-                "허용되지 않은 업데이트 보호 단계 전환: {1}")
         catalog.Set(
             "不支持的启动规格类型",
                 "지원하지 않는 실행 사양 형식")
@@ -382,9 +313,6 @@ class KoreanStrings {
             "代码热重载完毕，界面已恢复显示。",
                 "코드 핫 리로드가 끝나 화면을 다시 표시했습니다.")
         catalog.Set(
-            "仲裁期间捕获到升级活动",
-                "판정 중 업데이트 활동 감지")
-        catalog.Set(
             "使用说明",
                 "사용 안내")
         catalog.Set(
@@ -393,9 +321,6 @@ class KoreanStrings {
         catalog.Set(
             "保存",
                 "저장")
-        catalog.Set(
-            "保存升级保护恢复状态失败：{1}",
-                "업데이트 보호 복구 상태를 저장하지 못했습니다: {1}")
         catalog.Set(
             "保存失败",
                 "저장 실패")
@@ -411,9 +336,6 @@ class KoreanStrings {
         catalog.Set(
             "保存设置失败，请查看运行日志。",
                 "설정을 저장하지 못했습니다. 실행 로그를 확인하세요.")
-        catalog.Set(
-            "保存软件升级保护设置失败，请查看运行日志。",
-                "업데이트 보호 설정을 저장하지 못했습니다. 실행 로그를 확인하세요.")
         catalog.Set(
             "保存运行参数失败：{1}",
                 "실행 설정을 저장하지 못했습니다: {1}")
@@ -450,39 +372,6 @@ class KoreanStrings {
         catalog.Set(
             "刷新运行日志窗口失败，已暂停自动刷新：{1}",
                 "실행 로그 창을 새로 고치지 못해 자동 갱신을 멈췄습니다: {1}")
-        catalog.Set(
-            "升级保护仅支持具有有效完整路径的程序或脚本，安装足迹目录必须存在并包含目标文件。",
-                "업데이트 보호는 유효한 전체 경로를 가진 앱 또는 스크립트만 지원합니다. 설치 폴더가 존재하고 대상 파일을 포함해야 합니다.")
-        catalog.Set(
-            "升级保护仍在进行",
-                "업데이트 보호가 아직 진행 중")
-        catalog.Set(
-            "升级保护初始化时无法建立进程基线，将在下一轮重试。",
-                "업데이트 보호 초기화 중 프로세스 기준 상태를 만들지 못했습니다. 다음 주기에 다시 시도합니다.")
-        catalog.Set(
-            "升级保护协调器未能初始化，核心守护不会启动。",
-                "업데이트 보호 조정기를 초기화하지 못해 핵심 모니터링을 시작하지 않습니다.")
-        catalog.Set(
-            "升级保护配置",
-                "업데이트 보호 설정")
-        catalog.Set(
-            "升级文件监听",
-                "업데이트 파일 감시")
-        catalog.Set(
-            "升级文件监听异常（{1}）：{2}",
-                "업데이트 파일 감시 오류（{1}）: {2}")
-        catalog.Set(
-            "升级文件监听异常：{1}",
-                "업데이트 파일 감시 오류: {1}")
-        catalog.Set(
-            "升级等待已超时",
-                "업데이트 대기 시간 초과")
-        catalog.Set(
-            "升级进程扫描",
-                "업데이트 프로세스 검사")
-        catalog.Set(
-            "升级进程扫描异常：{1}",
-                "업데이트 프로세스 검사 오류: {1}")
         catalog.Set(
             "参数错误",
                 "매개변수 오류")
@@ -583,14 +472,8 @@ class KoreanStrings {
             "守护对象：",
                 "감시 대상:")
         catalog.Set(
-            "安全启动门暂缓启动：{1}（{2}）",
-                "안전 시작 게이트가 실행을 보류했습니다: {1}（{2}）")
-        catalog.Set(
             "安装目录特征",
                 "설치 폴더 특징")
-        catalog.Set(
-            "安装足迹目录：",
-                "설치 폴더:")
         catalog.Set(
             "完整路径",
                 "전체 경로")
@@ -631,9 +514,6 @@ class KoreanStrings {
             "进程守护小助手设置",
                 "프로세스 감시 도우미 설정")
         catalog.Set(
-            "尚未从真实升级过程学习到更新程序特征。",
-                "실제 업데이트에서 학습한 업데이트 프로그램 특징이 아직 없습니다.")
-        catalog.Set(
             "展示配置",
                 "표시 설정")
         catalog.Set(
@@ -642,9 +522,6 @@ class KoreanStrings {
         catalog.Set(
             "工作目录（CWD）：",
                 "작업 폴더（CWD）:")
-        catalog.Set(
-            "已从本次升级过程学习更新程序特征：{1}",
-                "이번 업데이트에서 학습한 업데이트 프로그램 특징: {1}")
         catalog.Set(
             "已保存身份",
                 "저장된 식별 정보")
@@ -685,9 +562,6 @@ class KoreanStrings {
             "已导出本地诊断包：{1}",
                 "로컬 진단 패키지를 내보냈습니다: {1}")
         catalog.Set(
-            "已恢复未完成的升级保护会话：{1}",
-                "완료되지 않은 업데이트 보호 세션을 복원했습니다: {1}")
-        catalog.Set(
             "已撤销上一步操作。",
                 "이전 작업을 실행 취소했습니다.")
         catalog.Set(
@@ -697,20 +571,11 @@ class KoreanStrings {
             "已更新守护对象路径。",
                 "감시 대상 경로를 업데이트했습니다.")
         catalog.Set(
-            "已更新软件升级保护设置：{1}",
-                "업데이트 보호 설정을 업데이트했습니다: {1}")
-        catalog.Set(
             "已添加 {1} 个守护对象。",
                 "모니터링 항목 {1}개를 추가했습니다.")
         catalog.Set(
             "已用完快速重试，将每隔 {1} 秒继续尝试启动：{2}",
                 "빠른 재시도를 모두 사용했습니다. 이후 {1}초마다 시작을 계속 시도합니다: {2}")
-        catalog.Set(
-            "已自动学习的更新程序特征：",
-                "자동 학습한 업데이트 프로그램 특징:")
-        catalog.Set(
-            "已进入软件升级保护：{1}{2}",
-                "업데이트 보호를 시작했습니다: {1}{2}")
         catalog.Set(
             "已重做操作。",
                 "작업을 다시 실행했습니다.")
@@ -756,24 +621,6 @@ class KoreanStrings {
         catalog.Set(
             "当前版本：{1}（源码版；本机 AutoHotkey {2} x64）",
                 "현재 버전: {1}（소스 버전, 로컬 AutoHotkey {2} x64）")
-        catalog.Set(
-            "当前状态：升级活动已结束，正在确认程序文件稳定",
-                "현재 상태: 업데이트 활동 종료, 프로그램 파일 안정 상태 확인 중")
-        catalog.Set(
-            "当前状态：升级等待超时，需要确认后恢复",
-                "현재 상태: 업데이트 대기 시간 초과, 재개 전 확인 필요")
-        catalog.Set(
-            "当前状态：已从上次运行恢复未完成的升级保护",
-                "현재 상태: 이전 실행의 미완료 업데이트 보호를 복원함")
-        catalog.Set(
-            "当前状态：已暂停自动启动，正在等待升级完成",
-                "현재 상태: 자동 시작 일시 중지, 업데이트 완료 대기 중")
-        catalog.Set(
-            "当前状态：显式升级维护已开始，正在等待结束命令",
-                "현재 상태: 명시적 업데이트 유지 관리 시작, 종료 명령 대기 중")
-        catalog.Set(
-            "当前状态：正在判断本次退出是否由升级引起",
-                "현재 상태: 이번 종료가 업데이트로 인한 것인지 판정 중")
         catalog.Set(
             "当前状态：正常守护",
                 "현재 상태: 정상 모니터링 중")
@@ -871,12 +718,6 @@ class KoreanStrings {
             "支持的程序与脚本",
                 "지원되는 앱 및 스크립트")
         catalog.Set(
-            "收到显式维护开始命令",
-                "명시적 유지 관리 시작 명령을 받음")
-        catalog.Set(
-            "收到显式维护结束命令，开始执行安全恢复检查：{1}",
-                "명시적 유지 관리 종료 명령을 받았습니다. 안전 재개 확인을 시작합니다: {1}")
-        catalog.Set(
             "整条展示配置",
                 "전체 표시 설정")
         catalog.Set(
@@ -947,18 +788,6 @@ class KoreanStrings {
         catalog.Set("日志保存位置：", "로그 저장 위치:")
         catalog.Set("确定", "확인")
         catalog.Set(
-            "时间设置无效。`n`n退出检测窗口：2-120 秒`n文件稳定等待：2-300 秒`n最长升级等待：60-86400 秒，且必须大于稳定等待时间",
-                "시간 설정이 올바르지 않습니다.`n`n종료 감지 시간: 2-120초`n파일 안정 대기: 2-300초`n최대 업데이트 대기: 60-86400초이며 안정 대기보다 길어야 함")
-        catalog.Set(
-            "显式升级维护命令执行异常：{1}",
-                "명시적 업데이트 유지 관리 명령 실행 오류: {1}")
-        catalog.Set(
-            "显式升级维护命令未找到监控目标：{1}",
-                "명시적 업데이트 유지 관리 명령에 해당하는 모니터링 대상을 찾지 못했습니다: {1}")
-        catalog.Set(
-            "显式升级维护命令被忽略，目标未启用升级保护：{1}",
-                "대상의 업데이트 보호가 꺼져 있어 명시적 업데이트 유지 관리 명령을 무시했습니다: {1}")
-        catalog.Set(
             "显示主界面",
                 "메인 창 표시")
         catalog.Set(
@@ -995,23 +824,11 @@ class KoreanStrings {
             "更新检查返回了无法识别的状态：{1}",
                 "업데이트 확인에서 알 수 없는 상태를 반환했습니다: {1}")
         catalog.Set(
-            "最长升级等待（秒）：",
-                "최대 업데이트 대기（초）:")
-        catalog.Set(
-            "未发现升级活动（{1}，耗时 {2} 秒），恢复普通重启流程：{3}",
-                "업데이트 활동을 찾지 못했습니다（{1}, {2}초）. 일반 다시 시작 절차로 돌아갑니다: {3}")
-        catalog.Set(
-            "未发现升级活动（{1}，耗时 {2} 秒），目标仍不存在：{3}",
-                "업데이트 활동을 찾지 못했습니다（{1}, {2}초）. 대상은 여전히 없습니다: {3}")
-        catalog.Set(
             "未找到目标",
                 "대상을 찾을 수 없음")
         catalog.Set(
             "未添加",
                 "추가되지 않음")
-        catalog.Set(
-            "未知升级保护阶段",
-                "알 수 없는 업데이트 보호 단계")
         catalog.Set(
             "未知守护阶段",
                 "알 수 없는 모니터링 단계")
@@ -1024,12 +841,6 @@ class KoreanStrings {
         catalog.Set(
             "未知错误",
                 "알 수 없는 오류")
-        catalog.Set(
-            "查看实时运行日志`n涵盖监控、重启、升级保护与操作记录",
-                "실시간 실행 로그 보기`n모니터링, 다시 시작, 업데이트 보호 및 작업 기록 포함")
-        catalog.Set(
-            "查看支持类型、操作方法、守护设置`n以及升级保护说明",
-                "지원 대상 형식, 사용 방법, 모니터링 설정 보기`n업데이트 보호 안내 포함")
         catalog.Set(
             "核心守护",
                 "핵심 모니터링")
@@ -1136,9 +947,6 @@ class KoreanStrings {
             "用户指定",
                 "사용자 지정")
         catalog.Set(
-            "用户结束了升级等待，重新执行安全启动检查：{1}",
-                "사용자가 업데이트 대기를 종료했습니다. 안전 시작 확인을 다시 수행합니다: {1}")
-        catalog.Set(
             "界面语言和字体已即时更新，无需重新启动小助手。",
                 "인터페이스 언어와 글꼴을 즉시 업데이트했습니다. 도우미를 다시 시작할 필요가 없습니다.")
         catalog.Set(
@@ -1204,9 +1012,6 @@ class KoreanStrings {
             "目标文件已恢复，重新核对运行状态：{1}",
                 "대상 파일이 돌아왔습니다. 실행 상태를 다시 확인합니다: {1}")
         catalog.Set(
-            "目标文件缺失时检测到升级活动",
-                "대상 파일이 없는 동안 업데이트 활동 감지")
-        catalog.Set(
             "目标程序文件不存在",
                 "대상 프로그램 파일이 없음")
         catalog.Set(
@@ -1215,9 +1020,6 @@ class KoreanStrings {
         catalog.Set(
             "目标路径",
                 "대상 경로")
-        catalog.Set(
-            "目标退出时检测到升级信号",
-                "대상 종료 시 업데이트 신호 감지")
         catalog.Set(
             "真实目标来源标记",
                 "실제 대상 원본 표식")
@@ -1279,9 +1081,6 @@ class KoreanStrings {
             "显示",
                 "표시")
         catalog.Set(
-            "结束升级等待并恢复守护",
-                "업데이트 대기를 끝내고 모니터링 재개")
-        catalog.Set(
             "编码损坏",
                 "인코딩 손상")
         catalog.Set(
@@ -1299,9 +1098,6 @@ class KoreanStrings {
         catalog.Set(
             "自动",
                 "자동")
-        catalog.Set(
-            "自动识别升级并保护启动过程",
-                "업데이트 자동 감지 및 시작 과정 보호")
         catalog.Set(
             "自动识别进程",
                 "프로세스 자동 식별")
@@ -1348,9 +1144,6 @@ class KoreanStrings {
             "该真实进程已由其他守护对象守护。",
                 "이 실제 프로세스는 다른 모니터링 항목이 이미 보호하고 있습니다.")
         catalog.Set(
-            "该软件正在升级保护中。请等待升级完成，或在“软件升级保护”中结束等待后再结束运行。",
-                "이 소프트웨어는 업데이트 보호 중입니다. 업데이트가 끝날 때까지 기다리거나 “업데이트 보호”에서 대기를 끝낸 뒤 실행을 종료하세요.")
-        catalog.Set(
             "语义版本无效",
                 "유의적 버전이 올바르지 않음")
         catalog.Set(
@@ -1377,18 +1170,6 @@ class KoreanStrings {
         catalog.Set(
             "轮询间隔必须为 500-86400000 毫秒的正整数！",
                 "폴링 간격은 500~86400000밀리초의 양의 정수여야 합니다!")
-        catalog.Set(
-            "软件升级保护",
-                "소프트웨어 업데이트 보호")
-        catalog.Set(
-            "软件升级保护超过最长等待时间，需要用户确认后恢复：{1}",
-                "소프트웨어 업데이트 보호가 최대 대기 시간을 초과했습니다. 사용자가 확인해야 재개할 수 있습니다: {1}")
-        catalog.Set(
-            "软件升级完成，准备恢复启动：{1}",
-                "소프트웨어 업데이트가 완료되어 시작 재개를 준비합니다: {1}")
-        catalog.Set(
-            "软件升级完成，已恢复正常守护：{1}",
-                "소프트웨어 업데이트가 완료되어 정상 모니터링을 재개했습니다: {1}")
         catalog.Set(
             "载入中...",
                 "불러오는 중...")
@@ -1524,6 +1305,19 @@ class KoreanStrings {
         catalog.Set(
             "📂 浏览文件夹...",
                 "📂 폴더 찾아보기...")
+        catalog.Set("获取正在运行的所有进程",
+            "실행 중인 모든 프로세스 가져오기")
+        catalog.Set("正在运行的进程", "실행 중인 프로세스")
+        catalog.Set("应用", "앱")
+        catalog.Set("后台进程", "백그라운드 프로세스")
+        catalog.Set("正在载入运行进程：{1}／{2}",
+            "실행 중인 프로세스 불러오는 중: {1}/{2}")
+        catalog.Set("正在读取运行进程：{1}",
+            "실행 중인 프로세스 읽는 중: {1}")
+        catalog.Set("正在运行的程序：{1} 项",
+            "실행 중인 프로그램: {1}개")
+        catalog.Set("无法读取正在运行的进程。",
+            "실행 중인 프로세스를 읽을 수 없습니다.")
         catalog.Set(
             "选择...",
                 "선택...")
@@ -1537,12 +1331,6 @@ class KoreanStrings {
             "🔄 反转状态",
                 "🔄 상태 반전")
         catalog.Set(
-            "🔄 恢复升级保护状态",
-                "🔄 업데이트 보호 상태 복원")
-        catalog.Set(
-            "🔄 显式升级维护中",
-                "🔄 명시적 업데이트 유지 관리 중")
-        catalog.Set(
             "🔄 检查",
                 "🔄 확인")
         catalog.Set(
@@ -1551,12 +1339,6 @@ class KoreanStrings {
         catalog.Set(
             "🔄 等待程序文件恢复",
                 "🔄 프로그램 파일 복구 대기")
-        catalog.Set(
-            "🔄 软件升级中",
-                "🔄 소프트웨어 업데이트 중")
-        catalog.Set(
-            "🔄 软件升级保护设置",
-                "🔄 소프트웨어 업데이트 보호 설정")
         catalog.Set(
             "⏹️ 结束运行",
                 "⏹️ 실행 종료")
@@ -1711,7 +1493,6 @@ class KoreanStrings {
         catalog.Set("微信支付", "WeChat Pay")
         catalog.Set("支付宝", "Alipay")
         catalog.Set("二维码图片未找到", "QR 코드 이미지를 찾을 수 없습니다")
-        catalog.Set("• 主界面的“帮助”可打开使用说明、本次运行日志或项目反馈页面；日志包含监控、重启、升级保护和操作记录，并会自动更新。", "• 메인 창의 도움말에서 사용 설명서, 이번 실행 로그 또는 프로젝트 의견 페이지를 열 수 있습니다. 로그에는 모니터링, 다시 시작, 업데이트 보호 및 사용자 작업이 기록되며 자동으로 갱신됩니다.")
         catalog.Set("⚙️ 进程识别与启动设置", "⚙️ 프로세스 식별 및 실행 설정")
         catalog.Set("进程识别与启动设置", "프로세스 식별 및 실행 설정")
         catalog.Set("进程识别", "프로세스 식별")
@@ -1745,7 +1526,6 @@ class KoreanStrings {
         catalog.Set("配置暂未写入", "구성 파일에 아직 기록되지 않음")
         catalog.Set("已更新进程识别与启动设置：{1}", "프로세스 식별 및 실행 설정을 업데이트했습니다: {1}")
         catalog.Set("• 快捷方式：LNK、URL、APPREF-MS，包括可解析真实目标的 MSI 快捷方式。特殊快捷方式可在“进程识别与启动设置”中手动指定真实进程。", "• 바로 가기: LNK, URL, APPREF-MS를 지원하며 실제 대상을 확인할 수 있는 MSI 바로 가기도 포함합니다. 특수한 바로 가기는 '프로세스 식별 및 실행 설정'에서 실제 프로세스를 직접 지정할 수 있습니다.")
-        catalog.Set("• 右键守护对象可自定义主窗口名称和图标，也可打开所在位置、结束运行、编辑路径、切换管理员运行、配置进程识别与启动设置及软件升级保护，并查看批处理输出日志。“结束运行”会同时暂停守护，目标不会被自动重新启动；要求管理员运行但当前权限不符时仍会显示警告。", "• 항목을 마우스 오른쪽 버튼으로 클릭하면 이름과 아이콘 변경, 파일 위치 열기, 실행 종료, 경로 편집, 관리자 실행, 프로세스 식별, 실행 설정, 업데이트 보호 및 배치 출력 로그를 사용할 수 있습니다. 실행 종료는 감시도 일시 중지하므로 대상이 자동으로 다시 시작되지 않으며, 관리자 권한 불일치 경고는 계속 표시됩니다.")
         catalog.Set("添加", "추가")
         catalog.Set("暂停", "일시 중지")
         catalog.Set("恢复", "재개")
@@ -1758,7 +1538,6 @@ class KoreanStrings {
         catalog.Set("统计：运行", "실행 중")
         catalog.Set("统计：停止", "중지됨")
         catalog.Set("统计：恢复", "복구 중")
-        catalog.Set("统计：升级", "업데이트 중")
         catalog.Set("统计：暂停", "일시 중지됨")
         catalog.Set("统计：失效", "무효화됨")
         catalog.Set("统计：总计", "합계")
@@ -1880,15 +1659,11 @@ class KoreanStrings {
         catalog.Set("候选进程命令行不可用", "The candidate process command line is unavailable")
         catalog.Set("命令行只提供相对目标路径，无法可靠匹配", "The command line provides only a relative target path, so it cannot be matched reliably")
         catalog.Set("候选进程镜像路径不可访问", "The candidate process image path is inaccessible")
-        catalog.Set("发现多个版本目录包含同名入口，已暂停自动迁移：{1}", "Multiple version directories contain an entry with the same name; automatic relocation is paused: {1}")
-        catalog.Set("版本目录迁移候选暂不可读取，将稍后重试：{1}", "The version-directory relocation candidate is temporarily unreadable and will be retried later: {1}")
-        catalog.Set("版本目录迁移候选仍在本次忽略冷却期内：{1} -> {2}", "The version-directory relocation candidate is still in this ignore cooldown: {1} -> {2}")
         catalog.Set("候选进程创建身份无法核对", "The candidate process creation identity cannot be verified")
         catalog.Set("存在多个候选进程，无法唯一确认", "Multiple candidate processes exist, so the target cannot be uniquely confirmed")
         catalog.Set("目标探活规格无效", "The target probe specification is invalid")
         catalog.Set("无法执行内容迁移：缺少旧文件的完整内容指纹：{1}", "Content relocation cannot run because the previous file has no complete content fingerprint: {1}")
         catalog.Set("监测到目标文件缺失，内容迁移将在缺失状态稳定后开始扫描：{1}", "The target file is missing; content relocation will start scanning after the missing state is stable: {1}")
-        catalog.Set("内容迁移暂缓：目标正处于升级保护、维护恢复或近期启动信号保护中：{1}", "Content relocation is paused because the target is under update protection, maintenance recovery, or recent launch-signal protection: {1}")
         catalog.Set("内容迁移候选已被拒绝：{1} -> {2}（候选不存在、扩展名不兼容、已被守护或与现有目标冲突）", "The content relocation candidate was rejected: {1} -> {2} (candidate missing, incompatible extension, already monitored, or conflicting with an existing target)")
         catalog.Set("内容迁移候选仍在本次忽略冷却期内：{1} -> {2}", "The content relocation candidate is still in this ignore cooldown: {1} -> {2}")
         catalog.Set("后台扫描失败或超时", "The background scan failed or timed out")
@@ -1911,15 +1686,13 @@ class KoreanStrings {
         catalog.Set("手动重启已取消，原进程未能停止：{1}", "기존 프로세스를 중지하지 못해 수동 다시 시작을 취소했습니다: {1}")
         catalog.Set("暂时无法查询进程状态，稍后重试手动重启：{1}", "프로세스 상태를 일시적으로 조회할 수 없습니다. 나중에 수동 다시 시작을 재시도합니다: {1}")
         catalog.Set("暂时无法重新启动", "현재 다시 시작할 수 없음")
-        catalog.Set("该软件正在升级保护中。请等待升级完成，或在“软件升级保护”中结束等待后再重新启动。", "이 소프트웨어는 업데이트 보호 중입니다. 업데이트가 끝날 때까지 기다리거나 “업데이트 보호”에서 대기를 끝낸 뒤 다시 시작하세요.")
         catalog.Set("• “重新启动”会先请求目标正常退出；超过设置时间后，是否强制终止由“停止策略”中的选项决定。", "• ‘다시 시작’은 먼저 대상에 정상 종료를 요청합니다. 제한 시간이 지나면 ‘종료 정책’의 설정에 따라 강제 종료 여부가 결정됩니다.")
         catalog.Set("查看版本、运行环境和项目入口", "버전, 런타임 및 프로젝트 링크 보기")
         catalog.Set("找作者对线", "작성자에게 피드백 보내기")
-        catalog.Set("升级期间检测到唯一同名新版本入口，等待用户确认：{1} -> {2}", "A unique same-named entry in a new version directory was detected during the upgrade. Awaiting confirmation: {1} -> {2}")
-        catalog.Set("升级期间发现唯一同名新版本入口；已记录并持续校验候选 SHA-256。确认后将更新守护目标，名称、图标和启动设置保持不变。", "The only same-named entry in a new version directory was found during the upgrade. Its SHA-256 is recorded and rechecked. Confirming updates the monitored target without changing its name, icon, or launch settings.")
         catalog.Set("内容完全一致 / SHA-256", "Exact content match / SHA-256")
-        catalog.Set("唯一同名新版本入口 / SHA-256", "Unique same-named version entry / SHA-256")
-        catalog.Set("• 常规迁移不使用文件名、文件 ID 或目录监听作为判断依据。版本目录升级是受限例外：升级期间仅在同一父目录中存在唯一同名新版本入口时提出迁移，并记录、持续校验候选 SHA-256。发现多个候选、多个内容相同的副本或扫描未完整完成时不会猜测目标；确认后只更新守护路径，名称、图标和启动设置保持不变。", "• Regular relocation decisions do not use file names, file IDs, or directory watchers. Version-directory upgrades are a restricted exception: during an upgrade, relocation is proposed only when exactly one same-named entry exists in a new version directory under the same parent, and that candidate's SHA-256 is recorded and continuously verified. The assistant does not guess when multiple candidates or identical copies exist, or when a scan is incomplete. Confirming changes only the monitored path and preserves the name, icon, and launch settings.")
+        catalog.Set("界面缩放：", "UI 크기 조절:")
+        catalog.Set("; UiScale：界面缩放百分比，支持 80、90、100、110、125、150、175、200。",
+            "; UiScale: UI 크기 조절 비율입니다. 80, 90, 100, 110, 125, 150, 175, 200을 지원합니다.")
         return catalog
     }
 }

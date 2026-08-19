@@ -69,8 +69,8 @@ Gitleaks，不需要把第三方 DLL 加入系统 `PATH`。正式发布会强制
 ## 提交与 Pull Request
 
 Pull Request 应说明问题、用户可见变化、关键设计、兼容性、实际验证命令和未覆盖
-风险。涉及界面时附经过脱敏的截图或录屏；涉及配置时说明对 `watchdog.ini`、
-`watchdog.maintenance.ini`、备份和恢复的影响。
+风险。涉及界面时附经过脱敏的截图或录屏；涉及配置时说明对 `watchdog.ini`、备份和
+恢复的影响。
 
 用户可见变化必须同步更新 README、CHANGELOG 和对应使用文档。新增版本按
 [更新日志模板](../docs/changelog-template.md)整理；普通 Pull Request 不应创建版本

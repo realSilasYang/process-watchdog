@@ -14,7 +14,9 @@ class MainWindow {
     static SequenceColumn := 4
 
     __New() {
-        this.gui := Gui("+Resize +MinSize580x300", Tr("进程守护小助手"))
+        this.gui := Gui("+Resize +MinSize"
+            WindowLayoutService.StructuralMinimumWidth "x300",
+            Tr("进程守护小助手"))
         this.lv := ""
         this.listSelectionPresenter := ""
         this.listHeader := ""

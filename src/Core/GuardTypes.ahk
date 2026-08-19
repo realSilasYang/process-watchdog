@@ -98,13 +98,6 @@ class GuardStatusKind {
     static ProgramMissing := "ProgramMissing"
     static ScriptMissing := "ScriptMissing"
     static RelocationPending := "RelocationPending"
-    static SafeStartWait := "SafeStartWait"
     static LaunchRetry := "LaunchRetry"
-    static MaintenanceArbitrating := "MaintenanceArbitrating"
-    static MaintenanceUpdating := "MaintenanceUpdating"
-    static MaintenanceFileWaiting := "MaintenanceFileWaiting"
-    static MaintenanceStabilizing := "MaintenanceStabilizing"
-    static MaintenanceRecovering := "MaintenanceRecovering"
-    static MaintenanceTimedOut := "MaintenanceTimedOut"
     static Unknown := "Unknown"
 }

@@ -106,31 +106,7 @@ class TargetIdentityService {
         if !this.IsCurrent(path, stateObj)
             return false
 
-        priorInstallRoot := ""
-        nextInstallRoot := ""
-        rootChanged := false
-        hasAutomaticMaintenanceRoot := stateObj.HasOwnProp(
-            "MaintenanceConfig") && !stateObj.MaintenanceConfig.RootIsCustom
-        if hasAutomaticMaintenanceRoot {
-            priorInstallRoot := stateObj.MaintenanceConfig.InstallRoot
-            nextInstallRoot := this.Callbacks.HasOwnProp("GetDefaultRoot")
-                ? this.Callbacks.GetDefaultRoot.Call(freshTarget)
-                : ""
-            if nextInstallRoot == "" {
-                SplitPath(freshTarget, , &freshDirectory)
-                nextInstallRoot := freshDirectory != ""
-                    ? this.Callbacks.NormalizeRoot.Call(freshDirectory)
-                    : priorInstallRoot
-            }
-            rootChanged := !this.Callbacks.PathsEquivalent.Call(
-                priorInstallRoot, nextInstallRoot)
-        }
-        refreshedFingerprint := this.Runtime.targetFileInspector
-            .GetFingerprint(freshTarget)
-        if !this.IsCurrent(path, stateObj)
-            return false
-
-        ; 快捷方式在升级后可能改指向全新的可执行文件。提交新身份之前必须推进
+        ; 快捷方式可能改指向全新的可执行文件。提交新身份之前必须推进
         ; 控制器代际并清除旧 PID，避免旧目标的重启、验证或停止回调落到新目标上。
         if this.Callbacks.HasOwnProp("InvalidateRuntimeIdentity")
             && IsObject(this.Callbacks.InvalidateRuntimeIdentity) {
@@ -149,21 +125,7 @@ class TargetIdentityService {
             stateObj.ShortcutTargetSource := resolutionSource
             if descriptor.Readable
                 stateObj.ShortcutArgs := shortcutArguments
-            if hasAutomaticMaintenanceRoot
-                stateObj.MaintenanceConfig.InstallRoot := nextInstallRoot
-            if stateObj.HasOwnProp("SafetyFingerprint") {
-                stateObj.SafetyFingerprint := refreshedFingerprint
-                stateObj.MaintenanceBaselineFingerprint := refreshedFingerprint
-                stateObj.SafetyStableSince := nowTicks
-                stateObj.MaintenanceFingerprintCheckedTicks := nowTicks
-                stateObj.MaintenanceReadyCheckedTicks := 0
-            }
         } finally Critical(previousCritical ? previousCritical : "Off")
-
-        if rootChanged {
-            this.Runtime.maintenanceCoordinator.CloseWatcher(stateObj)
-            this.Runtime.maintenanceCoordinator.EnsureWatcher(path, stateObj)
-        }
         this.Runtime.targetSpecsService.Get(path, stateObj, true)
         this.Log(this.Text("已刷新快捷方式真实进程（{1}）：{2} -> {3}",
             this.Text(resolutionSource), path, freshTarget))
@@ -176,12 +138,12 @@ class TargetIdentityService {
     }
 
     TargetSubjectExists(path, stateObj := "") {
-        subjectPath := this.GetMaintenanceSubjectPath(path)
+        subjectPath := this.GetTargetSubjectPath(path)
         return subjectPath != "" && FileExist(subjectPath)
             && !DirExist(subjectPath)
     }
 
-    GetMaintenanceSubjectPath(path) {
+    GetTargetSubjectPath(path) {
         SplitPath(path, , , &extension)
         if (StrLower(extension) != "lnk")
             return path

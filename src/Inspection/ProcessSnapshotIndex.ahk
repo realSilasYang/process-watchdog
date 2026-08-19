@@ -95,7 +95,11 @@ class ProcessSnapshotIndex {
             "RecentStartSeconds", 0)))
         recentStart := recentSeconds > 0
             && this.WasProcessStartedRecently(candidate, recentSeconds)
-        if matchesPrior || recentStart {
+        minimumCreationTime := this.ContextValue(fallbackContext,
+            "MinimumCreationTime", "")
+        startedSinceBaseline := this.WasProcessStartedSince(candidate,
+            minimumCreationTime)
+        if matchesPrior || recentStart || startedSinceBaseline {
             return {Observation: ProcessObservation.Running(candidate.pid,
                 identity, this.CapturedAtTicks, "process-image-inferred")}
         }
@@ -109,6 +113,18 @@ class ProcessSnapshotIndex {
             return false
         try return Abs(DateDiff(A_Now, creation, "Seconds"))
             <= maximumAgeSeconds
+        catch
+            return false
+    }
+
+    WasProcessStartedSince(processInfo, minimumCreationTime) {
+        creation := this.ContextValue(processInfo, "creation", "")
+        creation := SubStr(String(creation), 1, 14)
+        minimumCreationTime := SubStr(String(minimumCreationTime), 1, 14)
+        if !RegExMatch(creation, "^\d{14}$")
+            || !RegExMatch(minimumCreationTime, "^\d{14}$")
+            return false
+        try return DateDiff(creation, minimumCreationTime, "Seconds") >= 0
         catch
             return false
     }
@@ -229,6 +245,37 @@ class ProcessSnapshotIndex {
                 return true
         }
         return false
+    }
+
+    CollectExecutablePathsInRoot(rootPath) {
+        evidence := {Running: [], Uncertain: []}
+        root := RTrim(this.Canonical(rootPath), "\")
+        if (root == "")
+            return evidence
+
+        runningPaths := Map()
+        runningPaths.CaseSense := "Off"
+        uncertainPaths := Map()
+        uncertainPaths.CaseSense := "Off"
+        for processInfo in this.Processes {
+            if !processInfo.HasOwnProp("exe") || processInfo.exe == ""
+                continue
+            imagePath := this.Canonical(processInfo.exe)
+            if (imagePath == "" || InStr(imagePath, root "\") != 1)
+                continue
+            liveStatus := this.GetLiveStatus(processInfo)
+            if liveStatus > 0
+                runningPaths[imagePath] := processInfo.exe
+            else if liveStatus < 0
+                uncertainPaths[imagePath] := processInfo.exe
+        }
+        for canonicalPath, executablePath in runningPaths
+            evidence.Running.Push(executablePath)
+        for canonicalPath, executablePath in uncertainPaths {
+            if !runningPaths.Has(canonicalPath)
+                evidence.Uncertain.Push(executablePath)
+        }
+        return evidence
     }
 
     ObserveExecutableInRoot(rootPath, preferredName := "") {

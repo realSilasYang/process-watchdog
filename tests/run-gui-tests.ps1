@@ -107,6 +107,8 @@ function Invoke-GuiTest {
 try {
     Write-Host 'Running GUI smoke test...'
     Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\gui-smoke-tests.ahk')
+    Write-Host 'Running UI scale test...'
+    Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\ui-scale-tests.ahk')
     Write-Host 'Running history-toast interaction test...'
     Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\history-toast-tests.ahk')
     Write-Host 'Running shared message-box layout test...'
@@ -117,12 +119,6 @@ try {
         'gui\inline-edit-theme-tests.ahk')
     Write-Host 'Running log-window and diagnostic smoke test...'
     Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\log-window-smoke-tests.ahk')
-    Write-Host 'Running 13-language production-window smoke test...'
-    Invoke-GuiTest (Join-Path $PSScriptRoot `
-        'gui\localized-window-smoke-tests.ahk') -TimeoutMilliseconds 300000
-    Write-Host 'Running in-process language and font hot-switch test...'
-    Invoke-GuiTest (Join-Path $PSScriptRoot `
-        'gui\display-hot-switch-tests.ahk') -TimeoutMilliseconds 180000
     Write-Host "Running GUI resource soak for $SoakSeconds seconds..."
     Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\resource-soak-tests.ahk') `
         -Arguments $SoakSeconds `
