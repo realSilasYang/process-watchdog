@@ -21,8 +21,8 @@ class DisplayConfigCodec {
         if config.HasOwnProp("IconPath")
             normalized.IconPath := this.NormalizeTargetPath.Call(config.IconPath)
         if config.HasOwnProp("SequenceColor")
-            normalized.SequenceColor := MainSequenceColorPalette.NormalizeKey(
-                config.SequenceColor)
+            normalized.SequenceColor := MainSequenceColorPalette
+                .NormalizeSettingKey(config.SequenceColor)
         return normalized
     }
 

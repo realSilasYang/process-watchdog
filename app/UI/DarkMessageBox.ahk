@@ -9,6 +9,7 @@ CloseDarkMsgBox(mb, ownerLease, &closed) {
     closeContext := WindowHierarchy.Release(ownerLease)
     try {
         try UnregisterGuiControls(mb.Hwnd)
+        try ReleaseApplicationWindowScale(mb.Hwnd)
         mb.Destroy()
     }
     finally WindowHierarchy.CompleteClose(closeContext)
@@ -106,7 +107,8 @@ ShowDarkMsgBox(Message, Title := "", MsgType := "Info", ownerGui := "") {
     mb.OnEvent("Escape", closeAction)
 
     mbHwnd := mb.Hwnd
-    mb.Show("w300 h" layout.WindowHeight)
+    mb.Show(ScaleApplicationShowOptions("w300 h" layout.WindowHeight))
+    ApplyApplicationWindowScale(mb)
     WinWaitClose(mbHwnd) ; 挂起线程等待弹窗销毁，实现阻塞式的主线程停滞
     } catch as msgErr {
         CloseDarkMsgBox(mb, ownerLease, &closed)
@@ -187,11 +189,107 @@ ShowDarkConfirmBox(Message, Title, confirmText, cancelText,
         mb.OnEvent("Close", closeAction)
         mb.OnEvent("Escape", closeAction)
         mbHwnd := mb.Hwnd
-        mb.Show("w360 h" layout.WindowHeight)
+        mb.Show(ScaleApplicationShowOptions("w360 h" layout.WindowHeight))
+        ApplyApplicationWindowScale(mb)
         WinWaitClose(mbHwnd)
         return accepted
     } catch as confirmError {
         CloseDarkMsgBox(mb, ownerLease, &closed)
         throw confirmError
     }
+}
+
+CreateDarkChoiceAction(mb, ownerLease, &closed, &selected, value) {
+    return (*) => (selected := value,
+        CloseDarkMsgBox(mb, ownerLease, &closed))
+}
+
+; 四选一深色对话框用于需要明确恢复策略的守护事件。关闭窗口按最后一个选项
+; 处理，避免用户关闭提示后目标永远停留在等待选择状态。
+ShowDarkChoiceBox(Message, Title, choices, ownerGui := "") {
+    if !IsObject(choices) || !choices.Length
+        return ""
+    Message := NormalizeUserVisibleParentheses(Message)
+    Title := NormalizeUserVisibleParentheses(Title)
+    mb := Gui("-MinimizeBox -MaximizeBox", Title)
+    try RestoreHoveredButton()
+    if IsSet(GuiModules)
+        try GuiModules.HideTransientWindows()
+    dialogOwner := ownerGui
+    if !dialogOwner && IsSet(Main)
+        dialogOwner := Main.gui
+    ownerLease := ""
+    closed := false
+    selected := choices[choices.Length].Value
+    if dialogOwner && Type(dialogOwner) == "Gui" {
+        try {
+            if WinExist(dialogOwner.Hwnd) {
+                mb.Opt("+Owner" dialogOwner.Hwnd)
+                ownerLease := WindowHierarchy.Acquire(dialogOwner, mb.Hwnd)
+            }
+        }
+    }
+    try {
+        InitializeApplicationWindow(mb)
+        ; 使用符号字体配合主题警告色，确保警告图标不会被彩色 Emoji 字形覆盖颜色。
+        mb.SetFont("s18", "Segoe UI Symbol")
+        iconControl := mb.Add("Text", "x20 y20 w30 h30 BackgroundTrans c"
+            UiThemeService.Color("WarningIcon"), "⚠")
+        mb.SetFont("s10 c" UiThemeService.Color("Text"),
+            LocalizationService.GetUiFontName())
+        messageControl := mb.Add("Text", "x60 y20 w440 BackgroundTrans",
+            Message)
+        messageControl.GetPos(, , , &messageHeight)
+        buttonWidths := []
+        for choice in choices
+            buttonWidths.Push(100)
+        layout := CalculateDarkDialogLayout(520, messageHeight,
+            buttonWidths, 22)
+        iconControl.Move(, layout.IconY)
+        messageControl.Move(, layout.MessageY)
+        firstChoiceButton := ""
+        for index, choice in choices {
+            button := mb.Add("Text",
+                "x" layout.ButtonXs[index] " y" layout.ButtonY
+                    " w" buttonWidths[index] " h30 Center 0x200 Background"
+                    (index == 1 ? UiThemeService.Color("Primary")
+                        : UiThemeService.Color("Toolbar")) " c"
+                    (index == 1 ? UiThemeService.Color("ButtonText")
+                        : UiThemeService.Color("ToolbarText")),
+                choice.Text)
+            buttonValue := choice.Value
+            RegisterHoverButton(button,
+                index == 1 ? UiThemeService.Color("Primary")
+                    : UiThemeService.Color("Toolbar"))
+            RegisterButtonClick(button,
+                CreateDarkChoiceAction(mb, ownerLease, &closed,
+                    &selected, buttonValue), ButtonFeedbackMode.Dismissive)
+            if index == 1
+                firstChoiceButton := button
+        }
+        mb.Add("Text", "x10 y" layout.BottomY " w1 h15", "")
+        closeAction := (*) => CloseDarkMsgBox(mb, ownerLease, &closed)
+        mb.OnEvent("Close", closeAction)
+        mb.OnEvent("Escape", closeAction)
+        mbHwnd := mb.Hwnd
+        mb.Show(ScaleApplicationShowOptions("w520 h" layout.WindowHeight))
+        ApplyApplicationWindowScale(mb)
+        ; 首个选项是默认恢复动作。显示后再设置焦点和鼠标位置，确保控件
+        ; 已拥有屏幕坐标；窗口激活完成后再确认一次，避免前台切换覆盖定位。
+        try firstChoiceButton.Focus()
+        try MovePointerToControlCenter(firstChoiceButton)
+        SetTimer(ConfirmDarkChoicePointer.Bind(firstChoiceButton, mbHwnd), -1)
+        SetTimer(ConfirmDarkChoicePointer.Bind(firstChoiceButton, mbHwnd), -25)
+        WinWaitClose(mbHwnd)
+        return selected
+    } catch as choiceError {
+        CloseDarkMsgBox(mb, ownerLease, &closed)
+        throw choiceError
+    }
+}
+
+ConfirmDarkChoicePointer(button, mbHwnd, *) {
+    if !mbHwnd || !DllCall("user32\IsWindow", "Ptr", mbHwnd, "Int")
+        return
+    try MovePointerToControlCenter(button)
 }

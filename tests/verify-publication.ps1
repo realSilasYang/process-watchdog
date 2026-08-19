@@ -46,7 +46,6 @@ if ($LASTEXITCODE -ne 0) {
 }
 $forbiddenHistoryPatterns = @(
     '(^|/)watchdog\.ini$'
-    '(^|/)watchdog\.maintenance\.ini$'
     '(^|/)_codex_[^/]*$'
 )
 foreach ($historicalPath in $historicalPaths) {

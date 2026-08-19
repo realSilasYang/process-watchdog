@@ -159,6 +159,43 @@ class ProcessInspector {
         }
     }
 
+    GetWindowTitles(pid) {
+        if !pid || !ProcessExist(pid)
+            return []
+        titleMap := this.CaptureVisibleWindowTitleMap()
+        return titleMap.Has(pid) ? titleMap[pid] : []
+    }
+
+    CaptureVisibleWindowTitleMap() {
+        titleMap := Map()
+        seenByPid := Map()
+        try windows := WinGetList()
+        catch
+            return titleMap
+        for windowHandle in windows {
+            if !DllCall("user32\IsWindowVisible", "Ptr", windowHandle,
+                "Int")
+                continue
+            pid := 0
+            try pid := WinGetPID("ahk_id " windowHandle)
+            if !pid
+                continue
+            title := ""
+            try title := Trim(WinGetTitle("ahk_id " windowHandle))
+            if title == ""
+                continue
+            if !titleMap.Has(pid) {
+                titleMap[pid] := []
+                seenByPid[pid] := Map()
+            }
+            if seenByPid[pid].Has(title) || titleMap[pid].Length >= 16
+                continue
+            seenByPid[pid][title] := true
+            titleMap[pid].Push(SubStr(title, 1, 512))
+        }
+        return titleMap
+    }
+
     CaptureAutoHotkeyScriptSnapshot(maximumAgeMs := 0) {
         ; 提权脚本的命令行可能完全不可读，但 AHK 隐藏主窗口仍公开完整脚本路径。
         ; 只有每个解释器进程都能对应到标准主窗口时，快照才足以证明某脚本未运行。

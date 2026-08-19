@@ -529,7 +529,9 @@ FileAppend("RESOURCE_SOAK|PASS|seconds=" durationSeconds
 } catch as soakError {
     catchRecord := "RESOURCE_SOAK|FAIL|exception=" soakError.Message
         . "|file=" soakError.File "|line=" soakError.Line "`n"
-    FileAppend(catchRecord, "*")
+    try FileAppend(catchRecord, "*")
+    catch
+        OutputDebug(catchRecord)
     ExitApp(1)
 }
 ExitApp(0)

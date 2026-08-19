@@ -30,7 +30,7 @@ Process Watchdog Assistant is designed for Windows desktop applications, scripts
 
 The assistant does not decide that a target is running from its process name alone. It combines the full executable path, process creation identity, resolved shortcut target, and command-line evidence. When evidence is incomplete, it waits for another check instead of treating “temporarily unknown” as stopped and launching duplicate instances.
 
-The project provides light and dark GUIs, automatic recovery, update protection, runtime logs, undo and redo, custom display names and icons, and a Windows x64 release package with an SPDX SBOM, SHA-256 checksums, and build provenance.
+The project provides light and dark GUIs, automatic recovery, runtime logs, undo and redo, custom display names and icons, and a Windows x64 release package with an SPDX SBOM, SHA-256 checksums, and build provenance.
 
 # Interface Overview
 
@@ -42,16 +42,15 @@ The project provides light and dark GUIs, automatic recovery, update protection,
   <img src="images/process-watchdog-overview-light.png" alt="Process Watchdog Assistant main window" width="100%">
 </p>
 
-The main window keeps each target's order, application icon, display name, privilege requirement, and current state in one view. The command bar provides add, delete, pause, settings, help, and About actions; Help lets users choose the guide, runtime log, or feedback page, while About brings version, runtime, update, project, and Donate actions together. The footer summarizes running, recovery, update, paused, and failed targets, while the runtime log exposes the evidence behind abnormal states.
+The main window keeps each target's order, application icon, display name, privilege requirement, and current state in one view. The command bar provides add, delete, pause, settings, help, and About actions; Help lets users choose the guide, runtime log, or feedback page, while About brings version, runtime, update, project, and Donate actions together. The footer summarizes running, recovery, paused, and failed targets, while the runtime log exposes the evidence behind abnormal states.
 
 ## Highlights
 
 - Monitor EXE, AHK, Python, JavaScript, PowerShell, BAT, CMD, and LNK targets.
 - Use `Running`, `Stopped`, and `Unknown` probe results; an unknown result never triggers a blind restart.
 - Give every target its own controller, generation, and task tokens, so stale callbacks become invalid immediately after pausing, deletion, or path changes.
-- After a directly added file or one of its parent folders is renamed, or the file is moved across folders or volumes, narrow candidates by compatible extension and exact size, verify the complete SHA-256 content hash, then ask for confirmation. Recovery also works for moves made while the assistant was closed. Normal relocation never uses names, file IDs, or directory notifications; a version-directory update is a restricted exception only after an update is confirmed and exactly one same-named entry exists under the same parent, with that candidate's SHA-256 continuously verified.
+- After a directly added file or one of its parent folders is renamed, or the file is moved across folders or volumes, narrow candidates by compatible extension and exact size, verify the complete SHA-256 content hash, then ask for confirmation. Recovery also works for moves made while the assistant was closed. Relocation never uses names, file IDs, or directory notifications.
 - Enforce an administrator requirement when configured; report a privilege mismatch for an existing process and elevate the next monitored launch.
-- Keep update protection off by default. When enabled, combine updater processes, parent-child relationships, installation-directory activity, and file stability before pausing or resuming monitoring. A successful update learns only a dedicated updater inside the install root as a full path scoped to that root; global installer tools, temporary programs, and process names never become permanent evidence.
 - Replace configuration atomically. Records that cannot be parsed are moved to `[Recovery]` instead of being silently discarded.
 - Use the Everything service exclusively for application search, without a local full-disk fallback or an application-imposed result limit. Large result sets are appended in short batches so icon extraction does not monopolize the UI.
 - Support Simplified Chinese, Traditional Chinese (Hong Kong), Traditional Chinese (Taiwan), English, Japanese, Vietnamese, Korean, Spanish, French, Brazilian Portuguese, Russian, German, and Italian. The interface follows the Windows UI language by default, falls back to English for unsupported languages, and can be selected manually under Display. Language and content-font changes take effect immediately in the current process without stopping or reinitializing guard tasks.
@@ -73,7 +72,7 @@ A complete GUI automation run is recorded on real Windows 11 at 200% DPI, with r
 ---
 
 **[User guide](#user-guide)**<br>
-[Install and start](#1-installation-and-first-run) · [Add and manage items](#2-adding-and-managing-items) · [Status and recovery](#3-status-and-recovery) · [Update protection](#4-update-protection) · [Settings](#5-settings) · [Logs and diagnostics](#6-logs-diagnostics-and-privacy)
+[Install and start](#1-installation-and-first-run) · [Add and manage items](#2-adding-and-managing-items) · [Status and recovery](#3-status-and-recovery) · [Settings](#4-settings) · [Logs and diagnostics](#5-logs-diagnostics-and-privacy)
 
 **[Developer guide](#developer-guide)**<br>
 [Directories](#1-directories-and-responsibilities) · [Correctness boundaries](#2-correctness-boundaries) · [Validation](#3-validation-commands) · [Release and contribution](#4-release-and-contribution)
@@ -146,11 +145,10 @@ Right-click an item in the main list to:
 - Restart the target, stop it, edit its full path, or open its file location. Restart applies the configured stop policy before launching again; Stop Running also pauses monitoring so the target is not launched again automatically.
 - Configure process identification and launch settings before the administrator toggle.
 - Toggle the administrator requirement. A running target with insufficient privileges is reported; after monitoring is resumed, the next launch is elevated as configured.
-- Open Update Protection Settings.
 - BAT and CMD entries additionally show View batch output log. Other target
   types do not show this command. The file is created only when the assistant
   actually launches that batch entry and captures its standard output and error.
-- Customize the name and icon shown in the main window. Display customization does not change target identity, launch behavior, or update protection.
+- Customize the name and icon shown in the main window. Display customization does not change target identity or launch behavior.
 - Restore the default name and icon. The reset action is disabled when the current display is already the default.
 
 Drag rows to reorder them; the order is persisted. Use `Ctrl+Z`, `Ctrl+Y`, or `Ctrl+Shift+Z` to undo or redo additions, deletions, sorting, and configuration changes. See [Common scenarios](en/quick-start.md) for examples.
@@ -167,30 +165,12 @@ A list status describes the evidence currently available and the next action. Do
 | Running (privilege mismatch) | The instance exists but does not satisfy the configured administrator requirement |
 | Waiting for process status / Possibly stopped | Evidence is incomplete or an exit was just observed; the assistant is rechecking and will not immediately launch a duplicate |
 | Starting / Retry countdown | Recovery is confirmed and the next attempt follows the configured retry sequence |
-| Updating / Confirming file stability | Update protection paused automatic launch until update activity ends and target files become stable |
 | Paused | Automatic checks and recovery are paused without closing the target process |
 | Stopped / Launch failed / Wait timed out | Recovery did not succeed or requires confirmation; inspect the log for the exact evidence and failure reason |
 
 The default retry delays are 1, 10, and 60 seconds. After the fast sequence is exhausted, the final delay is reused to prevent a tight launch loop. Deleting, pausing, changing a path, or undoing an operation invalidates old scheduled tasks and asynchronous results.
 
-## 4. Update protection
-
-Update protection is disabled by default and must be enabled per item:
-
-1. Right-click the target and open Update Protection Settings.
-2. Select automatic update detection and launch protection.
-3. Verify the installation footprint, exit-detection window, file-stability wait, and maximum update wait.
-4. Save the settings and let the application perform one real update normally. The assistant combines updater processes, parent-child relationships, installation-directory activity, file notifications, and learned updater signatures to decide whether protection should begin.
-
-Once an update is confirmed, automatic launch is suspended. Normal monitoring resumes only after activity ends and the target files are stable. If detection times out or does not match reality, use End update wait and resume monitoring in the same window. The launch entry is still checked for safety before recovery.
-
-Learning does not record a same-named process as soon as it appears. A permanent updater signature is saved only when a real update changed the target file, the updater has a complete path inside this target's installation footprint, and the update then completed successfully. Global tools such as `msiexec` or `winget`, temporary-directory processes, name-only candidates, and unsuccessful updates are not learned. An unfinished session temporarily preserves confirmed updater identities and pending signatures so evaluation can continue after restarting the assistant.
-
-For a direct-file target installed under a version directory such as `2.0.10` or `v2.0.11`, the assistant proposes relocation only when exactly one same-named entry exists in another version directory under the same parent, and it continuously verifies that candidate's own SHA-256. Multiple candidates, duplicate copies, or an incomplete scan remain unresolved. If a process image path is temporarily inaccessible, recovery is confirmed only within an already confirmed update, with exactly one same-named process, and with either the same pre-update creation identity or a recent start time.
-
-Update protection is not a general installer or Windows-service manager. For portable applications, updaters outside the installation directory, or unusual launchers, inspect the runtime log before adjusting the footprint and rules.
-
-## 5. Settings
+## 4. Settings
 
 Assistant Settings is divided by responsibility:
 
@@ -204,7 +184,7 @@ Assistant Settings is divided by responsibility:
 
 Numeric ranges are validated by the settings window. Comments in `watchdog.ini` sit beside their corresponding sections and settings. Prefer the GUI for edits so encoded fields remain intact. See [Configuration, backup, and recovery](en/configuration.md).
 
-## 6. Logs, diagnostics, and privacy
+## 5. Logs, diagnostics, and privacy
 
 The Runtime Log allows text selection and copying and can be maximized or resized. Scrollbars appear only when needed, and the log itself is not editable.
 
@@ -217,7 +197,7 @@ do not automatically receive a separate output file.
 
 For difficult problems, export a local diagnostics bundle from the log window. It includes application, Windows, AutoHotkey, DPI, resource-handle, monitoring phase, configuration-warning, and current-log summaries. Nothing is uploaded automatically.
 
-Personal configuration is stored in `watchdog.ini` under the actual runtime directory; unfinished update sessions use `watchdog.maintenance.ini` there. Portable and source editions use their entry directory. Both files are ignored by Git and never shipped in a release. `config/watchdog.example.ini` only documents current defaults and fields.
+Personal configuration is stored in `watchdog.ini` under the actual runtime directory. Portable and source editions use their entry directory; the file is ignored by Git and never shipped in a release. `config/watchdog.example.ini` only documents current defaults and fields.
 
 A portable EXE and source entry in one directory share personal state; separate directories remain independent. A machine-wide single-instance lock prevents forms from running concurrently. Shortcuts and the scheduled task point to whichever actual runtime form most recently created or switched the integration, so choose one everyday entry per installation. See [Configuration, backup, and recovery](en/configuration.md) and [Installation, upgrades, and removal](en/installation.md).
 
@@ -253,7 +233,6 @@ process-watchdog/
 │  ├─ Diagnostics/           local diagnostics bundles
 │  ├─ Execution/             launch, graceful close, and staged termination
 │  ├─ Inspection/            process, shortcut, file, and directory evidence
-│  ├─ Maintenance/           update-protection state and session recovery
 │  ├─ Platform/              Win32 constants and platform boundary
 │  ├─ UI/                    list projection, icon resources, and window lifecycle
 │  └─ Update/                asynchronous self-update coordination

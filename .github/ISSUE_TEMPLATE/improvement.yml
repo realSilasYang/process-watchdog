@@ -43,7 +43,7 @@ body:
     id: risk
     attributes:
       label: 兼容性与风险
-      description: 请说明是否可能影响配置格式、守护正确性、升级保护、DPI、暗色模式、窗口生命周期或原生资源。
+      description: 请说明是否可能影响配置格式、守护正确性、停止后恢复策略、DPI、暗色模式、窗口生命周期或原生资源。
 
   - type: textarea
     id: evidence

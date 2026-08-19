@@ -46,29 +46,32 @@ class BatchOutputLogNoticeWindow extends ManagedWindow {
                 LocalizationService.GetLanguageSystemUiFontName())
             this.gui.Add("Text", "x" textX " y20 w" textWidth
                 " h24 BackgroundTrans", Tr("尚未生成批处理输出日志"))
-            this.gui.SetFont("norm s9 c" UiThemeService.Color("MutedText"),
+            this.gui.SetFont("norm s10 c" UiThemeService.Color("MutedText"),
                 LocalizationService.GetUiFontName())
             this.gui.Add("Text", "x" textX " y48 w" textWidth
-                " h38 BackgroundTrans", Tr(
+                " h40 BackgroundTrans", Tr(
                     "小助手只有在启动 BAT 或 CMD 守护对象时才会创建此文件。"))
 
-            this.gui.SetFont("norm s9 c" UiThemeService.Color("MutedText"),
+            this.gui.SetFont("norm s10 c" UiThemeService.Color("MutedText"),
                 LocalizationService.GetUiFontName())
-            this.gui.Add("Text", "x24 y94 w" contentWidth
-                " h18 BackgroundTrans", Tr("日志保存位置："))
-            pathInput := AddCenteredSingleLineEdit(this.gui, 24, 116,
-                contentWidth, 28, this.logPath, "ReadOnly",
+            this.gui.Add("Text", "x24 y96 w" contentWidth
+                " h20 BackgroundTrans", Tr("日志保存位置："))
+            pathInput := AddCenteredSingleLineEdit(this.gui, 24, 118,
+                contentWidth, 30, this.logPath, "ReadOnly",
                 UiThemeService.Color("Surface"))
             this.pathEdit := pathInput.Edit
             RegisterTextInputControl(this.pathEdit, true)
             SetDarkControl(this.pathEdit.Hwnd)
 
-            this.gui.Add("Text", "x24 y160 w" contentWidth
+            this.gui.Add("Text", "x24 y164 w" contentWidth
                 " h1 Background" UiThemeService.Color("Divider"))
             buttonWidth := compactLayout ? 82 : 96
+            this.gui.SetFont("norm s10 bold c"
+                UiThemeService.Color("ButtonText"),
+                LocalizationService.GetLanguageSystemUiFontName())
             this.confirmButton := this.gui.Add("Text",
                 "x" Floor((windowWidth - buttonWidth) / 2)
-                    " y176 w" buttonWidth " h30 Center 0x200 Background"
+                    " y180 w" buttonWidth " h32 Center 0x200 Background"
                     UiThemeService.Color("Primary") " c"
                     UiThemeService.Color("ButtonText"), Tr("确定"))
             RegisterHoverButton(this.confirmButton,
@@ -77,7 +80,7 @@ class BatchOutputLogNoticeWindow extends ManagedWindow {
                 ObjBindMethod(this, "Close"), ButtonFeedbackMode.Dismissive)
             this.gui.OnEvent("Close", ObjBindMethod(this, "Close"))
             this.gui.OnEvent("Escape", ObjBindMethod(this, "Close"))
-            ShowApplicationWindow(this.gui, "w" windowWidth " h224")
+            ShowApplicationWindow(this.gui, "w" windowWidth " h232")
             ShowSingleLineEditFromStart(this.pathEdit)
             this.confirmButton.Focus()
         } catch as openErr {

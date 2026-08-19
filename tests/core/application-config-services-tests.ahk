@@ -54,6 +54,7 @@ RunApplicationConfigServiceTests() {
             && repository.Read("Settings", "UiLanguage", "") == "auto"
             && repository.Read("Settings", "UiFont", "") == "auto"
             && repository.Read("Settings", "Theme", "") == "auto"
+            && repository.Read("Settings", "UiScale", "") == "100"
             && repository.Read("Settings", "RecursiveBatchImport", "") == "1"
             && repository.Read("Settings", "CheckUpdatesOnStartup", "") == "1"
             && repository.Read("Settings", "RunAsAdministrator", "") == "1"
@@ -73,6 +74,7 @@ RunApplicationConfigServiceTests() {
             {Key: "UiLanguage", Value: "unsupported"},
             {Key: "UiFont", Value: "__Watchdog_Missing_Font__"},
             {Key: "Theme", Value: "unsupported"},
+            {Key: "UiScale", Value: 133},
             {Key: "CheckInterval", Value: 10},
             {Key: "RetrySequence", Value: "broken"},
             {Key: "LogDirectory", Value: "   "},
@@ -84,6 +86,7 @@ RunApplicationConfigServiceTests() {
         AssertApplicationConfig(loaded.UiLanguage == "auto"
             && loaded.UiFont == "auto"
             && loaded.Theme == "auto"
+            && loaded.UiScale == 100
             && loaded.CheckInterval == 2000
             && loaded.RetrySequence == "1, 10, 60"
             && loaded.RetryDelayArray.Length == 3
@@ -102,6 +105,7 @@ RunApplicationConfigServiceTests() {
         candidate.UiLanguage := "ja-JP"
         candidate.UiFont := selectedFont
         candidate.Theme := "light"
+        candidate.UiScale := 125
         candidate.RetrySequence := "1, 2"
         candidate.ShowAtStartup := true
         candidate.RunAsAdministrator := false
@@ -113,6 +117,7 @@ RunApplicationConfigServiceTests() {
         AssertApplicationConfig(runtime.uiLanguage == "ja-JP"
             && runtime.uiFont == selectedFont
             && runtime.uiTheme == "light"
+            && runtime.uiScale == 125
             && runtime.checkInterval == 750
             && runtime.retryDelayArray.Length == 2
             && runtime.retryDelayArray[2] == 2000
@@ -146,6 +151,17 @@ RunApplicationConfigServiceTests() {
             "无效界面主题仍被保存或污染了已有配置")
         candidate.Theme := "light"
 
+        originalScale := repository.Read("Settings", "UiScale", "")
+        candidate.UiScale := 133
+        invalidScaleRejected := false
+        try settingsService.Save(candidate)
+        catch
+            invalidScaleRejected := true
+        AssertApplicationConfig(invalidScaleRejected
+            && repository.Read("Settings", "UiScale", "") == originalScale,
+            "不支持的界面缩放仍被保存或污染了已有配置")
+        candidate.UiScale := 125
+
         originalInterval := repository.Read("Settings", "CheckInterval", "")
         candidate.CheckInterval := 1
         rejected := false
@@ -171,12 +187,13 @@ RunApplicationConfigServiceTests() {
         repository.WriteValue("Layout", "Col2W", "bad")
         AssertApplicationConfig(layoutService.Load().Column2 == 200,
             "损坏的状态列宽度没有回退到收窄后的默认值")
-        layoutService.Save({Width: 580, Height: 300,
+        minimumWindowWidth := WindowLayoutService.StructuralMinimumWidth
+        layoutService.Save({Width: minimumWindowWidth, Height: 300,
             Column1: 250, Column2: 180})
         reloadedLayout := layoutService.Load()
         layoutRuntime := {}
         layoutService.Apply(layoutRuntime, reloadedLayout)
-        AssertApplicationConfig(layoutRuntime.savedWidth == 580
+        AssertApplicationConfig(layoutRuntime.savedWidth == minimumWindowWidth
             && layoutRuntime.savedHeight == 300
             && layoutRuntime.savedColumn1 == 250
             && layoutRuntime.savedColumn2 == 180,
@@ -189,6 +206,14 @@ RunApplicationConfigServiceTests() {
         AssertApplicationConfig(narrowColumnRejected
             && layoutService.Load().Column2 == 180,
             "状态列接受了低于可读下限的宽度或污染了已保存布局")
+        narrowWindowRejected := false
+        try layoutService.Save({Width: minimumWindowWidth - 1, Height: 300,
+            Column1: 250, Column2: 180})
+        catch
+            narrowWindowRejected := true
+        AssertApplicationConfig(narrowWindowRejected
+                && layoutService.Load().Width == minimumWindowWidth,
+            "主窗口接受了低于首帧结构下限的宽度或污染了已保存布局")
     } finally {
         try FileDelete(configPath)
         Loop Files, configPath ".tmp.*"

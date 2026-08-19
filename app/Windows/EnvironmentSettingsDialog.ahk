@@ -609,7 +609,6 @@ class EnvironmentSettingsDialog extends ManagedWindow {
         priorPhase := stateObj.Phase
         if identityChanged {
             stateObj.CancelScheduledTasks()
-            App.maintenanceCoordinator.CleanupTarget(path, stateObj, false)
             ClearStateProcessIdentity(stateObj)
             stateObj.ResetGuardAttemptState()
         }
@@ -625,23 +624,9 @@ class EnvironmentSettingsDialog extends ManagedWindow {
         App.targetSpecsService.Get(path, stateObj, true)
         if identityChanged {
             stateObj.OneShot := IsOneShotTarget(path, resolvedTarget)
-            stateObj.MaintenanceConfig := App.maintenanceConfigCodec
-                .NormalizeSnapshot(stateObj.MaintenanceConfig, path,
-                    resolvedTarget)
-            fingerprintTarget := resolvedTarget != "" ? resolvedTarget : path
-            refreshedFingerprint := App.targetFileInspector.GetFingerprint(
-                fingerprintTarget)
-            stateObj.SafetyFingerprint := refreshedFingerprint
-            stateObj.MaintenanceBaselineFingerprint := refreshedFingerprint
-            stateObj.SafetyStableSince := GetTickCount64()
-            stateObj.MaintenanceFingerprintCheckedTicks := 0
-            stateObj.MaintenanceReadyCheckedTicks := 0
-            if stateObj.Enabled && stateObj.MaintenanceConfig.Enabled
-                App.maintenanceCoordinator.EnsureWatcher(path, stateObj)
-            App.maintenanceCoordinator.SaveJournal()
+            RefreshMainSequenceVisual(path)
 
-            if (stateObj.Enabled
-                && !App.maintenanceCoordinator.IsBlocking(stateObj)) {
+            if stateObj.Enabled {
                 if StateProcessIdentityIsValid(path, stateObj) {
                     UpdateRunningState(path, stateObj, stateObj.Generation)
                 } else if !(stateObj.OneShot

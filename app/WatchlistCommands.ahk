@@ -10,7 +10,7 @@ GetGuardActivationStatusKind(enabled) {
     return enabled ? GuardStatusKind.Initializing : GuardStatusKind.Paused
 }
 
-RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", arguments := "", environment := "", maintenanceConfig := "", storedResolvedTarget := "", resolvedTargetManual := false, shortcutArguments := "", displayConfig := "", runtimePath := "", runtimeArguments := "", storedContentHash := "", storedContentSize := 0) {
+RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", arguments := "", environment := "", storedResolvedTarget := "", resolvedTargetManual := false, shortcutArguments := "", displayConfig := "", runtimePath := "", runtimeArguments := "", storedContentHash := "", storedContentSize := 0, askBeforeRestart := false) {
     path := NormalizeTargetPath(path)
     if (path == "")
         return false
@@ -39,23 +39,6 @@ RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", argumen
             ? path : "")
     if App.targetIdentityService.FindConflict(identityTarget)
         return false
-    normalizedMaintenance := App.maintenanceConfigCodec.Normalize(
-        maintenanceConfig, path)
-    if (StrLower(pathExtension) == "lnk" && resolvedTarget != "") {
-        requestedMaintenance := false
-        if (maintenanceConfig && Type(maintenanceConfig) == "Object"
-            && maintenanceConfig.HasOwnProp("Enabled"))
-            requestedMaintenance := !!maintenanceConfig.Enabled
-        normalizedMaintenance.Enabled := requestedMaintenance
-            && IsMaintenanceSupportedTarget(resolvedTarget)
-        if (!normalizedMaintenance.RootIsCustom || normalizedMaintenance.InstallRoot == "") {
-            normalizedMaintenance.InstallRoot := GetDefaultMaintenanceRoot(
-                resolvedTarget)
-        }
-    }
-    fingerprintTarget := resolvedTarget != "" ? resolvedTarget : path
-    currentFingerprint := App.targetFileInspector.GetFingerprint(
-        fingerprintTarget)
     contentHash := RegExMatch(storedContentHash, "i)^[0-9a-f]{64}$")
         ? StrUpper(storedContentHash) : ""
     try contentSize := Max(0, Integer(storedContentSize))
@@ -72,6 +55,7 @@ RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", argumen
         State: initialStatus, StatusKind: GetGuardActivationStatusKind(enabled),
         FailCount: 0, Pending: false,
         Enabled: enabled ? 1 : 0,
+        AskBeforeRestart: askBeforeRestart ? 1 : 0,
         TargetStartTicks: 0, RunAsAdmin: runAsAdmin ? 1 : 0, WorkDir: workingDirectory,
         Args: arguments, ShortcutArgs: shortcutArguments, EnvVars: environment,
         RuntimePath: runtimePath, RuntimeArgs: runtimeArguments,
@@ -82,19 +66,7 @@ RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", argumen
         ResolvedTargetManual: !!resolvedTargetManual,
         ShortcutResolveCheckedTicks: GetTickCount64(),
         VerifyAttempts: 0,
-        OneShot: IsOneShotTarget(path, resolvedTarget), MaintenanceConfig: normalizedMaintenance,
-        MaintenanceMode: MaintenancePhase.Normal, MaintenanceStartedTicks: 0,
-        MaintenanceStartedAt: "", MaintenanceLastActivityTicks: 0,
-        MaintenanceRestartDueTicks: 0, MaintenanceBaselineFingerprint: currentFingerprint,
-        ArbitrationSnapshotRequestTicks: 0, ArbitrationSignalBaselineTicks: 0,
-        MaintenanceFileChanged: false, ExplicitMaintenance: false,
-        MaintenanceWatcherRoot: "", MaintenanceWatcherPath: "", KnownActorIdentities: Map(),
-        TransientActorIdentities: Map(), LastActorSeenTicks: 0,
-        MaintenanceActorCheckedTicks: 0, LastFileActivityTicks: 0,
-        MaintenanceFingerprintCheckedTicks: 0,
-        MaintenanceReadyCheckedTicks: 0, MaintenanceLastReady: true,
-        SafetyFingerprint: currentFingerprint, SafetyStableSince: GetTickCount64(),
-        MaintenanceLearningCandidates: Map(), MissingSinceTicks: 0,
+        OneShot: IsOneShotTarget(path, resolvedTarget), MissingSinceTicks: 0,
         ContentHash: contentHash, ContentSize: contentSize,
         DisplayConfig: displayConfig, TargetSpecs: "", TargetSpecsFingerprint: "",
         Scheduler: App.scheduler
@@ -103,8 +75,6 @@ RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", argumen
     try {
         App.targetSpecsService.Get(path, stateObj, true)
         App.appOrder.Push(path)
-        if enabled
-            App.maintenanceCoordinator.EnsureWatcher(path, stateObj)
         iconIdx := GetMainListIconIndex(path, stateObj, Main.lv.IL)
         row := Main.lv.Add("Icon" iconIdx,
             FormatMainListLabel(GetMainDisplayName(path, stateObj), runAsAdmin),
@@ -115,7 +85,6 @@ RegisterApp(path, enabled := 1, runAsAdmin := 0, workingDirectory := "", argumen
         ScheduleMainListTemporarySortRefresh()
         return true
     } catch as projectionErr {
-        App.maintenanceCoordinator.CloseWatcher(stateObj)
         if App.appStates.Has(path) && App.appStates[path] == stateObj
             App.appStates.Delete(path)
         RemoveAppOrderPath(path)
@@ -161,6 +130,7 @@ CaptureSelectedWatchPaths(includeContextTarget := false) {
     seen := Map()
     seen.CaseSense := "Off"
     row := 0
+    ; GetNext() 默认枚举选中行，不能传入不存在的 "S"/"Selected" 选项。
     Loop {
         row := Main.lv.GetNext(row)
         if !row
@@ -205,8 +175,17 @@ SetSelectedMainSequenceColor(colorKey, *) {
     colorKey := MainSequenceColorPalette.NormalizeKey(requestedKey)
     if requestedKey != "" && colorKey == ""
         return false
+    if requestedKey == ""
+        colorKey := MainSequenceColorPalette.NoneKey
     return QueueGuardMutation(SetSelectedMainSequenceColorCore.Bind(
         paths.Clone(), colorKey))
+}
+
+RefreshMainSequenceVisual(path) {
+    row := FindRow(path)
+    if row > 0 && Main.HasOwnProp("listSelectionPresenter")
+            && IsObject(Main.listSelectionPresenter)
+        Main.listSelectionPresenter.RefreshItem(row)
 }
 
 SetSelectedMainSequenceColorCore(paths, colorKey) {
@@ -224,10 +203,7 @@ SetSelectedMainSequenceColorCore(paths, colorKey) {
         display.SequenceColor := colorKey
         stateObj.DisplayConfig := display
         changedPaths.Push(path)
-        row := FindRow(path)
-        if row > 0 && Main.HasOwnProp("listSelectionPresenter")
-                && IsObject(Main.listSelectionPresenter)
-            Main.listSelectionPresenter.RefreshItem(row)
+        RefreshMainSequenceVisual(path)
     }
     if !changedPaths.Length
         return false
@@ -267,16 +243,11 @@ ToggleItemPauseCore(paths) {
                 UpdateState(chkPath, GetGuardActivationStatus(false),
                     stateObj, operationGeneration, true,
                     GuardStatusKind.Paused)
-                App.maintenanceCoordinator.CleanupTarget(chkPath,
-                    stateObj, false)
             } else {
                 stateObj.TransitionTo(GuardPhase.Initializing)
                 UpdateState(chkPath, GetGuardActivationStatus(true),
                     stateObj, operationGeneration, true,
                     GuardStatusKind.Initializing)
-                App.maintenanceCoordinator.ResetSession(chkPath, stateObj,
-                    false)
-                App.maintenanceCoordinator.EnsureWatcher(chkPath, stateObj)
             }
             LogMsg(newEnabled ? Tr("恢复守护：{1}", chkPath)
                 : Tr("暂停守护：{1}", chkPath))
@@ -285,7 +256,6 @@ ToggleItemPauseCore(paths) {
     }
 
     if (changedAny) {
-        App.maintenanceCoordinator.SaveJournal()
         CommitUndoState(undoState,
             CreateAppHistoryAction("toggle-pause", paths))
         SaveAppsToIni()
@@ -448,9 +418,6 @@ PrepareWatchPathTransitionFromState(previousPath, requestedPath,
         }
         if prospectiveWorkingDirectory != ""
             targetItem.WorkDir := prospectiveWorkingDirectory
-        targetItem.Maintenance := App.maintenanceConfigCodec
-            .NormalizeSnapshot(targetItem.Maintenance, newPath,
-                prospectiveResolvedTarget)
         pathChanged := true
         break
     }
@@ -571,8 +538,10 @@ ResetTargetRelocationState(path, stateObj) {
     SplitPath(path, , , &extension)
     isScript := RegExMatch(extension,
         "i)^(ahk|py|pyw|js|vbs|vbe|wsf|ps1|bat|cmd|rb|pl|php|lua|jar|sh|bash)$")
-    App.maintenanceCoordinator.MarkTargetMissing(path, stateObj,
-        isScript ? Tr("❌ 脚本不存在") : Tr("❌ 程序不存在"),
+    stateObj.MissingSinceTicks := GetTickCount64()
+    stateObj.TransitionTo(GuardPhase.Exhausted)
+    UpdateState(path, isScript ? Tr("❌ 脚本不存在") : Tr("❌ 程序不存在"),
+        stateObj, stateObj.Generation, true,
         isScript ? GuardStatusKind.ScriptMissing
             : GuardStatusKind.ProgramMissing)
     return true
@@ -674,7 +643,7 @@ CommitUndoState(beforeState, action := "") {
 
 CloneRuntimeSettingsHistoryState(settings) {
     clone := {}
-    for propertyName in ["UiLanguage", "UiFont", "Theme", "CheckInterval",
+    for propertyName in ["UiLanguage", "UiFont", "Theme", "UiScale", "CheckInterval",
             "RetrySequence", "ShowAtStartup", "RunAsAdministrator",
             "CheckUpdatesOnStartup", "RecursiveBatchImport", "LogMaxEntries",
             "LogDirectory",
@@ -692,6 +661,7 @@ GetRuntimeSettingsHistoryFields(beforeState, afterState) {
         {Property: "UiLanguage", Label: "界面语言："},
         {Property: "UiFont", Label: "界面内容字体："},
         {Property: "Theme", Label: "主题："},
+        {Property: "UiScale", Label: "界面缩放："},
         {Property: "ShowAtStartup", Label: "启动时显示主窗口"},
         {Property: "RunAsAdministrator", Label: "以管理员身份运行"},
         {Property: "CheckUpdatesOnStartup", Label: "启动时检查小助手更新"},
@@ -747,9 +717,10 @@ ApplyRuntimeSettingsSnapshot(settings) {
     priorRunAsAdministrator := App.runAsAdministrator
     displayChanged := settings.UiLanguage != App.uiLanguage
         || settings.UiFont != App.uiFont || settings.Theme != App.uiTheme
+        || settings.UiScale != App.uiScale
     if displayChanged
         ApplyDisplaySettingsHot(settings.UiLanguage, settings.UiFont,
-            settings.Theme)
+            settings.Theme, settings.UiScale)
     App.runtimeSettingsService.Apply(App, settings)
     ApplyRuntimeElevationSettingChange(priorRunAsAdministrator,
         App.runAsAdministrator)
@@ -845,9 +816,9 @@ FormatHistoryAction(entry) {
         case "relocate-path": label := Tr("更新已更名的守护目标")
         case "reorder": label := Tr("调整守护顺序")
         case "run-as-admin": label := Tr("管理员运行状态")
+        case "ask-before-restart": label := Tr("停止后询问恢复")
         case "display": label := Tr("自定义名称和图标")
         case "environment": label := Tr("进程识别与启动设置")
-        case "maintenance": label := Tr("软件升级保护")
         case "runtime-settings":
             label := Tr("小助手设置")
             fieldLabels := []
@@ -953,34 +924,21 @@ ApplyAppConfigTransition(path, stateObj, sourceItem, targetItem) {
         && !!stateObj.Enabled == !!sourceItem.Enabled
     nextEnabled := enabledChanged ? !!targetItem.Enabled : !!stateObj.Enabled
 
-    previousMaintenance := App.maintenanceConfigCodec.NormalizeSnapshot(
-        stateObj.MaintenanceConfig, path, currentResolvedTarget)
-    nextMaintenance := App.appConfigSnapshotService
-        .MergeMaintenanceTransition(previousMaintenance,
-            sourceItem.Maintenance, targetItem.Maintenance,
-            !identityTransition || identityChanged)
     nextDisplay := App.appConfigSnapshotService.MergeDisplayTransition(
         stateObj.HasOwnProp("DisplayConfig") ? stateObj.DisplayConfig : "",
         sourceItem.Display, targetItem.Display)
-    maintenanceChanged := !App.maintenanceConfigCodec.Equals(
-        previousMaintenance, nextMaintenance)
-    maintenanceRootChanged := !PathsEquivalent(previousMaintenance.InstallRoot,
-        nextMaintenance.InstallRoot)
-    previousProtectionEnabled := previousMaintenance.Enabled
 
     if (identityChanged || enabledChanged) {
         stateObj.CancelScheduledTasks()
-        App.maintenanceCoordinator.CleanupTarget(path, stateObj, false)
-    } else if (maintenanceChanged && previousProtectionEnabled
-        && !nextMaintenance.Enabled) {
-        App.maintenanceCoordinator.CleanupTarget(path, stateObj, false)
-    } else if (maintenanceChanged && maintenanceRootChanged) {
-        App.maintenanceCoordinator.CloseWatcher(stateObj)
     }
 
     if (!!sourceItem.RunAsAdmin != !!targetItem.RunAsAdmin
         && !!stateObj.RunAsAdmin == !!sourceItem.RunAsAdmin)
         stateObj.RunAsAdmin := targetItem.RunAsAdmin
+    if (!!sourceItem.AskBeforeRestart != !!targetItem.AskBeforeRestart
+        && !!stateObj.AskBeforeRestart == !!sourceItem.AskBeforeRestart)
+        stateObj.AskBeforeRestart := targetItem.AskBeforeRestart ? 1 : 0
+    RefreshMainSequenceVisual(path)
     for propertyName in ["WorkDir", "Args", "ShortcutArgs", "EnvVars",
         "RuntimePath", "RuntimeArgs"] {
         if (sourceItem.%propertyName% != targetItem.%propertyName%
@@ -989,7 +947,6 @@ ApplyAppConfigTransition(path, stateObj, sourceItem, targetItem) {
     }
     stateObj.ResolvedTarget := nextResolvedTarget
     stateObj.ResolvedTargetManual := nextResolvedTargetManual
-    stateObj.MaintenanceConfig := nextMaintenance
     stateObj.DisplayConfig := nextDisplay
 
     if identityChanged {
@@ -1004,39 +961,12 @@ ApplyAppConfigTransition(path, stateObj, sourceItem, targetItem) {
     if (identityChanged || enabledChanged) {
         stateObj.ResetGuardAttemptState()
         ClearStateProcessIdentity(stateObj)
-        fingerprintTarget := nextResolvedTarget != "" ? nextResolvedTarget : path
-        refreshedFingerprint := App.targetFileInspector.GetFingerprint(
-            fingerprintTarget)
-        stateObj.MaintenanceBaselineFingerprint := refreshedFingerprint
-        stateObj.SafetyFingerprint := refreshedFingerprint
-        stateObj.SafetyStableSince := GetTickCount64()
-        stateObj.MaintenanceFingerprintCheckedTicks := 0
-        stateObj.MaintenanceReadyCheckedTicks := 0
         stateObj.State := GetGuardActivationStatus(nextEnabled)
         stateObj.StatusKind := GetGuardActivationStatusKind(nextEnabled)
         stateObj.TransitionTo(nextEnabled ? GuardPhase.Initializing
             : GuardPhase.Paused)
-        if nextEnabled
-            App.maintenanceCoordinator.EnsureWatcher(path, stateObj)
-        else
-            App.maintenanceCoordinator.CloseWatcher(stateObj)
-    } else if maintenanceChanged {
-        if nextMaintenance.Enabled
-            App.maintenanceCoordinator.EnsureWatcher(path, stateObj)
-        else
-            App.maintenanceCoordinator.CloseWatcher(stateObj)
-        if (previousProtectionEnabled && !nextMaintenance.Enabled && stateObj.Enabled) {
-            stateObj.State := Tr("初始化...")
-            stateObj.StatusKind := GuardStatusKind.Initializing
-            stateObj.TransitionTo(GuardPhase.Initializing)
-            App.guardRuntime.ScheduleRestart(path, 200)
-        }
     }
-    return {
-        JournalChanged: identityChanged || enabledChanged
-            || (maintenanceChanged && previousProtectionEnabled
-                && !nextMaintenance.Enabled)
-    }
+    return {RuntimeChanged: identityChanged || enabledChanged}
 }
 
 SyncMainListToConfigState(items) {
@@ -1102,6 +1032,118 @@ SyncMainListToConfigState(items) {
     Main.listProjection.Rebuild(Main.lv)
     Main.listProjection.RefreshSequenceFromOrder(Main.lv, App.appOrder)
     RefreshMainStatusSortKeys()
+    AlignMainListBottomIfScrolled()
+}
+
+ToggleAskBeforeRestart(*) {
+    paths := CaptureSelectedWatchPaths(true)
+    if !paths.Length
+        return
+    QueueGuardMutation(ToggleAskBeforeRestartCore.Bind(paths),
+        "切换停止后询问恢复")
+}
+
+ToggleAskBeforeRestartCore(paths) {
+    App.editSessionId++
+    undoState := CaptureAppConfigState()
+    changedPaths := []
+    for path in paths {
+        if !App.appStates.Has(path)
+            continue
+        stateObj := App.appStates[path]
+        nextValue := !(stateObj.HasOwnProp("AskBeforeRestart")
+            && stateObj.AskBeforeRestart)
+        stateObj.AskBeforeRestart := nextValue ? 1 : 0
+        RefreshMainSequenceVisual(path)
+        changedPaths.Push(path)
+    }
+    if !changedPaths.Length
+        return false
+    CommitUndoState(undoState,
+        CreateAppHistoryAction("ask-before-restart", changedPaths))
+    if !SaveAppsToIni()
+        return false
+    LogMsg(nextValue
+        ? Tr("已开启停止后询问恢复：{1}", changedPaths[1])
+        : Tr("已关闭停止后询问恢复，改为静默恢复：{1}", changedPaths[1]))
+    return true
+}
+
+QueueRestartDecisionPrompt(path, stateObj, generation, targetName) {
+    if !App.guardRuntime.IsSupervisorCurrent(path, stateObj, generation)
+        return false
+    if !stateObj.StopPromptPending
+        return false
+    if stateObj.HasOwnProp("StopPromptTaskQueued")
+        && stateObj.StopPromptTaskQueued
+        return true
+    ; 弹窗首行必须与主列表保持一致，优先使用用户自定义的守护对象名称。
+    targetName := GetMainDisplayName(path, stateObj)
+    stateObj.StopPromptTaskQueued := true
+    try {
+        SetTimer(ShowRestartDecisionPrompt.Bind(path, stateObj, generation,
+            targetName), -1)
+        return true
+    } catch {
+        stateObj.StopPromptTaskQueued := false
+        return false
+    }
+}
+
+ShowRestartDecisionPrompt(path, stateObj, generation, targetName, *) {
+    if !App.guardRuntime.IsSupervisorCurrent(path, stateObj, generation)
+        || !stateObj.StopPromptPending {
+        if App.guardRuntime.IsSupervisorCurrent(path, stateObj, generation)
+            stateObj.StopPromptTaskQueued := false
+        return
+    }
+    choices := [
+        {Text: Tr("立即恢复"), Value: "now"},
+        {Text: Tr("等待 1 分钟"), Value: "minute1"},
+        {Text: Tr("等待 3 分钟"), Value: "minute3"},
+        {Text: Tr("暂停守护"), Value: "pause"}
+    ]
+    try decision := ShowDarkChoiceBox(
+        Tr("监测到守护对象已停止：{1}`n请选择后续处理方式。", targetName),
+        Tr("进程守护小助手 事件提醒"), choices, Main.gui)
+    catch as promptError {
+        LogMsg(Tr("恢复选择弹窗创建失败：{1}",
+            TrDiagnostic(promptError.Message)))
+        decision := "pause"
+    }
+    applyChoice := ApplyRestartDecision.Bind(path, stateObj,
+        generation, decision)
+    if !QueueGuardMutation(applyChoice, "处理停止后的恢复选择")
+        applyChoice.Call()
+}
+
+ApplyRestartDecision(path, stateObj, generation, decision) {
+    if !App.guardRuntime.IsSupervisorCurrent(path, stateObj, generation)
+        || !stateObj.StopPromptPending
+        return false
+    stateObj.StopPromptTaskQueued := false
+    if decision == "pause" {
+        ToggleItemPauseCore([path])
+        return true
+    }
+    stateObj.StopPromptPending := false
+    stateObj.StopPromptGeneration := 0
+    stateObj.Pending := false
+    stateObj.TargetStartTicks := 0
+    delayMs := decision == "minute1" ? 60000
+        : (decision == "minute3" ? 180000 : 0)
+    task := App.guardRuntime.ScheduleRestartFor(path, stateObj, delayMs)
+    if !(task is TargetScheduledTask) {
+        stateObj.Pending := false
+        stateObj.TransitionTo(GuardPhase.Initializing)
+        UpdateState(path, Tr("初始化..."), stateObj,
+            stateObj.Generation, false, GuardStatusKind.Initializing)
+        return false
+    }
+    LogMsg(delayMs == 0
+        ? Tr("已选择立即恢复：{1}", path)
+        : Tr("已选择等待 {1} 分钟后恢复：{2}", delayMs / 60000, path))
+    return true
 }
 
 ApplyState(stateArr, sourceStateArr := "", rollbackOnFailure := true,
@@ -1119,7 +1161,7 @@ ApplyState(stateArr, sourceStateArr := "", rollbackOnFailure := true,
     interaction := CaptureMainListInteraction()
     Main.lv.Opt("-Redraw")
     try {
-        journalChanged := false
+        runtimeChanged := false
         pathsToRemove := []
         if isTransition {
             for sourcePath, sourceItem in sourceState.Index {
@@ -1135,9 +1177,8 @@ ApplyState(stateArr, sourceStateArr := "", rollbackOnFailure := true,
         for existingPath in pathsToRemove {
             existingState := App.appStates[existingPath]
             existingState.CancelScheduledTasks()
-            App.maintenanceCoordinator.CleanupTarget(existingPath, existingState, false)
             App.appStates.Delete(existingPath)
-            journalChanged := true
+            runtimeChanged := true
         }
 
         for item in preparedState.Items {
@@ -1150,7 +1191,7 @@ ApplyState(stateArr, sourceStateArr := "", rollbackOnFailure := true,
                     transitionResult := ApplyAppConfigTransition(item.Path,
                         App.appStates[item.Path],
                         sourceItem, item)
-                    journalChanged := journalChanged || transitionResult.JournalChanged
+                    runtimeChanged := runtimeChanged || transitionResult.RuntimeChanged
                 }
             } else if !isTransition {
                 currentItem := App.appConfigSnapshotService.CreateSnapshot(
@@ -1158,7 +1199,7 @@ ApplyState(stateArr, sourceStateArr := "", rollbackOnFailure := true,
                 transitionResult := ApplyAppConfigTransition(item.Path,
                     App.appStates[item.Path],
                     currentItem, item)
-                journalChanged := journalChanged || transitionResult.JournalChanged
+                runtimeChanged := runtimeChanged || transitionResult.RuntimeChanged
             }
         }
         for item in preparedState.Items {
@@ -1166,10 +1207,10 @@ ApplyState(stateArr, sourceStateArr := "", rollbackOnFailure := true,
                 && (!isTransition || !sourceState.Index.Has(item.Path))
             if shouldAdd {
                 if !RegisterApp(item.Path, item.Enabled, item.RunAsAdmin, item.WorkDir, item.Args,
-                    item.EnvVars, item.Maintenance, item.ResolvedTarget,
+                    item.EnvVars, item.ResolvedTarget,
                     item.ResolvedTargetManual, item.ShortcutArgs, item.Display,
                     item.RuntimePath, item.RuntimeArgs, item.ContentHash,
-                    item.ContentSize) {
+                    item.ContentSize, item.AskBeforeRestart) {
                     throw Error(Tr("守护对象路径无效：{1}", item.Path))
                 }
             }
@@ -1179,8 +1220,6 @@ ApplyState(stateArr, sourceStateArr := "", rollbackOnFailure := true,
                 sourceState.Items, preparedState.Items)
             : preparedState.Items
         SyncMainListToConfigState(projectedItems)
-        if journalChanged
-            App.maintenanceCoordinator.SaveJournal()
         if !SaveAppsToIni()
             throw Error(Tr("监控配置尚未保存，请查看运行日志。"))
     } catch as applyError {

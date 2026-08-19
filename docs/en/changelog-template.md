@@ -74,8 +74,8 @@ breaking changes or mandatory upgrade actions.
 - Combine commits for one feature. Do not list commit subjects, filenames,
   internal classes, variable names, or pure refactoring. Mention internal work
   only when it changes reliability, performance, compatibility, or maintenance boundaries.
-- A change to configuration, defaults, privileges, system integration, update
-  protection, or minimum environment explains old-data handling, backup needs,
+- A change to configuration, defaults, privileges, system integration, or
+  minimum environment explains old-data handling, backup needs,
   and failure recovery.
 - For GUI, DPI, dark mode, and multi-monitor work, claim only the physically
   verified range. Mark untested combinations in Release notes and the manual matrix.

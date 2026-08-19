@@ -3,6 +3,8 @@
 ; 窗口与列宽一起原子写入，重新加载后按同一逻辑像素语义恢复。
 
 class WindowLayoutService {
+    static StructuralMinimumWidth := 540
+
     __New(repository) {
         this.Repository := repository
     }
@@ -10,7 +12,7 @@ class WindowLayoutService {
     Load() {
         return {
             Width: this.Repository.ReadBoundedInt("Layout", "GuiW", 730,
-                580, 32767),
+                WindowLayoutService.StructuralMinimumWidth, 32767),
             Height: this.Repository.ReadBoundedInt("Layout", "GuiH", 520,
                 300, 32767),
             Column1: this.Repository.ReadBoundedInt("Layout", "Col1W", 500,
@@ -43,7 +45,8 @@ class WindowLayoutService {
         if !IsObject(layout)
             throw TypeError("窗口布局对象无效")
         return {
-            Width: this.RequireDimension(layout, "Width", 580),
+            Width: this.RequireDimension(layout, "Width",
+                WindowLayoutService.StructuralMinimumWidth),
             Height: this.RequireDimension(layout, "Height", 300),
             Column1: this.RequireDimension(layout, "Column1", 200),
             Column2: this.RequireDimension(layout, "Column2", 140)

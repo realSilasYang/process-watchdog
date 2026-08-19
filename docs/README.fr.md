@@ -30,8 +30,7 @@ L’Assistant de surveillance des processus s’adresse aux applications de bure
 
 L’assistant ne s’appuie pas uniquement sur le nom du processus. Il recoupe le chemin complet, l’identité de création du processus, la cible réelle du raccourci et les indices de ligne de commande. Lorsque les éléments sont insuffisants, il attend la vérification suivante au lieu de considérer un état inconnu comme un arrêt.
 
-Le projet propose une interface claire ou sombre, le rétablissement automatique, la protection pendant les mises à jour, un journal d’exécution, l’annulation et le rétablissement, des noms et icônes personnalisés, ainsi qu’un paquet Windows x64 assorti d’un SBOM SPDX, de sommes SHA-256 et d’une provenance de compilation.
-
+Le projet propose une interface claire ou sombre, le rétablissement automatique, un journal d’exécution, l’annulation et le rétablissement, des noms et icônes personnalisés, ainsi qu’un paquet Windows x64 assorti d’un SBOM SPDX, de sommes SHA-256 et d’une provenance de compilation.
 # Aperçu de l’interface
 
 <p align="center">
@@ -42,7 +41,7 @@ Le projet propose une interface claire ou sombre, le rétablissement automatique
   <img src="images/process-watchdog-overview-light.png" alt="Fenêtre principale de Process Watchdog Assistant" width="100%">
 </p>
 
-La fenêtre principale réunit l’ordre des cibles surveillées, l’icône, le nom, les privilèges requis et l’état courant. La barre de commandes propose Ajouter, Supprimer, Suspendre, Réglages, Aide et À propos ; Aide ouvre le mode d’emploi, le journal d’exécution ou la page de retours, tandis qu’À propos regroupe version, environnement, mises à jour, projet et Donner. La barre inférieure récapitule les cibles actives, en rétablissement, en mise à jour, suspendues ou en échec, tandis que le journal expose les indices à l’origine de chaque état anormal.
+La fenêtre principale réunit l’ordre des cibles surveillées, l’icône, le nom, les privilèges requis et l’état courant. La barre de commandes propose Ajouter, Supprimer, Suspendre, Réglages, Aide et À propos ; Aide ouvre le mode d’emploi, le journal d’exécution ou la page de retours, tandis qu’À propos regroupe version, environnement, mises à jour, projet et Donner. La barre inférieure récapitule les cibles actives, en rétablissement, suspendues ou en échec, tandis que le journal expose les indices à l’origine de chaque état anormal.
 
 ## Points forts
 
@@ -50,7 +49,6 @@ La fenêtre principale réunit l’ordre des cibles surveillées, l’icône, le
 - Utilise les résultats `Running`, `Stopped` et `Unknown` ; un état inconnu ne déclenche jamais un redémarrage à l’aveugle.
 - Attribue à chaque cible son propre contrôleur, sa génération et ses jetons de tâche. Les anciens rappels deviennent immédiatement invalides après une suspension, une suppression ou un changement de chemin.
 - Peut exiger les droits administrateur. Une instance active dont les droits ne conviennent pas est signalée, et le prochain lancement surveillé est élevé conformément au réglage.
-- La protection des mises à jour est désactivée par défaut. Une fois activée, elle combine processus de mise à jour, relations parent-enfant, activité du dossier d’installation et stabilité des fichiers avant de suspendre ou reprendre la surveillance.
 - Remplace la configuration de manière atomique. Les enregistrements impossibles à analyser sont déplacés vers `[Recovery]` plutôt que perdus silencieusement.
 - La recherche d’applications utilise exclusivement le service Everything, sans analyse locale de tout le disque ni limite de résultats imposée par l’application. Les grands ensembles sont ajoutés par petits lots pour éviter que l’extraction d’icônes ne monopolise l’interface.
 - Prend en charge le chinois simplifié, le chinois traditionnel de Hong Kong, le chinois traditionnel de Taïwan, l’anglais, le japonais, le vietnamien, le coréen, l’espagnol, le français, le portugais du Brésil, le russe, l’allemand et l’italien. L’interface suit par défaut la langue de Windows, revient à l’anglais pour une langue non prise en charge et peut être choisie dans Affichage. La langue et la police du contenu sont appliquées immédiatement au processus courant sans arrêter ni réinitialiser la surveillance.
@@ -72,7 +70,7 @@ Une exécution complète de l’automatisation GUI est documentée sous Windows 
 ---
 
 **[Guide d’utilisation](#guide-dutilisation)**<br>
-[Installation](#1-installation-et-premier-démarrage) · [Gestion](#2-ajout-et-gestion-des-éléments) · [États](#3-états-et-rétablissement) · [Mises à jour](#4-protection-pendant-les-mises-à-jour) · [Réglages](#5-réglages) · [Journaux](#6-journaux-diagnostic-et-confidentialité)
+[Installation](#1-installation-et-premier-démarrage) · [Gestion](#2-ajout-et-gestion-des-éléments) · [États](#3-états-et-rétablissement) · [Réglages](#4-réglages) · [Journaux](#5-journaux-diagnostic-et-confidentialité)
 
 **[Guide de développement](#guide-de-développement)**<br>
 [Dossiers](#1-dossiers-et-responsabilités) · [Correction](#2-limites-de-correction) · [Vérification](#3-commandes-de-vérification) · [Publication](#4-publication-et-contribution)
@@ -95,7 +93,7 @@ Si l’assistant vous a fait gagner du temps lors d’un diagnostic ou du rétab
 2. Le ZIP portable s’exécute après extraction complète sans installation séparée d’AutoHotkey ; le ZIP du code source exige AutoHotkey v2 x64. Les polices doivent être installées dans Windows mais ne sont pas requises pour exécuter le programme ; la recherche d’applications nécessite aussi la [dernière version officielle d’Everything](https://www.voidtools.com/downloads/).
 3. Lancez `进程守护小助手.exe`. L’application demande les droits administrateur, puis affiche la fenêtre principale ou reste dans la zone de notification selon les réglages.
 4. Choisissez Ajouter pour sélectionner une cible, ou faites glisser un fichier compatible dans la fenêtre principale.
-5. Ouvrez le journal pour voir les indices d’identité, contrôles d’état, tentatives de rétablissement et signaux de mise à jour effectivement utilisés.
+5. Ouvrez le journal pour voir les indices d’identité, contrôles d’état, tentatives de rétablissement effectivement utilisés.
 
 Pour lancer le code source, installez AutoHotkey v2 x64 puis exécutez `进程守护小助手.ahk`. Si vous clonez le dépôt avec Git, installez aussi Git LFS et exécutez `git lfs pull` afin d’obtenir les fichiers de polices complets plutôt que leurs pointeurs LFS. Le ZIP du code source joint à chaque version contient déjà ces ressources et ne nécessite pas Git LFS. Les versions officielles intègrent l’environnement AutoHotkey ayant réussi tous les essais de publication ; un utilisateur ordinaire n’a pas à l’installer séparément.
 
@@ -124,7 +122,7 @@ Fermer la fenêtre principale ne fait que la masquer dans la zone de notificatio
 
 Un élément peut définir son point d’entrée, son dossier de travail, ses arguments et l’exigence de droits administrateur. Le LNK reste le point d’entrée, tandis que le chemin réel du programme est conservé séparément pour identifier le processus. Un raccourci indirect créé par un installateur n’a donc pas à être remplacé manuellement par un EXE interne susceptible de changer.
 
-Le menu contextuel permet d’ouvrir l’emplacement, arrêter la cible, modifier le chemin, configurer l’identification du processus et le lancement, changer l’exigence d’administrateur, régler la protection des mises à jour et personnaliser le nom ou l’icône affichés uniquement dans la fenêtre principale. Arrêter l’exécution suspend aussi la surveillance afin d’éviter tout redémarrage automatique. La présentation ne modifie ni l’identité, ni le lancement, ni la protection. Si les valeurs sont déjà celles par défaut, la restauration est désactivée.
+Le menu contextuel permet d’ouvrir l’emplacement, arrêter la cible, modifier le chemin, configurer l’identification du processus et le lancement, changer l’exigence d’administrateur et personnaliser le nom ou l’icône affichés uniquement dans la fenêtre principale. Arrêter l’exécution suspend aussi la surveillance afin d’éviter tout redémarrage automatique. La présentation ne modifie ni l’identité ni le lancement. Si les valeurs sont déjà celles par défaut, la restauration est désactivée.
 
 Seuls les éléments BAT et CMD affichent en plus la commande Afficher le journal de sortie du traitement par lots ; elle reste absente pour les autres types de cible. Le fichier de journal distinct n’est créé que lorsque l’assistant lance réellement cet élément et capture sa sortie standard et sa sortie d’erreur. Aucun fichier n’est ajouté automatiquement à un traitement déjà en cours d’exécution.
 
@@ -140,26 +138,12 @@ L’état de la liste décrit les indices disponibles et l’action suivante. Ne
 | En cours (privilèges incompatibles) | L’instance existe mais ne satisfait pas l’exigence d’administrateur |
 | En attente de l’état / Arrêt possible | Les indices sont insuffisants ou une sortie vient d’être observée ; nouvelle vérification sans lancement en double |
 | Démarrage / Compte à rebours | Le besoin de rétablissement est confirmé et le prochain essai suit la séquence d’attente |
-| Mise à jour / Confirmation de stabilité | Le lancement automatique attend la fin de l’activité et la stabilité des fichiers |
 | Suspendu | Les contrôles et le rétablissement automatiques sont suspendus sans fermer le processus cible |
 | Arrêté / Échec du lancement / Délai dépassé | Le rétablissement n’a pas réussi ou nécessite une confirmation ; le journal donne les indices et la raison |
 
 Les délais par défaut sont 1, 10 et 60 secondes. Une fois la séquence rapide épuisée, le dernier délai est réutilisé afin d’éviter une boucle de lancement serrée. Supprimer, suspendre, changer un chemin ou annuler invalide les anciennes tâches et les résultats asynchrones.
 
-## 4. Protection pendant les mises à jour
-
-La protection est désactivée par défaut et doit être activée pour chaque élément :
-
-1. Faites un clic droit sur la cible et ouvrez Protection des mises à jour.
-2. Activez la détection automatique et la protection du démarrage.
-3. Vérifiez l’emprise d’installation, la fenêtre de détection de sortie, l’attente de stabilité et l’attente maximale.
-4. Enregistrez, puis laissez l’application effectuer normalement une véritable mise à jour. L’assistant combine processus de mise à jour, relations parent-enfant, activité des dossiers, notifications de fichiers et signatures apprises pour décider de commencer la protection.
-
-Une fois la mise à jour confirmée, le lancement automatique est suspendu. La surveillance normale ne reprend qu’après la fin de l’activité et la stabilisation des fichiers. Si la détection expire ou ne correspond pas à la réalité, choisissez Terminer l’attente et reprendre la surveillance. La sécurité du point d’entrée est encore contrôlée avant le rétablissement.
-
-Cette fonction n’est ni un installateur universel ni un gestionnaire de services Windows. Pour une application portable, un programme de mise à jour externe au dossier ou un lanceur inhabituel, consultez d’abord le journal avant d’ajuster l’emprise et les règles.
-
-## 5. Réglages
+## 4. Réglages
 
 | Catégorie | Options |
 | --- | --- |
@@ -171,13 +155,13 @@ Cette fonction n’est ni un installateur universel ni un gestionnaire de servic
 
 La fenêtre valide les plages numériques. Les commentaires de `watchdog.ini` sont placés près des sections et réglages concernés ; utilisez de préférence l’interface pour ne pas endommager les champs encodés. Consultez [Configuration, sauvegarde et récupération](en/configuration.md).
 
-## 6. Journaux, diagnostic et confidentialité
+## 5. Journaux, diagnostic et confidentialité
 
 Le journal d’exécution permet la sélection et la copie du texte, l’agrandissement et le redimensionnement. Les barres de défilement n’apparaissent qu’en cas de besoin et le texte n’est pas modifiable.
 
 Pour un problème difficile, exportez un paquet de diagnostic local depuis le journal. Il contient des résumés de l’application, Windows, AutoHotkey, du DPI, des handles de ressources, de la phase de surveillance, des avertissements de configuration et du journal courant, sans aucun envoi automatique.
 
-La configuration personnelle se trouve dans `watchdog.ini` sous le dossier d’exécution réel et les sessions inachevées dans `watchdog.maintenance.ini`. Les éditions portable et source utilisent leur propre dossier d’entrée. Git ignore ces deux fichiers, qui ne sont ni distribués ni écrasés.
+La configuration personnelle se trouve dans `watchdog.ini` sous le dossier d’exécution réel. Les éditions portable et source utilisent leur propre dossier d’entrée. Git ignore ce fichier, qui n’est ni distribué ni écrasé.
 
 Un EXE portable et une entrée source ne partagent leur état que dans le même dossier ; l’EXE autonome ne partage rien avec les fichiers placés près du lanceur téléchargé. Le verrou global empêche l’exécution simultanée des formes. Les raccourcis et la tâche planifiée ciblent la dernière forme réellement intégrée. Consultez [Configuration, sauvegarde et récupération](en/configuration.md) et [Installation, mise à niveau et suppression](en/installation.md).
 
@@ -198,7 +182,7 @@ process-watchdog/
 ├─ assets/                  icônes, images de don et polices privées du processus
 ├─ config/                  exemple actuel commenté au niveau des réglages
 ├─ docs/                    documentation utilisateur, architecture, langues, images et gouvernance
-├─ src/                     configuration, cœur, diagnostic, exécution, inspection, mises à jour, plateforme et UI
+├─ src/                     configuration, cœur, diagnostic, exécution, inspection, plateforme et UI
 ├─ runtime/                 assistant de mise à jour en arrière-plan pour EXE et source
 ├─ tests/                   validations du cœur, de l’interface, des versions et du dépôt
 ├─ third_party/             DLL, licences et manifestes de dépendances verrouillés
@@ -213,7 +197,7 @@ Le script racine se limite à inclure les modules, assembler les dépendances et
 - L’identité de la cible, le point de lancement et la présentation personnalisée sont indépendants ; la présentation ne doit pas modifier la décision de surveillance.
 - `Running`, `Stopped` et `Unknown` sont des résultats d’observation externe ; le rétablissement ne commence qu’après confirmation de l’arrêt.
 - Chaque minuterie, rappel, observateur, processus de travail, fenêtre et ressource native doit disposer d’un nettoyage idempotent.
-- Les instantanés de configuration, cibles surveillées et réglages de protection sont validés dans la même transaction ; les tests ne doivent jamais lire ni écraser le `watchdog.ini` personnel.
+- Les instantanés de configuration, cibles surveillées sont validés dans la même transaction ; les tests ne doivent jamais lire ni écraser le `watchdog.ini` personnel.
 - L’ancien défilement fluide par superposition de captures GDI ne doit pas revenir ; ListView et le journal gardent leur défilement natif.
 - Les affirmations sur le DPI, les icônes, le mode sombre, la hiérarchie et l’accessibilité nécessitent des preuves réelles sous Windows ; l’automatisation ne remplace pas une matrice d’écrans physiques.
 

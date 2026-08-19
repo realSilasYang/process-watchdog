@@ -7,6 +7,8 @@ OnMainGuiClose(*) {
 }
 
 HideMainGui(force := false) {
+    if IsSet(Main) && IsObject(Main.contextPopup)
+        try Main.contextPopup.Hide()
     if !force && WindowHierarchy.IsOwnerLocked(Main.gui) {
         WindowHierarchy.ActivateTopOwned(Main.gui)
         return false
@@ -52,8 +54,13 @@ LayoutMainListHeader(clientWidth) {
             Main.lv.Hwnd) / dpiScale)
         statusWidth := Round(SendMessage(Win32.LVM_GETCOLUMNWIDTH, 1, 0,
             Main.lv.Hwnd) / dpiScale)
-        return Main.listHeader.SetBounds(10, 60,
-            [sequenceWidth, nameWidth, statusWidth], Max(0, clientWidth - 20))
+        if IsSet(UiScaleService)
+            Main.listHeader.Height := UiScaleService.Scale(
+                ListViewPseudoHeader.DefaultHeight)
+        return Main.listHeader.SetBounds(UiScaleService.Scale(10),
+            UiScaleService.Scale(60),
+            [sequenceWidth, nameWidth, statusWidth],
+            Max(0, clientWidth - UiScaleService.Scale(20)))
     } catch {
         return false
     }
@@ -98,14 +105,29 @@ ClearMainListTemporarySort() {
 }
 
 PositionMainCommandButtons(clientWidth) {
-    positions := GetMainCommandButtonPositions(clientWidth)
+    positions := GetMainCommandButtonPositions(clientWidth, true)
     result := AtomicControlLayout.Apply(Main.gui, [
-        {Control: Main.btnSet, X: positions.Settings, Y: 15,
-            Width: Main.settingsButtonWidth, Height: 30},
-        {Control: Main.btnSupport, X: positions.Support, Y: 15,
-            Width: Main.supportButtonWidth, Height: 30},
-        {Control: Main.btnAbout, X: positions.About, Y: 15,
-            Width: Main.aboutButtonWidth, Height: 30}
+        {Control: Main.btnAdd, X: UiScaleService.Scale(10),
+            Y: UiScaleService.Scale(15),
+            Width: UiScaleService.Scale(80), Height: UiScaleService.Scale(30)},
+        {Control: Main.btnPause, X: UiScaleService.Scale(100),
+            Y: UiScaleService.Scale(15),
+            Width: UiScaleService.Scale(80), Height: UiScaleService.Scale(30)},
+        {Control: Main.btnDel, X: UiScaleService.Scale(190),
+            Y: UiScaleService.Scale(15),
+            Width: UiScaleService.Scale(80), Height: UiScaleService.Scale(30)},
+        {Control: Main.btnSet, X: positions.Settings,
+            Y: UiScaleService.Scale(15),
+            Width: UiScaleService.Scale(Main.settingsButtonWidth),
+            Height: UiScaleService.Scale(30)},
+        {Control: Main.btnSupport, X: positions.Support,
+            Y: UiScaleService.Scale(15),
+            Width: UiScaleService.Scale(Main.supportButtonWidth),
+            Height: UiScaleService.Scale(30)},
+        {Control: Main.btnAbout, X: positions.About,
+            Y: UiScaleService.Scale(15),
+            Width: UiScaleService.Scale(Main.aboutButtonWidth),
+            Height: UiScaleService.Scale(30)}
     ], {ParentColor: UiThemeService.Color("Window"), ClearMargin: 2})
     return result.Status == AtomicControlLayout.Applied
         || result.Status == AtomicControlLayout.Unchanged
@@ -211,10 +233,25 @@ IsMainListScreenPoint(lParam, messageHwnd := 0) {
     if !IsSet(Main) || !IsObject(Main.lv) || !Main.lv.Hwnd
             || !DllCall("user32\IsWindow", "Ptr", Main.lv.Hwnd, "Int")
         return false
-    if messageHwnd == Main.lv.Hwnd && !lParam
-        return true
     screenX := SignedMainListWord(lParam)
     screenY := SignedMainListWord(lParam >> 16)
+    if messageHwnd {
+        listRoot := DllCall("user32\GetAncestor", "Ptr", Main.lv.Hwnd,
+            "UInt", 2, "Ptr") ; 根窗口
+        messageRoot := DllCall("user32\GetAncestor", "Ptr", messageHwnd,
+            "UInt", 2, "Ptr")
+        if !listRoot || messageRoot != listRoot
+            return false
+        point := (screenY << 32) | (screenX & 0xFFFFFFFF)
+        pointHwnd := DllCall("user32\WindowFromPoint", "Int64", point,
+            "Ptr")
+        pointRoot := pointHwnd ? DllCall("user32\GetAncestor", "Ptr",
+            pointHwnd, "UInt", 2, "Ptr") : 0
+        if pointRoot && pointRoot != listRoot
+            return false
+    }
+    if messageHwnd == Main.lv.Hwnd && !lParam
+        return true
     rect := Buffer(16, 0)
     if !DllCall("user32\GetWindowRect", "Ptr", Main.lv.Hwnd,
             "Ptr", rect, "Int")
@@ -278,6 +315,69 @@ GetMainListRowHeightPixels() {
     }
     dpi := DllCall("user32\GetDpiForWindow", "Ptr", Main.lv.Hwnd, "UInt")
     return Max(20, Round(28 * (dpi ? dpi : 96) / 96))
+}
+
+GetMainListHeightSnapDeltaPixels() {
+    clientRect := Buffer(16, 0)
+    if !DllCall("user32\GetClientRect", "Ptr", Main.lv.Hwnd,
+            "Ptr", clientRect, "Int")
+        return 0
+    clientHeight := NumGet(clientRect, 12, "Int")
+    rowHeight := GetMainListRowHeightPixels()
+    if clientHeight <= 0 || rowHeight <= 0
+        return 0
+    remainder := Mod(clientHeight, rowHeight)
+    if remainder <= 1 || rowHeight - remainder <= 1
+        return remainder <= 1 ? -remainder : rowHeight - remainder
+    return remainder * 2 < rowHeight ? -remainder : rowHeight - remainder
+}
+
+GetSnappedMainWindowHeight(heightDip) {
+    dpi := DllCall("user32\GetDpiForWindow", "Ptr", Main.lv.Hwnd, "UInt")
+    deltaPixels := GetMainListHeightSnapDeltaPixels()
+    deltaDip := Round(deltaPixels * 96 / (dpi ? dpi : 96))
+    return Max(300, Integer(heightDip) + deltaDip)
+}
+
+SnapMainWindowHeightToListRows(*) {
+    if !IsSet(Main) || !IsObject(Main.gui) || !Main.gui.Hwnd
+            || !DllCall("user32\IsWindowVisible", "Ptr", Main.gui.Hwnd, "Int")
+            || DllCall("user32\IsIconic", "Ptr", Main.gui.Hwnd, "Int")
+            || DllCall("user32\IsZoomed", "Ptr", Main.gui.Hwnd, "Int")
+        return false
+    Main.gui.GetClientPos(,, &clientWidth, &clientHeight)
+    snappedHeight := GetSnappedMainWindowHeight(clientHeight)
+    if snappedHeight == Round(clientHeight)
+        return false
+    Main.gui.Show("NoActivate w" Round(clientWidth) " h" snappedHeight)
+    return true
+}
+
+MainWindowResizeFinished(wParam, lParam, msg, hwnd) {
+    if hwnd != Main.gui.Hwnd
+        return
+    SnapMainWindowHeightToListRows()
+}
+
+AlignMainListBottomIfScrolled() {
+    itemCount := Main.lv.GetCount()
+    if !itemCount
+        || SendMessage(Win32.LVM_GETTOPINDEX, 0, 0, Main.lv.Hwnd) <= 0
+        return false
+    clientRect := Buffer(16, 0)
+    lastItemRect := Buffer(16, 0)
+    NumPut("Int", Win32.LVIR_BOUNDS, lastItemRect, 0)
+    if !DllCall("user32\GetClientRect", "Ptr", Main.lv.Hwnd,
+            "Ptr", clientRect, "Int")
+        || !SendMessage(Win32.LVM_GETITEMRECT, itemCount - 1,
+            lastItemRect.Ptr, Main.lv.Hwnd)
+        return false
+    bottomGap := NumGet(clientRect, 12, "Int")
+        - NumGet(lastItemRect, 12, "Int")
+    if bottomGap <= 0
+        return false
+    SendMessage(Win32.LVM_SCROLL, 0, -bottomGap, Main.lv.Hwnd)
+    return true
 }
 
 QueueMainListSmoothScroll(lines) {
@@ -377,17 +477,24 @@ SignedMainListWord(value) {
 
 ; 缩放只调整命令栏、列表和可见列，不改变图标逻辑尺寸或隐藏身份列。
 GuiResized(GuiObj, MinMax, Width, Height) {
-    if (MinMax == -1)
+    if (MinMax == -1) {
+        if IsSet(Main) && IsObject(Main.contextPopup)
+            try Main.contextPopup.Hide()
         return
+    }
     PositionMainCommandButtons(Width)
-    MoveAndRefreshResizableText(Main.statsText, 10, Height - 20,
-        Width - 20, 20)
+    MoveAndRefreshResizableText(Main.statsText, UiScaleService.Scale(10),
+        Height - UiScaleService.Scale(20),
+        Width - UiScaleService.Scale(20), UiScaleService.Scale(20))
     if IsSet(GuiModules)
         try GuiModules.historyToast.Reposition()
 
     listRedrawSuspended := SuspendMainListResizeRedraw()
     try {
-        Main.lv.Move(10, 88, Width - 20, Height - 113)
+        Main.lv.Move(UiScaleService.Scale(10), UiScaleService.Scale(92),
+            Width - UiScaleService.Scale(20),
+            Height - UiScaleService.Scale(117))
+        AlignMainListBottomIfScrolled()
 
         ; 名称列吸收剩余宽度，状态列保持可读下限，路径身份列始终隐藏。
         rc := Buffer(16)
@@ -419,17 +526,16 @@ ShowContextMenu(GuiCtrlObj, Item, IsRightClick, X, Y) {
     }
     stateObj := App.appStates[path]
     isAdmin := stateObj.HasOwnProp("RunAsAdmin") && stateObj.RunAsAdmin
-    maintenanceSupported := IsMaintenanceSupportedTarget(path)
-    maintenanceEnabled := maintenanceSupported
-        && stateObj.HasOwnProp("MaintenanceConfig")
-        && stateObj.MaintenanceConfig.Enabled
+    askBeforeRestart := stateObj.HasOwnProp("AskBeforeRestart")
+        && stateObj.AskBeforeRestart
     batchLogSupported := false
     try batchLogSupported := App.targetSpecsService.Get(path,
         stateObj).Launch.Kind == TargetLaunchKind.Batch
     ; 使用不激活的自绘浮层而非原生 Menu.Show，避免右键菜单接管焦点时
     ; ListView 在首帧把选中背景重绘成方形。
-    popupItems := BuildMainContextPopupItems(isAdmin, maintenanceEnabled,
-        maintenanceSupported, batchLogSupported)
+    popupItems := BuildMainContextPopupItems(isAdmin, batchLogSupported,
+        askBeforeRestart)
+    RefreshMainCommandState(true)
     if Main.HasOwnProp("listSelectionPresenter")
         Main.listSelectionPresenter.RefreshItem(Item)
     if IsObject(Main.contextPopup)
@@ -568,16 +674,11 @@ ClearManualRestartRequest(stateObj, expectedGeneration) {
 BeginManualRestartRequests(paths) {
     resumedAny := false
     resumedPaths := []
-    blockedAny := false
     undoState := ""
     for path in paths {
         if !App.appStates.Has(path)
             continue
         stateObj := App.appStates[path]
-        if App.maintenanceCoordinator.IsBlocking(stateObj) {
-            blockedAny := true
-            continue
-        }
         if stateObj.ManualRestartRequested || stateObj.ManualStopRequested
             continue
         wasEnabled := !!stateObj.Enabled
@@ -585,13 +686,6 @@ BeginManualRestartRequests(paths) {
             if Type(undoState) != "Array"
                 undoState := CaptureAppConfigState()
             stateObj.Enabled := 1
-            try App.maintenanceCoordinator.EnsureWatcher(path, stateObj)
-            catch {
-                stateObj.Enabled := 0
-                try App.maintenanceCoordinator.CloseWatcher(stateObj)
-                stateObj.TransitionTo(GuardPhase.Paused)
-                throw
-            }
         }
         stateObj.CancelScheduledTasks()
         stateObj.ResetGuardAttemptState()
@@ -615,8 +709,6 @@ BeginManualRestartRequests(paths) {
             stateObj.Pending := false
             if !wasEnabled {
                 stateObj.Enabled := 0
-                try App.maintenanceCoordinator.CleanupTarget(path,
-                    stateObj, false)
                 stateObj.TransitionTo(GuardPhase.Paused)
                 UpdateState(path, Tr("⏸️ 已暂停"), stateObj,
                     stateObj.Generation)
@@ -633,10 +725,6 @@ BeginManualRestartRequests(paths) {
             CreateAppHistoryAction("toggle-pause", resumedPaths))
         SaveAppsToIni()
     }
-    if blockedAny {
-        ShowDarkMsgBoxDeferred(Tr("该软件正在升级保护中。请等待升级完成，或在“软件升级保护”中结束等待后再重新启动。"),
-            Tr("暂时无法重新启动"), "Info", Main.gui)
-    }
     if paths.Length > 0
         OnLVSelectChange()
 }
@@ -649,10 +737,6 @@ PerformManualRestart(path, expectedSupervisor, expectedGeneration,
                 && App.appStates[path] == expectedSupervisor
             ClearManualRestartRequest(expectedSupervisor,
                 expectedGeneration)
-        return
-    }
-    if App.maintenanceCoordinator.IsBlocking(expectedSupervisor) {
-        ClearManualRestartRequest(expectedSupervisor, expectedGeneration)
         return
     }
     if !App.guardWorkGate.TryEnter("ManualRestart") {
@@ -754,10 +838,6 @@ CompleteManualRestartAfterStop(path, expectedSupervisor,
                 expectedGeneration)
             return
         stateObj := expectedSupervisor
-        if App.maintenanceCoordinator.IsBlocking(stateObj) {
-            ClearManualRestartRequest(stateObj, expectedGeneration)
-            return
-        }
         if !stopResult.Stopped {
             ClearManualRestartRequest(stateObj, expectedGeneration)
             stateObj.Pending := false
@@ -778,8 +858,7 @@ CompleteManualRestartAfterStop(path, expectedSupervisor,
 
 FinalizeManualRestart(path, stateObj, expectedGeneration) {
     if !App.guardRuntime.IsSupervisorCurrent(path, stateObj,
-            expectedGeneration) || !stateObj.Enabled
-            || App.maintenanceCoordinator.IsBlocking(stateObj) {
+            expectedGeneration) || !stateObj.Enabled {
         ClearManualRestartRequest(stateObj, expectedGeneration)
         if !stateObj.Enabled {
             stateObj.Pending := false
@@ -826,8 +905,7 @@ TryScheduleManualRestartCallback(callback, path, stateObj,
         if App.guardRuntime.IsSupervisorCurrent(path, stateObj,
                 expectedGeneration) {
             ClearManualRestartRequest(stateObj, expectedGeneration)
-            stateObj.Pending := App.maintenanceCoordinator.IsBlocking(
-                stateObj)
+            stateObj.Pending := false
             stateObj.TargetStartTicks := 0
             if !stateObj.Pending {
                 stateObj.TransitionTo(GuardPhase.Initializing)
@@ -861,9 +939,10 @@ OpenNotificationWindows(*) {
     if IsSet(App) && App.shutdownStarted
         return
 
+    ; 主窗口的显示、恢复、激活和最终自绘表面刷新由同一入口完成。
+    ; 这里不要再追加 WinShow/WinRestore，否则会在已提交的首帧后再次
+    ; 触发 ListView 的原生焦点绘制，导致圆角选中层和彩点短暂丢失。
     try ShowMainGui()
-    try WinShow("ahk_id " Main.gui.Hwnd)
-    try WinRestore("ahk_id " Main.gui.Hwnd)
 
     try ShowLog()
     if GuiModules.log.IsOpen() {
@@ -875,13 +954,18 @@ OpenNotificationWindows(*) {
 }
 
 RefreshMainCommandButtonsAfterShow() {
-    ; 这些 STATIC 在隐藏的主窗口中完成 owner-draw 注册。状态同步和 SVG
-    ; 注入会提前消耗无效区域，因此窗口首次显示后必须重新制造一次可见期
-    ; 绘制；这与鼠标首次经过时触发的可靠刷新路径完全相同。
-    return RedrawVisibleRoundedButtons([
+    ; 隐藏或最小化窗口恢复后，ListView 可能只提交原生矩形选中底色，且
+    ; 序号列的 NM_CUSTOMDRAW 不一定随父窗口恢复首帧执行。先在同一可见期
+    ; 同步刷新列表，再刷新 owner-draw 按钮，鼠标移动不再承担修复职责。
+    listRefreshed := false
+    if Main.HasOwnProp("listSelectionPresenter")
+            && IsObject(Main.listSelectionPresenter)
+        try listRefreshed := Main.listSelectionPresenter.RefreshNativeSurface()
+    buttonRefreshed := RedrawVisibleRoundedButtons([
         Main.btnAdd, Main.btnPause, Main.btnDel,
         Main.btnSet, Main.btnSupport, Main.btnAbout
     ])
+    return listRefreshed || buttonRefreshed
 }
 
 PrepareMainWindowFirstVisibleSurface() {
@@ -900,6 +984,7 @@ PrepareMainWindowFirstVisibleSurface() {
         Main.statsPresenter.Redraw()
     else if Main.HasOwnProp("statsText") && IsObject(Main.statsText)
         Main.statsText.Redraw()
+    UiScaleService.RescaleWindowFonts(Main.gui)
     RefreshMainCommandButtonsAfterShow()
     DllCall("user32\RedrawWindow", "Ptr", Main.gui.Hwnd, "Ptr", 0,
         "Ptr", 0, "UInt", Win32.RDW_LAYOUT_REFRESH, "Int")
@@ -918,9 +1003,79 @@ ShowMainGuiWithOptions(showOptions := "") {
 }
 
 ShowMainGui(*) {
-    ShowMainGuiWithOptions()
-    if WindowHierarchy.IsOwnerLocked(Main.gui)
-        WindowHierarchy.ActivateTopOwned(Main.gui)
+    mainHwnd := Main.gui.Hwnd
+    wasFirstVisible := Main.firstVisiblePresentationCompleted
+    wasVisible := DllCall("user32\IsWindowVisible", "Ptr", mainHwnd,
+        "Int") != 0
+    wasMinimized := DllCall("user32\IsIconic", "Ptr", mainHwnd,
+        "Int") != 0
+    needsRestoreCloak := wasFirstVisible
+        && (!wasVisible || wasMinimized)
+    cloakApplied := needsRestoreCloak
+        && FirstVisibleWindowPresenter.SetCloaked(mainHwnd, true)
+    ; 已显示窗口从托盘重新取得焦点时，Gui.Show/WinActivate 会先让原生
+    ; ListView 画出矩形焦点选中态。只冻结列表，不冻结主窗口；激活完成后
+    ; 再同步提交圆角自绘终态，标题栏和其余控件仍可正常完成激活动画。
+    listRedrawSuspended := wasFirstVisible && wasVisible && !wasMinimized
+        && SuspendMainListResizeRedraw()
+    visible := false
+    try {
+        try {
+            visible := ShowMainGuiWithOptions()
+            if WindowHierarchy.IsOwnerLocked(Main.gui)
+                WindowHierarchy.ActivateTopOwned(Main.gui)
+            else if visible
+                try WinActivate("ahk_id " mainHwnd)
+        } finally {
+            ResumeMainListResizeRedraw(listRedrawSuspended)
+            listRedrawSuspended := false
+        }
+        ; 激活可能重新写入 CDIS_FOCUS；在激活完成后再提交一次合并的最终表面。
+        if visible
+            RefreshMainCommandButtonsAfterShow()
+        if cloakApplied
+            FirstVisibleWindowPresenter.FlushComposition()
+    } finally {
+        ; Show/Activate 异常时也不能让 ListView 留在停绘状态。
+        ResumeMainListResizeRedraw(listRedrawSuspended)
+        if cloakApplied {
+            FirstVisibleWindowPresenter.SetCloaked(mainHwnd, false)
+            FirstVisibleWindowPresenter.FlushComposition()
+        }
+    }
+    return visible
+}
+
+ResizeMainWindowForUiScale(previousScale, nextScale) {
+    if previousScale == nextScale || !IsSet(Main) || !Main.gui
+        return false
+    try Main.gui.GetClientPos(,, &clientWidth, &clientHeight)
+    catch
+        return false
+    if clientWidth <= 0 || clientHeight <= 0
+        return false
+    ratio := nextScale / previousScale
+    targetWidth := Max(1, Round(clientWidth * ratio))
+    targetHeight := Max(1, Round(clientHeight * ratio))
+    visible := DllCall("user32\IsWindowVisible", "Ptr", Main.gui.Hwnd,
+        "Int") != 0
+    Main.gui.Show((visible ? "" : "Hide ") "w" targetWidth
+        " h" targetHeight)
+    return true
+}
+
+RefreshMainImageListForUiScale(previousScale, nextScale) {
+    if previousScale == nextScale || !IsSet(Main) || !Main.gui
+        return false
+    dpi := DllCall("user32\GetDpiForWindow", "Ptr", Main.gui.Hwnd, "UInt")
+    if !dpi
+        dpi := 96
+    rebuildRequest := App.iconResources.CreateDpiRebuildRequest(dpi,
+        RebuildMainImageList)
+    if rebuildRequest.PreviousTimer
+        SetTimer(rebuildRequest.PreviousTimer, 0)
+    SetTimer(rebuildRequest.Timer, -1)
+    return true
 }
 
 ; 主窗口文件拖放沿用添加窗口的目标解析规则；目录交给批量导入，文件则在
@@ -966,7 +1121,7 @@ AddDroppedWatchItems(files) {
         resolvedPath := ResolveShortcutForAdd(filePath, &shortcutArgs,
             &resolvedWorkDir)
         if RegisterApp(resolvedPath, 1, 0, resolvedWorkDir,
-            "", "", "", "", false, shortcutArgs) {
+            "", "", "", false, shortcutArgs) {
             addedCount++
             addedPaths.Push(resolvedPath)
         }

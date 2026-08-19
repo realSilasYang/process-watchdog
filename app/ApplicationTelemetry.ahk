@@ -41,14 +41,11 @@ UpdateStatsUI() {
     paused := 0
     stopped := 0
     pending := 0
-    updating := 0
     invalid := 0
 
     for _, obj in App.appStates {
         if (!obj.Enabled) {
             paused++
-        } else if App.maintenanceCoordinator.IsBlocking(obj) {
-            updating++
         } else if obj.MissingSinceTicks || obj.Phase == GuardPhase.Exhausted {
             invalid++
         } else if obj.Phase == GuardPhase.Running {
@@ -85,11 +82,6 @@ UpdateStatsUI() {
             IconPath: GetApplicationAssetPath(
                 "ui-icons\lucide\hourglass.svg"),
             IconColorRole: "InitializingIcon"},
-        {Text: ResolveMainStatsLabel(Tr("统计：升级"), "统计：升级",
-                "升级中") colon updating,
-            IconPath: GetApplicationAssetPath(
-                "ui-icons\lucide\refresh-cw.svg"),
-            IconColorRole: "UpdateIcon"},
         {Text: ResolveMainStatsLabel(Tr("统计：失效"), "统计：失效",
                 "已失效") colon invalid,
             IconPath: GetApplicationAssetPath(
@@ -116,10 +108,40 @@ UpdateStatsUI() {
     }
     if Main.statsPresenter {
         Main.statsPresenter.SetItems(statusItems, statsStr)
+        EnsureMainStatusBarMinimumWidth()
     } else if Main.statsText.Text != statsStr {
         ; 测试替身或极早启动阶段没有自绘投影时仍保留完整纯文本回退。
         Main.statsText.Text := statsStr
     }
+}
+
+EnsureMainStatusBarMinimumWidth() {
+    if !IsSet(Main) || !IsObject(Main.gui)
+        || !Main.HasOwnProp("statsPresenter")
+        || !IsObject(Main.statsPresenter)
+        return false
+    footerWidth := Main.statsPresenter.GetMinimumWidthDip()
+    if footerWidth <= 0
+        return false
+    minimumWidth := Max(WindowLayoutService.StructuralMinimumWidth,
+        footerWidth + 20)
+    try Main.gui.Opt("+MinSize" minimumWidth "x300")
+    if !Main.gui.Hwnd
+        return true
+    try isVisible := DllCall("user32\IsWindowVisible", "Ptr", Main.gui.Hwnd,
+        "Int") != 0
+    catch
+        isVisible := false
+    if !isVisible || DllCall("user32\IsIconic", "Ptr", Main.gui.Hwnd,
+            "Int") || DllCall("user32\IsZoomed", "Ptr", Main.gui.Hwnd,
+            "Int")
+        return true
+    try Main.gui.GetClientPos(,, &clientWidth, &clientHeight)
+    catch
+        return true
+    if clientWidth < minimumWidth
+        Main.gui.Show("NoActivate w" minimumWidth " h" clientHeight)
+    return true
 }
 
 ResolveMainStatsLabel(translated, translationKey, simplifiedFallback) {
@@ -236,7 +258,6 @@ LogMsg(msg) {
 
 BuildDiagnosticStateSummary() {
     phaseCounts := Map()
-    maintenanceCounts := Map()
     enabledCount := 0
     pausedCount := 0
     for path, stateObj in App.appStates {
@@ -249,11 +270,6 @@ BuildDiagnosticStateSummary() {
             phase := "unavailable"
         phaseCounts[phase] := phaseCounts.Has(phase)
             ? phaseCounts[phase] + 1 : 1
-        try maintenancePhaseValue := String(stateObj.MaintenanceMode)
-        catch
-            maintenancePhaseValue := "unavailable"
-        maintenanceCounts[maintenancePhaseValue] := maintenanceCounts.Has(
-            maintenancePhaseValue) ? maintenanceCounts[maintenancePhaseValue] + 1 : 1
     }
 
     text := "TargetCount=" App.appStates.Count "`r`n"
@@ -274,8 +290,6 @@ BuildDiagnosticStateSummary() {
         text .= App.fileScanner.BuildDiagnosticText()
     for phase, count in phaseCounts
         text .= "GuardPhase." phase "=" count "`r`n"
-    for phase, count in maintenanceCounts
-        text .= "MaintenancePhase." phase "=" count "`r`n"
     return text
 }
 

@@ -532,7 +532,7 @@ $localizedReadmes = @(
 )
 $readmeRequiredTopics = @(
     'Running', 'Stopped', 'Unknown', 'Everything', 'watchdog.ini',
-    'watchdog.maintenance.ini', 'AutoHotkey', 'Ahk2Exe',
+    'AutoHotkey', 'Ahk2Exe',
     'third_party', 'reproducible-build.ps1'
 )
 foreach ($readmeDefinition in $localizedReadmes) {
@@ -816,7 +816,7 @@ foreach ($stateIsolationRequirement in @(
         'function Assert-NoLocalWatchdogState',
         'Get-ChildItem -LiteralPath $Root -Recurse -Force -File',
         'function Assert-EmptyPackagedWatchlistExample',
-        "@('Apps', 'Maintenance', 'Display', 'Launch'",
+        "@('Apps', 'Display', 'Launch'",
         "'Identity', 'Recovery')")) {
     if (-not $releaseVerifierSource.Contains($stateIsolationRequirement)) {
         throw "Release verification is missing local-rule isolation: $stateIsolationRequirement"
@@ -875,7 +875,7 @@ foreach ($updateRequirement in @(
         'Test-UpdatedApplication',
         'Wait-ForUpdatedApplicationReady',
         "'--unshallow'",
-        "@('watchdog.ini', 'watchdog.maintenance.ini')",
+        "@('watchdog.ini')",
         "'source-git'",
         "'--error-unmatch'",
         'merge-base',

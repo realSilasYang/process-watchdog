@@ -23,7 +23,8 @@ class UiThemeService {
         colors := Map(
             "Window", "1E1E1E", "Text", "F2F2F2",
             "Primary", "0E639C", "ButtonText", "FFFFFF",
-            "Toolbar", "333333", "ToolbarText", "F2F2F2")
+            "Toolbar", "333333", "ToolbarText", "F2F2F2",
+            "WarningIcon", "FBBF24")
         return colors[name]
     }
 }
@@ -73,7 +74,35 @@ RegisterButtonClick(control, callback, *) {
     control.OnEvent("Click", callback)
 }
 
+MovePointerToControlCenter(control) {
+    try hWnd := control.Hwnd
+    catch
+        return false
+    controlRect := Buffer(16, 0)
+    if !DllCall("user32\GetWindowRect", "Ptr", hWnd,
+            "Ptr", controlRect, "Int")
+        return false
+    centerX := (NumGet(controlRect, 0, "Int")
+        + NumGet(controlRect, 8, "Int")) // 2
+    centerY := (NumGet(controlRect, 4, "Int")
+        + NumGet(controlRect, 12, "Int")) // 2
+    return !!DllCall("user32\SetCursorPos", "Int", centerX,
+        "Int", centerY, "Int")
+}
+
 UnregisterGuiControls(*) {
+}
+
+ScaleApplicationShowOptions(options) {
+    return options
+}
+
+ApplyApplicationWindowScale(*) {
+    return false
+}
+
+ReleaseApplicationWindowScale(*) {
+    return false
 }
 
 #Include ..\..\app\UI\DarkMessageBox.ahk
@@ -117,7 +146,8 @@ InspectDarkMessageBox(dialogHwnd, message, mode) {
         controls[ReadDarkMessageControlText(controlHwnd)] := controlHwnd
 
     AssertDarkMessageBox(controls.Has(message), "弹窗正文控件缺失")
-    iconText := mode == "message" ? "❌" : "⬆️"
+    iconText := mode == "message" ? "❌"
+        : mode == "confirm" ? "⬆️" : "⚠"
     AssertDarkMessageBox(controls.Has(iconText), "弹窗图标控件缺失")
     messageRect := GetDarkMessageControlRect(controls[message], dialogHwnd)
     iconRect := GetDarkMessageControlRect(controls[iconText], dialogHwnd)
@@ -132,7 +162,7 @@ InspectDarkMessageBox(dialogHwnd, message, mode) {
                 - clientWidth) <= 2,
             "确定按钮没有水平居中于窗口：left=" buttonRect.Left
                 " right=" buttonRect.Right " client=" clientWidth)
-    } else {
+    } else if mode == "confirm" {
         confirmRect := GetDarkMessageControlRect(controls["立即更新"],
             dialogHwnd)
         cancelRect := GetDarkMessageControlRect(controls["稍后"],
@@ -141,11 +171,41 @@ InspectDarkMessageBox(dialogHwnd, message, mode) {
                 - clientWidth) <= 2,
             "确认框按钮组没有水平居中于窗口：left=" confirmRect.Left
                 " right=" cancelRect.Right " client=" clientWidth)
+    } else {
+        firstChoiceRect := Buffer(16, 0)
+        AssertDarkMessageBox(DllCall("user32\GetWindowRect",
+            "Ptr", controls["立即恢复"], "Ptr", firstChoiceRect, "Int"),
+            "无法读取立即恢复按钮屏幕位置")
+        cursorPoint := Buffer(8, 0)
+        cursorX := 0
+        cursorY := 0
+        cursorInsideButton := false
+        Loop 40 {
+            AssertDarkMessageBox(DllCall("user32\GetCursorPos",
+                "Ptr", cursorPoint, "Int"), "无法读取系统鼠标位置")
+            cursorX := NumGet(cursorPoint, 0, "Int")
+            cursorY := NumGet(cursorPoint, 4, "Int")
+            cursorInsideButton := cursorX >= NumGet(firstChoiceRect, 0, "Int")
+                && cursorX < NumGet(firstChoiceRect, 8, "Int")
+                && cursorY >= NumGet(firstChoiceRect, 4, "Int")
+                && cursorY < NumGet(firstChoiceRect, 12, "Int")
+            if cursorInsideButton
+                break
+            Sleep(25)
+        }
+        AssertDarkMessageBox(cursorInsideButton,
+            "事件提醒窗口显示后鼠标没有定位到立即恢复按钮：cursor="
+                cursorX "," cursorY " button="
+                NumGet(firstChoiceRect, 0, "Int") ","
+                NumGet(firstChoiceRect, 4, "Int") "-"
+                NumGet(firstChoiceRect, 8, "Int") ","
+                NumGet(firstChoiceRect, 12, "Int"))
     }
 }
 
 GetDarkMessageBoxTestTitle(mode) {
-    return mode == "message" ? "消息框布局测试" : "确认框布局测试"
+    return mode == "message" ? "消息框布局测试"
+        : mode == "confirm" ? "确认框布局测试" : "事件提醒布局测试"
 }
 
 GetDarkMessageBoxTestMessage(mode) {
@@ -154,12 +214,14 @@ GetDarkMessageBoxTestMessage(mode) {
         . "用户配置目录\AppData\Roaming\Microsoft\Windows\Start Menu\"
         . "Programs\进程守护小助手.lnk"
     }
-    return "发现新版本 2.0.6，当前版本为 2.0.5。`n`n"
-        . "更新包验证完成后将自动重启。是否立即更新？"
+    if mode == "confirm"
+        return "发现新版本 2.0.6，当前版本为 2.0.5。`n`n"
+            . "更新包验证完成后将自动重启。是否立即更新？"
+    return "监测到守护对象已停止：测试守护对象"
 }
 
 RunDarkMessageBoxChild(mode) {
-    if mode != "message" && mode != "confirm"
+    if mode != "message" && mode != "confirm" && mode != "choice"
         throw Error("未知弹窗测试模式：" mode)
     ; 父测试进程异常退出时，子进程也会自行结束，避免 CI 桌面遗留阻塞弹窗。
     SetTimer((*) => ExitApp(1), -15000)
@@ -167,8 +229,14 @@ RunDarkMessageBoxChild(mode) {
     message := GetDarkMessageBoxTestMessage(mode)
     if mode == "message"
         ShowDarkMsgBox(message, title, "Error")
-    else
+    else if mode == "confirm"
         ShowDarkConfirmBox(message, title, "立即更新", "稍后")
+    else
+        ShowDarkChoiceBox(message, title, [
+            {Text: "立即恢复", Value: "resume"},
+            {Text: "等待1分钟", Value: "wait1"},
+            {Text: "等待3分钟", Value: "wait3"},
+            {Text: "暂停守护", Value: "pause"}])
 }
 
 RunDarkMessageBoxLayoutCase(mode) {
@@ -189,6 +257,8 @@ RunDarkMessageBoxLayoutCase(mode) {
         ; 可见就绪已证明控件构造完成；随后按捕获的 HWND 读取，避免显示过渡
         ; 瞬间让 WinGetControlsHwnd 再次按可见性过滤掉同一窗口。
         DetectHiddenWindows(true)
+        if mode == "choice"
+            Sleep(150)
         FileAppend("DARK_MESSAGE_BOX_LAYOUT|STAGE|inspect-" mode "`n", "*")
         InspectDarkMessageBox(dialogHwnd, message, mode)
     } finally {
@@ -208,4 +278,5 @@ RunDarkMessageBoxLayoutCase(mode) {
 RunDarkMessageBoxLayoutTests() {
     RunDarkMessageBoxLayoutCase("message")
     RunDarkMessageBoxLayoutCase("confirm")
+    RunDarkMessageBoxLayoutCase("choice")
 }

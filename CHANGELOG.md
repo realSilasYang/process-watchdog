@@ -7,6 +7,45 @@
 
 ## 🚧 [未发布]
 
+## 🎉 版本 [2.1.1] - 2026-08-19
+
+### 📦 发布物说明
+
+- **`fonts.zip`（可选字体包）**：提供首选字体和回退字体，需先安装到 Windows；它不是程序运行必需。
+- **`process-watchdog-2.1.1-source.zip`（完整源码版）**：包含 AHK 源码、模块、测试和文档，不含字体，适合审阅、开发或从源码运行；本机需要 AutoHotkey v2 x64。
+- **`process-watchdog-2.1.1-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证和运行所需资源，不含字体；无需安装 AutoHotkey，适合完整解压后长期使用。
+- **Everything（[官方最新版](https://www.voidtools.com/downloads/)）**：为程序搜索提供索引和后台服务；随包 `Everything64.dll` 只是 IPC 客户端，不能替代 Everything 本体。
+
+---
+
+### ⚠️ 重要说明
+
+- **升级保护已移除**：不再提供软件升级保护及其维护会话。首次启动会删除旧的 `watchdog.maintenance.ini` 并清除 `watchdog.ini` 中的 `[Maintenance]` 段；若仍需保留未完成会话记录，请先手动备份这些文件，否则旧会话数据将被删除。
+
+---
+
+### ✨ 新增
+
+- **停止后按条目询问恢复**：主列表右键菜单可为单个守护对象开启“停止后每次询问恢复”。检测到该对象停止后，事件提醒提供立即恢复、等待 1 分钟、等待 3 分钟和暂停守护；未开启的对象继续静默恢复，不会产生额外弹窗。
+- **界面缩放**：显示设置新增 80% 至 200% 的缩放选项，窗口、控件、字体、图标与浮层会共同适配所选比例。
+- **询问恢复状态圆点**：开启停止后询问恢复的条目默认显示绿色圆点；自定义圆点可覆盖该标记，清除圆点后恢复默认状态标识。
+
+---
+
+### 🚀 优化
+
+- **运行进程载入更清晰**：先完成可用进程的去重与最终数量统计，再开始渲染列表；载入期间只显示正确进度，避免分母变化和半成品列表干扰选择。
+- **设置窗口更紧凑**：显示页四个选项缩小纵向间距，启动页保持原有间距；整体窗口宽高收紧，同时保证日志路径和操作按钮不被裁切。
+- **运行时清理收敛**：移除升级保护的代码、测试、图标和文档入口，配置与发布包只保留当前守护所需的状态。
+
+---
+
+### 🐛 修复
+
+- **暂停状态即时同步**：从列表或右键菜单变更暂停状态后，主界面状态列、暂停按钮与选择视觉会立即刷新，不再保留旧状态。
+- **恢复选择提示更可靠**：事件提醒标题、守护对象名称和黄色警告图标均正确显示，窗口出现后焦点和鼠标会定位到“立即恢复”。
+- **窗口恢复后的按钮绘制**：主窗口和子窗口重新显示时会同步刷新按钮与列表表面，避免出现必须移动鼠标后控件才完整显示的情况。
+
 ## 🎉 版本 [2.1.0] - 2026-08-15
 
 ### 📦 发布物说明
@@ -550,7 +589,10 @@
 - 后台文件扫描使用 `DirExist` 明确区分目录边界，临时文件遇到瞬时占用时执行
   短时有界重试；测试分别报告结果协议、实际文件集合和清理失败。
 
-[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.12...HEAD
+[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.1...HEAD
+[2.1.1]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.1
+[2.1.0]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.0
+[2.0.13]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.0.13
 [2.0.12]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.11...v2.0.12
 [2.0.11]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.10...v2.0.11
 [2.0.10]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.9...v2.0.10

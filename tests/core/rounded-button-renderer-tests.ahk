@@ -488,7 +488,7 @@ AssertLucideSvgAssets() {
         "settings.svg", "shield-alert.svg", "shield-ellipsis.svg",
         "sliders-horizontal.svg", "square-plus.svg",
         "target.svg", "timer.svg", "trash-2.svg",
-        "triangle-alert-red.svg", "triangle-alert-timeout.svg",
+        "triangle-alert-red.svg",
         "triangle-alert.svg", "undo-2.svg", "wand-sparkles.svg"
     ]
     try {
@@ -630,6 +630,47 @@ AssertRoundedButtonAccessibility() {
     }
 }
 
+AssertStatusBarGapLayout() {
+    testGui := Gui("+ToolWindow")
+    statusText := testGui.Add("Text", "w1000 h20")
+    presenter := SvgStatusBarPresenter(statusText)
+    try {
+        presenter.SetItems([
+            {Text: "运行中: 13", IconPath: ""},
+            {Text: "已暂停: 0", IconPath: ""},
+            {Text: "已停止: 0", IconPath: ""}
+        ])
+        measuredWidth := presenter.GetMinimumWidthDip()
+        AssertRoundedButtonRenderer(measuredWidth > 20,
+            "状态栏没有根据实际控件字体测量最小宽度")
+
+        evenLayout := presenter.CalculateGapLayout(1000, 500, 6)
+        AssertRoundedButtonRenderer(evenLayout.BaseGap == 100
+                && evenLayout.ExtraGaps == 0,
+            "状态栏没有平均分配可用宽度")
+
+        remainderLayout := presenter.CalculateGapLayout(1003, 500, 6)
+        AssertRoundedButtonRenderer(remainderLayout.BaseGap == 100
+                && remainderLayout.ExtraGaps == 3
+                && remainderLayout.BaseGap * 5
+                    + remainderLayout.ExtraGaps == 503,
+            "状态栏没有完整分配剩余像素")
+
+        overflowLayout := presenter.CalculateGapLayout(400, 500, 6)
+        AssertRoundedButtonRenderer(overflowLayout.BaseGap == 0
+                && overflowLayout.ExtraGaps == 0,
+            "状态栏内容超宽时仍增加了额外间距")
+
+        singleLayout := presenter.CalculateGapLayout(1000, 120, 1)
+        AssertRoundedButtonRenderer(singleLayout.BaseGap == 0
+                && singleLayout.ExtraGaps == 0,
+            "单项说明标签生成了无效间距")
+    } finally {
+        presenter.Dispose()
+        try testGui.Destroy()
+    }
+}
+
 RunRoundedButtonRendererTests() {
     AssertRoundedButtonRenderer(RoundedButtonRenderer.EnsureStarted(),
         "GDI+ 按钮渲染器无法初始化")
@@ -654,5 +695,6 @@ RunRoundedButtonRendererTests() {
     AssertTextVisualAlignment()
     AssertLucideSvgAssets()
     AssertRoundedButtonAccessibility()
+    AssertStatusBarGapLayout()
     RoundedButtonRenderer.Shutdown()
 }

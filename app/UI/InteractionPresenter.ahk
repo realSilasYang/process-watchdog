@@ -1860,6 +1860,9 @@ SetButtonLeadingTextSlot(ctrl, slotDip := 20, gapDip := 4,
     } catch {
         return false
     }
+    slotDip := UiScaleService.Scale(slotDip)
+    gapDip := UiScaleService.Scale(gapDip)
+    visualSizeDip := UiScaleService.Scale(visualSizeDip)
     state.leadingTextSlotDip := slotDip
     state.leadingTextGapDip := gapDip
     state.leadingTextVisualSizeDip := visualSizeDip
@@ -1884,6 +1887,8 @@ SetButtonClearMark(ctrl, sizeDip := 16, strokeDip := 2) {
     } catch {
         return false
     }
+    state.clearMarkSizeDip := UiScaleService.Scale(state.clearMarkSizeDip)
+    state.clearMarkStrokeDip := UiScaleService.Scale(state.clearMarkStrokeDip)
     RedrawRoundedButton(hWnd)
     return true
 }
@@ -1906,6 +1911,8 @@ SetButtonIcon(ctrl, glyph, fontName := "Segoe MDL2 Assets", sizeDip := 14,
     } catch {
         return false
     }
+    sizeDip := UiScaleService.Scale(sizeDip)
+    gapDip := UiScaleService.Scale(gapDip)
     if (glyph == "" || fontName == "")
         return false
     state.buttonIcon := {
@@ -1962,6 +1969,8 @@ SetButtonSvgIcon(ctrl, svgPath, sizeDip := 14, gapDip := 7,
     } catch {
         return false
     }
+    sizeDip := UiScaleService.Scale(sizeDip)
+    gapDip := UiScaleService.Scale(gapDip)
     if svgPath == "" || !FileExist(svgPath) || DirExist(svgPath)
         return false
     tintMode := StrLower(requestedTint)

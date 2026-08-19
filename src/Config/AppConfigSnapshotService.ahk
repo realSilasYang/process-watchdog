@@ -1,11 +1,9 @@
 ; 守护对象配置快照与差量合并服务。
-; 快照只保存可持久化的业务字段，不复制控件和运行中任务；恢复时按目标路径合并
-; 当前运行态，确保撤销旧操作不会抹掉随后学习到的升级特征或重新引入过期控制器。
+; 快照只保存可持久化的业务字段，不复制控件和运行中任务。
 
 class AppConfigSnapshotService {
-    __New(maintenanceConfigCodec, displayConfigCodec, normalizePath,
+    __New(displayConfigCodec, normalizePath,
         pathsEquivalent) {
-        this.MaintenanceConfigCodec := maintenanceConfigCodec
         this.DisplayConfigCodec := displayConfigCodec
         this.NormalizePath := normalizePath
         this.PathsEquivalent := pathsEquivalent
@@ -20,6 +18,7 @@ class AppConfigSnapshotService {
                 Path: path,
                 Enabled: 1,
                 RunAsAdmin: 0,
+                AskBeforeRestart: false,
                 WorkDir: "",
                 Args: "",
                 ShortcutArgs: "",
@@ -30,16 +29,12 @@ class AppConfigSnapshotService {
                 ResolvedTargetManual: false,
                 ContentHash: "",
                 ContentSize: 0,
-                Maintenance: this.MaintenanceConfigCodec.CreateDefault(path),
                 Display: this.DisplayConfigCodec.CreateDefault()
             }
         }
 
         resolvedTarget := stateObj.HasOwnProp("ResolvedTarget")
             ? this.NormalizePath.Call(stateObj.ResolvedTarget) : ""
-        maintenanceConfig := stateObj.HasOwnProp("MaintenanceConfig")
-            ? stateObj.MaintenanceConfig
-            : this.MaintenanceConfigCodec.CreateDefault(path)
         displayConfig := stateObj.HasOwnProp("DisplayConfig")
             ? stateObj.DisplayConfig : ""
         return {
@@ -47,6 +42,8 @@ class AppConfigSnapshotService {
             Enabled: !stateObj.HasOwnProp("Enabled") || stateObj.Enabled ? 1 : 0,
             RunAsAdmin: stateObj.HasOwnProp("RunAsAdmin")
                 && stateObj.RunAsAdmin ? 1 : 0,
+            AskBeforeRestart: stateObj.HasOwnProp("AskBeforeRestart")
+                && stateObj.AskBeforeRestart ? 1 : 0,
             WorkDir: stateObj.HasOwnProp("WorkDir") ? stateObj.WorkDir : "",
             Args: stateObj.HasOwnProp("Args") ? stateObj.Args : "",
             ShortcutArgs: stateObj.HasOwnProp("ShortcutArgs")
@@ -63,8 +60,6 @@ class AppConfigSnapshotService {
                 ? stateObj.ContentHash : "",
             ContentSize: stateObj.HasOwnProp("ContentSize")
                 ? stateObj.ContentSize : 0,
-            Maintenance: this.MaintenanceConfigCodec.NormalizeSnapshot(
-                maintenanceConfig, path, resolvedTarget),
             Display: this.DisplayConfigCodec.Clone(displayConfig)
         }
     }
@@ -77,14 +72,14 @@ class AppConfigSnapshotService {
             return ""
         resolvedTarget := item.HasOwnProp("ResolvedTarget")
             ? this.NormalizePath.Call(item.ResolvedTarget) : ""
-        maintenanceConfig := item.HasOwnProp("Maintenance") ? item.Maintenance
-            : this.MaintenanceConfigCodec.CreateDefault(path)
         displayConfig := item.HasOwnProp("Display") ? item.Display
             : this.DisplayConfigCodec.CreateDefault()
         return {
             Path: path,
             Enabled: !item.HasOwnProp("Enabled") || item.Enabled ? 1 : 0,
             RunAsAdmin: item.HasOwnProp("RunAsAdmin") && item.RunAsAdmin ? 1 : 0,
+            AskBeforeRestart: item.HasOwnProp("AskBeforeRestart")
+                && item.AskBeforeRestart ? 1 : 0,
             WorkDir: item.HasOwnProp("WorkDir") ? item.WorkDir : "",
             Args: item.HasOwnProp("Args") ? item.Args : "",
             ShortcutArgs: item.HasOwnProp("ShortcutArgs")
@@ -101,8 +96,6 @@ class AppConfigSnapshotService {
                 ? item.ContentHash : "",
             ContentSize: item.HasOwnProp("ContentSize")
                 ? item.ContentSize : 0,
-            Maintenance: this.MaintenanceConfigCodec.NormalizeSnapshot(
-                maintenanceConfig, path, resolvedTarget),
             Display: this.DisplayConfigCodec.Normalize(displayConfig)
         }
     }
@@ -129,6 +122,7 @@ class AppConfigSnapshotService {
         return this.PathsEquivalent.Call(first.Path, second.Path)
             && !!first.Enabled == !!second.Enabled
             && !!first.RunAsAdmin == !!second.RunAsAdmin
+            && !!first.AskBeforeRestart == !!second.AskBeforeRestart
             && first.WorkDir == second.WorkDir
             && first.Args == second.Args
             && first.ShortcutArgs == second.ShortcutArgs
@@ -139,8 +133,6 @@ class AppConfigSnapshotService {
             && this.PathsEquivalent.Call(first.ResolvedTarget,
                 second.ResolvedTarget)
             && !!first.ResolvedTargetManual == !!second.ResolvedTargetManual
-            && this.MaintenanceConfigCodec.Equals(first.Maintenance,
-                second.Maintenance)
             && this.DisplayConfigCodec.Equals(first.Display, second.Display)
     }
 
@@ -200,60 +192,6 @@ class AppConfigSnapshotService {
         return mergedItems
     }
 
-    MergeMaintenanceTransition(currentConfig, sourceConfig, targetConfig,
-        allowRootTransition := true) {
-        merged := {
-            Enabled: !!currentConfig.Enabled,
-            InstallRoot: currentConfig.InstallRoot,
-            RootIsCustom: !!currentConfig.RootIsCustom,
-            DetectionSeconds: currentConfig.DetectionSeconds,
-            StableSeconds: currentConfig.StableSeconds,
-            MaxWaitSeconds: currentConfig.MaxWaitSeconds,
-            LearnedActors: []
-        }
-        for actor in currentConfig.LearnedActors
-            merged.LearnedActors.Push(actor)
-
-        if (!!sourceConfig.Enabled != !!targetConfig.Enabled
-            && !!currentConfig.Enabled == !!sourceConfig.Enabled)
-            merged.Enabled := !!targetConfig.Enabled
-        if (!!sourceConfig.RootIsCustom != !!targetConfig.RootIsCustom
-            && !!currentConfig.RootIsCustom == !!sourceConfig.RootIsCustom)
-            merged.RootIsCustom := !!targetConfig.RootIsCustom
-        if (allowRootTransition
-            && !this.PathsEquivalent.Call(sourceConfig.InstallRoot,
-                targetConfig.InstallRoot)
-            && this.PathsEquivalent.Call(currentConfig.InstallRoot,
-                sourceConfig.InstallRoot))
-            merged.InstallRoot := targetConfig.InstallRoot
-        for propertyName in ["DetectionSeconds", "StableSeconds",
-            "MaxWaitSeconds"] {
-            if (sourceConfig.%propertyName% != targetConfig.%propertyName%
-                && currentConfig.%propertyName% == sourceConfig.%propertyName%)
-                merged.%propertyName% := targetConfig.%propertyName%
-        }
-
-        if !this.ActorArraysEqual(sourceConfig.LearnedActors,
-            targetConfig.LearnedActors) {
-            sourceActors := this.CreateActorSet(sourceConfig.LearnedActors)
-            targetActors := this.CreateActorSet(targetConfig.LearnedActors)
-            filteredActors := []
-            for actor in merged.LearnedActors {
-                if !(sourceActors.Has(actor) && !targetActors.Has(actor))
-                    filteredActors.Push(actor)
-            }
-            merged.LearnedActors := filteredActors
-            mergedActorSet := this.CreateActorSet(merged.LearnedActors)
-            for actor in targetConfig.LearnedActors {
-                if !sourceActors.Has(actor) && !mergedActorSet.Has(actor) {
-                    merged.LearnedActors.Push(actor)
-                    mergedActorSet[actor] := true
-                }
-            }
-        }
-        return merged
-    }
-
     MergeDisplayTransition(currentConfig, sourceConfig, targetConfig) {
         current := this.DisplayConfigCodec.Normalize(currentConfig)
         source := this.DisplayConfigCodec.Normalize(sourceConfig)
@@ -264,24 +202,10 @@ class AppConfigSnapshotService {
         if (!this.PathsEquivalent.Call(source.IconPath, target.IconPath)
             && this.PathsEquivalent.Call(current.IconPath, source.IconPath))
             merged.IconPath := target.IconPath
+        if (source.SequenceColor != target.SequenceColor
+            && current.SequenceColor == source.SequenceColor)
+            merged.SequenceColor := target.SequenceColor
         return merged
     }
 
-    ActorArraysEqual(firstActors, secondActors) {
-        if (firstActors.Length != secondActors.Length)
-            return false
-        for index, actor in firstActors {
-            if (StrLower(actor) != StrLower(secondActors[index]))
-                return false
-        }
-        return true
-    }
-
-    CreateActorSet(actors) {
-        actorSet := Map()
-        actorSet.CaseSense := "Off"
-        for actor in actors
-            actorSet[actor] := true
-        return actorSet
-    }
 }

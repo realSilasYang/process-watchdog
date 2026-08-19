@@ -1,5 +1,5 @@
 ; 应用级根状态与依赖装配入口。
-; 这里集中持有配置、守护、升级保护、进程检查和界面资源服务，避免业务模块
+; 这里集中持有配置、守护、进程检查和界面资源服务，避免业务模块
 ; 通过零散全局变量找回依赖；关闭时也能沿同一所有权关系释放后台任务和原生资源。
 
 class ApplicationState {
@@ -12,10 +12,10 @@ class ApplicationState {
             this.configRepository, ParseRetrySequence,
             A_Temp "\ProcessWatchdogLogs")
         this.windowLayoutService := WindowLayoutService(this.configRepository)
-        this.maintenanceJournalPath := A_ScriptDir "\watchdog.maintenance.ini"
         this.uiLanguage := LocalizationService.GetRequestedLanguage()
         this.uiFont := LocalizationService.GetRequestedUiFont()
         this.uiTheme := UiThemeService.GetRequestedTheme()
+        this.uiScale := UiScaleService.GetRequested()
         this.checkInterval := 2000
         this.retrySequence := "1, 10, 60"
         this.retryDelayArray := []
@@ -47,10 +47,6 @@ class ApplicationState {
             Now: GetTickCount64,
             Quote: QuoteCommandLineArgument
         })
-        this.maintenancePollInterval := 1000
-        this.maintenanceProcessInterval := 1000
-        this.maintenanceFingerprintInterval := 30000
-        this.maintenanceFingerprintRetryInterval := 5000
         this.guardWorkGate := GuardWorkGate(GetTickCount64, LogMsg)
         this.guardMutationQueue := GuardMutationQueue(this.guardWorkGate,
             HandleGuardMutationError)
@@ -86,40 +82,28 @@ class ApplicationState {
             ObjBindMethod(IniFieldCodec, "Decode"), LogMsg)
         this.processSnapshots.Localizer := Tr
         this.processSnapshots.DiagnosticLocalizer := TrDiagnostic
-        this.maintenanceActorMatcher := MaintenanceActorMatcher(
-            ObjBindMethod(this.processInspector, "GetCreationIdentity"))
         this.displayConfigCodec := DisplayConfigCodec(NormalizeTargetPath,
             PathsEquivalent)
-        this.maintenanceConfigCodec := MaintenanceConfigCodec({
-            GetDefaultRoot: GetDefaultMaintenanceRoot,
-            IsSupportedTarget: IsMaintenanceSupportedTarget,
-            NormalizeRoot: NormalizeMaintenanceRoot,
-            ParseBoundedInteger: ParseBoundedInteger,
-            PathsEquivalent: PathsEquivalent
-        }, this.maintenanceActorMatcher)
         this.appConfigSnapshotService := AppConfigSnapshotService(
-            this.maintenanceConfigCodec, this.displayConfigCodec,
+            this.displayConfigCodec,
             NormalizeTargetPath, PathsEquivalent)
         this.appConfigHistoryService := AppConfigHistoryService(
             this.appConfigSnapshotService, 20)
         this.watchlistPersistenceService := WatchlistPersistenceService(
-            this.configRepository, IniFieldCodec, this.maintenanceConfigCodec,
+            this.configRepository, IniFieldCodec,
             this.displayConfigCodec, this.appConfigSnapshotService)
-        this.maintenanceSessionCodec := MaintenanceSessionCodec()
         this.targetIdentityService := TargetIdentityService(this, {
-            GetDefaultRoot: GetDefaultMaintenanceRoot,
             InvalidateRuntimeIdentity: InvalidateShortcutRuntimeIdentity,
             Localize: Tr,
             Log: LogMsg,
-            NormalizeRoot: NormalizeMaintenanceRoot,
             Now: GetTickCount64,
             PathsEquivalent: PathsEquivalent
         })
         this.targetFileInspector := TargetFileInspector({
             CanonicalPath: GetCanonicalPath,
             GetSubjectPath: ObjBindMethod(this.targetIdentityService,
-                "GetMaintenanceSubjectPath"),
-            IsSupportedTarget: IsMaintenanceSupportedTarget
+                "GetTargetSubjectPath"),
+            IsSupportedTarget: (path) => true
         })
         this.shortcutTargetResolver := ShortcutTargetResolver(
             this.processSnapshots, {
@@ -139,41 +123,6 @@ class ApplicationState {
             GetCanonicalPath,
             ObjBindMethod(this.processInspector,
                 "CaptureAutoHotkeyScriptSnapshot"))
-        this.maintenanceCoordinator := MaintenanceCoordinator(this, {
-            CanonicalPath: GetCanonicalPath,
-            ClearProcessIdentity: ClearStateProcessIdentity,
-            DeserializeSession: ObjBindMethod(this.maintenanceSessionCodec,
-                "Deserialize"),
-            GetFingerprint: ObjBindMethod(this.targetFileInspector,
-                "GetFingerprint"),
-            GetMaintenanceSubjectPath: ObjBindMethod(
-                this.targetIdentityService, "GetMaintenanceSubjectPath"),
-            HashPath: HashPath,
-            IsSupportedTarget: IsMaintenanceSupportedTarget,
-            IsTargetFileReady: ObjBindMethod(this.targetFileInspector,
-                "IsReady"),
-            Localize: Tr,
-            LocalizeDiagnostic: TrDiagnostic,
-            Log: LogMsg,
-            LogSlow: LogSlowBackgroundOperation,
-            NormalizeRoot: NormalizeMaintenanceRoot,
-            NormalizeTargetPath: NormalizeTargetPath,
-            ObserveTarget: ObserveTarget,
-            RefreshShortcutIdentity: ObjBindMethod(
-                this.targetIdentityService, "RefreshShortcut"),
-            SaveApps: SaveAppsToIni,
-            SerializeSession: ObjBindMethod(this.maintenanceSessionCodec,
-                "Serialize"),
-            ScheduleRestart: "",
-            SetProcessIdentity: SetStateProcessIdentity,
-            TargetReferenceExists: ObjBindMethod(this.targetIdentityService,
-                "TargetReferenceExists"),
-            TargetSubjectExists: ObjBindMethod(this.targetIdentityService,
-                "TargetSubjectExists"),
-            UpdateRunningState: UpdateRunningState,
-            UpdateState: UpdateState,
-            WatcherFactory: DirectoryChangeWatcher
-        })
         this.targetRelocationService := TargetRelocationService(this, {
             CanonicalPath: GetCanonicalPath,
             FindConflict: ObjBindMethod(this.targetIdentityService,
@@ -184,12 +133,6 @@ class ApplicationState {
                 "GetContentSignature"),
             GetSearchRoots: ObjBindMethod(this.targetFileInspector,
                 "GetRelocationSearchRoots"),
-            HasRecentMaintenanceSignal: ObjBindMethod(
-                this.maintenanceCoordinator, "HasRecentSignal"),
-            IsMaintenanceBlocking: ObjBindMethod(
-                this.maintenanceCoordinator, "IsBlocking"),
-            IsMaintenanceProtectionEnabled: ObjBindMethod(
-                this.maintenanceCoordinator, "IsProtectionEnabled"),
             Localize: Tr,
             LocalizeDiagnostic: TrDiagnostic,
             Log: LogMsg,
@@ -219,6 +162,7 @@ class ApplicationState {
             LogSlow: LogSlowBackgroundOperation,
             NormalizeTargetPath: NormalizeTargetPath,
             ObserveTarget: ObserveTarget,
+            PromptRestartDecision: QueueRestartDecisionPrompt,
             RefreshShortcutIdentity: ObjBindMethod(
                 this.targetIdentityService, "RefreshShortcut"),
             SaveApps: SaveAppsToIni,
@@ -226,13 +170,13 @@ class ApplicationState {
             StateProcessIdentityIsValid: StateProcessIdentityIsValid,
             TargetReferenceExists: ObjBindMethod(this.targetIdentityService,
                 "TargetReferenceExists"),
+            TargetSubjectExists: ObjBindMethod(this.targetIdentityService,
+                "TargetSubjectExists"),
             UpdateRunningState: UpdateRunningState,
             UpdateState: UpdateState
         })
         this.scheduler.ErrorHandler := ObjBindMethod(this.guardRuntime,
             "HandleTaskError")
-        this.maintenanceCoordinator.Callbacks.ScheduleRestart := ObjBindMethod(
-            this.guardRuntime, "ScheduleRestartFor")
         this.processSnapshots.SnapshotPublishedCallback := ObjBindMethod(
             this, "OnProcessSnapshotPublished")
         this.pendingProcessSnapshot := ""
@@ -306,7 +250,6 @@ class ApplicationState {
         }
         snapshot := ""
         snapshotIndex := ""
-        maintenanceAccepted := false
         guardAccepted := false
         try {
             previousCritical := A_IsCritical
@@ -325,13 +268,6 @@ class ApplicationState {
                 return false
             }
             try {
-            maintenanceAccepted := this.maintenanceCoordinator
-                .OnSnapshotPublished(snapshot, snapshotIndex)
-            } catch as maintenanceError {
-                LogMsg(Tr("处理后台进程快照时发生错误：{1}",
-                    TrDiagnostic(maintenanceError.Message)))
-            }
-            try {
             guardAccepted := this.guardRuntime.OnSnapshotPublished(
                 snapshot, snapshotIndex)
             } catch as guardError {
@@ -343,7 +279,7 @@ class ApplicationState {
             if Type(this.pendingProcessSnapshot) == "Array"
                 try SetTimer(this.processSnapshotDeliveryTimer, -1)
         }
-        return maintenanceAccepted || guardAccepted
+        return guardAccepted
     }
 
     ClearPendingProcessSnapshot() {

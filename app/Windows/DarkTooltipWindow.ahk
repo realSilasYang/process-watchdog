@@ -17,7 +17,7 @@ class DarkTooltipWindow extends ManagedWindow {
                 Key: "dark",
                 Background: UiThemeService.Color("Tooltip"),
                 Text: UiThemeService.Color("TooltipText"),
-                FontSize: 9,
+                FontSize: 10,
                 PaddingX: 12,
                 PaddingY: 8,
                 MaxTextWidth: 440,
@@ -92,6 +92,7 @@ class DarkTooltipWindow extends ManagedWindow {
                     }
                 } else if (control == Main.btnAdd) {
                     text := Tr("添加程序、脚本或快捷方式`n支持搜索、文件夹批量导入和文件拖放")
+                        . "`nCtrl+N"
                 } else if (control == Main.btnDel) {
                     text := Tr("删除选中的守护对象（支持多选，可撤销）`n快捷键：Delete")
                 } else if (control == Main.btnPause) {
@@ -171,6 +172,9 @@ class DarkTooltipWindow extends ManagedWindow {
         } else {
             this.textControl.Text := text
         }
+        this.textControl.SetFont("norm s" appearance.FontSize " c"
+            appearance.Text, LocalizationService.GetUiFontName())
+        ForgetApplicationWindowControls(this.gui)
         this.ResizeTextControl(text, appearance.MaxTextWidth)
         point := Buffer(8)
         DllCall("user32\GetCursorPos", "Ptr", point)

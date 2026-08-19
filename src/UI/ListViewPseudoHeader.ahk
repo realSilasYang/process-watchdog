@@ -3,7 +3,8 @@
 ; 只改变当前行投影，业务顺序及持久化仍由调用方持有。
 
 class ListViewPseudoHeader {
-    static DefaultHeight := 28
+    static DefaultHeight := 32
+    static DefaultFontSize := 11
     static InputGuardSubclassId := 0x4C565048 ; "LVPH"：伪表头输入保护标识
     static InputGuardCallback := 0
     static PressedCellHwnd := 0
@@ -50,7 +51,8 @@ class ListViewPseudoHeader {
         this.BackgroundColor := this.GetOption(options, "BackgroundColor", "333333")
         this.TextColor := this.GetOption(options, "TextColor", "B8BAB9")
         this.FontName := this.GetOption(options, "FontName", "Microsoft YaHei UI")
-        this.FontSize := this.GetOption(options, "FontSize", 9)
+        this.FontSize := this.GetOption(options, "FontSize",
+            ListViewPseudoHeader.DefaultFontSize)
         this.Height := Max(1, Integer(this.GetOption(options, "Height",
             ListViewPseudoHeader.DefaultHeight)))
 

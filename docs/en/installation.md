@@ -102,13 +102,12 @@ under the system temp directory. A compiled EXE inside a Git source repository
 is not allowed to overwrite that repository; run the update from the source
 entry instead.
 
-Manual upgrade remains supported: exit the old instance, back up both state
+Manual upgrade remains supported: exit the old instance, back up the configuration
 files, fully extract the new package into a new directory, copy the configuration,
 and follow any one-time migration notes in the Release.
 
-A release never includes `watchdog.ini` or `watchdog.maintenance.ini`, so replacing
-program files does not overwrite personal configuration or unfinished
-update-protection sessions. The current version accepts only the
+A release never includes `watchdog.ini`, so replacing program files does not overwrite
+personal configuration. The current version accepts only the
 nine-field monitoring record documented in the README. Unparseable records are
 moved to `[Recovery]` instead of being silently deleted.
 

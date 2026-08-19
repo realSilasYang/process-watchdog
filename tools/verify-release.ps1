@@ -34,7 +34,7 @@ function Assert-NoLocalWatchdogState {
         [string]$PackageLabel
     )
 
-    $forbiddenNames = @('watchdog.ini', 'watchdog.maintenance.ini')
+    $forbiddenNames = @('watchdog.ini')
     $matches = @(Get-ChildItem -LiteralPath $Root -Recurse -Force -File |
         Where-Object { $_.Name -in $forbiddenNames })
     if ($matches.Count -gt 0) {
@@ -59,7 +59,7 @@ function Assert-EmptyPackagedWatchlistExample {
         throw "$PackageLabel is missing config/watchdog.example.ini."
     }
     $exampleText = Get-Content -LiteralPath $examplePath -Raw -Encoding Unicode
-    foreach ($sectionName in @('Apps', 'Maintenance', 'Display', 'Launch',
+    foreach ($sectionName in @('Apps', 'Display', 'Launch',
             'Identity', 'Recovery')) {
         $sectionPattern = '(?ms)^\[' + [regex]::Escape($sectionName) +
             '\]\s*\r?\n(?<Body>.*?)(?=^\[|\z)'
@@ -154,7 +154,6 @@ $requiredPaths = @(
     'assets\ui-icons\lucide\timer.svg',
     'assets\ui-icons\lucide\trash-2.svg',
     'assets\ui-icons\lucide\triangle-alert-red.svg',
-    'assets\ui-icons\lucide\triangle-alert-timeout.svg',
     'assets\ui-icons\lucide\triangle-alert.svg',
     'assets\ui-icons\lucide\undo-2.svg',
     'assets\ui-icons\lucide\wand-sparkles.svg',
@@ -280,8 +279,7 @@ if ($updateManifest.schemaVersion -ne 1 -or
     $updateManifest.packageKind -ne 'compiled' -or
     $updateManifest.version -ne $version -or
     $updateManifest.entry -cne $executable.Name -or
-    'watchdog.ini' -in $updateManifest.managedPaths -or
-    'watchdog.maintenance.ini' -in $updateManifest.managedPaths) {
+    'watchdog.ini' -in $updateManifest.managedPaths) {
     throw 'Compiled update manifest is unsafe or inconsistent.'
 }
 $expectedCompiledManagedPaths = @(
@@ -495,8 +493,7 @@ if ($sourceVersion -ne $version -or
     $sourceUpdateManifest.packageKind -ne 'source' -or
     $sourceUpdateManifest.version -ne $version -or
     $sourceUpdateManifest.entry -cne $mainScript.Name -or
-    'watchdog.ini' -in $sourceUpdateManifest.managedPaths -or
-    'watchdog.maintenance.ini' -in $sourceUpdateManifest.managedPaths) {
+    'watchdog.ini' -in $sourceUpdateManifest.managedPaths) {
     throw 'Source update manifest is unsafe or inconsistent.'
 }
 $expectedSourceManagedPaths = @(

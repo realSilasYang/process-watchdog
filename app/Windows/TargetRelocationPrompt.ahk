@@ -54,59 +54,55 @@ class TargetRelocationPrompt extends ManagedWindow {
                 LocalizationService.GetLanguageSystemUiFontName())
             this.gui.Add("Text", "x24 y20 w" contentWidth
                 " h26 BackgroundTrans", Tr("检测到守护目标可能已更名"))
-            this.gui.SetFont("norm s9 c" UiThemeService.Color("MutedText"),
+            this.gui.SetFont("norm s10 c" UiThemeService.Color("MutedText"),
                 LocalizationService.GetUiFontName())
-            isVersionedEntry := candidate.HasOwnProp("Evidence")
-                && candidate.Evidence == "VersionedEntryUnique"
-            descriptionText := isVersionedEntry
-                ? Tr("升级期间发现唯一同名新版本入口；已记录并持续校验候选 SHA-256。确认后将更新守护目标，名称、图标和启动设置保持不变。")
-                : Tr("小助手找到了与原文件内容完全一致的新路径。确认后将更新守护目标，名称、图标和启动设置保持不变。")
+            descriptionText := Tr("小助手找到了与原文件内容完全一致的新路径。确认后将更新守护目标，名称、图标和启动设置保持不变。")
             this.descriptionLabel := this.gui.Add("Text",
-                "x24 y52 w" contentWidth " h42 BackgroundTrans",
+                "x24 y52 w" contentWidth " h46 BackgroundTrans",
                 descriptionText)
 
-            this.gui.SetFont("norm s9 c" UiThemeService.Color("Text"),
+            this.gui.SetFont("norm s10 c" UiThemeService.Color("Text"),
                 LocalizationService.GetUiFontName())
-            this.gui.Add("Text", "x24 y102 w" contentWidth
-                " h18 BackgroundTrans", Tr("原路径："))
-            oldInput := AddCenteredSingleLineEdit(this.gui, 24, 122,
-                contentWidth, 28, candidate.OldPath, "ReadOnly",
+            this.gui.Add("Text", "x24 y106 w" contentWidth
+                " h20 BackgroundTrans", Tr("原路径："))
+            oldInput := AddCenteredSingleLineEdit(this.gui, 24, 128,
+                contentWidth, 30, candidate.OldPath, "ReadOnly",
                 UiThemeService.Color("Surface"))
             this.oldPathEdit := oldInput.Edit
             RegisterTextInputControl(this.oldPathEdit, true)
             SetDarkControl(this.oldPathEdit.Hwnd)
 
-            this.gui.Add("Text", "x24 y158 w" contentWidth
-                " h18 BackgroundTrans", Tr("新路径："))
-            newInput := AddCenteredSingleLineEdit(this.gui, 24, 178,
-                contentWidth, 28, candidate.NewPath, "ReadOnly",
+            this.gui.Add("Text", "x24 y166 w" contentWidth
+                " h20 BackgroundTrans", Tr("新路径："))
+            newInput := AddCenteredSingleLineEdit(this.gui, 24, 188,
+                contentWidth, 30, candidate.NewPath, "ReadOnly",
                 UiThemeService.Color("Surface"))
             this.newPathEdit := newInput.Edit
             RegisterTextInputControl(this.newPathEdit, true)
             SetDarkControl(this.newPathEdit.Hwnd)
 
-            this.gui.SetFont("norm s9 c" UiThemeService.Color("MutedText"),
+            this.gui.SetFont("norm s10 c" UiThemeService.Color("MutedText"),
                 LocalizationService.GetUiFontName())
-            evidenceText := isVersionedEntry
-                ? Tr("唯一同名新版本入口 / SHA-256")
-                : Tr("内容完全一致 / SHA-256")
             this.evidenceLabel := this.gui.Add("Text",
-                "x24 y216 w" contentWidth
-                " h20 Center BackgroundTrans",
-                Tr("识别依据：") evidenceText)
-            this.gui.Add("Text", "x24 y246 w" contentWidth
+                "x24 y228 w" contentWidth
+                " h22 Center BackgroundTrans",
+                Tr("识别依据：") Tr("内容完全一致 / SHA-256"))
+            this.gui.Add("Text", "x24 y260 w" contentWidth
                 " h1 Background" UiThemeService.Color("Divider"))
 
             buttonWidth := compactLayout ? 128 : 160
             buttonGap := 14
             buttonStartX := Floor((windowWidth - buttonWidth * 2
                 - buttonGap) / 2)
+            this.gui.SetFont("norm s10 bold c"
+                UiThemeService.Color("Text"),
+                LocalizationService.GetLanguageSystemUiFontName())
             this.updateButton := this.gui.Add("Button",
-                "x" buttonStartX " y264 w" buttonWidth " h34",
+                "x" buttonStartX " y278 w" buttonWidth " h36",
                 Tr("更新守护路径"))
             this.ignoreButton := this.gui.Add("Button",
                 "x" (buttonStartX + buttonWidth + buttonGap)
-                    " y264 w" buttonWidth " h34", Tr("忽略"))
+                    " y278 w" buttonWidth " h36", Tr("忽略"))
             RegisterHoverButton(this.updateButton,
                 UiThemeService.Color("Primary"))
             SetButtonTextColor(this.updateButton,
@@ -121,7 +117,7 @@ class TargetRelocationPrompt extends ManagedWindow {
             RegisterButtonClick(this.ignoreButton,
                 ObjBindMethod(this, "Ignore"),
                 ButtonFeedbackMode.Dismissive)
-            ShowApplicationWindow(this.gui, "w" windowWidth " h318")
+            ShowApplicationWindow(this.gui, "w" windowWidth " h334")
             ShowSingleLineEditFromStart(this.oldPathEdit)
             ShowSingleLineEditFromStart(this.newPathEdit)
             this.updateButton.Focus()

@@ -9,6 +9,7 @@ class ListViewSelectionPresenter {
 
     __New(listView, radiusDip := "", subItemDrawCallback := "") {
         this.listView := listView
+        this.listHwnd := 0
         this.subItemDrawCallback := IsObject(subItemDrawCallback)
             ? subItemDrawCallback : ""
         try this.radiusDip := radiusDip == ""
@@ -20,7 +21,8 @@ class ListViewSelectionPresenter {
         this.nativeRefreshCallback := ObjBindMethod(this,
             "RefreshNativeSurface")
         this.attached := false
-        if IsObject(listView) && listView.Hwnd {
+        try this.listHwnd := IsObject(listView) ? listView.Hwnd : 0
+        if this.listHwnd {
             listView.OnNotify(Win32.NM_CUSTOMDRAW, this.notifyCallback)
             this.attached := true
         }
@@ -33,6 +35,7 @@ class ListViewSelectionPresenter {
                 this.notifyCallback, -1)
         this.attached := false
         this.listView := ""
+        this.listHwnd := 0
         this.subItemDrawCallback := ""
         this.notifyCallback := ""
         this.nativeRefreshCallback := ""
@@ -46,21 +49,26 @@ class ListViewSelectionPresenter {
         itemSpecOffset := A_PtrSize == 8 ? 56 : 36
         itemIndex := NumGet(lParam, itemSpecOffset, "UPtr")
         return (SendMessage(Win32.LVM_GETITEMSTATE, itemIndex,
-            Win32.LVIS_SELECTED, listView.Hwnd) & Win32.LVIS_SELECTED) != 0
+            Win32.LVIS_SELECTED, this.listHwnd) & Win32.LVIS_SELECTED) != 0
     }
 
     RefreshItem(row) {
-        if !this.attached || row <= 0 || row > this.listView.GetCount()
+        hwnd := this.GetLiveListHwnd()
+        if !hwnd || row <= 0
+            return false
+        try itemCount := this.listView.GetCount()
+        catch
+            return false
+        if row > itemCount
             return false
         result := SendMessage(Win32.LVM_REDRAWITEMS, row - 1, row - 1,
-            this.listView.Hwnd)
-        DllCall("user32\UpdateWindow", "Ptr", this.listView.Hwnd, "Int")
+            hwnd)
+        DllCall("user32\UpdateWindow", "Ptr", hwnd, "Int")
         return result != 0
     }
 
     ScheduleNativeSurfaceRefresh(delayMs := 15) {
-        if !this.attached || !IsObject(this.listView)
-            || !this.listView.Hwnd
+        if !this.GetLiveListHwnd()
             return false
         try delayMs := Max(1, Integer(delayMs))
         catch
@@ -72,19 +80,33 @@ class ListViewSelectionPresenter {
     }
 
     RefreshNativeSurface(*) {
-        if !this.attached || !IsObject(this.listView)
-            || !this.listView.Hwnd
+        hwnd := this.GetLiveListHwnd()
+        if !hwnd
             return false
         try SetTimer(this.nativeRefreshCallback, 0)
         ; 不自行画线；让 Windows ListView 像搜索窗口一样完成一次原生绘制，
         ; 双缓冲会在整帧完成后提交，列边界因此保持连续且不会闪烁。
-        return DllCall("user32\RedrawWindow", "Ptr", this.listView.Hwnd,
+        return DllCall("user32\RedrawWindow", "Ptr", hwnd,
             "Ptr", 0, "Ptr", 0, "UInt", Win32.RDW_CONTROL_REFRESH,
             "Int") != 0
     }
 
+    GetLiveListHwnd() {
+        hwnd := this.listHwnd
+        if !this.attached || !hwnd
+            || !DllCall("user32\IsWindow", "Ptr", hwnd, "Int")
+            return 0
+        return hwnd
+    }
+
     HandleCustomDraw(listView, lParam) {
-        if !lParam || !this.attached || listView.Hwnd != this.listView.Hwnd
+        hwnd := this.GetLiveListHwnd()
+        if !lParam || !hwnd
+            return
+        try notificationHwnd := listView.Hwnd
+        catch
+            return
+        if notificationHwnd != hwnd
             return
         drawStageOffset := A_PtrSize == 8 ? 24 : 12
         drawStage := NumGet(lParam, drawStageOffset, "UInt")
@@ -128,7 +150,7 @@ class ListViewSelectionPresenter {
         rowRect := Buffer(16, 0)
         NumPut("Int", Win32.LVIR_BOUNDS, rowRect, 0)
         if !SendMessage(Win32.LVM_GETITEMRECT, itemIndex, rowRect.Ptr,
-                listView.Hwnd)
+                this.listHwnd)
             return false
         hdcOffset := A_PtrSize == 8 ? 32 : 16
         hdc := NumGet(lParam, hdcOffset, "Ptr")
@@ -137,7 +159,7 @@ class ListViewSelectionPresenter {
         right := NumGet(rowRect, 8, "Int")
         bottom := NumGet(rowRect, 12, "Int")
         windowDpi := DllCall("user32\GetDpiForWindow", "Ptr",
-            listView.Hwnd, "UInt")
+            this.listHwnd, "UInt")
         if !windowDpi
             windowDpi := 96
         horizontalInset := Max(2,

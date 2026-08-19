@@ -7,6 +7,45 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.1.1] - 2026-08-19
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides preferred and fallback fonts that must be installed into Windows first; it is not required to run the application.
+- **`process-watchdog-2.1.1-source.zip` (complete source edition):** Includes the AHK source, modules, tests, and documentation without fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64 locally.
+- **`process-watchdog-2.1.1-windows-x64.zip` (complete portable edition, recommended):** Includes the EXE, documentation, licenses, and required runtime resources without fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([official latest version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application search; the bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### ⚠️ Important Notes
+
+- **Upgrade protection removed:** Software upgrade protection and its maintenance sessions are no longer available. The first launch removes the legacy `watchdog.maintenance.ini` and the `[Maintenance]` section in `watchdog.ini`; back up those files before upgrading if an unfinished session record must be kept, otherwise the legacy session data is deleted.
+
+---
+
+### ✨ Added
+
+- **Per-target restart decisions after a stop:** A main-list context-menu action enables “Ask after a stop” for individual monitored targets. When such a target stops, the reminder offers immediate recovery, one- or three-minute delays, and pause guarding; all other targets continue to recover silently without extra prompts.
+- **Interface scaling:** Display settings now provide scales from 80% to 200%; windows, controls, fonts, icons, and popups adapt together to the selected scale.
+- **Restart-decision status dot:** Targets that ask before recovery receive a green dot by default. A custom dot overrides it, and clearing a custom dot restores the default state indicator.
+
+---
+
+### 🚀 Improvements
+
+- **Clearer running-process loading:** The application now deduplicates usable processes and determines the final total before rendering the list. Loading shows accurate progress only, avoiding changing totals and partial rows during selection.
+- **More compact settings window:** The four Display fields use less vertical space while the Startup layout keeps its original spacing. The window is smaller without clipping log paths or action buttons.
+- **Removed upgrade-protection remnants:** Upgrade-protection code, tests, icons, and documentation have been removed so configuration and release packages retain only the state required for current monitoring.
+
+---
+
+### 🐛 Fixed
+
+- **Immediate pause-state synchronization:** Changing pause state from the list or its context menu now immediately refreshes the main status, pause command, and selection visuals.
+- **Reliable recovery-decision reminder:** The reminder shows its title, monitored display name, and yellow warning symbol correctly, then focuses and moves the pointer to “Recover now.”
+- **Buttons after restoring a window:** Main and child windows now refresh their buttons and list surface when shown again, so controls do not require pointer movement before rendering completely.
+
 ## 🎉 Version [2.1.0] - 2026-08-15
 
 ### 📦 Release Assets
@@ -602,7 +641,10 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.12...HEAD
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.1...HEAD
+[2.1.1]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.1
+[2.1.0]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.0
+[2.0.13]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.0.13
 [2.0.12]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.11...v2.0.12
 [2.0.11]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.10...v2.0.11
 [2.0.10]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.9...v2.0.10

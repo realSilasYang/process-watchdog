@@ -22,14 +22,6 @@ DelItemCore(paths) {
         if App.appStates.Has(delPath) {
             stateObj := App.appStates[delPath]
             stateObj.CancelScheduledTasks()
-            try App.maintenanceCoordinator.CleanupTarget(delPath,
-                stateObj, false)
-            catch as cleanupError {
-                ; 删除的首要承诺是立即停止守护。监听器清理异常不能让控制器
-                ; 继续藏在内存中；编排器的共享订阅会在后续轮询自行剔除。
-                LogMsg(Tr("升级文件监听异常：{1}",
-                    TrDiagnostic(cleanupError.Message)))
-            }
             App.appStates.Delete(delPath)
             RemoveAppOrderPath(delPath)
             LogMsg(Tr("已取消监控：{1}", delPath))
@@ -45,8 +37,8 @@ DelItemCore(paths) {
     Main.listProjection.Rebuild(Main.lv)
     Main.listProjection.RefreshSequenceFromOrder(Main.lv, App.appOrder)
     RefreshMainStatusSortKeys()
+    AlignMainListBottomIfScrolled()
 
-    App.maintenanceCoordinator.SaveJournal()
     CommitUndoState(undoState, CreateAppHistoryAction("delete", paths))
     SaveAppsToIni()
     Main.contextTargetRow := 0

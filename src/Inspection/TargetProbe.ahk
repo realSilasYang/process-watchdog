@@ -116,13 +116,17 @@ class TargetProbe {
                 observationContext, "RecentStartSeconds", 0)))
             recentStart := recentSeconds > 0
                 && this.WasProcessStartedRecently(candidate, recentSeconds)
-            if matchesPrior || recentStart
+            minimumCreationTime := this.ContextValue(observationContext,
+                "MinimumCreationTime", "")
+            startedSinceBaseline := this.WasProcessStartedSince(candidate,
+                minimumCreationTime)
+            if matchesPrior || recentStart || startedSinceBaseline
                 return ProcessObservation.Running(candidate.pid, identity,
                     snapshotResult.CapturedAtTicks,
                     "process-image-inferred")
         }
-        ; 原生快照没有 WMI 的创建时间字段。升级恢复的唯一同名新实例
-        ; 因此再复用一份足够新的后台快照，才能验证“近期启动”这项证据。
+        ; 原生快照没有 WMI 的创建时间字段。必要时复用一份足够新的后台
+        ; 快照，才能验证“近期启动”这项证据。
         if inaccessibleCandidate
             && this.IsImagePathFallbackAllowed(observationContext) {
             fallbackIndex := this.ResolveSnapshotIndex("",
@@ -155,6 +159,18 @@ class TargetProbe {
             return false
         try return Abs(DateDiff(A_Now, creation, "Seconds"))
             <= maximumAgeSeconds
+        catch
+            return false
+    }
+
+    WasProcessStartedSince(processInfo, minimumCreationTime) {
+        creation := this.Value(processInfo, "creation", "")
+        creation := SubStr(String(creation), 1, 14)
+        minimumCreationTime := SubStr(String(minimumCreationTime), 1, 14)
+        if !RegExMatch(creation, "^\d{14}$")
+            || !RegExMatch(minimumCreationTime, "^\d{14}$")
+            return false
+        try return DateDiff(creation, minimumCreationTime, "Seconds") >= 0
         catch
             return false
     }

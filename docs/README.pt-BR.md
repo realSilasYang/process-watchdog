@@ -30,8 +30,7 @@ O Assistente de monitoramento de processos foi criado para aplicativos de deskto
 
 O assistente não decide que um alvo está em execução apenas pelo nome do processo. Ele cruza o caminho completo, a identidade de criação do processo, o destino real do atalho e evidências da linha de comando. Quando faltam evidências, aguarda a próxima verificação em vez de tratar um estado desconhecido como parado.
 
-O projeto oferece interface clara e escura, recuperação automática, proteção durante atualizações, log de execução, desfazer e refazer, nomes e ícones personalizados e um pacote Windows x64 com SBOM SPDX, somas SHA-256 e procedência da compilação.
-
+O projeto oferece interface clara e escura, recuperação automática, log de execução, desfazer e refazer, nomes e ícones personalizados e um pacote Windows x64 com SBOM SPDX, somas SHA-256 e procedência da compilação.
 # Visão geral da interface
 
 <p align="center">
@@ -42,7 +41,7 @@ O projeto oferece interface clara e escura, recuperação automática, proteçã
   <img src="images/process-watchdog-overview-light.png" alt="Janela principal do Process Watchdog Assistant" width="100%">
 </p>
 
-A janela principal reúne a ordem dos alvos monitorados, o ícone do aplicativo, o nome, os requisitos de privilégio e o estado atual. A barra de comandos oferece Adicionar, Excluir, Pausar, Configurações, Ajuda e Sobre; Ajuda abre o manual, o log de execução ou a página de comentários, enquanto Sobre reúne versão, ambiente, atualizações, projeto e Doar. A barra inferior resume os alvos em execução, recuperação, atualização, pausa e falha, enquanto o log mostra as evidências por trás de cada estado anormal.
+A janela principal reúne a ordem dos alvos monitorados, o ícone do aplicativo, o nome, os requisitos de privilégio e o estado atual. A barra de comandos oferece Adicionar, Excluir, Pausar, Configurações, Ajuda e Sobre; Ajuda abre o manual, o log de execução ou a página de comentários, enquanto Sobre reúne versão, ambiente, atualizações, projeto e Doar. A barra inferior resume os alvos em execução, recuperação, pausa e falha, enquanto o log mostra as evidências por trás de cada estado anormal.
 
 ## Principais recursos
 
@@ -50,7 +49,6 @@ A janela principal reúne a ordem dos alvos monitorados, o ícone do aplicativo,
 - Usa os resultados `Running`, `Stopped` e `Unknown`; um resultado desconhecido nunca causa uma reinicialização às cegas.
 - Cada alvo recebe controlador, geração e tokens de tarefa próprios. Retornos antigos são invalidados imediatamente após pausar, excluir ou alterar o caminho.
 - Pode exigir privilégios de administrador. Avisa quando uma instância em execução não cumpre o requisito e eleva a próxima inicialização monitorada conforme a configuração.
-- A proteção de atualização fica desativada por padrão. Quando ativada, combina processos de atualização, relações pai-filho, atividade da pasta de instalação e estabilidade dos arquivos antes de pausar ou retomar o monitoramento.
 - Substitui a configuração de forma atômica. Registros que não podem ser analisados vão para `[Recovery]` em vez de desaparecer silenciosamente.
 - A busca de aplicativos usa exclusivamente o serviço Everything, sem varredura local de todo o disco nem limite de resultados imposto pelo aplicativo. Conjuntos grandes são adicionados em lotes curtos para que a extração de ícones não bloqueie a interface.
 - Oferece chinês simplificado, chinês tradicional de Hong Kong, chinês tradicional de Taiwan, inglês, japonês, vietnamita, coreano, espanhol, francês, português do Brasil, russo, alemão e italiano. A interface segue o idioma do Windows por padrão, usa inglês quando o idioma não é compatível e também pode ser escolhida em Exibição. Alterações de idioma e fonte de conteúdo entram em vigor imediatamente no processo atual sem interromper nem reinicializar as tarefas de monitoramento.
@@ -72,7 +70,7 @@ Há uma execução completa de automação da GUI documentada no Windows 11 com 
 ---
 
 **[Guia do usuário](#guia-do-usuário)**<br>
-[Instalação](#1-instalação-e-primeira-execução) · [Gerenciamento](#2-adicionar-e-gerenciar-itens) · [Estados](#3-estados-e-recuperação) · [Atualizações](#4-proteção-durante-atualizações) · [Configurações](#5-configurações) · [Logs](#6-logs-diagnóstico-e-privacidade)
+[Instalação](#1-instalação-e-primeira-execução) · [Gerenciamento](#2-adicionar-e-gerenciar-itens) · [Estados](#3-estados-e-recuperação) · [Configurações](#4-configurações) · [Logs](#5-logs-diagnóstico-e-privacidade)
 
 **[Guia do desenvolvedor](#guia-do-desenvolvedor)**<br>
 [Pastas](#1-pastas-e-responsabilidades) · [Correção](#2-limites-de-correção) · [Verificação](#3-comandos-de-verificação) · [Publicação](#4-publicação-e-contribuição)
@@ -95,7 +93,7 @@ Se o assistente poupou seu tempo ao diagnosticar falhas ou recuperar aplicativos
 2. O ZIP portátil funciona após a extração completa e não exige uma instalação separada do AutoHotkey; o ZIP do código-fonte requer AutoHotkey v2 x64. As fontes devem ser instaladas no Windows, mas não são necessárias para executar o programa; a busca de aplicativos também requer a [versão oficial mais recente do Everything](https://www.voidtools.com/downloads/).
 3. Execute `进程守护小助手.exe`. O aplicativo solicitará privilégios de administrador e, conforme a configuração, mostrará a janela principal ou ficará na área de notificação.
 4. Selecione Adicionar para escolher um alvo ou arraste arquivos compatíveis para a janela principal.
-5. Abra o Log para ver as evidências de identidade, as verificações de estado, as tentativas de recuperação e os sinais de atualização usados de fato.
+5. Abra o Log para ver as evidências de identidade, as verificações de estado, as tentativas de recuperação usados de fato.
 
 Para executar pelo código-fonte, instale o AutoHotkey v2 x64 e abra `进程守护小助手.ahk`. Ao clonar o repositório com Git, instale também o Git LFS e execute `git lfs pull` para obter os arquivos de fontes completos, em vez de ponteiros LFS. O ZIP de código-fonte anexado ao Release já contém esses recursos e não precisa do Git LFS. As versões oficiais incorporam o runtime do AutoHotkey aprovado em todos os testes de publicação, portanto usuários comuns não precisam instalá-lo separadamente.
 
@@ -124,7 +122,7 @@ Fechar a janela principal apenas a oculta na área de notificação; o monitoram
 
 Um item pode definir seu ponto de entrada, pasta de trabalho, argumentos e exigência de administrador. O LNK permanece como ponto de entrada e o caminho real do programa é armazenado separadamente para identificar o processo. Assim, um atalho indireto criado pelo instalador não precisa ser substituído manualmente por um EXE interno que pode mudar.
 
-O menu de contexto permite abrir a pasta, encerrar a execução do alvo, mudar o caminho, configurar a identificação do processo e a inicialização, alternar a exigência de administrador, configurar a proteção e personalizar o nome ou ícone exibido apenas na janela principal. Encerrar execução também pausa o monitoramento para impedir uma reinicialização automática. A apresentação não muda a identidade, a inicialização nem a proteção. Se a exibição já for a padrão, a restauração fica desativada.
+O menu de contexto permite abrir a pasta, encerrar a execução do alvo, mudar o caminho, configurar a identificação do processo e a inicialização, alternar a exigência de administrador e personalizar o nome ou ícone exibido apenas na janela principal. Encerrar execução também pausa o monitoramento para impedir uma reinicialização automática. A apresentação não muda nem a identidade nem a inicialização. Se a exibição já for a padrão, a restauração fica desativada.
 
 Somente itens BAT e CMD exibem também a opção Ver log de saída em lote; os demais tipos de alvo não mostram esse comando. O arquivo de log separado só é criado quando o assistente realmente inicia o item e captura sua saída padrão e de erro. Um processo em lote que já estava em execução não recebe esse arquivo automaticamente.
 
@@ -140,26 +138,12 @@ O estado da lista descreve as evidências disponíveis e a próxima ação. Não
 | Em execução (privilégio incompatível) | A instância existe, mas não cumpre a exigência de administrador |
 | Aguardando estado / Possivelmente parado | As evidências são insuficientes ou uma saída acabou de ocorrer; nova verificação sem lançamento duplicado |
 | Iniciando / Contagem regressiva | A recuperação foi confirmada e a próxima tentativa segue a sequência de espera |
-| Atualizando / Confirmando estabilidade | O início automático aguarda o fim da atividade e a estabilidade dos arquivos |
 | Pausado | Verificações e recuperação automáticas estão pausadas sem fechar o processo-alvo |
 | Parado / Falha ao iniciar / Tempo esgotado | A recuperação falhou ou requer confirmação; o log informa as evidências e o motivo |
 
 Os atrasos padrão são 1, 10 e 60 segundos. Após a sequência rápida, o último atraso é reutilizado para evitar um ciclo intenso de inicializações. Excluir, pausar, mudar um caminho ou desfazer invalida tarefas agendadas e resultados assíncronos antigos.
 
-## 4. Proteção durante atualizações
-
-A proteção fica desativada por padrão e precisa ser habilitada para cada item:
-
-1. Clique com o botão direito no alvo e abra Proteção durante atualizações.
-2. Ative a detecção automática e a proteção da inicialização.
-3. Verifique a área de instalação, a janela de detecção de saída, a espera de estabilidade e a espera máxima.
-4. Salve e deixe o aplicativo fazer uma atualização real normalmente. O assistente combina processos de atualização, relações pai-filho, atividade de pastas, notificações de arquivo e características aprendidas para decidir quando iniciar a proteção.
-
-Depois que a atualização é confirmada, a inicialização automática fica suspensa. O monitoramento normal só volta quando a atividade termina e os arquivos ficam estáveis. Se a detecção expirar ou não corresponder à realidade, use Encerrar espera e retomar monitoramento. A segurança do ponto de entrada ainda é verificada antes da recuperação.
-
-O recurso não é um instalador universal nem um gerenciador de serviços do Windows. Para aplicativos portáteis, atualizadores fora da pasta ou inicializadores incomuns, consulte primeiro o log e então ajuste a área e as regras.
-
-## 5. Configurações
+## 4. Configurações
 
 | Categoria | Opções |
 | --- | --- |
@@ -171,13 +155,13 @@ O recurso não é um instalador universal nem um gerenciador de serviços do Win
 
 A janela valida os intervalos numéricos. Os comentários de `watchdog.ini` ficam junto das seções e opções correspondentes; prefira a interface para não danificar campos codificados. Consulte [Configuração, backup e recuperação](en/configuration.md).
 
-## 6. Logs, diagnóstico e privacidade
+## 5. Logs, diagnóstico e privacidade
 
 O Log de execução permite selecionar e copiar texto, maximizar e redimensionar a janela. As barras de rolagem aparecem apenas quando necessárias e o texto não pode ser editado.
 
 Para um problema difícil, exporte um pacote de diagnóstico local pela janela do log. Ele contém resumos do aplicativo, Windows, AutoHotkey, DPI, identificadores de recurso, fase de monitoramento, avisos de configuração e log atual, sem upload automático.
 
-A configuração pessoal fica em `watchdog.ini` no diretório real de execução, e as sessões inacabadas em `watchdog.maintenance.ini`. As edições portátil e de código-fonte usam a própria pasta de entrada. O Git ignora os dois arquivos e nenhuma versão os inclui ou sobrescreve.
+A configuração pessoal fica em `watchdog.ini` no diretório real de execução. As edições portátil e de código-fonte usam a própria pasta de entrada. O Git ignora esse arquivo e nenhuma versão o inclui ou sobrescreve.
 
 Um EXE portátil e uma entrada de código-fonte só compartilham estado na mesma pasta; o EXE independente não usa a configuração ao lado do lançador baixado. O bloqueio global impede formas simultâneas, e os atalhos e a tarefa agendada apontam para a última forma real integrada. Consulte [Configuração, backup e recuperação](en/configuration.md) e [Instalação, atualização e remoção](en/installation.md).
 
@@ -198,7 +182,7 @@ process-watchdog/
 ├─ assets/                  ícones, imagens de doação e fontes privadas do processo
 ├─ config/                  exemplo atual com comentários junto às opções
 ├─ docs/                    documentação de usuário, arquitetura, idiomas, imagens e governança
-├─ src/                     configuração, núcleo, diagnóstico, execução, inspeção, atualização, plataforma e UI
+├─ src/                     configuração, núcleo, diagnóstico, execução, inspeção, plataforma e UI
 ├─ runtime/                 auxiliar de atualização em segundo plano para EXE e fonte
 ├─ tests/                   verificações do núcleo, GUI, versão e repositório
 ├─ third_party/             DLLs, licenças e manifestos de dependências fixados
@@ -213,7 +197,7 @@ O script raiz apenas inclui módulos, monta dependências e inicia o aplicativo.
 - Identidade do alvo, ponto de entrada e apresentação personalizada são independentes; a apresentação não pode alterar decisões de monitoramento.
 - `Running`, `Stopped` e `Unknown` são resultados de evidências externas; a recuperação só começa após confirmar a parada.
 - Cada temporizador, callback, observador, processo de trabalho, janela e recurso nativo precisa de limpeza idempotente.
-- Instantâneos de configuração, itens e proteção são confirmados na mesma transação; testes não podem ler nem sobrescrever o `watchdog.ini` pessoal.
+- Instantâneos de configuração, itens são confirmados na mesma transação; testes não podem ler nem sobrescrever o `watchdog.ini` pessoal.
 - A rolagem suave descartada por sobreposição de capturas GDI não deve voltar; ListView e log mantêm a rolagem nativa.
 - Declarações sobre DPI, ícones, modo escuro, hierarquia e acessibilidade exigem provas reais no Windows; automação não substitui uma matriz física.
 

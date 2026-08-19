@@ -191,7 +191,7 @@ class UiThemeService {
             ["WaitingIcon", "A0B7FF"], ["QueryIcon", "E9C08C"],
             ["RelocationIcon", "5DD4E8"], ["UnknownIcon", "858585"],
             ["InitializingIcon", "0F7EE7"],
-            ["PermissionIcon", "A16207"], ["SafeStartIcon", "5F9B0D"]
+            ["PermissionIcon", "A16207"]
         ]
             palette[pair[1]] := pair[2]
         return palette
@@ -231,7 +231,7 @@ class UiThemeService {
             ["RelocationIcon", "0E7490"], ["UnknownIcon", "526170"],
             ["InitializingIcon", "0369A1"],
             ; 这两种原色在深浅背景下均达到非文本图形所需对比度，保留不变。
-            ["PermissionIcon", "A16207"], ["SafeStartIcon", "5F9B0D"]
+            ["PermissionIcon", "A16207"]
         ]
             palette[pair[1]] := pair[2]
         return palette
@@ -251,6 +251,8 @@ class UiThemeService {
 }
 
 class MainSequenceColorPalette {
+    static NoneKey := "none"
+
     static Presets() {
         return [
             {Key: "sage", Name: "雾松绿"},
@@ -269,6 +271,22 @@ class MainSequenceColorPalette {
             if preset.Key == key
                 return key
         }
+        return ""
+    }
+
+    static NormalizeSettingKey(key) {
+        key := StrLower(Trim(String(key)))
+        if key == this.NoneKey
+            return key
+        return this.NormalizeKey(key)
+    }
+
+    static Resolve(configuredKey) {
+        configuredKey := this.NormalizeSettingKey(configuredKey)
+        if configuredKey == this.NoneKey
+            return ""
+        if configuredKey != ""
+            return configuredKey
         return ""
     }
 

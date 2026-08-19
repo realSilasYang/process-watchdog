@@ -11,8 +11,8 @@
 - `tests/verify-windows-integration.ps1 -SoakSeconds 300` 通过，核心测试、完整字体哈希、GDI 和 USER 增长均符合要求。
 - 当前发行 EXE 与完成长时 GUI 压力测试的 EXE 哈希一致；若不一致，重新运行长测。
 - `tests/reproducible-build.ps1` 连续两次产生相同便携 ZIP、源码 ZIP、可选字体 ZIP 和 SBOM 哈希。
-- `git log --all --name-only` 不包含真实配置、维护会话或临时探针。
-- `watchdog.ini` 和 `watchdog.maintenance.ini` 仍被忽略且哈希未改变。
+- `git log --all --name-only` 不包含真实配置或临时探针。
+- `watchdog.ini` 仍被忽略且哈希未改变。
 - `VERSION` 与两份 CHANGELOG 完全一致，目标版本标签尚不存在。
 - CHANGELOG 已按 `docs/changelog-template.md` 合并零散提交，并明确配置迁移、默认值、
   权限变化和用户必须执行的操作。

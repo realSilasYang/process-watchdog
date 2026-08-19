@@ -18,10 +18,28 @@ class ShortcutTargetTestSnapshots {
     __New() {
         this.Fresh := false
         this.LatestSnapshot := []
+        this.Index := ""
     }
 
     HasFreshSnapshot(*) {
         return this.Fresh
+    }
+
+    GetIndex(*) {
+        return this.Fresh ? this.Index : ""
+    }
+}
+
+class ShortcutTargetTestResidentIndex {
+    __New(running := "", uncertain := "") {
+        this.Running := Type(running) == "Array" ? running : []
+        this.Uncertain := Type(uncertain) == "Array" ? uncertain : []
+        this.Root := ""
+    }
+
+    CollectExecutablePathsInRoot(rootPath) {
+        this.Root := rootPath
+        return {Running: this.Running, Uncertain: this.Uncertain}
     }
 }
 
@@ -127,6 +145,15 @@ RunShortcutTargetResolverTests() {
     portableRoot := testRoot "\portable"
     portableAppRoot := portableRoot "\App\Bandicam"
     portableShortcut := testRoot "\Bandicam.lnk"
+    residentRoot := testRoot "\resident"
+    residentRuntimeRoot := residentRoot "\Avalonia"
+    residentLauncher := residentRoot "\Product.exe"
+    residentProcess := residentRuntimeRoot "\Product.Avalonia.exe"
+    residentSecond := residentRuntimeRoot "\Product.Worker.exe"
+    residentHelper := residentRuntimeRoot "\ProductUpdater.exe"
+    residentOutsideRoot := testRoot "\resident-other"
+    residentOutside := residentOutsideRoot "\Product.Avalonia.exe"
+    residentShortcut := testRoot "\Resident.lnk"
     try {
         try DirDelete(testRoot, true)
         DirCreate(testRoot)
@@ -135,6 +162,8 @@ RunShortcutTargetResolverTests() {
         DirCreate(ambiguousRoot)
         DirCreate(proxyRoot)
         DirCreate(portableAppRoot)
+        DirCreate(residentRuntimeRoot)
+        DirCreate(residentOutsideRoot)
         FileAppend("#Requires AutoHotkey v2.0`n", scriptPath, "UTF-8")
         FileCreateShortcut(A_AhkPath, directShortcut, testRoot)
         FileCreateShortcut(A_AhkPath, argumentShortcut, testRoot,
@@ -229,6 +258,66 @@ RunShortcutTargetResolverTests() {
         AssertShortcutTargetResolver(
             resolver.ResolveMsiTarget(directShortcut) == "",
             "普通非 MSI 快捷方式被错误识别为广告快捷方式")
+
+        FileCopy(A_AhkPath, residentLauncher)
+        FileCopy(A_AhkPath, residentProcess)
+        FileCopy(A_AhkPath, residentSecond)
+        FileCopy(A_AhkPath, residentHelper)
+        FileCopy(A_AhkPath, residentOutside)
+        FileCreateShortcut(residentLauncher, residentShortcut, residentRoot)
+        snapshots.Fresh := true
+        residentIndex := ShortcutTargetTestResidentIndex([residentProcess])
+        snapshots.Index := residentIndex
+        resolvedResident := resolver.ResolveEffective(residentShortcut,
+            true, &residentSource)
+        AssertShortcutTargetResolver(
+            ShortcutTargetTestCanonical(resolvedResident)
+                == ShortcutTargetTestCanonical(residentProcess)
+            && residentSource == "安装目录特征"
+            && ShortcutTargetTestCanonical(residentIndex.Root)
+                == ShortcutTargetTestCanonical(residentRoot),
+            "短命启动器没有解析到安装根子目录内唯一的驻留进程")
+
+        snapshots.Index := ShortcutTargetTestResidentIndex(
+            [residentProcess, residentSecond])
+        AssertShortcutTargetResolver(
+            ShortcutTargetTestCanonical(resolver.ResolveEffective(
+                residentShortcut, true, &multipleResidentSource))
+                == ShortcutTargetTestCanonical(residentLauncher)
+            && multipleResidentSource == "快捷方式目标",
+            "多个驻留进程候选仍被错误猜测为真实目标")
+
+        snapshots.Index := ShortcutTargetTestResidentIndex(
+            [residentProcess], [residentSecond])
+        AssertShortcutTargetResolver(
+            ShortcutTargetTestCanonical(resolver.ResolveEffective(
+                residentShortcut, true, &uncertainResidentSource))
+                == ShortcutTargetTestCanonical(residentLauncher),
+            "存在身份不可核对的第二候选时仍错误学习驻留目标")
+
+        snapshots.Index := ShortcutTargetTestResidentIndex(
+            [residentOutside])
+        AssertShortcutTargetResolver(
+            ShortcutTargetTestCanonical(resolver.ResolveEffective(
+                residentShortcut, true, &outsideResidentSource))
+                == ShortcutTargetTestCanonical(residentLauncher),
+            "安装根外的同类进程被错误学习为快捷方式真实目标")
+
+        snapshots.Index := ShortcutTargetTestResidentIndex(
+            [residentLauncher, residentProcess])
+        AssertShortcutTargetResolver(
+            ShortcutTargetTestCanonical(resolver.ResolveEffective(
+                residentShortcut, true, &liveLauncherSource))
+                == ShortcutTargetTestCanonical(residentLauncher),
+            "启动器仍在运行时被子目录进程错误替换")
+
+        snapshots.Index := ShortcutTargetTestResidentIndex(
+            [residentProcess, residentHelper])
+        AssertShortcutTargetResolver(
+            ShortcutTargetTestCanonical(resolver.ResolveEffective(
+                residentShortcut, true, &helperResidentSource))
+                == ShortcutTargetTestCanonical(residentProcess),
+            "更新辅助进程错误阻止了唯一主驻留进程的识别")
 
         portableLauncher := portableRoot "\BandicamPortable.exe"
         portableResident := portableAppRoot "\bdcam.exe"
