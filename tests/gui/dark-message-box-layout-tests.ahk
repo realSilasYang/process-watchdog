@@ -74,6 +74,13 @@ RegisterButtonClick(control, callback, *) {
     control.OnEvent("Click", callback)
 }
 
+RedrawRoundedButton(*) {
+}
+
+RenderRoundedButtonNow(*) {
+    return false
+}
+
 MovePointerToControlCenter(control) {
     try hWnd := control.Hwnd
     catch

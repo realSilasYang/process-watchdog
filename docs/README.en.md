@@ -178,7 +178,7 @@ Assistant Settings is divided by responsibility:
 | --- | --- |
 | Display | Interface language, interface content font, and theme |
 | Startup | Desktop and Start menu shortcuts, scheduled automatic startup, and both startup behaviors |
-| Monitoring | Process status interval, automatic restart delay sequence after a crash, and subfolder inclusion during folder import |
+| Monitoring | Process status interval, automatic restart delay sequence after a crash, recovery-confirmation start count, and subfolder inclusion during folder import |
 | Stop Policy | GUI and CLI shutdown timeouts and whether force termination is allowed after timeout |
 | Logs | Startup clearing, runtime-log display limit, batch-log retention days, and save path |
 

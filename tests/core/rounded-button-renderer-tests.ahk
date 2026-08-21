@@ -671,6 +671,62 @@ AssertStatusBarGapLayout() {
     }
 }
 
+AssertScaledChoiceButtonTextRendering() {
+    previousScale := UiScaleService.GetRequested()
+    previousTheme := UiThemeService.GetRequestedTheme()
+    testGui := Gui("+ToolWindow", "Choice button text rendering")
+    button := ""
+    buttonDc := 0
+    try {
+        UiScaleService.Configure(200)
+        UiThemeService.Configure("dark")
+        testGui.BackColor := UiThemeService.Color("Window")
+        testGui.SetFont("s10 c" UiThemeService.Color("Text"))
+        button := testGui.Add("Text", "x20 y20 w100 h30 Center 0x200 Background"
+            UiThemeService.Color("Primary") " c"
+            UiThemeService.Color("ButtonText"), "立即恢复")
+        RegisterHoverButton(button, UiThemeService.Color("Primary"))
+        testGui.Show(ScaleApplicationShowOptions("w140 h70"))
+        ApplyApplicationWindowScale(testGui)
+        AssertRoundedButtonRenderer(RefreshDarkChoiceButtons([button],
+            testGui.Hwnd), "缩放后恢复选择按钮没有提交重绘")
+        SetTimer(RefreshDarkChoiceButtons.Bind([button], testGui.Hwnd), -1)
+        SetTimer(RefreshDarkChoiceButtons.Bind([button], testGui.Hwnd), -25)
+        Sleep(75)
+        buttonDc := DllCall("user32\GetDC", "Ptr", button.Hwnd, "Ptr")
+        clientRect := Buffer(16, 0)
+        AssertRoundedButtonRenderer(buttonDc
+            && DllCall("user32\GetClientRect", "Ptr", button.Hwnd,
+                "Ptr", clientRect, "Int"),
+            "无法读取缩放后恢复选择按钮的客户区")
+        width := NumGet(clientRect, 8, "Int")
+        height := NumGet(clientRect, 12, "Int")
+        lightPixelCount := 0
+        Loop height {
+            y := A_Index - 1
+            Loop width {
+                x := A_Index - 1
+                pixel := DllCall("gdi32\GetPixel", "Ptr", buttonDc,
+                    "Int", x, "Int", y, "UInt")
+                if ((pixel & 0xFF) >= 220
+                    && ((pixel >> 8) & 0xFF) >= 220
+                    && ((pixel >> 16) & 0xFF) >= 220)
+                    lightPixelCount++
+            }
+        }
+        AssertRoundedButtonRenderer(lightPixelCount > 20,
+            "200% 缩放下恢复选择按钮没有绘制可见文字")
+    } finally {
+        if buttonDc
+            DllCall("user32\ReleaseDC", "Ptr", button.Hwnd,
+                "Ptr", buttonDc)
+        try UnregisterGuiControls(testGui.Hwnd)
+        try testGui.Destroy()
+        UiScaleService.Configure(previousScale)
+        UiThemeService.Configure(previousTheme)
+    }
+}
+
 RunRoundedButtonRendererTests() {
     AssertRoundedButtonRenderer(RoundedButtonRenderer.EnsureStarted(),
         "GDI+ 按钮渲染器无法初始化")
@@ -696,5 +752,6 @@ RunRoundedButtonRendererTests() {
     AssertLucideSvgAssets()
     AssertRoundedButtonAccessibility()
     AssertStatusBarGapLayout()
+    AssertScaledChoiceButtonTextRendering()
     RoundedButtonRenderer.Shutdown()
 }

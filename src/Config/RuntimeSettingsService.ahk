@@ -30,6 +30,9 @@ class RuntimeSettingsService {
                 "CheckInterval", defaults.CheckInterval, 500, 86400000),
             RetrySequence: this.Repository.Read("Settings", "RetrySequence",
                 defaults.RetrySequence),
+            AskBeforeRestartFromStopCount: this.Repository.ReadBoundedInt(
+                "Settings", "AskBeforeRestartFromStopCount",
+                defaults.AskBeforeRestartFromStopCount, 1, 9999),
             ShowAtStartup: this.Repository.ReadBool("Settings",
                 "ShowAtStartup", defaults.ShowAtStartup),
             RunAsAdministrator: this.Repository.ReadBool("Settings",
@@ -93,6 +96,8 @@ class RuntimeSettingsService {
         runtime.checkInterval := settings.CheckInterval
         runtime.retrySequence := settings.RetrySequence
         runtime.retryDelayArray := this.CloneArray(settings.RetryDelayArray)
+        runtime.askBeforeRestartFromStopCount :=
+            settings.AskBeforeRestartFromStopCount
         runtime.showAtStartup := !!settings.ShowAtStartup
         runtime.runAsAdministrator := !!settings.RunAsAdministrator
         runtime.checkUpdatesOnStartup := !!settings.CheckUpdatesOnStartup
@@ -121,6 +126,8 @@ class RuntimeSettingsService {
             CheckInterval: this.RequireInteger(settings, "CheckInterval",
                 500, 86400000),
             RetrySequence: this.RequireText(settings, "RetrySequence"),
+            AskBeforeRestartFromStopCount: this.RequireInteger(settings,
+                "AskBeforeRestartFromStopCount", 1, 9999),
             ShowAtStartup: this.RequireBoolean(settings, "ShowAtStartup"),
             RunAsAdministrator: this.RequireBoolean(settings,
                 "RunAsAdministrator"),
@@ -158,6 +165,7 @@ class RuntimeSettingsService {
             CheckInterval: 2000,
             RetrySequence: "1, 10, 60",
             RetryDelayArray: [1000, 10000, 60000],
+            AskBeforeRestartFromStopCount: 2,
             ShowAtStartup: false,
             RunAsAdministrator: true,
             CheckUpdatesOnStartup: true,
@@ -179,7 +187,9 @@ class RuntimeSettingsService {
             {Key: "Theme", Value: settings.Theme},
             {Key: "UiScale", Value: settings.UiScale},
             {Key: "CheckInterval", Value: settings.CheckInterval},
-            {Key: "RetrySequence", Value: settings.RetrySequence}
+            {Key: "RetrySequence", Value: settings.RetrySequence},
+            {Key: "AskBeforeRestartFromStopCount",
+                Value: settings.AskBeforeRestartFromStopCount}
         ]
         if includeReloadMarker
             entries.Push({Key: "ShowAfterReload", Value: 0})

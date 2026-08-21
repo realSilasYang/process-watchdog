@@ -82,6 +82,10 @@ The directory containing the real runtime entry determines the configuration loc
 background process after startup. Set it to `0` to disable only the startup
 check; the About page can still check manually.
 
+`AskBeforeRestartFromStopCount=2` controls which confirmed stop first shows a
+recovery choice for items with Ask After a Stop enabled. The valid range is
+`1-9999`; applying a new value takes effect immediately and starts a new stop-count round.
+
 ## Monitored items and launch environments
 
 Each `AppN` under `[Apps]` has nine stable fields:

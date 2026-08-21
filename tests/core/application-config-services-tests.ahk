@@ -58,6 +58,7 @@ RunApplicationConfigServiceTests() {
             && repository.Read("Settings", "RecursiveBatchImport", "") == "1"
             && repository.Read("Settings", "CheckUpdatesOnStartup", "") == "1"
             && repository.Read("Settings", "RunAsAdministrator", "") == "1"
+            && repository.Read("Settings", "AskBeforeRestartFromStopCount", "") == "2"
             && repository.Read("Settings", "PreferEverything", "") == ""
             && repository.Read("Settings", "NativeScanTimeoutSeconds", "") == ""
             && repository.Read("Settings", "EverythingMaxResults", "") == "",
@@ -77,6 +78,7 @@ RunApplicationConfigServiceTests() {
             {Key: "UiScale", Value: 133},
             {Key: "CheckInterval", Value: 10},
             {Key: "RetrySequence", Value: "broken"},
+            {Key: "AskBeforeRestartFromStopCount", Value: 0},
             {Key: "LogDirectory", Value: "   "},
             {Key: "GracefulStopSeconds", Value: 999},
             {Key: "ShowAtStartup", Value: "invalid"},
@@ -90,6 +92,7 @@ RunApplicationConfigServiceTests() {
             && loaded.CheckInterval == 2000
             && loaded.RetrySequence == "1, 10, 60"
             && loaded.RetryDelayArray.Length == 3
+            && loaded.AskBeforeRestartFromStopCount == 2
             && loaded.LogDirectory == defaultLogDirectory
             && loaded.GracefulStopSeconds == 3
             && !loaded.ShowAtStartup
@@ -107,6 +110,7 @@ RunApplicationConfigServiceTests() {
         candidate.Theme := "light"
         candidate.UiScale := 125
         candidate.RetrySequence := "1, 2"
+        candidate.AskBeforeRestartFromStopCount := 5
         candidate.ShowAtStartup := true
         candidate.RunAsAdministrator := false
         candidate.CheckUpdatesOnStartup := false
@@ -121,12 +125,14 @@ RunApplicationConfigServiceTests() {
             && runtime.checkInterval == 750
             && runtime.retryDelayArray.Length == 2
             && runtime.retryDelayArray[2] == 2000
+            && runtime.askBeforeRestartFromStopCount == 5
             && runtime.showAtStartup
             && !runtime.runAsAdministrator
             && !runtime.checkUpdatesOnStartup
             && runtime.logDirectory == "D:\Logs"
             && repository.Read("Settings", "UiLanguage", "") == "ja-JP"
-            && repository.Read("Settings", "RunAsAdministrator", "") == "0",
+            && repository.Read("Settings", "RunAsAdministrator", "") == "0"
+            && repository.Read("Settings", "AskBeforeRestartFromStopCount", "") == "5",
             "有效运行参数没有统一校验、保存并应用到运行态")
 
         originalFont := repository.Read("Settings", "UiFont", "")
@@ -172,6 +178,19 @@ RunApplicationConfigServiceTests() {
             && repository.Read("Settings", "CheckInterval", "")
                 == originalInterval,
             "越界运行参数仍污染了已保存设置")
+
+        originalAskBeforeRestartFromStopCount := repository.Read("Settings",
+            "AskBeforeRestartFromStopCount", "")
+        candidate.CheckInterval := 750
+        candidate.AskBeforeRestartFromStopCount := 10000
+        rejected := false
+        try settingsService.Save(candidate)
+        catch
+            rejected := true
+        AssertApplicationConfig(rejected
+            && repository.Read("Settings", "AskBeforeRestartFromStopCount", "")
+                == originalAskBeforeRestartFromStopCount,
+            "询问起始停止次数越界仍污染了已保存设置")
 
         repository.WriteValues("Layout", [
             {Key: "GuiW", Value: "bad"},

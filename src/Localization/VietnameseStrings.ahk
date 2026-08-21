@@ -1693,6 +1693,10 @@ class VietnameseStrings {
         catalog.Set("界面缩放：", "Ty le giao dien:")
         catalog.Set("; UiScale：界面缩放百分比，支持 80、90、100、110、125、150、175、200。",
             "; UiScale: ty le giao dien theo phan tram, ho tro 80, 90, 100, 110, 125, 150, 175 va 200.")
+        catalog.Set("如果设置了恢复前询问，应从第几次停止开始询问？",
+            "Hoi khoi phuc tu lan dung thu may:")
+        catalog.Set("停止后询问恢复的起始停止次数必须为 1-9999。",
+            "So lan dung bat dau hoi khoi phuc phai nam trong khoang 1-9999.")
         return catalog
     }
 }

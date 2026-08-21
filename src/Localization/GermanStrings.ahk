@@ -1631,6 +1631,10 @@ class GermanStrings {
         catalog.Set("界面缩放：", "Oberflachenskalierung:")
         catalog.Set("; UiScale：界面缩放百分比，支持 80、90、100、110、125、150、175、200。",
             "; UiScale: Skalierung der Oberflache in Prozent, unterstutzte Werte sind 80, 90, 100, 110, 125, 150, 175 und 200.")
+        catalog.Set("如果设置了恢复前询问，应从第几次停止开始询问？",
+            "Wiederherstellung ab Stopp-Nummer abfragen:")
+        catalog.Set("停止后询问恢复的起始停止次数必须为 1-9999。",
+            "Die Anzahl der Stopps bis zur Wiederherstellungsabfrage muss zwischen 1 und 9999 liegen.")
         return catalog
     }
 }

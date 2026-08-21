@@ -7,6 +7,29 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.1.2] - 2026-08-21
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides preferred and fallback fonts that must be installed into Windows first; it is not required to run the application.
+- **`process-watchdog-2.1.2-source.zip` (complete source edition):** Includes the AHK source, modules, tests, and documentation without fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64 locally.
+- **`process-watchdog-2.1.2-windows-x64.zip` (complete portable edition, recommended):** Includes the EXE, documentation, licenses, and required runtime resources without fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([official latest version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application search; the bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### ✨ Added
+
+- **Recovery-confirmation start count:** Monitoring settings now accept a `1-9999` start count for targets with “Ask after a stop” enabled, determining which confirmed stop first opens the recovery choice; the default is `2`, and older configurations use that default when the key is absent.
+
+### 🚀 Improvements
+
+- **Synchronized stop counting:** Toggling recovery confirmation for an item, changing its start count, or resetting a guard attempt starts a new stop-count round instead of reusing stale state; the setting is also included in save, undo, and restore flows.
+
+### 🐛 Fixed
+
+- **Recovery buttons at high scale:** Recovery-choice prompts now submit a complete button redraw immediately after scaling, preventing the first frame at ratios such as 200% from showing only the button surface until the pointer moves over it.
+
 ## 🎉 Version [2.1.1] - 2026-08-19
 
 ### 📦 Release Assets
@@ -641,7 +664,8 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.1...HEAD
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.2...HEAD
+[2.1.2]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.2
 [2.1.1]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.1
 [2.1.0]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.0
 [2.0.13]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.0.13
