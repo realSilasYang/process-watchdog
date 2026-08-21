@@ -204,6 +204,20 @@ CreateDarkChoiceAction(mb, ownerLease, &closed, &selected, value) {
         CloseDarkMsgBox(mb, ownerLease, &closed))
 }
 
+RefreshDarkChoiceButtons(buttons, mbHwnd, *) {
+    if !mbHwnd || !DllCall("user32\IsWindow", "Ptr", mbHwnd, "Int")
+        return false
+    refreshedAny := false
+    for _, button in buttons {
+        try RedrawRoundedButton(button.Hwnd)
+        catch
+            continue
+        refreshedAny := true
+        try RenderRoundedButtonNow(button.Hwnd)
+    }
+    return refreshedAny
+}
+
 ; 四选一深色对话框用于需要明确恢复策略的守护事件。关闭窗口按最后一个选项
 ; 处理，避免用户关闭提示后目标永远停留在等待选择状态。
 ShowDarkChoiceBox(Message, Title, choices, ownerGui := "") {
@@ -241,6 +255,7 @@ ShowDarkChoiceBox(Message, Title, choices, ownerGui := "") {
             Message)
         messageControl.GetPos(, , , &messageHeight)
         buttonWidths := []
+        choiceButtons := []
         for choice in choices
             buttonWidths.Push(100)
         layout := CalculateDarkDialogLayout(520, messageHeight,
@@ -264,6 +279,7 @@ ShowDarkChoiceBox(Message, Title, choices, ownerGui := "") {
             RegisterButtonClick(button,
                 CreateDarkChoiceAction(mb, ownerLease, &closed,
                     &selected, buttonValue), ButtonFeedbackMode.Dismissive)
+            choiceButtons.Push(button)
             if index == 1
                 firstChoiceButton := button
         }
@@ -274,6 +290,11 @@ ShowDarkChoiceBox(Message, Title, choices, ownerGui := "") {
         mbHwnd := mb.Hwnd
         mb.Show(ScaleApplicationShowOptions("w520 h" layout.WindowHeight))
         ApplyApplicationWindowScale(mb)
+        ; 缩放会替换各控件字体并触发窗口重绘；立即和延迟各提交一次 owner-draw，
+        ; 避免事件提醒首帧只有按钮表面而遗漏文字层。
+        RefreshDarkChoiceButtons(choiceButtons, mbHwnd)
+        SetTimer(RefreshDarkChoiceButtons.Bind(choiceButtons, mbHwnd), -1)
+        SetTimer(RefreshDarkChoiceButtons.Bind(choiceButtons, mbHwnd), -25)
         ; 首个选项是默认恢复动作。显示后再设置焦点和鼠标位置，确保控件
         ; 已拥有屏幕坐标；窗口激活完成后再确认一次，避免前台切换覆盖定位。
         try firstChoiceButton.Focus()

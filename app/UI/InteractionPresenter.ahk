@@ -1741,6 +1741,30 @@ RedrawRoundedButton(hWnd) {
             "UInt", Win32.RDW_BUTTON_REFRESH, "Int")
 }
 
+; 字体缩放后的 Static owner-draw 控件偶发只保留表面层。可见且已注册的按钮可
+; 直接提交一帧完整像素，作为 WM_DRAWITEM 重绘请求之外的确定性回退。
+RenderRoundedButtonNow(hWnd) {
+    if !hWnd || !DllCall("user32\IsWindowVisible", "Ptr", hWnd, "Int")
+        || !App.uiInteractions.HasButton(hWnd)
+        return false
+    state := App.uiInteractions.GetButton(hWnd)
+    if !state.HasOwnProp("roundedOwnerDraw") || !state.roundedOwnerDraw
+        return false
+    clientRect := Buffer(16, 0)
+    if !DllCall("user32\GetClientRect", "Ptr", hWnd, "Ptr", clientRect,
+        "Int")
+        return false
+    width := NumGet(clientRect, 8, "Int")
+    height := NumGet(clientRect, 12, "Int")
+    if width <= 0 || height <= 0
+        return false
+    hdc := DllCall("user32\GetDC", "Ptr", hWnd, "Ptr")
+    if !hdc
+        return false
+    try return RoundedButtonRenderer.Draw(hdc, width, height, state)
+    finally DllCall("user32\ReleaseDC", "Ptr", hWnd, "Ptr", hdc)
+}
+
 RedrawVisibleRoundedButtons(controls) {
     if Type(controls) != "Array"
         return false

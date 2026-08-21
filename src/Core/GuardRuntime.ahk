@@ -433,8 +433,7 @@ class GuardRuntime {
                         continue
                     }
                     stateObj.StoppedEvidenceTicks := stoppedEvidenceTicks
-                    if stateObj.HasOwnProp("AskBeforeRestart")
-                        && stateObj.AskBeforeRestart {
+                    if this.ShouldPromptAfterConfirmedStop(stateObj) {
                         stateObj.StopPromptPending := true
                         stateObj.StopPromptGeneration := stateObj.Generation
                         stateObj.Pending := true
@@ -479,6 +478,21 @@ class GuardRuntime {
         return this.IsSupervisorCurrent(path, stateObj, generation)
             && stateObj.Enabled
             && !stateObj.RelocationPending
+    }
+
+    ShouldPromptAfterConfirmedStop(stateObj) {
+        try stopCount := Integer(stateObj.StopCountSinceGuardReset) + 1
+        catch
+            stopCount := 1
+        stateObj.StopCountSinceGuardReset := Max(1, stopCount)
+        if !stateObj.HasOwnProp("AskBeforeRestart")
+            || !stateObj.AskBeforeRestart
+            return false
+        try threshold := Integer(this.Runtime.askBeforeRestartFromStopCount)
+        catch
+            threshold := 2
+        threshold := Max(1, Min(9999, threshold))
+        return stateObj.StopCountSinceGuardReset >= threshold
     }
 
     ObserveAvailableRelocationTarget(path, stateObj) {

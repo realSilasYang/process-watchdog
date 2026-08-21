@@ -644,7 +644,7 @@ CommitUndoState(beforeState, action := "") {
 CloneRuntimeSettingsHistoryState(settings) {
     clone := {}
     for propertyName in ["UiLanguage", "UiFont", "Theme", "UiScale", "CheckInterval",
-            "RetrySequence", "ShowAtStartup", "RunAsAdministrator",
+            "RetrySequence", "AskBeforeRestartFromStopCount", "ShowAtStartup", "RunAsAdministrator",
             "CheckUpdatesOnStartup", "RecursiveBatchImport", "LogMaxEntries",
             "LogDirectory",
             "LogRetentionDays", "ClearLogsOnStartup", "GracefulStopSeconds",
@@ -667,6 +667,8 @@ GetRuntimeSettingsHistoryFields(beforeState, afterState) {
         {Property: "CheckUpdatesOnStartup", Label: "启动时检查小助手更新"},
         {Property: "CheckInterval", Label: "进程状态检查间隔（毫秒）："},
         {Property: "RetrySequence", Label: "崩溃自动重启延迟序列（秒）："},
+        {Property: "AskBeforeRestartFromStopCount",
+            Label: "如果设置了恢复前询问，应从第几次停止开始询问？"},
         {Property: "RecursiveBatchImport", Label: "导入文件夹时包含子目录"},
         {Property: "GracefulStopSeconds", Label: "GUI 程序关闭超时（秒）："},
         {Property: "CtrlCWaitSeconds", Label: "CLI 程序关闭超时（秒）："},
@@ -1054,6 +1056,7 @@ ToggleAskBeforeRestartCore(paths) {
         nextValue := !(stateObj.HasOwnProp("AskBeforeRestart")
             && stateObj.AskBeforeRestart)
         stateObj.AskBeforeRestart := nextValue ? 1 : 0
+        stateObj.StopCountSinceGuardReset := 0
         RefreshMainSequenceVisual(path)
         changedPaths.Push(path)
     }
@@ -1067,6 +1070,11 @@ ToggleAskBeforeRestartCore(paths) {
         ? Tr("已开启停止后询问恢复：{1}", changedPaths[1])
         : Tr("已关闭停止后询问恢复，改为静默恢复：{1}", changedPaths[1]))
     return true
+}
+
+ResetAskBeforeRestartStopCounts() {
+    for _, stateObj in App.appStates
+        stateObj.StopCountSinceGuardReset := 0
 }
 
 QueueRestartDecisionPrompt(path, stateObj, generation, targetName) {

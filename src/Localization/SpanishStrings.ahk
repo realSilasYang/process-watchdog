@@ -1631,6 +1631,10 @@ class SpanishStrings {
         catalog.Set("界面缩放：", "Escala de interfaz:")
         catalog.Set("; UiScale：界面缩放百分比，支持 80、90、100、110、125、150、175、200。",
             "; UiScale: porcentaje de escala de la interfaz, valores compatibles: 80, 90, 100, 110, 125, 150, 175 y 200.")
+        catalog.Set("如果设置了恢复前询问，应从第几次停止开始询问？",
+            "Preguntar por la recuperacion a partir de la detencion numero:")
+        catalog.Set("停止后询问恢复的起始停止次数必须为 1-9999。",
+            "El numero inicial de detenciones para confirmar la recuperacion debe estar entre 1 y 9999.")
         return catalog
     }
 }

@@ -85,6 +85,7 @@ class TargetSupervisor {
         this.ManualStopRequested := false
         this.StoppedEvidenceTicks := 0
         this.AskBeforeRestart := false
+        this.StopCountSinceGuardReset := 0
         this.StopPromptPending := false
         this.StopPromptGeneration := 0
         this.StopPromptTaskQueued := false
@@ -138,6 +139,7 @@ class TargetSupervisor {
         this.ManualRestartGeneration := 0
         this.ManualStopRequested := false
         this.StoppedEvidenceTicks := 0
+        this.StopCountSinceGuardReset := 0
         this.StopPromptPending := false
         this.StopPromptGeneration := 0
         this.StopPromptTaskQueued := false

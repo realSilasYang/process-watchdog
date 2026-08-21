@@ -282,6 +282,8 @@ class WatchdogConfigRepository {
                 this.Text("; CheckUpdatesOnStartup：启动后是否在后台检查小助手新版。")]},
             {Section: "Settings", Key: "RetrySequence", Lines: [
                 this.Text("; RetrySequence：重启等待秒数，逗号分隔，最多 10 项，每项范围 1～86400。")]},
+            {Section: "Settings", Key: "AskBeforeRestartFromStopCount",
+                Lines: [this.Text("; AskBeforeRestartFromStopCount：开启“停止后询问恢复”时，从第几次确认停止开始显示恢复选择，范围 1～9999。")]},
             {Section: "Settings", Key: "ShowAfterReload", Lines: [
                 this.Text("; ShowAfterReload：内部重载标记，重载完成后会自动恢复为 0。")]},
             {Section: "Settings", Key: "AllowForceTerminate", Lines: [

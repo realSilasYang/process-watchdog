@@ -7,6 +7,29 @@
 
 ## 🚧 [未发布]
 
+## 🎉 版本 [2.1.2] - 2026-08-21
+
+### 📦 发布物说明
+
+- **`fonts.zip`（可选字体包）**：提供首选字体和回退字体，需先安装到 Windows；它不是程序运行必需。
+- **`process-watchdog-2.1.2-source.zip`（完整源码版）**：包含 AHK 源码、模块、测试和文档，不含字体，适合审阅、开发或从源码运行；本机需要 AutoHotkey v2 x64。
+- **`process-watchdog-2.1.2-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证和运行所需资源，不含字体；无需安装 AutoHotkey，适合完整解压后长期使用。
+- **Everything（[官方最新版](https://www.voidtools.com/downloads/)）**：为程序搜索提供索引和后台服务；随包 `Everything64.dll` 只是 IPC 客户端，不能替代 Everything 本体。
+
+---
+
+### ✨ 新增
+
+- **恢复询问起始停止次数**：监控设置新增 `1-9999` 的起始次数配置，控制启用“停止后每次询问恢复”的守护对象从第几次确认停止开始弹出恢复选择；默认值为 `2`，旧配置缺少该项时自动采用默认值。
+
+### 🚀 优化
+
+- **停止计数与配置变更同步**：切换单个条目的恢复询问、修改起始停止次数或重置守护尝试时会重新开始本轮停止计数，避免沿用过期状态；该设置也纳入配置保存、撤销和恢复流程。
+
+### 🐛 修复
+
+- **高缩放恢复按钮文字**：恢复选择提示在缩放后立即提交完整按钮绘制，避免 200% 等比例下首帧只显示按钮表面、必须移动鼠标后文字才出现。
+
 ## 🎉 版本 [2.1.1] - 2026-08-19
 
 ### 📦 发布物说明
@@ -589,7 +612,8 @@
 - 后台文件扫描使用 `DirExist` 明确区分目录边界，临时文件遇到瞬时占用时执行
   短时有界重试；测试分别报告结果协议、实际文件集合和清理失败。
 
-[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.1...HEAD
+[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.2...HEAD
+[2.1.2]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.2
 [2.1.1]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.1
 [2.1.0]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.0
 [2.0.13]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.0.13

@@ -1789,6 +1789,10 @@ class EnglishStrings {
         catalog.Set("界面缩放：", "Interface scale:")
         catalog.Set("; UiScale：界面缩放百分比，支持 80、90、100、110、125、150、175、200。",
             "; UiScale: interface scale percentage, supported values are 80, 90, 100, 110, 125, 150, 175, and 200.")
+        catalog.Set("如果设置了恢复前询问，应从第几次停止开始询问？",
+            "If Ask Before Recovery is enabled, which stop should prompting begin with?")
+        catalog.Set("停止后询问恢复的起始停止次数必须为 1-9999。",
+            "The recovery-confirmation start count must be between 1 and 9999.")
         return catalog
     }
 }
