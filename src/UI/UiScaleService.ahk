@@ -51,6 +51,12 @@ class UiScaleService {
         return Round(Number(value) * this.Factor)
     }
 
+    static Unscale(value) {
+        if !this.Factor
+            return Round(Number(value))
+        return Round(Number(value) / this.Factor)
+    }
+
     static ScaleShowOptions(options) {
         if this.Factor == 1
             return options

@@ -14,8 +14,13 @@ class MainWindow {
     static SequenceColumn := 4
 
     __New() {
+        minimumWidth := IsSet(UiScaleService)
+            ? UiScaleService.Scale(WindowLayoutService.StructuralMinimumWidth)
+            : WindowLayoutService.StructuralMinimumWidth
+        minimumHeight := IsSet(UiScaleService)
+            ? UiScaleService.Scale(300) : 300
         this.gui := Gui("+Resize +MinSize"
-            WindowLayoutService.StructuralMinimumWidth "x300",
+            minimumWidth "x" minimumHeight,
             Tr("进程守护小助手"))
         this.lv := ""
         this.listSelectionPresenter := ""

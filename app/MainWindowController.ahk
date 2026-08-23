@@ -25,11 +25,15 @@ HideMainGui(force := false) {
             windowDpi := DllCall("user32\GetDpiForWindow", "Ptr",
                 Main.gui.Hwnd, "UInt")
             dpiScale := (windowDpi ? windowDpi : 96) / 96
-            App.windowLayoutService.Save({
-                Width: Round(gW), Height: Round(gH),
-                Column1: Round(c1 / dpiScale),
-                Column2: Round(c2 / dpiScale)
+            savedLayout := App.windowLayoutService.Save({
+                Width: UiScaleService.Unscale(gW),
+                Height: UiScaleService.Unscale(gH),
+                Column1: UiScaleService.Unscale(c1 / dpiScale),
+                Column2: UiScaleService.Unscale(c2 / dpiScale)
             })
+            ; Hide 是运行态布局的提交边界；恢复前不能继续持有旧尺寸，
+            ; 否则托盘恢复会重新使用过期的窗口大小。
+            App.windowLayoutService.Apply(App, savedLayout)
         } catch as layoutErr {
             LogMsg(Tr("保存窗口布局失败：{1}",
                 TrDiagnostic(layoutErr.Message)))
@@ -346,10 +350,13 @@ SnapMainWindowHeightToListRows(*) {
             || DllCall("user32\IsZoomed", "Ptr", Main.gui.Hwnd, "Int")
         return false
     Main.gui.GetClientPos(,, &clientWidth, &clientHeight)
-    snappedHeight := GetSnappedMainWindowHeight(clientHeight)
-    if snappedHeight == Round(clientHeight)
+    clientWidthDip := UiScaleService.Unscale(clientWidth)
+    clientHeightDip := UiScaleService.Unscale(clientHeight)
+    snappedHeight := GetSnappedMainWindowHeight(clientHeightDip)
+    if snappedHeight == clientHeightDip
         return false
-    Main.gui.Show("NoActivate w" Round(clientWidth) " h" snappedHeight)
+    Main.gui.Show(UiScaleService.ScaleShowOptions("NoActivate w"
+        clientWidthDip " h" snappedHeight))
     return true
 }
 
@@ -1021,7 +1028,9 @@ ShowMainGui(*) {
     visible := false
     try {
         try {
-            visible := ShowMainGuiWithOptions()
+            showOptions := !wasVisible
+                ? "w" App.savedWidth " h" App.savedHeight : ""
+            visible := ShowMainGuiWithOptions(showOptions)
             if WindowHierarchy.IsOwnerLocked(Main.gui)
                 WindowHierarchy.ActivateTopOwned(Main.gui)
             else if visible
