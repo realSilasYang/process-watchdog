@@ -7,6 +7,23 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.1.3] - 2026-08-23
+
+### 🐛 Fixed
+
+- **Scaled window persistence:** Main-window dimensions are normalized back to the configured 96-DPI layout units when UI scaling is enabled, so reopening no longer compounds the runtime scale.
+- **Tray restoration:** Runtime layout state is synchronized at hide time, and restoring from the tray uses the latest saved dimensions instead of stale values.
+- **Resize constraints:** Resize snapping and minimum-size handling now understand UI scaling without asynchronously expanding the user's custom window size.
+
+---
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides preferred and fallback interface fonts that must be installed into Windows first; it is not required to run the application.
+- **`process-watchdog-2.1.3-source.zip` (complete source edition):** Includes the AHK source, modules, tests, and documentation without fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64 locally.
+- **`process-watchdog-2.1.3-windows-x64.zip` (complete portable edition, recommended):** Includes the EXE, documentation, licenses, and required runtime resources without fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([latest version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application search; the bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
 ## 🎉 Version [2.1.2] - 2026-08-21
 
 ### 📦 Release Assets
@@ -664,7 +681,8 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.2...HEAD
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.3...HEAD
+[2.1.3]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.3
 [2.1.2]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.2
 [2.1.1]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.1
 [2.1.0]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.0

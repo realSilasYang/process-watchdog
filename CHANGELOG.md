@@ -7,11 +7,22 @@
 
 ## 🚧 [未发布]
 
+## 🎉 版本 [2.1.3] - 2026-08-23
+
 ### 🐛 修复
 
 - 开启 UI 缩放时，保存的主窗口尺寸现在正确归一化回配置的 96-DPI 布局单位，恢复后不再受运行时缩放影响。
 - 运行时布局状态保持同步，隐藏窗口时使用保存的尺寸恢复，避免托盘恢复重新应用过期的窗口大小。
 - 调整窗口尺寸的吸附和最小尺寸约束现在能够识别缩放，不会异步扩展用户窗口。
+
+---
+
+### 📦 发布物说明
+
+- **`fonts.zip`（可选字体包）**：提供首选字体和回退字体，需先安装到 Windows；它不是程序运行必需。
+- **`process-watchdog-2.1.3-source.zip`（完整源码版）**：包含 AHK 源码、模块、测试和文档，不含字体，适合审阅、开发或从源码运行；本机需要 AutoHotkey v2 x64。
+- **`process-watchdog-2.1.3-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证和运行所需资源，不含字体；无需安装 AutoHotkey，适合完整解压后长期使用。
+- **Everything（[官方最新版](https://www.voidtools.com/downloads/)）**：为程序搜索提供索引和后台服务；随包 `Everything64.dll` 只是 IPC 客户端，不能替代 Everything 本体。
 
 ## 🎉 版本 [2.1.2] - 2026-08-21
 
@@ -618,7 +629,8 @@
 - 后台文件扫描使用 `DirExist` 明确区分目录边界，临时文件遇到瞬时占用时执行
   短时有界重试；测试分别报告结果协议、实际文件集合和清理失败。
 
-[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.2...HEAD
+[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.3...HEAD
+[2.1.3]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.3
 [2.1.2]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.2
 [2.1.1]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.1
 [2.1.0]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.0
