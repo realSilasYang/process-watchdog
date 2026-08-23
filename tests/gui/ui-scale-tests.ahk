@@ -55,11 +55,19 @@ RunUiScaleTests() {
         AssertUiScale(UiScaleService.ScaleShowOptions("x3 y4 w80 h30")
                 == "x3 y4 w120 h45",
             "界面缩放没有正确转换窗口展示尺寸")
+        AssertUiScale(UiScaleService.Unscale(120) == 80,
+            "界面缩放没有正确还原保存尺寸")
         AssertUiScale(UiScaleService.ApplyWindow(testGui),
             "界面缩放没有应用到真实窗口")
         scaledBounds := GetUiScaleControlBounds(control.Hwnd)
         scaledOrigin := GetUiScaleClientOrigin(testGui.Hwnd)
         scaledFontHeight := GetUiScaleFontHeight(control.Hwnd)
+        testGui.Show(UiScaleService.ScaleShowOptions("w638 h555"))
+        testGui.GetClientPos(,, &scaledClientWidth, &scaledClientHeight)
+        AssertUiScale(UiScaleService.Unscale(scaledClientWidth) == 638
+                && UiScaleService.Unscale(scaledClientHeight) == 555,
+            "界面缩放后的窗口尺寸无法还原为保存尺寸: "
+                scaledClientWidth "x" scaledClientHeight)
         AssertUiScale(scaledBounds.Width == Round(baseBounds.Width * 1.5)
             && scaledBounds.Height == Round(baseBounds.Height * 1.5)
             && scaledBounds.Left - scaledOrigin.X == Round(

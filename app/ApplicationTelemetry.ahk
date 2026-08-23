@@ -123,9 +123,6 @@ EnsureMainStatusBarMinimumWidth() {
     footerWidth := Main.statsPresenter.GetMinimumWidthDip()
     if footerWidth <= 0
         return false
-    minimumWidth := Max(WindowLayoutService.StructuralMinimumWidth,
-        footerWidth + 20)
-    try Main.gui.Opt("+MinSize" minimumWidth "x300")
     if !Main.gui.Hwnd
         return true
     try isVisible := DllCall("user32\IsWindowVisible", "Ptr", Main.gui.Hwnd,
@@ -136,11 +133,13 @@ EnsureMainStatusBarMinimumWidth() {
             "Int") || DllCall("user32\IsZoomed", "Ptr", Main.gui.Hwnd,
             "Int")
         return true
-    try Main.gui.GetClientPos(,, &clientWidth, &clientHeight)
-    catch
-        return true
-    if clientWidth < minimumWidth
-        Main.gui.Show("NoActivate w" minimumWidth " h" clientHeight)
+    ; 运行中只更新原生最小约束，不主动 Show 扩大窗口。状态栏绘制会在
+    ; 客户区不足时裁切文本；异步统计刷新不得覆盖用户刚调整的窗口尺寸。
+    minimumWidth := Max(UiScaleService.Scale(
+        WindowLayoutService.StructuralMinimumWidth),
+        footerWidth + UiScaleService.Scale(20))
+    minimumHeight := UiScaleService.Scale(300)
+    try Main.gui.Opt("+MinSize" minimumWidth "x" minimumHeight)
     return true
 }
 
