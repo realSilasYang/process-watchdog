@@ -698,6 +698,63 @@ ManualStopKnownProcessIsStopped(stateObj) {
         return false
 }
 
+ScheduleManualStopDispatch(delayMs := 1) {
+    if !App.HasOwnProp("manualStopQueue") || !App.manualStopQueue.Length
+        return false
+    if !App.HasOwnProp("manualStopDispatchTimer")
+        App.manualStopDispatchTimer := DispatchManualStopQueue.Bind()
+    try {
+        SetTimer(App.manualStopDispatchTimer, -Max(1, delayMs))
+        return true
+    } catch as scheduleError {
+        FailQueuedManualStops(scheduleError)
+        return false
+    }
+}
+
+DispatchManualStopQueue(*) {
+    if !App.HasOwnProp("manualStopQueue")
+        return
+    request := ""
+    try {
+        if App.manualStopQueue.Length
+            request := App.manualStopQueue.RemoveAt(1)
+        if IsObject(request) {
+            try PerformManualStop(request.Path, request.State,
+                request.Generation, 0)
+            catch as dispatchError {
+                try FinalizeManualStopFailure(request.Path, request.State,
+                    request.Generation,
+                    Tr("结束运行失败，目标进程未能停止：{1}", request.Path))
+                try LogMsg(Tr("后台调度任务异常（{1}）：{2}",
+                    request.Path, TrDiagnostic(dispatchError.Message)))
+            }
+        }
+    } finally {
+        if App.manualStopQueue.Length
+            ScheduleManualStopDispatch(1)
+    }
+}
+
+FailQueuedManualStops(scheduleError := "") {
+    if !App.HasOwnProp("manualStopQueue")
+        return 0
+    failed := 0
+    while App.manualStopQueue.Length {
+        request := App.manualStopQueue.RemoveAt(1)
+        if !IsObject(request)
+            continue
+        failed++
+        try FinalizeManualStopFailure(request.Path, request.State,
+            request.Generation,
+            Tr("结束运行失败，目标进程未能停止：{1}", request.Path))
+        if IsObject(scheduleError)
+            try LogMsg(Tr("后台调度任务异常（{1}）：{2}", request.Path,
+                TrDiagnostic(scheduleError.Message)))
+    }
+    return failed
+}
+
 RestartSelectedApp(*) {
     paths := CaptureSelectedWatchPaths(true)
     if !paths.Length

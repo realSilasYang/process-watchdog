@@ -1129,23 +1129,18 @@ BeginManualStopRequests(paths) {
                 TrDiagnostic(saveError.Message)))
         }
     }
-    for request in requests {
-        try {
-            SetTimer(PerformManualStop.Bind(request.Path, request.State,
-                request.Generation, 0), -1)
-        }
-        catch as scheduleError {
-            try FinalizeManualStopFailure(request.Path, request.State,
-                request.Generation,
-                Tr("结束运行失败，目标进程未能停止：{1}", request.Path))
-            try LogMsg(Tr("后台调度任务异常（{1}）：{2}",
-                request.Path, TrDiagnostic(scheduleError.Message)))
-        }
+    if requests.Length {
+        if !App.HasOwnProp("manualStopQueue")
+            App.manualStopQueue := []
+        for request in requests
+            App.manualStopQueue.Push(request)
+        ScheduleManualStopDispatch()
     }
     if (paths.Length > 0) {
         try OnLVSelectChange()
     }
 }
+
 PerformManualStop(path, expectedSupervisor, expectedGeneration,
     attempt) {
     stateObj := expectedSupervisor
