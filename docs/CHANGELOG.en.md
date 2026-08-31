@@ -52,7 +52,7 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### ✨ Added
 
-- **Recovery-confirmation start count:** Monitoring settings now accept a `1-9999` start count for targets with “Ask after a stop” enabled, determining which confirmed stop first opens the recovery choice; the default is `2`, and older configurations use that default when the key is absent.
+- **Recovery-confirmation start count:** Monitoring settings now accept a `1-9999` start count for targets with “Ask before every recovery” enabled, determining which confirmed stop first opens the recovery choice; the default is `2`, and older configurations use that default when the key is absent.
 
 ### 🚀 Improvements
 
@@ -81,7 +81,7 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### ✨ Added
 
-- **Per-target restart decisions after a stop:** A main-list context-menu action enables “Ask after a stop” for individual monitored targets. When such a target stops, the reminder offers immediate recovery, one- or three-minute delays, and pause guarding; all other targets continue to recover silently without extra prompts.
+- **Per-target recovery confirmation:** A main-list context-menu action enables “Ask before every recovery” for individual monitored targets. When such a target stops, the reminder offers immediate recovery, one- or three-minute delays, and pause guarding; all other targets continue to recover silently without extra prompts.
 - **Interface scaling:** Display settings now provide scales from 80% to 200%; windows, controls, fonts, icons, and popups adapt together to the selected scale.
 - **Restart-decision status dot:** Targets that ask before recovery receive a green dot by default. A custom dot overrides it, and clearing a custom dot restores the default state indicator.
 

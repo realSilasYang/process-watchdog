@@ -661,6 +661,85 @@ ReadRegistryDefaultValue(keyName) {
         return ""
 }
 
+ManualStopRequestIsCurrent(path, stateObj, expectedGeneration := 0) {
+    try {
+        if !IsObject(stateObj) || !App.appStates.Has(path)
+            || App.appStates[path] != stateObj
+            || !stateObj.ManualStopRequested
+            || (App.HasOwnProp("shutdownStarted") && App.shutdownStarted)
+            || (expectedGeneration
+                && stateObj.Generation != expectedGeneration)
+            || (expectedGeneration && stateObj.HasOwnProp(
+                "ManualStopGeneration")
+                && stateObj.ManualStopGeneration != expectedGeneration)
+            return false
+        return true
+    } catch {
+        return false
+    }
+}
+
+ClearManualStopRequest(stateObj, expectedGeneration := 0) {
+    if !IsObject(stateObj) || !stateObj.ManualStopRequested
+        return false
+    if expectedGeneration && stateObj.HasOwnProp("ManualStopGeneration")
+        && stateObj.ManualStopGeneration != expectedGeneration
+        return false
+    stateObj.ManualStopRequested := false
+    if stateObj.HasOwnProp("ManualStopGeneration")
+        stateObj.ManualStopGeneration := 0
+    return true
+}
+
+ManualStopKnownProcessIsStopped(stateObj) {
+    try return stateObj.PID && stateObj.PIDCreationIdentity
+        && App.targetStopper.GetIdentityStatus(stateObj.PID,
+            stateObj.PIDCreationIdentity) == 0
+    catch
+        return false
+}
+
+ScheduleManualStopReconciliation(delayMs := 250) {
+    if !App.HasOwnProp("manualStopReconcileTimer")
+        App.manualStopReconcileTimer := ReconcileManualStopStates.Bind()
+    try {
+        SetTimer(App.manualStopReconcileTimer, -Max(1, delayMs))
+        return true
+    } catch as timerError {
+        try LogMsg(Tr("后台调度任务异常：{1}",
+            TrDiagnostic(timerError.Message)))
+        return false
+    }
+}
+
+ReconcileManualStopStates(*) {
+    if !App.HasOwnProp("manualStopReconcileTimer")
+        return false
+    if App.HasOwnProp("shutdownStarted") && App.shutdownStarted {
+        try SetTimer(App.manualStopReconcileTimer, 0)
+        return false
+    }
+    pending := false
+    for path, stateObj in App.appStates {
+        if !IsObject(stateObj) || !stateObj.ManualStopRequested
+            || !stateObj.Pending || stateObj.Enabled
+            continue
+        pending := true
+        generation := stateObj.HasOwnProp("ManualStopGeneration")
+            ? stateObj.ManualStopGeneration : 0
+        ; 这里只依据停止前记住的 PID 和创建身份做收尾，不会重新派发停止
+        ; 回调。这样即使完成回调在系统繁忙窗口中延迟，界面也能收敛，
+        ; 同时不会制造重复停止或改变其它对象的批量生命周期。
+        if generation && ManualStopKnownProcessIsStopped(stateObj)
+            try FinalizeManualStop(path, stateObj, generation)
+    }
+    if pending
+        ScheduleManualStopReconciliation()
+    else
+        try SetTimer(App.manualStopReconcileTimer, 0)
+    return pending
+}
+
 RestartSelectedApp(*) {
     paths := CaptureSelectedWatchPaths(true)
     if !paths.Length

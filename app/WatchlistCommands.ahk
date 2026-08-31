@@ -818,7 +818,7 @@ FormatHistoryAction(entry) {
         case "relocate-path": label := Tr("更新已更名的守护目标")
         case "reorder": label := Tr("调整守护顺序")
         case "run-as-admin": label := Tr("管理员运行状态")
-        case "ask-before-restart": label := Tr("停止后询问恢复")
+        case "ask-before-restart": label := Tr("每次恢复前询问")
         case "display": label := Tr("自定义名称和图标")
         case "environment": label := Tr("进程识别与启动设置")
         case "runtime-settings":
@@ -1042,7 +1042,7 @@ ToggleAskBeforeRestart(*) {
     if !paths.Length
         return
     QueueGuardMutation(ToggleAskBeforeRestartCore.Bind(paths),
-        "切换停止后询问恢复")
+        "切换每次恢复前询问")
 }
 
 ToggleAskBeforeRestartCore(paths) {
@@ -1067,8 +1067,8 @@ ToggleAskBeforeRestartCore(paths) {
     if !SaveAppsToIni()
         return false
     LogMsg(nextValue
-        ? Tr("已开启停止后询问恢复：{1}", changedPaths[1])
-        : Tr("已关闭停止后询问恢复，改为静默恢复：{1}", changedPaths[1]))
+        ? Tr("已开启每次恢复前询问：{1}", changedPaths[1])
+        : Tr("已关闭每次恢复前询问，改为静默恢复：{1}", changedPaths[1]))
     return true
 }
 

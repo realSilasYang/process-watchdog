@@ -888,7 +888,7 @@ class SettingsWindow extends ManagedWindow {
         logRetentionDays := ParseBoundedInteger(logRetentionValue, 1, 3650)
         logDirectory := Trim(logDirectoryValue)
         if !askBeforeRestartFromStopCount {
-            ShowDarkMsgBoxDeferred(Tr("停止后询问恢复的起始停止次数必须为 1-9999。"),
+            ShowDarkMsgBoxDeferred(Tr("每次恢复前询问的起始停止次数必须为 1-9999。"),
                 Tr("参数错误"), "Error", this.gui)
             return
         }

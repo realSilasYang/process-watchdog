@@ -178,6 +178,8 @@ ReleaseApplicationMutex() {
 }
 
 ShutdownApplicationResources(*) {
+    if IsSet(App) && App.HasOwnProp("manualStopReconcileTimer")
+        try SetTimer(App.manualStopReconcileTimer, 0)
     if App.appsDirty
         try SaveAppsToIni(false)
     try SetTimer(App.configSaveRetryTimer, 0)

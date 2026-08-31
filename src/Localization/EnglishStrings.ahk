@@ -1751,7 +1751,7 @@ class EnglishStrings {
         catalog.Set("目标探活规格无效",
             "The target probe specification is invalid")
         catalog.Set("🔄 重新启动", "🔄 Restart")
-        catalog.Set("🔔 停止后每次询问恢复", "🔔 Ask after a stop")
+        catalog.Set("🔔 每次恢复前询问", "🔔 Ask before every recovery")
         catalog.Set("立即恢复", "Restart now")
         catalog.Set("等待 1 分钟", "Wait 1 minute")
         catalog.Set("等待 3 分钟", "Wait 3 minutes")
@@ -1768,11 +1768,11 @@ class EnglishStrings {
             "The process stopped; waiting for a recovery choice: {1}")
         catalog.Set("恢复选择弹窗创建失败：{1}",
             "Could not show the recovery choice dialog: {1}")
-        catalog.Set("停止后询问恢复", "Ask after a stop")
-        catalog.Set("已开启停止后询问恢复：{1}",
-            "Recovery confirmation enabled after a stop: {1}")
-        catalog.Set("已关闭停止后询问恢复，改为静默恢复：{1}",
-            "Recovery confirmation disabled; silent recovery is used: {1}")
+        catalog.Set("每次恢复前询问", "Ask before every recovery")
+        catalog.Set("已开启每次恢复前询问：{1}",
+            "Ask-before-recovery enabled: {1}")
+        catalog.Set("已关闭每次恢复前询问，改为静默恢复：{1}",
+            "Ask-before-recovery disabled; silent recovery is used: {1}")
         catalog.Set("已选择立即恢复：{1}", "Restarting now: {1}")
         catalog.Set("已选择等待 {1} 分钟后恢复：{2}",
             "Restarting after {1} minute(s): {2}")
@@ -1791,8 +1791,8 @@ class EnglishStrings {
             "; UiScale: interface scale percentage, supported values are 80, 90, 100, 110, 125, 150, 175, and 200.")
         catalog.Set("如果设置了恢复前询问，应从第几次停止开始询问？",
             "If Ask Before Recovery is enabled, which stop should prompting begin with?")
-        catalog.Set("停止后询问恢复的起始停止次数必须为 1-9999。",
-            "The recovery-confirmation start count must be between 1 and 9999.")
+        catalog.Set("每次恢复前询问的起始停止次数必须为 1-9999。",
+            "The start count for asking before recovery must be between 1 and 9999.")
         return catalog
     }
 }

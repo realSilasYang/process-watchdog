@@ -472,7 +472,7 @@ RefreshMainCommandState(forceRefresh := false) {
                 ? (firstState ? "pause" : "resume") : "reverse")
         expectedText := allSameState && firstState != -1
             ? (firstState ? Tr("⏸️ 暂停") : Tr("▶️ 恢复"))
-            : Tr("🔄 反转状态")
+            : Tr("🔄 反转")
         if (!forceRefresh && lastState == newState
                 && Main.btnPause.Text == expectedText)
             return
@@ -657,7 +657,7 @@ ConfigureMainContextMenu(isAdmin := false, batchLogSupported := false) {
         Tr("🛡️ 以管理员身份运行"), isAdmin)
     contextMenu.Add(adminLabel, ToggleRunAsAdmin)
     contextMenu.Add(FormatContextMenuToggleLabel(
-        Tr("🔔 停止后每次询问恢复"), false), ToggleAskBeforeRestart)
+        Tr("🔔 每次恢复前询问"), false), ToggleAskBeforeRestart)
     if batchLogSupported {
         contextMenu.Add(Tr("📄 查看批处理输出日志"), OpenProcessLog)
     }
@@ -681,7 +681,7 @@ BuildMainContextPopupItems(isAdmin := false, batchLogSupported := false,
         {Text: Tr("⚙️ 进程识别与启动设置"), Action: OpenEnvSettings},
         {Text: Tr("🛡️ 以管理员身份运行"), Check: isAdmin,
             Action: ToggleRunAsAdmin},
-        {Text: Tr("🔔 停止后每次询问恢复"), Check: askBeforeRestart,
+        {Text: Tr("🔔 每次恢复前询问"), Check: askBeforeRestart,
             Action: ToggleAskBeforeRestart},
     ]
     if batchLogSupported {
@@ -1073,98 +1073,119 @@ EndSelectedApp(*) {
         return
     QueueGuardMutation(BeginManualStopRequests.Bind(paths))
 }
-
 BeginManualStopRequests(paths) {
     App.editSessionId++
     changedPaths := []
     requests := []
     undoState := ""
     for path in paths {
-        if !App.appStates.Has(path)
-            continue
-        stateObj := App.appStates[path]
-        if stateObj.ManualStopRequested
-            continue
-        wasEnabled := !!stateObj.Enabled
-        if wasEnabled {
-            if Type(undoState) != "Array"
-                undoState := CaptureAppConfigState()
-            changedPaths.Push(path)
+        stateObj := ""
+        try {
+            if !App.appStates.Has(path)
+                continue
+            stateObj := App.appStates[path]
+            if stateObj.ManualStopRequested
+                continue
+            wasEnabled := !!stateObj.Enabled
+            if wasEnabled {
+                if Type(undoState) != "Array"
+                    undoState := CaptureAppConfigState()
+                changedPaths.Push(path)
+            }
+            stateObj.Enabled := 0
+            stateObj.CancelScheduledTasks()
+            stateObj.ResetGuardAttemptState()
+            operationGeneration := stateObj.Generation
+            stateObj.ManualStopRequested := true
+            stateObj.ManualStopGeneration := operationGeneration
+            stateObj.Pending := true
+            stateObj.TargetStartTicks := 0
+            stateObj.TransitionTo(GuardPhase.Paused)
+            UpdateState(path, Tr("⏳ 正在结束运行..."), stateObj,
+                operationGeneration, true, GuardStatusKind.Paused)
+            requests.Push({Path: path, State: stateObj,
+                Generation: operationGeneration})
+        } catch as beginError {
+            if IsObject(stateObj) && App.appStates.Has(path)
+                && App.appStates[path] == stateObj {
+                try {
+                    if !stateObj.Enabled && stateObj.ManualStopRequested
+                        FinalizeManualStopFailure(path, stateObj,
+                            stateObj.Generation,
+                            Tr("结束运行失败，目标进程未能停止：{1}", path))
+                }
+            }
+            try LogMsg(Tr("后台调度任务异常（{1}）：{2}", path,
+                TrDiagnostic(beginError.Message)))
         }
-        stateObj.Enabled := 0
-        stateObj.CancelScheduledTasks()
-        stateObj.ResetGuardAttemptState()
-        operationGeneration := stateObj.Generation
-        stateObj.ManualStopRequested := true
-        stateObj.Pending := true
-        stateObj.TargetStartTicks := 0
-        stateObj.TransitionTo(GuardPhase.Paused)
-        UpdateState(path, Tr("⏳ 正在结束运行..."), stateObj,
-            operationGeneration, true, GuardStatusKind.Paused)
-        requests.Push({Path: path, State: stateObj,
-            Generation: operationGeneration})
     }
-
     if changedPaths.Length {
-        CommitUndoState(undoState,
-            CreateAppHistoryAction("toggle-pause", changedPaths))
-        SaveAppsToIni()
+        try {
+            CommitUndoState(undoState,
+                CreateAppHistoryAction("toggle-pause", changedPaths))
+            SaveAppsToIni()
+        } catch as saveError {
+            try LogMsg(Tr("保存监控配置失败：{1}",
+                TrDiagnostic(saveError.Message)))
+        }
     }
     for request in requests {
         try {
             SetTimer(PerformManualStop.Bind(request.Path, request.State,
                 request.Generation, 0), -1)
-        }
-        catch {
-            FinalizeManualStopFailure(request.Path, request.State,
+        } catch as scheduleError {
+            try FinalizeManualStopFailure(request.Path, request.State,
                 request.Generation,
                 Tr("结束运行失败，目标进程未能停止：{1}", request.Path))
+            try LogMsg(Tr("后台调度任务异常（{1}）：{2}",
+                request.Path, TrDiagnostic(scheduleError.Message)))
         }
     }
-
+    if requests.Length
+        ScheduleManualStopReconciliation()
     if (paths.Length > 0) {
-        OnLVSelectChange()
+        try OnLVSelectChange()
     }
 }
-
 PerformManualStop(path, expectedSupervisor, expectedGeneration,
     attempt) {
-    if !App.guardRuntime.IsSupervisorCurrent(path, expectedSupervisor,
-            expectedGeneration) {
-        if App.appStates.Has(path)
-            && App.appStates[path] == expectedSupervisor {
-            expectedSupervisor.ManualStopRequested := false
-        }
-        return
-    }
-    if !App.guardWorkGate.TryEnter() {
-        retryCallback := PerformManualStop.Bind(path,
-            expectedSupervisor, expectedGeneration, attempt)
-        if !TryScheduleManualStopCallback(retryCallback, path,
-            expectedSupervisor, expectedGeneration)
-            return
-        return
-    }
-
+    stateObj := expectedSupervisor
     operationGeneration := expectedGeneration
-    gateHeld := true
+    gateHeld := false
     try {
-        if !App.guardRuntime.IsSupervisorCurrent(path, expectedSupervisor,
+        if !ManualStopRequestIsCurrent(path, expectedSupervisor,
             expectedGeneration)
             return
-        stateObj := expectedSupervisor
+        if !App.guardWorkGate.TryEnter("ManualStop") {
+            retryCallback := PerformManualStop.Bind(path,
+                expectedSupervisor, expectedGeneration, attempt)
+            TryScheduleManualStopCallback(retryCallback, path,
+                expectedSupervisor, expectedGeneration)
+            return
+        }
+        gateHeld := true
+        if !ManualStopRequestIsCurrent(path, expectedSupervisor,
+            expectedGeneration)
+            return
         stateObj.CancelScheduledTasks()
         operationGeneration := stateObj.Generation
+        stateObj.ManualStopGeneration := operationGeneration
         stateObj.Pending := true
         stateObj.TargetStartTicks := 0
         stateObj.TransitionTo(GuardPhase.Paused)
         UpdateState(path, Tr("⏳ 正在结束运行..."), stateObj,
             operationGeneration, false, GuardStatusKind.Paused)
         observation := ObserveTarget(path, "", 1000)
-        if !App.guardRuntime.IsSupervisorCurrent(path, stateObj,
+        if !ManualStopRequestIsCurrent(path, stateObj,
             operationGeneration)
             return
         if observation.IsUnknown() {
+            ; 快照短暂不可用时优先核对控制器记住的进程身份，避免禁用后的
+            ; 对象因已退出却无法得到快照而永久停留在结束运行状态。
+            if ManualStopKnownProcessIsStopped(stateObj) {
+                FinalizeManualStop(path, stateObj, operationGeneration)
+                return
+            }
             ScheduleManualStopRetry(path, stateObj,
                 operationGeneration, attempt)
             return
@@ -1200,93 +1221,92 @@ PerformManualStop(path, expectedSupervisor, expectedGeneration,
                 completionCallback.Call()
             return
         }
-
         FinalizeManualStop(path, stateObj, operationGeneration)
+    } catch as stopError {
+        if ManualStopRequestIsCurrent(path, stateObj, operationGeneration)
+            try FinalizeManualStopFailure(path, stateObj,
+                operationGeneration,
+                Tr("结束运行失败，目标进程未能停止：{1}", path))
+        try LogMsg(Tr("后台调度任务异常（{1}）：{2}", path,
+            TrDiagnostic(stopError.Message)))
     } finally {
-        if App.appStates.Has(path)
-            && App.appStates[path] == expectedSupervisor
-            && expectedSupervisor.ManualStopRequested
-            && expectedSupervisor.Generation != operationGeneration {
-            expectedSupervisor.ManualStopRequested := false
-        }
         if gateHeld
             App.guardWorkGate.Leave()
     }
 }
-
 CompleteManualStopAfterStop(path, expectedSupervisor,
     expectedGeneration, pid, creationIdentity, stopResult) {
-    if !App.guardRuntime.IsSupervisorCurrent(path, expectedSupervisor,
-        expectedGeneration) {
-        if App.appStates.Has(path)
-            && App.appStates[path] == expectedSupervisor {
-            expectedSupervisor.ManualStopRequested := false
-        }
-        return
-    }
-    if !App.guardWorkGate.TryEnter() {
-        retryCallback := CompleteManualStopAfterStop.Bind(path,
-            expectedSupervisor, expectedGeneration, pid,
-            creationIdentity, stopResult)
-        if !TryScheduleManualStopCallback(retryCallback, path,
-            expectedSupervisor, expectedGeneration)
-            return
-        return
-    }
+    stateObj := expectedSupervisor
+    gateHeld := false
     try {
-        if !App.guardRuntime.IsSupervisorCurrent(path, expectedSupervisor,
+        if !ManualStopRequestIsCurrent(path, expectedSupervisor,
             expectedGeneration)
             return
-        stateObj := expectedSupervisor
+        if !App.guardWorkGate.TryEnter("ManualStopAfterStop") {
+            retryCallback := CompleteManualStopAfterStop.Bind(path,
+                expectedSupervisor, expectedGeneration, pid,
+                creationIdentity, stopResult)
+            TryScheduleManualStopCallback(retryCallback, path,
+                expectedSupervisor, expectedGeneration)
+            return
+        }
+        gateHeld := true
+        if !ManualStopRequestIsCurrent(path, expectedSupervisor,
+            expectedGeneration)
+            return
         if !stopResult.Stopped {
             identityStatus := App.targetStopper.GetIdentityStatus(pid,
                 creationIdentity)
-            if identityStatus == 0
-                ClearStateProcessIdentity(stateObj)
-            else
+            if identityStatus == 0 {
+                FinalizeManualStop(path, stateObj, expectedGeneration)
+                return
+            }
+            if identityStatus != 0
                 SetStateProcessIdentity(stateObj, pid, creationIdentity)
             FinalizeManualStopFailure(path, stateObj, expectedGeneration,
                 Tr("结束运行失败，目标进程未能停止：{1}", path))
             return
         }
         FinalizeManualStop(path, stateObj, expectedGeneration)
-    } finally App.guardWorkGate.Leave()
+    } catch as completionError {
+        if ManualStopRequestIsCurrent(path, stateObj, expectedGeneration)
+            try FinalizeManualStopFailure(path, stateObj, expectedGeneration,
+                Tr("结束运行失败，目标进程未能停止：{1}", path))
+        try LogMsg(Tr("后台调度任务异常（{1}）：{2}", path,
+            TrDiagnostic(completionError.Message)))
+    } finally {
+        if gateHeld
+            App.guardWorkGate.Leave()
+    }
 }
-
 FinalizeManualStop(path, stateObj, expectedGeneration) {
-    if !App.guardRuntime.IsSupervisorCurrent(path, stateObj,
-            expectedGeneration) || stateObj.Enabled {
-        stateObj.ManualStopRequested := false
-        stateObj.Pending := false
-        stateObj.TargetStartTicks := 0
+    if !ManualStopRequestIsCurrent(path, stateObj, expectedGeneration)
+        || stateObj.Enabled {
         return false
     }
     stateObj.Pending := false
     stateObj.TargetStartTicks := 0
     stateObj.FailCount := 0
-    stateObj.ManualStopRequested := false
-    ClearStateProcessIdentity(stateObj)
-    stateObj.TransitionTo(GuardPhase.Paused)
-    UpdateState(path, Tr("⏸️ 已暂停"), stateObj, expectedGeneration,
+    ClearManualStopRequest(stateObj, expectedGeneration)
+    try ClearStateProcessIdentity(stateObj)
+    try stateObj.TransitionTo(GuardPhase.Paused)
+    try UpdateState(path, Tr("⏸️ 已暂停"), stateObj, expectedGeneration,
         true, GuardStatusKind.Paused)
-    LogMsg(Tr("已结束运行：{1}", path))
+    try LogMsg(Tr("已结束运行：{1}", path))
     return true
 }
-
 FinalizeManualStopFailure(path, stateObj, expectedGeneration, logMessage) {
-    if !App.guardRuntime.IsSupervisorCurrent(path, stateObj,
-            expectedGeneration)
+    if !ManualStopRequestIsCurrent(path, stateObj, expectedGeneration)
         return false
-    stateObj.ManualStopRequested := false
     stateObj.Pending := false
     stateObj.TargetStartTicks := 0
-    stateObj.TransitionTo(GuardPhase.Paused)
-    UpdateState(path, Tr("❌ 无法结束运行"), stateObj,
+    ClearManualStopRequest(stateObj, expectedGeneration)
+    try stateObj.TransitionTo(GuardPhase.Paused)
+    try UpdateState(path, Tr("❌ 无法结束运行"), stateObj,
         expectedGeneration, true, GuardStatusKind.Paused)
-    LogMsg(logMessage)
+    try LogMsg(logMessage)
     return true
 }
-
 ScheduleManualStopRetry(path, stateObj, operationGeneration, attempt) {
     if attempt >= 4 {
         FinalizeManualStopFailure(path, stateObj, operationGeneration,
@@ -1302,23 +1322,18 @@ ScheduleManualStopRetry(path, stateObj, operationGeneration, attempt) {
     return TryScheduleManualStopCallback(retryCallback, path, stateObj,
         operationGeneration, 2000)
 }
-
 TryScheduleManualStopCallback(callback, path, stateObj,
     expectedGeneration, delayMs := 100) {
     try {
         SetTimer(callback, -Max(1, delayMs))
         return true
     } catch as timerError {
-        if App.guardRuntime.IsSupervisorCurrent(path, stateObj,
-            expectedGeneration) {
-            stateObj.ManualStopRequested := false
-            stateObj.Pending := false
-            stateObj.TargetStartTicks := 0
-            stateObj.TransitionTo(GuardPhase.Paused)
-            UpdateState(path, Tr("❌ 无法结束运行"), stateObj,
-                expectedGeneration, true, GuardStatusKind.Paused)
+        if ManualStopRequestIsCurrent(path, stateObj, expectedGeneration) {
+            try FinalizeManualStopFailure(path, stateObj,
+                expectedGeneration,
+                Tr("结束运行失败，目标进程未能停止：{1}", path))
         }
-        LogMsg(Tr("后台调度任务异常（{1}）：{2}", path,
+        try LogMsg(Tr("后台调度任务异常（{1}）：{2}", path,
             TrDiagnostic(timerError.Message)))
         return false
     }
