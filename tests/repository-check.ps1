@@ -41,10 +41,13 @@ $requiredFiles = @(
     'VERSION',
     'config\watchdog.example.ini',
     'assets\app\watchdog.ico',
+    'assets\app\watchdog-logo.png',
     'assets\donate\微信个人收款码.png',
     'assets\donate\微信个人收款码-界面.png',
+    'assets\donate\微信个人收款码-浅色界面.png',
     'assets\donate\支付宝个人收款码.png',
     'assets\donate\支付宝个人收款码-界面.png',
+    'assets\donate\支付宝个人收款码-浅色界面.png',
     'assets\ui-icons\external-link.svg',
     'assets\fonts\AppleSDGothicNeo-Regular.ttf',
     'assets\fonts\COMMERCIAL-LICENSE-NOTICE.md',
@@ -60,6 +63,7 @@ $requiredFiles = @(
     'assets\fonts\README.md',
     'assets\fonts\README.en.md',
     'docs\images\process-watchdog-overview.png',
+    'docs\images\process-watchdog-overview-light.png',
     '.editorconfig',
     '.mailmap',
     '.github\CODEOWNERS',
@@ -97,6 +101,7 @@ $requiredFiles = @(
     'tools\verify-github-release.ps1',
     'tools\verify-release-draft.ps1',
     'tools\verify-published-release.ps1',
+    'tools\verify-downloaded-release.ps1',
     'tools\resolve-toolchain.ps1',
     'tools\generate-sbom.ps1',
     'tools\verify-release.ps1',
@@ -157,9 +162,9 @@ foreach ($prefix in @('src\', 'app\', 'tests\core\', 'assets\', 'config\',
         }
     }
 }
-# 随包字体中存在超过 GitHub 普通对象单文件限制的完整 CJK 集合。字体必须统一
-# 通过 Git LFS 追踪，三个会读取或打包字体的工作流也必须显式还原 LFS 对象；否则
-# 本地测试看到的是完整字体，CI 和 Release 却只会得到一百多字节的指针文件。
+# 随包字体中存在超过 GitHub 普通对象单文件限制的完整 CJK 集合，因此仍统一通过
+# Git LFS 追踪。CI 和发布不直接消耗 LFS 配额，而是从最新正式 fonts.zip 恢复字节，
+# 再按当前 metadata.json 逐项校验；指针、旧字体或损坏缓存都不能进入测试或构建。
 foreach ($fontExtension in @('ttc', 'ttf', 'otf')) {
     $attributeProbe = git -C $projectRoot check-attr filter -- `
         "assets/fonts/__repository_check__.$fontExtension"
@@ -168,13 +173,14 @@ foreach ($fontExtension in @('ttc', 'ttf', 'otf')) {
         throw "Packaged *.$fontExtension fonts must be tracked by Git LFS."
     }
 }
-$lfsWorkflows = @('ci.yml', 'release.yml', 'soak.yml')
-foreach ($workflowName in $lfsWorkflows) {
+$fontWorkflows = @('ci.yml', 'release.yml', 'release-dry-run.yml', 'soak.yml')
+foreach ($workflowName in $fontWorkflows) {
     $workflowPath = Join-Path $projectRoot `
         ".github\workflows\$workflowName"
     $workflowText = Get-Content -LiteralPath $workflowPath -Raw -Encoding UTF8
-    if ($workflowText -notmatch '(?m)^\s+lfs:\s+true\s*$') {
-        throw "$workflowName must restore packaged Git LFS font assets."
+    if ($workflowText -match '(?m)^\s+lfs:\s+true\s*$' -or
+        -not $workflowText.Contains('.\tools\restore-font-assets.ps1')) {
+        throw "$workflowName must restore verified fonts without an LFS transfer."
     }
 }
 if ($trackedNormalized.Contains('watchdog.ini')) {
@@ -188,8 +194,7 @@ if (Get-ChildItem -LiteralPath $projectRoot -File -Filter '_codex_*') {
 }
 foreach ($obsoletePath in @(
         'README.en.md', 'CHANGELOG.en.md', 'watchdog.ico',
-        'watchdog.example.ini', 'docs\development',
-        'docs\images\process-watchdog-overview-light.png')) {
+        'watchdog.example.ini', 'docs\development')) {
     if (Test-Path -LiteralPath (Join-Path $projectRoot $obsoletePath)) {
         throw "Obsolete repository location remains: $obsoletePath"
     }
@@ -210,10 +215,19 @@ $releaseNotesRelativePath = "docs/release-notes/v$version.md"
 if ($trackedFiles -notcontains $releaseNotesRelativePath) {
     throw "Current release notes are not tracked: $releaseNotesRelativePath"
 }
-Assert-ReleaseNotesContent -Version $version -BodyPath $releaseNotesPath
+# v2.0.5 及更早版本已经按当时的三程序附件模型公开，历史说明必须保持事实不变。
+# 新模型从下一版本起执行完整附件说明契约；旧版本仍统一验证章节结构和风险说明。
+if ([Version]$version -ge [Version]'2.0.6') {
+    Assert-ReleaseNotesContent -Version $version -BodyPath $releaseNotesPath
+} else {
+    Assert-ReleaseNotesNoValidationSection -BodyPath $releaseNotesPath
+    Assert-ReleaseNotesImportantSection -BodyPath $releaseNotesPath
+}
 $allReleaseNotes = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot `
     'docs\release-notes') -File -Filter 'v*.md')
 foreach ($releaseNotesFile in $allReleaseNotes) {
+    Assert-ReleaseNotesNoValidationSection `
+        -BodyPath $releaseNotesFile.FullName
     Assert-ReleaseNotesImportantSection -BodyPath $releaseNotesFile.FullName
 }
 $legacyReleaseNotesRelativePath = 'docs/release-notes/v1.0.0.md'
@@ -233,8 +247,7 @@ foreach ($marker in @(
         '无需另行安装 AutoHotkey',
         '它不是可运行程序',
         '必须先退出旧实例',
-        '## ⚠️ 重要说明',
-        '## ✅ 验证范围')) {
+        '## ⚠️ 重要说明')) {
     if (-not $legacyReleaseNotes.Contains($marker)) {
         throw "Historical v1.0.0 release notes are missing required marker: $marker"
     }
@@ -282,6 +295,10 @@ foreach ($contract in $changelogContracts) {
     if ($changelogText -match '(?m)^## \[(?:\d|未发布|Unreleased)') {
         throw "Legacy changelog headings must not return: $($contract.Path)"
     }
+    if ($changelogText -match
+        '(?mi)^#{2,3}\s+(?:✅\s*)?(?:验证范围|驗證範圍|测试范围|測試範圍|Validation\s+Scope|Verification\s+Scope|Test\s+Coverage)\s*\r?$') {
+        throw "Changelog must not contain a validation-scope section: $($contract.Path)"
+    }
 }
 
 $templateContracts = @(
@@ -289,14 +306,16 @@ $templateContracts = @(
         Path = 'docs\changelog-template.md'
         Markers = @('# 📝 中文更新日志模板',
             '## 🎉 版本 [X.Y.Z] - YYYY-MM-DD', '### 📦 发布物说明',
-            '模板默认不生成“重要说明”', '没有合格事项时连标题一起删除')
+            '模板默认不生成“重要说明”', '没有合格事项时连标题一起删除',
+            '更新日志和 Release Notes 均不得包含“✅ 验证范围”章节')
     }
     @{
         Path = 'docs\en\changelog-template.md'
         Markers = @('# 📝 English Changelog Template',
             '## 🎉 Version [X.Y.Z] - YYYY-MM-DD', '### 📦 Release Assets',
             'does not generate Important Notes by default',
-            'Remove the heading when no item qualifies')
+            'Remove the heading when no item qualifies',
+            'Neither changelogs nor Release notes may contain a `✅ Validation Scope` section')
     }
 )
 foreach ($contract in $templateContracts) {
@@ -513,16 +532,24 @@ $localizedReadmes = @(
 )
 $readmeRequiredTopics = @(
     'Running', 'Stopped', 'Unknown', 'Everything', 'watchdog.ini',
-    'watchdog.maintenance.ini', 'AutoHotkey', 'Ahk2Exe',
+    'AutoHotkey', 'Ahk2Exe',
     'third_party', 'reproducible-build.ps1'
 )
 foreach ($readmeDefinition in $localizedReadmes) {
     $readmePath = Join-Path $projectRoot $readmeDefinition.Path
     $readme = Get-Content -LiteralPath $readmePath -Raw -Encoding UTF8
+    $expectedLogoHref = if ($readmeDefinition.Path -eq 'README.md') {
+        './assets/app/watchdog-logo.png'
+    } else {
+        '../assets/app/watchdog-logo.png'
+    }
+    $logoPattern = '(?s)<div align="center">\s*<img src="' +
+        [regex]::Escape($expectedLogoHref) +
+        '" width="112" alt="[^"]+">\s*<p>(.*?)</p>'
     $languageBarMatch = [regex]::Match($readme,
-        '(?s)<div align="center">\s*<p>(.*?)</p>')
+        $logoPattern)
     if (-not $languageBarMatch.Success) {
-        throw "Localized README has no language switcher: $($readmeDefinition.Path)"
+        throw "Localized README has no canonical logo and language switcher: $($readmeDefinition.Path)"
     }
 
     $expectedEntries = @()
@@ -553,13 +580,15 @@ foreach ($readmeDefinition in $localizedReadmes) {
             throw "Localized README is missing $requiredTopic`: $($readmeDefinition.Path)"
         }
     }
-    $overviewReferences = [regex]::Matches($readme,
+    $darkOverviewReferences = [regex]::Matches($readme,
         'process-watchdog-overview\.png')
-    if ($overviewReferences.Count -ne 1 -or
-        $readme.Contains('process-watchdog-overview-light.png') -or
+    $lightOverviewReferences = [regex]::Matches($readme,
+        'process-watchdog-overview-light\.png')
+    if ($darkOverviewReferences.Count -ne 1 -or
+        $lightOverviewReferences.Count -ne 1 -or
         $readme.Contains('media="(prefers-color-scheme:') -or
         $readme.Contains('<picture>')) {
-        throw "Localized README must use the single canonical overview image exactly once: $($readmeDefinition.Path)"
+        throw "Localized README must stack the canonical dark and light overview images exactly once each: $($readmeDefinition.Path)"
     }
 }
 
@@ -717,10 +746,11 @@ foreach ($releaseRequirement in @(
         'actions/upload-artifact@',
         'path: dist/**',
         'include-hidden-files: true',
+        '-OutputDirectory dist',
         '-SecondPowerShellPath powershell.exe',
-        'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.exe',
-        'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.zip',
+        'dist/fonts.zip',
         'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-source.zip',
+        'dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.zip',
         'draft: true',
         '--draft=false')) {
     if (-not $releaseWorkflow.Contains($releaseRequirement)) {
@@ -735,6 +765,7 @@ $ciWorkflow = Get-Content -LiteralPath `
     (Join-Path $projectRoot '.github\workflows\ci.yml') -Raw -Encoding UTF8
 if (-not $ciWorkflow.Contains('path: dist/**') -or
     -not $ciWorkflow.Contains('include-hidden-files: true') -or
+    -not $ciWorkflow.Contains('-OutputDirectory dist') -or
     -not $ciWorkflow.Contains('-SecondPowerShellPath powershell.exe') -or
     -not $ciWorkflow.Contains('tools\ci-toolchain.resolved.json') -or
     -not $ciWorkflow.Contains('.\tools\get-ci-impact.ps1') -or
@@ -742,16 +773,31 @@ if (-not $ciWorkflow.Contains('path: dist/**') -or
     -not $ciWorkflow.Contains('.\tests\verify-windows-integration.ps1') -or
     -not $ciWorkflow.Contains('.\tests\reproducible-build.ps1') -or
     -not $ciWorkflow.Contains('lfs: false') -or
-    -not $ciWorkflow.Contains('lfs: true') -or
+    -not $ciWorkflow.Contains('.\tools\restore-font-assets.ps1') -or
     $ciWorkflow.Contains('.\tools\invoke-release-validation.ps1')) {
     throw 'CI must separate fast, Windows integration and reproducible release validation.'
 }
 
 $buildScript = Get-Content -LiteralPath (Join-Path $projectRoot `
     'tools\build-release.ps1') -Raw -Encoding UTF8
-if ($buildScript -match "'/setversion'" -or
+if ($buildScript.Contains("Join-Path `$projectRoot 'dist'") -or
+    -not $buildScript.Contains('[Parameter(Mandatory)]') -or
+    $buildScript -match "'/setversion'" -or
     -not $buildScript.Contains(';@Ahk2Exe-SetVersion $version.0')) {
-    throw 'Release build must inject the source SetVersion directive instead of passing an unsupported Ahk2Exe CLI switch.'
+    throw 'Release build must require an explicit output directory and inject the source SetVersion directive.'
+}
+$reproducibleBuild = Get-Content -LiteralPath (Join-Path $projectRoot `
+    'tests\reproducible-build.ps1') -Raw -Encoding UTF8
+foreach ($localCleanupRequirement in @(
+        'ProcessWatchdogReproducibleBuild-',
+        '$removeOutputRoot = -not $OutputDirectory',
+        'Remove-Item -LiteralPath $outputRoot -Recurse -Force')) {
+    if (-not $reproducibleBuild.Contains($localCleanupRequirement)) {
+        throw "Local reproducible build cleanup is missing: $localCleanupRequirement"
+    }
+}
+if ($reproducibleBuild.Contains("Join-Path `$projectRoot 'dist'")) {
+    throw 'Local reproducible builds must not retain repository dist output by default.'
 }
 foreach ($determinismRequirement in @(
         'function Write-CanonicalJson',
@@ -762,6 +808,18 @@ foreach ($determinismRequirement in @(
         '$script:utf8WithBom')) {
     if (-not $buildScript.Contains($determinismRequirement)) {
         throw "Release build is missing a cross-runtime determinism boundary: $determinismRequirement"
+    }
+}
+$releaseVerifierSource = Get-Content -LiteralPath (Join-Path $projectRoot `
+    'tools\verify-release.ps1') -Raw -Encoding UTF8
+foreach ($stateIsolationRequirement in @(
+        'function Assert-NoLocalWatchdogState',
+        'Get-ChildItem -LiteralPath $Root -Recurse -Force -File',
+        'function Assert-EmptyPackagedWatchlistExample',
+        "@('Apps', 'Display', 'Launch'",
+        "'Identity', 'Recovery')")) {
+    if (-not $releaseVerifierSource.Contains($stateIsolationRequirement)) {
+        throw "Release verification is missing local-rule isolation: $stateIsolationRequirement"
     }
 }
 $archiveWriterSource = Get-Content -LiteralPath (Join-Path $projectRoot `
@@ -817,7 +875,7 @@ foreach ($updateRequirement in @(
         'Test-UpdatedApplication',
         'Wait-ForUpdatedApplicationReady',
         "'--unshallow'",
-        "@('watchdog.ini', 'watchdog.maintenance.ini')",
+        "@('watchdog.ini')",
         "'source-git'",
         "'--error-unmatch'",
         'merge-base',

@@ -16,7 +16,8 @@ class TargetProbe {
         this.Clock := clock
     }
 
-    Observe(probeSpec, snapshotIndex := "", maximumSnapshotAgeMs := 0) {
+    Observe(probeSpec, snapshotIndex := "", maximumSnapshotAgeMs := 0,
+        observationContext := "") {
         if !IsObject(probeSpec) || !probeSpec.HasOwnProp("Kind") {
             return ProcessObservation.Unknown(this.Now(), "target-probe",
                 "探活规格无效", ProcessObservationReason.InvalidProbe)
@@ -26,7 +27,7 @@ class TargetProbe {
                 return this.ObserveProcessName(probeSpec.TargetPath)
             case TargetProbeKind.ImagePath:
                 return this.ObserveImagePath(probeSpec.TargetPath,
-                    snapshotIndex)
+                    snapshotIndex, observationContext, maximumSnapshotAgeMs)
             case TargetProbeKind.CommandTarget:
                 return this.ObserveCommandTarget(probeSpec.TargetPath,
                     snapshotIndex, maximumSnapshotAgeMs,
@@ -60,9 +61,11 @@ class TargetProbe {
             : ProcessObservation.Stopped(this.Now(), "process-name")
     }
 
-    ObserveImagePath(targetPath, snapshotIndex := "") {
+    ObserveImagePath(targetPath, snapshotIndex := "", observationContext := "",
+        maximumSnapshotAgeMs := 0) {
         if snapshotIndex is ProcessSnapshotIndex
-            return snapshotIndex.ObserveImagePath(targetPath)
+            return snapshotIndex.ObserveImagePath(targetPath,
+                observationContext)
         snapshotResult := this.CaptureNativeSnapshot()
         if !snapshotResult.Ready {
             return ProcessObservation.Unknown(snapshotResult.CapturedAtTicks,
@@ -73,6 +76,8 @@ class TargetProbe {
         SplitPath(targetPath, &targetName)
         targetName := StrLower(targetName)
         inaccessibleCandidate := false
+        inaccessibleCandidates := []
+        identityUnavailable := false
         for processInfo in snapshotResult.Processes {
             pid := this.Value(processInfo, "pid", 0)
             if !pid || !ProcessExist(pid)
@@ -84,8 +89,54 @@ class TargetProbe {
                     snapshotResult.CapturedAtTicks, "process-image")
             }
             if (imagePath == "" && targetName != ""
-                && StrLower(this.Value(processInfo, "name", "")) == targetName)
+                && StrLower(this.Value(processInfo, "name", "")) == targetName) {
+                liveStatus := this.ResolveCreationIdentity(pid) != "" ? 1 : -1
+                if liveStatus > 0
+                    inaccessibleCandidates.Push(processInfo)
+                else
+                    identityUnavailable := true
                 inaccessibleCandidate := true
+            }
+        }
+        if inaccessibleCandidates.Length && !identityUnavailable
+            && this.IsImagePathFallbackAllowed(observationContext) {
+            if inaccessibleCandidates.Length > 1
+                return ProcessObservation.Unknown(snapshotResult.CapturedAtTicks,
+                    "process-image", "存在多个同名进程，无法唯一确认",
+                    ProcessObservationReason.AmbiguousTarget)
+            candidate := inaccessibleCandidates[1]
+            identity := this.ResolveCreationIdentity(candidate.pid)
+            priorPid := this.ContextValue(observationContext, "PriorPID", 0)
+            priorIdentity := String(this.ContextValue(observationContext,
+                "PriorCreationIdentity", ""))
+            matchesPrior := priorPid && candidate.pid == priorPid
+                && priorIdentity != "" && identity != ""
+                && StrLower(identity) == StrLower(priorIdentity)
+            recentSeconds := Max(1, Integer(this.ContextValue(
+                observationContext, "RecentStartSeconds", 0)))
+            recentStart := recentSeconds > 0
+                && this.WasProcessStartedRecently(candidate, recentSeconds)
+            minimumCreationTime := this.ContextValue(observationContext,
+                "MinimumCreationTime", "")
+            startedSinceBaseline := this.WasProcessStartedSince(candidate,
+                minimumCreationTime)
+            if matchesPrior || recentStart || startedSinceBaseline
+                return ProcessObservation.Running(candidate.pid, identity,
+                    snapshotResult.CapturedAtTicks,
+                    "process-image-inferred")
+        }
+        ; 原生快照没有 WMI 的创建时间字段。必要时复用一份足够新的后台
+        ; 快照，才能验证“近期启动”这项证据。
+        if inaccessibleCandidate
+            && this.IsImagePathFallbackAllowed(observationContext) {
+            fallbackIndex := this.ResolveSnapshotIndex("",
+                maximumSnapshotAgeMs)
+            if fallbackIndex is ProcessSnapshotIndex {
+                fallbackObservation := fallbackIndex.ObserveImagePath(
+                    targetPath, observationContext)
+                if !fallbackObservation.IsStopped()
+                    return fallbackObservation
+            }
         }
         return inaccessibleCandidate
             ? ProcessObservation.Unknown(snapshotResult.CapturedAtTicks,
@@ -93,6 +144,40 @@ class TargetProbe {
                 ProcessObservationReason.InaccessibleImagePath)
             : ProcessObservation.Stopped(snapshotResult.CapturedAtTicks,
                 "process-image")
+    }
+
+    IsImagePathFallbackAllowed(fallbackContext) {
+        return IsObject(fallbackContext)
+            && fallbackContext.HasOwnProp("AllowInaccessibleImageFallback")
+            && fallbackContext.AllowInaccessibleImageFallback
+    }
+
+    WasProcessStartedRecently(processInfo, maximumAgeSeconds) {
+        creation := this.Value(processInfo, "creation", "")
+        creation := SubStr(String(creation), 1, 14)
+        if !RegExMatch(creation, "^\d{14}$")
+            return false
+        try return Abs(DateDiff(A_Now, creation, "Seconds"))
+            <= maximumAgeSeconds
+        catch
+            return false
+    }
+
+    WasProcessStartedSince(processInfo, minimumCreationTime) {
+        creation := this.Value(processInfo, "creation", "")
+        creation := SubStr(String(creation), 1, 14)
+        minimumCreationTime := SubStr(String(minimumCreationTime), 1, 14)
+        if !RegExMatch(creation, "^\d{14}$")
+            || !RegExMatch(minimumCreationTime, "^\d{14}$")
+            return false
+        try return DateDiff(creation, minimumCreationTime, "Seconds") >= 0
+        catch
+            return false
+    }
+
+    ContextValue(objectValue, propertyName, defaultValue := "") {
+        return IsObject(objectValue) && objectValue.HasOwnProp(propertyName)
+            ? objectValue.%propertyName% : defaultValue
     }
 
     ObserveCommandTarget(targetPath, snapshotIndex := "",

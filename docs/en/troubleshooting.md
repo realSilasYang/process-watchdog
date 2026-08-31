@@ -14,13 +14,6 @@ Adding the shortcut again can refresh the resolved identity. If several
 candidates remain equally plausible, specify the real main program explicitly
 in the target settings.
 
-## Update protection never finishes
-
-Check whether the installation root is too broad, updater rules match unrelated
-processes, or the installer still holds the target file. You can end explicit
-maintenance in Update Protection. The assistant then repeats file-readiness and
-stability checks instead of launching blindly.
-
 ## Privilege mismatch
 
 If a running target does not satisfy Run as administrator, the list reports a

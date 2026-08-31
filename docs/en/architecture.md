@@ -35,7 +35,6 @@ mismatch, or application shutdown rejects the entire result.
   directory-change evidence.
 - `src/Execution` centralizes external effects such as launch, window close,
   Ctrl+C, and staged termination.
-- `src/Maintenance` owns update-protection state, evidence matching, and session recovery.
 - `src/UI` owns ListView projection, icon resources, interaction registration,
   and window ownership.
 - `src/Diagnostics` creates local diagnostics without automatic upload.
@@ -92,34 +91,27 @@ restart/verification tokens. When restart preflight or launch verification lacks
 a fresh snapshot, it makes one asynchronous generation-bound request. A result
 may resume the task only when it belongs to that request and arrives before the
 finite deadline; permanently unreadable evidence is not treated as a transient
-wait. Pause, delete, launch- or probe-input changes, undo, maintenance protection,
-and shutdown advance the generation and clear the handshake. Re-adding the same
+wait. Pause, delete, launch- or probe-input changes, undo, and shutdown advance
+the generation and clear the handshake. Re-adding the same
 path cannot accept a callback from the previous controller.
 
 All targets share one `WatchdogScheduler`. A due-time min-heap and one resettable
 timer replace a permanent timer per item. Heap operations use short critical
 sections; business callbacks run in normal thread state. `GuardWorkGate`
-serializes main monitoring, updater scanning, directory events, and explicit
-maintenance. A busy gate briefly reschedules work without blocking the UI.
+serializes main monitoring and restart verification. A busy gate briefly
+reschedules work without blocking the UI. The
+gate records current and recent owners, hold times, contention sources, and
+rate-limited sustained-contention warnings for diagnostic export.
 
 After fast retries are exhausted, `RestartPolicy` continues at the final
 configured interval; successful probing resets the count. Controller ownership
 is rechecked before and after any launch or stop operation that can wait.
 
-## Update protection
+## Content relocation
 
-Update protection is disabled by default. When enabled it uses the `Normal`,
-`Arbitrating`, `Updating`, `Stabilizing`, `Recovering`, and `TimedOut` states. An
-updater needs evidence such as a full path, installation root, command line that
-references the root, or a target parent-child chain. Actor caches use PID plus
-creation identity, so PID reuse cannot extend protection.
-
-After an update that changes the target file, a scoped updater signature can be
-learned. A process name alone, or a path without a scope root, cannot become
-permanent evidence. When a shortcut target moves, the final installation root is
-resolved before learned signatures are checked. Unfinished sessions are written
-atomically to `watchdog.maintenance.ini` and used only while a real unfinished
-state exists.
+Content relocation always requires the original exact size and complete SHA-256,
+plus explicit user confirmation. Ambiguous candidates or incomplete scans never
+change the monitored path.
 
 ## Configuration and history
 
@@ -131,13 +123,8 @@ through replacement. Failure preserves the old file and schedules one
 exponential-backoff retry.
 
 Portable EXE and source modes use `A_ScriptDir` as the configuration root. Entries
-in one directory share state and separate directories are independent. The standalone
-EXE is an outer bootstrapper: it verifies an embedded portable ZIP, transactionally
-installs it under `%LOCALAPPDATA%\ProcessWatchdog\Standalone` with staged extraction,
-managed-path backup, and rollback, then starts the real EXE there. Its `A_ScriptDir`,
-personal state, and later self-updates therefore remain under that stable root. A
-semantic-version comparison prevents an older bootstrapper from downgrading a newer
-installed payload. The global mutex still permits only one running instance. A separate PowerShell process checks
+in one directory share state and separate directories are independent. The global
+mutex permits only one running instance. A separate PowerShell process checks
 for self-updates, and the main thread only reads one atomic result file every
 250 milliseconds. A process handle, rather than a reusable PID, determines worker
 completion and timeout. Results must belong to the running version, and each EXE,
@@ -145,7 +132,7 @@ plain-source, or Git-source installation requires only its own applicable assets
 
 After the parent exits, the installer verifies SHA-256, canonical version, package
 kind, entry metadata, and the release manifest before replacing managed paths. A
-manifest may not include `watchdog.ini` or `watchdog.maintenance.ini`. Old and new
+manifest may not include `watchdog.ini`. Old and new
 manifests may change directory granularity; backups collapse their union to outermost
 paths. The current entry is copied to backup and remains available until one final
 same-directory atomic replacement after other paths are in place. The new entry must
@@ -155,7 +142,7 @@ assembly, and guard-timer startup, followed by a short stability observation. Be
 that normal start, the installer takes byte-accurate snapshots of both personal-state
 files. Timeout, early exit, a mismatched signal, or failure to start the core guard
 terminates the new process, restores old files or the prior Git commit, and restores
-the pre-start `watchdog.ini` and `watchdog.maintenance.ini` state, including removing
+the pre-start `watchdog.ini` state, including removing
 a file that did not previously exist. Both ordinary clones and Git worktrees require
 a clean tracked worktree and a fast-forward to the official tag.
 
@@ -167,13 +154,17 @@ Enabled|RunAsAdmin|Path|WorkDir|Args|EnvVars|ResolvedTarget|ResolvedTargetManual
 
 Boolean fields accept only `0` or `1`; non-empty text must decode losslessly. A
 wrong field count, legacy plain text, or damaged encoding is not registered as a
-target. Its original application, display, launch, and update values are moved
-to `[Recovery]`. The optional `[Launch]` section uses the matching `AppN` key for
-two independent `<HEX>` fields: runtime path and runtime arguments. It is
-rewritten in the same atomic transaction as `[Apps]`, `[Maintenance]`,
-`[Display]`, and `[Recovery]`. This keeps the existing nine-field record stable
+target. Its original application, display, launch, and content-identity
+values are moved to `[Recovery]`. The optional `[Launch]` section uses the
+matching `AppN` key for two independent `<HEX>` fields: runtime path and runtime
+arguments. The optional `[Identity]` section stores a direct file target's
+content baseline as `FileSize|SHA256`, allowing unchanged content to be
+confirmed after a file name, directory, or volume changes without treating file
+IDs or directory notifications as identity evidence. These sections are
+rewritten in the same atomic transaction as `[Apps]`, `[Display]`, and
+`[Recovery]`. This keeps the existing nine-field record stable
 while ensuring ordering, undo, redo, and recovery never drop launch-environment
-data.
+or content-identity data.
 
 Undo and redo use ordered configuration snapshots and per-field three-way
 merging. Undo reverses only fields changed by the original operation that still
@@ -214,6 +205,16 @@ GIF, TIF, TIFF, WebP, SVG, and ANI. SVG is rasterized in memory by the pinned
 resvg version. Bitmap sources are decoded to premultiplied alpha by WIC, scaled
 at high quality, and centered. GIF and ANI show a static representative frame.
 
+Visible sibling controls use the `AtomicControlLayout` transaction. Callers provide
+logical coordinates; the module performs one DPI conversion, one batched
+`DeferWindowPos` commit, moving-child `WM_ERASEBKGND` protection, old-position
+background fill, and old/new-union repaint. The parent is never redraw-suspended, so
+stable left controls are not dragged into a whole-window refresh. Unchanged layouts
+return `Unchanged`, while an unavailable native commit is explicit through
+`Mode: "Fallback"` or `Status: "Failed"`. See the [local layout transaction
+specification](ui-layout-transactions.md) for invariants, failure semantics, and a
+reusable example.
+
 ## Display-setting hot switch
 
 `LocalizationService` retains the requested and resolved language plus the
@@ -227,20 +228,14 @@ no provable source template remains unchanged. Content controls continue using
 the selected content font. Every button obtains the current language's Windows
 UI font at bold weight through the shared interaction-registration path, which
 also covers Settings tabs; the main-window footer applies the same font on
-creation and hot switch. Resolving this system emphasis font never loads a
-packaged font.
+creation and hot switch. Resolving this system emphasis font uses installed fonts only.
 
-For language-default fonts, the service first verifies that Windows GDI can
-create the installed preferred face. When absent, it loads the matching
-packaged preference: the original PingFang collection for Chinese, SF Pro Text
-regular and bold for Latin and Cyrillic languages, Harano Aji Gothic for
-Japanese, or Apple SD Gothic Neo for Korean. The service then privately loads
-the packaged Noto Sans variable font or original Noto Sans CJK collection,
-and uses a native Windows UI font only if loading also fails. Paths resolve from the installation root; successful
-and failed attempts are cached, each resource is loaded only once across hot
-switches, and `RemoveFontResourceExW` releases it during shutdown. OFL and
-commercially licensed fonts have separate SBOM entries, and the project license
-does not relicense the commercial files.
+For language-default fonts, the service asks Windows GDI for the installed preferred
+face, an installed Noto fallback, then a native Windows UI font. The optional font
+package is only installed by the user into Windows; runtime code never resolves font
+asset paths, registers process-private fonts, or releases them at shutdown. The font
+package records separate OFL and commercial authorization boundaries, and the project
+license does not relicense the commercial files.
 
 The transaction does not replace `App`, `GuardRuntime`, the scheduler, target
 controllers, the main window, or the ListView, and target generations do not
@@ -284,9 +279,9 @@ monitors, per-monitor DPI, and high contrast remain manual-matrix responsibiliti
 Public-release validation requires a non-shallow clone, scans every commit with
 the pinned Gitleaks, rejects personal configuration and temporary probes in
 history, and rejects local absolute paths in release text. Builds pin AutoHotkey,
-Ahk2Exe, runtime DLL, and packaged-font hashes, compile through an ASCII-only virtual path, and
-validate the compiled startup. Two builds must produce byte-identical EXE, ZIP,
+Ahk2Exe, runtime DLL, and optional-font-package hashes, compile through an ASCII-only virtual path, and
+validate the compiled startup. Two builds must produce byte-identical portable ZIP, source ZIP, font ZIP,
 and SPDX SBOM files. The portable package includes its SBOM, AutoHotkey license,
 and source archive for the exact embedded runtime. The complete Actions artifact
-retains checksums and the standalone SBOM, while provenance covers the three user
-editions.
+retains checksums and the separate SBOM, while provenance covers the two program
+editions and optional font package.

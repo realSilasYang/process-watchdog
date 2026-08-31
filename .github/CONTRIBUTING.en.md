@@ -56,7 +56,7 @@ them in isolated temporary directories, and remove their temporary copies.
 - External GitHub Actions must be pinned to a full commit SHA with a major-version
   comment. Modified workflows must pass the pinned actionlint version. Official
   publication is manual from `main` only.
-- Never commit personal `watchdog.ini`, maintenance sessions, diagnostics,
+- Never commit personal `watchdog.ini`, diagnostics,
   private paths, arguments, credentials, build products, or temporary probes.
 
 ## Minimum validation
@@ -71,9 +71,12 @@ them in isolated temporary directories, and remove their temporary copies.
 | Build, dependency, SBOM, or release package | Run `tests/reproducible-build.ps1` and release-layout validation |
 
 Ordinary CI applies the same tiers automatically. The fast gate always runs;
-only runtime changes download LFS fonts and start real Windows/GUI integration;
-non-documentation pushes to `main` and release-engineering pull requests add the
-cross-runtime reproducible build. A formal release skips no tier.
+only runtime changes restore complete fonts from the latest published font
+package, verify them against current metadata, and start real Windows/GUI
+integration. Non-documentation pushes to `main` and release-engineering pull
+requests add the cross-runtime reproducible build. Fonts remain LFS-tracked in
+Git, but CI and releases do not consume LFS download quota. A formal release
+skips no tier.
 
 The full manual GUI scope is in `tests/gui/MANUAL-REGRESSION.md`. Automation
 cannot replace real DPI, multi-monitor, high-contrast, touchpad, or screen-reader
@@ -84,7 +87,7 @@ testing. State clearly which combinations remain untested.
 A pull request should explain the problem, user-visible result, key design,
 compatibility impact, commands actually run, and untested risks. Include a
 redacted screenshot or recording for UI work. For configuration work, describe
-the impact on `watchdog.ini`, `watchdog.maintenance.ini`, backup, and recovery.
+the impact on `watchdog.ini`, backup, and recovery.
 
 User-visible changes must update both README languages, both relevant user
 documents, and the changelog. Organize a release with the

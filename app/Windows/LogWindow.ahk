@@ -40,7 +40,8 @@ class LogWindow extends ManagedWindow {
         this.exportButton := this.gui.Add("Button", "x250 y280 w120 h30",
             Tr("导出诊断包"))
         RegisterHoverButton(this.exportButton, UiThemeService.Color("Toolbar"))
-        SetButtonLucideIcon(this.exportButton, "package-open.svg", 14, 6)
+        SetButtonLucideIcon(this.exportButton, "package-open.svg", 14, 6,
+            "theme:LogsIcon")
         RegisterButtonClick(this.exportButton,
             ObjBindMethod(this, "ExportDiagnostics"))
         SetButtonTextColor(this.exportButton,

@@ -97,10 +97,6 @@ class AppConfigHistoryService {
         return !this.Busy && this.UndoEntries.Length > 0
     }
 
-    CanRedo() {
-        return !this.Busy && this.RedoEntries.Length > 0
-    }
-
     GetUndoCount() {
         return this.UndoEntries.Length
     }

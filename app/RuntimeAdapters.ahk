@@ -1,6 +1,6 @@
 ; 配置校验与目标规格适配层。
 ; 本模块把界面输入和应用层函数调用适配为核心层使用的明确规格对象。
-; 路径、环境变量、快捷方式与维护配置在进入守护状态机前统一规范化，
+; 路径、环境变量与快捷方式在进入守护状态机前统一规范化，
 ; 使核心逻辑不依赖控件文本，也不会把查询失败误当成目标已经停止。
 GetApplicationRootFilePath(relativePath) {
     ; 正式入口从安装根目录读取资源；独立测试通过 #Include 从 tests 子目录
@@ -21,6 +21,21 @@ GetApplicationAssetPath(relativePath) {
 GetApplicationIconPath() {
     ; 所有窗口从统一资源路径取得应用图标，避免测试入口和正式入口行为分叉。
     return GetApplicationAssetPath("app\watchdog.ico")
+}
+
+GetApplicationUserModelId() {
+    ; 不包含语言、版本、安装路径或解释器名称，确保源码版和 EXE 版共享
+    ; 同一应用身份，同时不会污染由公共 AutoHotkey 解释器承载的其它脚本。
+    return "realSilasYang.ProcessWatchdogAssistant"
+}
+
+ConfigureApplicationShellIdentity() {
+    try result := DllCall(
+        "shell32\SetCurrentProcessExplicitAppUserModelID",
+        "WStr", GetApplicationUserModelId(), "Int")
+    catch
+        return false
+    return result >= 0
 }
 
 ParseBoundedInteger(value, minValue, maxValue) {
@@ -120,74 +135,46 @@ LogSlowBackgroundOperation(operationName, startedTicks, thresholdMs := 200) {
         Tr(operationName), elapsedMs))
 }
 
-IsMaintenanceSupportedTarget(path) {
-    if !InStr(path, "\")
-        return false
-    SplitPath(path, , , &extension)
-    extension := StrLower(extension)
-    if (extension == "lnk") {
-        effectiveTarget := App.targetIdentityService.GetMonitoredTargetPath(
-            path)
-        if (effectiveTarget == "" && IsOneShotTarget(path))
-            return false
-    }
-    return RegExMatch(extension, "i)^(exe|com|ahk|py|pyw|js|vbs|vbe|wsf|ps1|bat|cmd|rb|pl|php|lua|jar|sh|bash|lnk)$") != 0
-}
-
-GetDefaultMaintenanceRoot(path) {
-    if !IsMaintenanceSupportedTarget(path)
-        return ""
-    SplitPath(path, , , &extension)
-    if (StrLower(extension) == "lnk") {
-        effectiveTarget := App.targetIdentityService.GetMonitoredTargetPath(
-            path)
-        if (effectiveTarget != "") {
-            SplitPath(effectiveTarget, , &effectiveDirectory)
-            if (effectiveDirectory != "")
-                return effectiveDirectory
-        }
-        workingDir := App.shortcutTargetResolver.GetWorkingDirectory(path)
-        if (workingDir != "")
-            return StrLen(workingDir) > 3 ? RTrim(workingDir, "\") : workingDir
-        targetPath := App.shortcutTargetResolver.GetTargetPath(path)
-        if (targetPath != "") {
-            SplitPath(targetPath, , &targetDirectory)
-            return targetDirectory
-        }
-    }
-    SplitPath(path, , &directory)
-    return directory
-}
-
-NormalizeMaintenanceRoot(rootPath, targetPath := "") {
-    rootPath := Trim(rootPath)
-    if (rootPath == "" && targetPath != "")
-        rootPath := GetDefaultMaintenanceRoot(targetPath)
-    rootPath := StrReplace(rootPath, "/", "\")
-    if (StrLen(rootPath) > 3)
-        rootPath := RTrim(rootPath, "\")
-    return rootPath
-}
-
 RegisterPersistedWatchItem(record) {
     return RegisterApp(record.Path, record.Enabled, record.RunAsAdmin,
-        record.WorkDir, record.Args, record.EnvVars, record.Maintenance,
-        record.ResolvedTarget, record.ResolvedTargetManual,
+        record.WorkDir, record.Args, record.EnvVars, record.ResolvedTarget,
+        record.ResolvedTargetManual,
         record.ShortcutArgs, record.Display, record.RuntimePath,
-        record.RuntimeArgs)
+        record.RuntimeArgs, record.ContentHash, record.ContentSize,
+        record.HasOwnProp("AskBeforeRestart") && record.AskBeforeRestart)
 }
 
 LoadWatchlistFromConfig() {
+    RemoveObsoleteUpgradeState()
     loadResult := App.watchlistPersistenceService.Load(
         RegisterPersistedWatchItem)
     App.configLoadWarnings := loadResult.Warnings
     App.configRecoveryEntries := loadResult.RecoveryEntries
+    if loadResult.NeedsIdentitySave
+        SaveAppsToIni()
     if App.configLoadWarnings.Length {
         LogMsg(BuildConfigLoadDiagnostic(App.configLoadWarnings,
             App.configRepository.Path))
-        try TrayTip(Tr("{1} 条监控配置未载入，相关项目当前不会被守护。点击查看具体位置和原因。",
+        try TrayTip(Tr("{1} 条监控配置未载入，相关守护对象当前不会被守护。点击查看具体位置和原因。",
             App.configLoadWarnings.Length), Tr("监控配置加载异常"), 2)
     }
+}
+
+RemoveObsoleteUpgradeState() {
+    try {
+        IniRead(App.configRepository.Path, "Maintenance")
+        App.configRepository.ReplaceSections([
+            {Name: "Maintenance", Entries: []}
+        ])
+    }
+    legacyPath := A_ScriptDir "\watchdog.maintenance.ini"
+    if !FileExist(legacyPath)
+        return false
+    try {
+        FileDelete(legacyPath)
+        return !FileExist(legacyPath)
+    } catch
+        return false
 }
 
 BuildConfigLoadDiagnostic(warnings, configPath) {
@@ -201,10 +188,10 @@ BuildConfigLoadDiagnostic(warnings, configPath) {
         diagnostic .= Tr("`r`n      目标：{1}", targetText)
         diagnostic .= Tr("`r`n      问题：{1}：{2}",
             TrDiagnostic(warning.Field), TrDiagnostic(warning.Reason))
-        diagnostic .= Tr("`r`n      影响：该项目本次未加入守护列表。")
+        diagnostic .= Tr("`r`n      影响：该守护对象本次未加入守护列表。")
     }
     diagnostic .= Tr("`r`n  配置文件：{1}", configPath)
-    diagnostic .= Tr("`r`n  处理建议：确认目标路径后，可在主界面重新添加该项目；也可退出小助手后检查上述配置位置。后续保存配置时，损坏记录会转存到 [Recovery]，不会被静默删除。")
+    diagnostic .= Tr("`r`n  处理建议：确认目标路径后，可在主界面重新添加该守护对象；也可退出小助手后检查上述配置位置。后续保存配置时，损坏记录会转存到 [Recovery]，不会被静默删除。")
     return diagnostic
 }
 
@@ -313,7 +300,7 @@ WriteApplicationUpdateReadySignal(readyPath, version) {
     }
 }
 
-ProcessMaintenanceCommandClient() {
+ProcessWorkerCommandClient() {
     if (A_Args.Length < 1)
         return false
     option := StrLower(A_Args[1])
@@ -336,21 +323,12 @@ ProcessMaintenanceCommandClient() {
             A_Args.Length >= 6 ? Integer(A_Args[6]) : 60)
         ExitApplication(succeeded ? 0 : 1)
     }
-    if (option != "--maintenance-begin" && option != "--maintenance-end")
-        return false
-    if (A_Args.Length < 2)
-        return true
-    command := (option == "--maintenance-begin" ? "BEGIN|" : "END|") A_Args[2]
-    targetWindow := FindRunningApplicationWindow()
-    if targetWindow {
-        Loop 3 {
-            if SendMaintenanceCopyData(targetWindow, command)
-                break
-            Sleep(200)
-        }
-        return true
+    if (option == "--content-match-worker" && A_Args.Length >= 8) {
+        succeeded := App.fileScanner.WriteContentMatchWorkerFile(A_Args[2],
+            A_Args[3], A_Args[4], Integer(A_Args[5]), A_Args[6],
+            Integer(A_Args[7]) != 0, Integer(A_Args[8]))
+        ExitApplication(succeeded ? 0 : 1)
     }
-    App.maintenanceCoordinator.PendingCommands.Push(command)
     return false
 }
 
@@ -359,7 +337,10 @@ FindRunningApplicationWindow() {
     try {
         DetectHiddenWindows(true)
         for candidateWindow in WinGetList("ahk_class AutoHotkeyGUI") {
-            if !SendMaintenanceCopyData(candidateWindow, "PING|", 500)
+            try candidateTitle := WinGetTitle("ahk_id " candidateWindow)
+            catch
+                continue
+            if candidateTitle != Tr("进程守护小助手")
                 continue
             rootOwner := DllCall("user32\GetAncestor", "Ptr",
                 candidateWindow, "UInt", 3, "Ptr") ; GA_ROOTOWNER：取得最上层所有者窗口
@@ -369,33 +350,6 @@ FindRunningApplicationWindow() {
         DetectHiddenWindows(hiddenWindowsBefore)
     }
     return 0
-}
-
-SendMaintenanceCopyData(targetWindow, command, timeoutMs := 3000) {
-    characterCount := StrPut(command, "UTF-16")
-    commandBuffer := Buffer(characterCount * 2, 0)
-    StrPut(command, commandBuffer, "UTF-16")
-    structureSize := A_PtrSize == 8 ? 24 : 12
-    copyData := Buffer(structureSize, 0)
-    NumPut("UPtr", 1, copyData, 0)
-    NumPut("UInt", characterCount * 2, copyData, A_PtrSize)
-    NumPut("Ptr", commandBuffer.Ptr, copyData, A_PtrSize == 8 ? 16 : 8)
-    messageResult := 0
-    return DllCall("user32\SendMessageTimeoutW", "Ptr", targetWindow,
-        "UInt", Win32.WM_COPYDATA, "Ptr", A_ScriptHwnd, "Ptr", copyData.Ptr,
-        "UInt", 0x0002, "UInt", Max(1, Integer(timeoutMs)),
-        "UPtr*", &messageResult, "Ptr") && messageResult != 0
-}
-
-ReceiveMaintenanceCopyData(wParam, lParam, msg, hwnd) {
-    if !lParam
-        return 0
-    byteCount := NumGet(lParam, A_PtrSize, "UInt")
-    dataPointer := NumGet(lParam, A_PtrSize == 8 ? 16 : 8, "Ptr")
-    if !dataPointer || byteCount < 2 || Mod(byteCount, 2)
-        return 0
-    command := StrGet(dataPointer, byteCount // 2 - 1, "UTF-16")
-    return App.maintenanceCoordinator.QueueCommand(command) ? 1 : 0
 }
 
 ClearStateProcessIdentity(stateObj, rememberLast := true) {
@@ -551,8 +505,6 @@ InvalidateShortcutRuntimeIdentity(path, stateObj) {
     if !stateObj.Enabled {
         stateObj.Pending := false
         stateObj.TransitionTo(GuardPhase.Paused)
-    } else if App.maintenanceCoordinator.IsBlocking(stateObj) {
-        stateObj.Pending := true
     } else {
         stateObj.Pending := false
         stateObj.TransitionTo(GuardPhase.Initializing)
@@ -560,12 +512,13 @@ InvalidateShortcutRuntimeIdentity(path, stateObj) {
     return true
 }
 
-ObserveTarget(target, snapshotIndex := "", maximumSnapshotAgeMs := 0) {
+ObserveTarget(target, snapshotIndex := "", maximumSnapshotAgeMs := 0,
+    observationContext := "") {
     target := NormalizeTargetPath(target)
     stateObj := App.appStates.Has(target) ? App.appStates[target] : ""
     specs := App.targetSpecsService.Get(target, stateObj)
     return App.targetProbe.Observe(specs.Probe, snapshotIndex,
-        maximumSnapshotAgeMs)
+        maximumSnapshotAgeMs, observationContext)
 }
 
 IsOneShotTarget(path, resolvedTarget := "") {

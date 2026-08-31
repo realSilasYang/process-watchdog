@@ -16,6 +16,27 @@ For MSI shortcuts or applications whose internal path changes with each version,
 the assistant combines installation-directory candidates with current process
 evidence to choose the main program conservatively.
 
+## When a target file is renamed or moved
+
+If a directly added EXE or script is renamed, one of its parent folders is
+renamed, or the file is moved across folders or volumes, the assistant first
+narrows candidates by compatible extension and exact size, then verifies the
+complete SHA-256 content hash. The content baseline is stored with the
+configuration, so recovery also works for moves made while the assistant was
+closed. File names, Windows file IDs, and directory notifications are not used
+as identity evidence.
+
+When a candidate is found, pending restart work for that item is frozen and a
+confirmation window shows the previous path, new path, and identity evidence.
+Update monitored path preserves the display name, icon, arguments, environment,
+and runtime settings, and the change can be undone. Ignore keeps the old path
+and returns the item to its normal missing-target state.
+
+Scanning runs in a separate worker process and does not block monitoring or the
+interface. If more than one identical copy is found in a completed search scope,
+or any search scope cannot be scanned completely, the assistant does not guess;
+it keeps the old path and retries later.
+
 ## Monitor scripts and command-line tools
 
 AHK, Python, JavaScript, PowerShell, BAT, CMD, Ruby, Perl, PHP, Lua, JAR, and
@@ -61,16 +82,6 @@ batch import does not depend on Everything.
 ## Require administrator privileges
 
 Enable Run as administrator in the item settings. If an already running target
-does not have the required privileges, the main window reports a mismatch. A
-context-menu restart launches it with elevation according to the saved setting.
-
-## Protect an application that updates itself
-
-Update protection is disabled by default. Enable it manually after confirming
-the installation directory. The assistant combines updater processes,
-parent-child relationships, command lines that reference the installation root,
-and file changes before entering update mode. Monitoring resumes only after the
-target file becomes available and stable again.
-
-If the application exposes a clear Check for updates command, you can also begin
-and end explicit maintenance from the Update Protection window.
+does not have the required privileges, the main window reports a mismatch. To
+restart it under the new setting, use Stop Running and then resume monitoring;
+the next monitored launch uses elevation according to the saved setting.

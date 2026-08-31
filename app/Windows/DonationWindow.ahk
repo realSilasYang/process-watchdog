@@ -1,4 +1,4 @@
-; 开源项目捐赠窗口。
+; 开源项目打赏窗口。
 ; 二维码直接读取发行包内的 PNG 资源，不创建临时文件或外部渲染进程；
 ; 缺少单张资源时仍显示另一张二维码，并在原位置给出明确提示。
 
@@ -10,11 +10,12 @@ class DonationWindow extends ManagedWindow {
         this.qrPictures := []
     }
 
-    Show(*) {
+    Show(ownerGui := "", *) {
         if this.ShowExisting()
             return
 
-        if !this.CreateOwnedGui(this.owner, "", Tr("支持开源项目"))
+        actualOwner := Type(ownerGui) == "Gui" ? ownerGui : this.owner
+        if !this.CreateOwnedGui(actualOwner, "", Tr("支持开源项目"))
             return
         try {
             this.gui.OnEvent("Escape", ObjBindMethod(this, "Close"))
@@ -22,7 +23,7 @@ class DonationWindow extends ManagedWindow {
             InitializeApplicationWindow(this.gui)
 
             compactLayout := LocalizationService.UsesCompactLayout()
-            windowWidth := compactLayout ? 570 : 680
+            windowWidth := compactLayout ? 500 : 680
             contentMargin := compactLayout ? 34 : 38
             qrSize := compactLayout ? 180 : 190
             qrGap := compactLayout ? 36 : 52
@@ -30,23 +31,19 @@ class DonationWindow extends ManagedWindow {
             secondQrX := firstQrX + qrSize + qrGap
 
             ; 说明文字的真实高度取决于语言、字体和 DPI，不能再用固定高度。
-            ; 先让原生 Text 控件完成换行测量，再以它的实际底边安排分隔线和二维码。
+            ; 先让原生 Text 控件完成换行测量，再以它的实际底边安排二维码。
             this.messageText := this.gui.Add("Text", "x" contentMargin
                 " y22 w" (windowWidth - contentMargin * 2)
                 " Center BackgroundTrans c"
                 UiThemeService.Color("Text"),
-                Tr("如果小助手为您节省了排查问题和恢复程序的时间，欢迎通过下方二维码打赏作者！`n进程守护小助手持续保持开源，项目的长期维护有赖于您的支持和鼓励~"))
+                Tr("如果小助手为您节省了恢复程序的时间，欢迎通过下方二维码打赏作者！`n请选择扶贫方式（≥Д≤）"))
             this.messageText.GetPos(, &messageY, , &messageHeight)
-            dividerY := messageY + messageHeight + 17
-            this.gui.Add("Text", "x" contentMargin " y" dividerY
-                " w" (windowWidth - contentMargin * 2) " h1 Background"
-                UiThemeService.Color("Divider"))
-            qrLabelY := dividerY + 15
+            qrLabelY := messageY + messageHeight + 10
 
             this.AddQrCode(firstQrX, qrLabelY, qrSize, Tr("微信支付"),
-                GetApplicationAssetPath("donate\微信个人收款码-界面.png"))
+                "微信个人收款码")
             this.AddQrCode(secondQrX, qrLabelY, qrSize, Tr("支付宝"),
-                GetApplicationAssetPath("donate\支付宝个人收款码-界面.png"))
+                "支付宝个人收款码")
 
             windowHeight := qrLabelY + 24 + qrSize + 22
             ShowApplicationWindow(this.gui,
@@ -57,10 +54,10 @@ class DonationWindow extends ManagedWindow {
         }
     }
 
-    AddQrCode(x, y, size, label, imagePath) {
+    AddQrCode(x, y, size, label, assetStem) {
+        imagePath := this.ResolveQrImagePath(assetStem)
         if FileExist(imagePath) {
-            ; 发行用二维码保留了扫码所需静区，但移除了源图中过量的透明外边。
-            ; 标签与深色二维码底板保留少量间距，避免浅色主题下文字被底板遮挡。
+            ; 主题专用图片保留扫码静区，并让二维码底板与窗口明暗一致。
             picture := this.gui.Add("Picture",
                 "x" x " y" (y + 24) " w" size " h" size, imagePath)
             this.qrPictures.Push(picture)
@@ -78,6 +75,20 @@ class DonationWindow extends ManagedWindow {
         this.qrLabels.Push(labelControl)
         this.gui.SetFont("s10 c" UiThemeService.Color("Text"),
             LocalizationService.GetUiFontName())
+    }
+
+    ResolveQrImagePath(assetStem) {
+        preferredSuffix := UiThemeService.IsDark()
+            ? "-界面.png" : "-浅色界面.png"
+        fallbackSuffix := UiThemeService.IsDark()
+            ? "-浅色界面.png" : "-界面.png"
+        preferredPath := GetApplicationAssetPath(
+            "donate\" assetStem preferredSuffix)
+        if FileExist(preferredPath)
+            return preferredPath
+        fallbackPath := GetApplicationAssetPath(
+            "donate\" assetStem fallbackSuffix)
+        return FileExist(fallbackPath) ? fallbackPath : preferredPath
     }
 
     Close(*) {

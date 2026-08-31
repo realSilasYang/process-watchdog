@@ -1,4 +1,6 @@
 <div align="center">
+  <img src="../assets/app/watchdog-logo.png" width="112" alt="Logo di Process Watchdog Assistant">
+
   <p><a href="../README.md">简体中文</a> · <a href="./README.zh-HK.md">繁體中文（香港）</a> · <a href="./README.zh-TW.md">繁體中文（台灣）</a> · <a href="./README.en.md">English</a> · <a href="./README.ja.md">日本語</a> · <a href="./README.vi.md">Tiếng Việt</a> · <a href="./README.ko.md">한국어</a> · <a href="./README.es.md">Español</a> · <a href="./README.fr.md">Français</a> · <a href="./README.pt-BR.md">Português</a> · <a href="./README.ru.md">Русский</a> · <a href="./README.de.md">Deutsch</a> · <strong>Italiano</strong></p>
 
   <h1>Assistente di sorveglianza dei processi</h1>
@@ -28,27 +30,29 @@ L’Assistente di sorveglianza dei processi è pensato per applicazioni desktop,
 
 L’assistente non stabilisce che una destinazione è in esecuzione basandosi solo sul nome del processo. Incrocia il percorso completo, l’identità di creazione del processo, la destinazione reale del collegamento e gli elementi della riga di comando. Se le prove non bastano, attende il controllo successivo invece di trattare uno stato sconosciuto come arrestato.
 
-Il progetto offre interfaccia chiara e scura, ripristino automatico, protezione durante gli aggiornamenti, registro di esecuzione, annulla e ripristina, nomi e icone personalizzati e un pacchetto Windows x64 con SBOM SPDX, checksum SHA-256 e provenienza della compilazione.
-
+Il progetto offre interfaccia chiara e scura, ripristino automatico, registro di esecuzione, annulla e ripristina, nomi e icone personalizzati e un pacchetto Windows x64 con SBOM SPDX, checksum SHA-256 e provenienza della compilazione.
 # Panoramica dell’interfaccia
 
 <p align="center">
-  <img src="images/process-watchdog-overview.png" alt="Finestra principale di Process Watchdog Assistant" width="100%">
+  <img src="images/process-watchdog-overview.png" alt="Finestra principale scura di Process Watchdog Assistant" width="100%">
 </p>
 
-La finestra principale riunisce l’ordine degli elementi sorvegliati, l’icona dell’app, il nome, i privilegi richiesti e lo stato corrente. La barra superiore consente di aggiungere, eliminare, sospendere, aprire le impostazioni, consultare l’aiuto o fare una donazione; da Aiuto si possono aprire il manuale e il registro di esecuzione. La barra inferiore riepiloga le destinazioni in esecuzione, ripristino, aggiornamento, pausa ed errore, mentre il registro espone le prove alla base di ciascuno stato anomalo.
+<p align="center">
+  <img src="images/process-watchdog-overview-light.png" alt="Finestra principale di Process Watchdog Assistant" width="100%">
+</p>
+
+La finestra principale riunisce l’ordine degli obiettivi monitorati, l’icona dell’app, il nome, i privilegi richiesti e lo stato corrente. La barra dei comandi offre Aggiungi, Elimina, Sospendi, Impostazioni, Aiuto e Informazioni; Aiuto apre il manuale, il registro di esecuzione o la pagina dei commenti, mentre Informazioni riunisce versione, ambiente, aggiornamenti, progetto e Dona. La barra inferiore riepiloga le destinazioni in esecuzione, ripristino, pausa ed errore, mentre il registro espone le prove alla base di ciascuno stato anomalo.
 
 ## Funzioni principali
 
 - Sorveglia destinazioni EXE, AHK, Python, JavaScript, PowerShell, BAT, CMD e LNK.
 - Usa i risultati `Running`, `Stopped` e `Unknown`; uno stato sconosciuto non provoca mai un riavvio alla cieca.
 - Ogni destinazione dispone di controller, generazione e token di attività indipendenti. I vecchi callback diventano subito invalidi dopo una pausa, eliminazione o modifica del percorso.
-- Può richiedere privilegi di amministratore. Segnala un’istanza attiva con privilegi insufficienti e innalza un riavvio manuale secondo la configurazione.
-- La protezione degli aggiornamenti è disattivata per impostazione predefinita. Quando è attiva, combina processi di aggiornamento, relazioni padre-figlio, attività della cartella di installazione e stabilità dei file prima di sospendere o riprendere la sorveglianza.
+- Può richiedere privilegi di amministratore. Segnala un’istanza attiva con privilegi insufficienti e avvia con privilegi elevati il successivo avvio sorvegliato secondo la configurazione.
 - Sostituisce la configurazione in modo atomico. I record non analizzabili vengono spostati in `[Recovery]` anziché scartati in silenzio.
 - La ricerca delle applicazioni usa esclusivamente il servizio Everything, senza scansione locale dell’intero disco né limite di risultati imposto dall’app. I gruppi grandi vengono aggiunti in piccoli lotti per evitare che l’estrazione delle icone blocchi l’interfaccia.
-- Supporta cinese semplificato, cinese tradizionale di Hong Kong, cinese tradizionale di Taiwan, inglese, giapponese, vietnamita, coreano, spagnolo, francese, portoghese brasiliano, russo, tedesco e italiano. Per impostazione predefinita segue la lingua di Windows, torna all’inglese per una lingua non supportata e può essere scelta in Generale. Le modifiche a lingua e carattere dei contenuti si applicano immediatamente al processo corrente senza arrestare o reinizializzare le attività di sorveglianza.
-- Con «Segui il valore predefinito della lingua» vengono preferiti PingFang, SF Pro Text, Harano Aji Gothic o Apple SD Gothic Neo. Se assenti, viene caricata privatamente la risorsa inclusa con licenza commerciale o OFL, poi la famiglia Noto corrispondente. Il carattere dei contenuti si applica a testo, campi, elenchi e informazioni; pulsanti, schede e barra inferiore usano sempre il carattere dell’interfaccia Windows in grassetto adatto alla lingua.
+- Supporta cinese semplificato, cinese tradizionale di Hong Kong, cinese tradizionale di Taiwan, inglese, giapponese, vietnamita, coreano, spagnolo, francese, portoghese brasiliano, russo, tedesco e italiano. Per impostazione predefinita segue la lingua di Windows, torna all’inglese per una lingua non supportata e può essere scelta in Visualizzazione. Le modifiche a lingua e carattere dei contenuti si applicano immediatamente al processo corrente senza arrestare o reinizializzare le attività di sorveglianza.
+- Con «Segui il valore predefinito della lingua» vengono usati solo caratteri installati in Windows: prima PingFang, SF Pro Text, Harano Aji Gothic o Apple SD Gothic Neo, poi la famiglia Noto corrispondente e infine un carattere di sistema Windows. I caratteri facoltativi devono essere prima installati in Windows; l’assistente non li carica mai privatamente dalla propria cartella. Il carattere dei contenuti si applica a testo, campi, elenchi e informazioni; pulsanti, schede e barra inferiore usano sempre il carattere dell’interfaccia Windows in grassetto adatto alla lingua.
 - I temi chiaro e scuro consentono la riduzione indipendente delle finestre secondarie, la ricostruzione delle icone in base al DPI, pulsanti arrotondati e icone personalizzate.
 - Il pacchetto diagnostico viene creato solo in locale e non è caricato automaticamente; gli artefatti ufficiali possono essere verificati in modo indipendente.
 
@@ -66,14 +70,14 @@ Un ciclo completo di automazione GUI è documentato su Windows 11 con DPI reale 
 ---
 
 **[Guida per l’utente](#guida-per-lutente)**<br>
-[Installazione](#1-installazione-e-primo-avvio) · [Gestione](#2-aggiungere-e-gestire-elementi) · [Stati](#3-stati-e-ripristino) · [Aggiornamenti](#4-protezione-durante-gli-aggiornamenti) · [Impostazioni](#5-impostazioni) · [Registri](#6-registri-diagnostica-e-riservatezza)
+[Installazione](#1-installazione-e-primo-avvio) · [Gestione](#2-aggiungere-e-gestire-elementi) · [Stati](#3-stati-e-ripristino) · [Impostazioni](#4-impostazioni) · [Registri](#5-registri-diagnostica-e-riservatezza)
 
 **[Guida per gli sviluppatori](#guida-per-gli-sviluppatori)**<br>
 [Cartelle](#1-cartelle-e-responsabilità) · [Correttezza](#2-limiti-di-correttezza) · [Verifica](#3-comandi-di-verifica) · [Pubblicazione](#4-pubblicazione-e-contributi)
 
 # Sostieni il progetto
 
-L’Assistente di sorveglianza dei processi resterà open source. La sua manutenzione a lungo termine dipende dal sostegno e dall’incoraggiamento della comunità. Se ti ha fatto risparmiare tempo nella diagnosi o nel ripristino di applicazioni, puoi fare una donazione volontaria con uno dei codici QR seguenti. I contributi finanziano manutenzione, test di compatibilità e nuove versioni.
+Se l’assistente ti ha fatto risparmiare tempo nella diagnosi o nel ripristino di applicazioni, puoi sostenere l’autore con uno dei codici QR seguenti. Scegli come vuoi contribuire:
 
 <p align="center">
   <img src="../assets/donate/微信个人收款码.png" width="220" alt="Codice QR per donazione WeChat Pay">
@@ -85,11 +89,11 @@ L’Assistente di sorveglianza dei processi resterà open source. La sua manuten
 
 ## 1. Installazione e primo avvio
 
-1. Scegli in [Releases](https://github.com/realSilasYang/process-watchdog/releases) una delle tre edizioni: EXE autonomo, ZIP portatile completo o ZIP completo del codice sorgente.
-2. L’EXE autonomo non richiede AutoHotkey e al primo avvio installa il carico verificato in `%LOCALAPPDATA%\ProcessWatchdog\Standalone`; lo ZIP portatile resta nella cartella in cui viene estratto per intero; lo ZIP del codice sorgente richiede AutoHotkey v2 x64.
+1. Scegli in [Releases](https://github.com/realSilasYang/process-watchdog/releases) lo ZIP portatile completo o lo ZIP completo del codice sorgente. Il pacchetto di font opzionale non è una terza edizione del programma.
+2. Lo ZIP portatile funziona dopo l’estrazione completa e non richiede AutoHotkey separato; lo ZIP del codice sorgente richiede AutoHotkey v2 x64. I font vanno installati in Windows ma non sono necessari per eseguire il programma; la ricerca delle applicazioni richiede anche l’[ultima versione ufficiale di Everything](https://www.voidtools.com/downloads/).
 3. Avvia `进程守护小助手.exe`. L’app richiede i privilegi di amministratore e, secondo le impostazioni, mostra la finestra principale oppure resta nell’area di notifica.
 4. Seleziona Aggiungi per scegliere una destinazione oppure trascina un file supportato nella finestra principale.
-5. Apri il Registro per vedere le prove di identità, i controlli di stato, i tentativi di ripristino e i segnali di aggiornamento effettivamente usati.
+5. Apri il Registro per vedere le prove di identità, i controlli di stato, i tentativi di ripristino effettivamente usati.
 
 Per avviare il codice sorgente, installa AutoHotkey v2 x64 ed esegui `进程守护小助手.ahk`. Se cloni il repository con Git, installa anche Git LFS ed esegui `git lfs pull` per ottenere i file dei font completi anziché i puntatori LFS. Lo ZIP del codice sorgente allegato a ogni release contiene già queste risorse e non richiede Git LFS. Le versioni ufficiali incorporano il runtime AutoHotkey che ha superato tutti i test di pubblicazione, quindi un utente normale non deve installarlo separatamente.
 
@@ -112,13 +116,13 @@ Chiudere la finestra principale la nasconde soltanto nell’area di notifica; la
 | Aggiungi | Scegliere una destinazione, cercare app installate o importare una cartella; le sottocartelle sono incluse per impostazione predefinita |
 | Elimina | Rimuovere gli elementi selezionati; supporta selezione multipla e annullamento |
 | Sospendi / Riprendi | Cambiare solo la sorveglianza automatica senza chiudere la destinazione attiva; una selezione mista viene invertita elemento per elemento |
-| Impostazioni | Configurare Generale, Sorveglianza e avvio, Criteri di arresto, Registri e Informazioni |
+| Impostazioni | Configurare Visualizzazione, Avvio, Monitoraggio, Criteri di arresto e Registri |
 | Aiuto | Scegliere il manuale integrato, il registro di esecuzione o la pagina dei commenti GitHub |
-| Dona | Mostrare i codici QR WeChat Pay e Alipay che sostengono la manutenzione |
+| Informazioni | Vedere versione e ambiente di esecuzione, controllare gli aggiornamenti, aprire il progetto o accedere a Dona |
 
 Un elemento può definire punto di ingresso, cartella di lavoro, argomenti e requisito di amministratore. Il file LNK resta il punto di ingresso e il percorso reale del programma viene memorizzato separatamente per identificare il processo. Non serve quindi sostituire manualmente un collegamento indiretto dell’installatore con un EXE interno soggetto a cambiamenti.
 
-Il menu contestuale permette di aprire la posizione, riavviare, cambiare il percorso, configurare l’identificazione del processo e le impostazioni di avvio, alternare il requisito di amministratore, configurare la protezione e personalizzare nome o icona mostrati solo nella finestra principale. La presentazione non modifica identità, avvio o protezione. Se è già predefinita, il ripristino è disabilitato.
+Il menu contestuale permette di aprire la posizione, terminare l’esecuzione della destinazione, cambiare il percorso, configurare l’identificazione del processo e le impostazioni di avvio, alternare il requisito di amministratore e personalizzare nome o icona mostrati solo nella finestra principale. Termina esecuzione mette anche in pausa la sorveglianza per impedire il riavvio automatico. La presentazione non modifica né l’identità né l’avvio. Se è già predefinita, il ripristino è disabilitato.
 
 Solo gli elementi BAT e CMD mostrano anche il comando Visualizza registro di output batch; per gli altri tipi di destinazione non compare. Il file di registro separato viene creato soltanto quando l’assistente avvia realmente l’elemento e ne acquisisce l’output standard e quello di errore. Un processo batch già in esecuzione non riceve automaticamente questo file.
 
@@ -134,44 +138,30 @@ Lo stato nell’elenco descrive le prove disponibili e l’azione successiva. No
 | In esecuzione (privilegi non conformi) | L’istanza esiste ma non soddisfa il requisito di amministratore |
 | In attesa dello stato / Possibile arresto | Le prove sono insufficienti o l’uscita è appena avvenuta; nuovo controllo senza avvio duplicato |
 | Avvio / Conto alla rovescia | Il ripristino è confermato e il prossimo tentativo segue la sequenza di attesa |
-| Aggiornamento / Verifica stabilità | L’avvio automatico attende la fine dell’attività e la stabilità dei file |
 | In pausa | I controlli e il ripristino automatici sono sospesi senza chiudere il processo di destinazione |
 | Arrestato / Avvio non riuscito / Tempo scaduto | Il ripristino non è riuscito o richiede conferma; il registro mostra prove e motivo |
 
 I ritardi predefiniti sono 1, 10 e 60 secondi. Esaurita la sequenza rapida, l’ultimo valore viene riutilizzato per evitare un ciclo serrato di avvii. Eliminare, sospendere, cambiare un percorso o annullare invalida vecchie attività e risultati asincroni.
 
-## 4. Protezione durante gli aggiornamenti
-
-La protezione è disattivata per impostazione predefinita e va abilitata per ogni elemento:
-
-1. Fai clic destro sulla destinazione e apri Protezione aggiornamenti.
-2. Attiva il riconoscimento automatico e la protezione dell’avvio.
-3. Controlla l’area di installazione, la finestra di rilevamento dell’uscita, l’attesa di stabilità e l’attesa massima.
-4. Salva e lascia che l’app esegua normalmente un vero aggiornamento. L’assistente combina processi di aggiornamento, relazioni padre-figlio, attività delle cartelle, notifiche dei file e caratteristiche apprese per decidere l’avvio della protezione.
-
-Dopo la conferma, l’avvio automatico resta sospeso. La sorveglianza normale riprende solo quando l’attività termina e i file sono stabili. Se il rilevamento scade o non corrisponde alla realtà, usa Termina attesa e riprendi sorveglianza. La sicurezza del punto di ingresso viene comunque ricontrollata prima del ripristino.
-
-La funzione non è un installatore universale né un gestore di servizi Windows. Per app portatili, updater esterni alla cartella o launcher insoliti, consulta prima il registro e poi adatta area e regole.
-
-## 5. Impostazioni
+## 4. Impostazioni
 
 | Categoria | Opzioni |
 | --- | --- |
-| Generale | Collegamenti Desktop e menu Start, avvio pianificato, due comportamenti all’avvio, lingua, carattere dei contenuti e tema |
-| Sorveglianza e avvio | Intervallo di stato del processo, sequenza di ritardi dopo un arresto anomalo e inclusione delle sottocartelle nell’importazione |
+| Visualizzazione | Lingua dell’interfaccia, carattere dei contenuti e tema |
+| Avvio | Collegamenti Desktop e menu Start, avvio pianificato e due comportamenti all’avvio |
+| Monitoraggio | Intervallo di stato del processo, sequenza di ritardi dopo un arresto anomalo e inclusione delle sottocartelle nell’importazione |
 | Criteri di arresto | Tempi per chiudere app GUI/CLI e autorizzazione alla terminazione forzata dopo la scadenza |
 | Registri | Pulizia all’avvio, limite di visualizzazione, giorni di conservazione dei registri in batch e percorso di salvataggio |
-| Informazioni | Versioni dell’app e dell’ambiente, controllo immediato e collegamento al progetto open source |
 
 La finestra convalida gli intervalli numerici. I commenti di `watchdog.ini` sono accanto alle sezioni e opzioni corrispondenti; preferisci l’interfaccia per non danneggiare i campi codificati. Consulta [Configurazione, backup e ripristino](en/configuration.md).
 
-## 6. Registri, diagnostica e riservatezza
+## 5. Registri, diagnostica e riservatezza
 
 Il Registro di esecuzione consente di selezionare e copiare testo, massimizzare e ridimensionare la finestra. Le barre di scorrimento compaiono solo quando necessarie e il testo non è modificabile.
 
 Per un problema difficile, esporta un pacchetto diagnostico locale dal registro. Contiene riepiloghi di app, Windows, AutoHotkey, DPI, handle delle risorse, fase di sorveglianza, avvisi di configurazione e registro corrente, senza caricamento automatico.
 
-La configurazione personale è in `watchdog.ini` nella directory di esecuzione reale e le sessioni non concluse in `watchdog.maintenance.ini`. Le edizioni portatile e sorgente usano la propria cartella di ingresso; l’EXE autonomo usa sempre `%LOCALAPPDATA%\ProcessWatchdog\Standalone`. Git ignora entrambi i file e nessuna release li include o sovrascrive.
+La configurazione personale è in `watchdog.ini` nella directory di esecuzione reale. Le edizioni portatile e sorgente usano la propria cartella di ingresso. Git ignora questo file e nessuna release lo include o sovrascrive.
 
 Un EXE portatile e un ingresso sorgente condividono lo stato solo nella stessa cartella; l’EXE autonomo non condivide la configurazione con i file accanto al launcher scaricato. Il blocco globale impedisce l’esecuzione simultanea. Collegamenti e attività pianificata puntano all’ultima forma di esecuzione integrata. Consulta [Configurazione, backup e ripristino](en/configuration.md) e [Installazione, aggiornamento e rimozione](en/installation.md).
 
@@ -192,7 +182,7 @@ process-watchdog/
 ├─ assets/                  icone, immagini di donazione e caratteri privati del processo
 ├─ config/                  esempio attuale con commenti vicino alle opzioni
 ├─ docs/                    documenti utente, architettura, lingue, immagini e governance
-├─ src/                     configurazione, nucleo, diagnostica, esecuzione, ispezione, aggiornamenti, piattaforma e UI
+├─ src/                     configurazione, nucleo, diagnostica, esecuzione, ispezione, piattaforma e UI
 ├─ runtime/                 helper di aggiornamento in background per EXE e sorgente
 ├─ tests/                   verifiche del nucleo, GUI, release e repository
 ├─ third_party/             DLL, licenze e manifesti di dipendenze bloccati
@@ -207,7 +197,7 @@ Lo script radice include soltanto i moduli, assembla le dipendenze e avvia l’a
 - Identità della destinazione, punto di avvio e presentazione personalizzata sono indipendenti; la presentazione non può cambiare le decisioni di sorveglianza.
 - `Running`, `Stopped` e `Unknown` sono risultati di prove esterne; il ripristino parte solo dopo la conferma dell’arresto.
 - Timer, callback, osservatori, processi di lavoro, finestre e risorse native devono avere una pulizia idempotente.
-- Istantanee di configurazione, elementi e protezione vengono confermati nella stessa transazione; i test non devono leggere o sovrascrivere il `watchdog.ini` personale.
+- Istantanee di configurazione, elementi vengono confermati nella stessa transazione; i test non devono leggere o sovrascrivere il `watchdog.ini` personale.
 - Lo scorrimento fluido scartato basato su sovrapposizione di schermate GDI non deve tornare; ListView e registro mantengono lo scorrimento nativo.
 - Le dichiarazioni su DPI, icone, modalità scura, gerarchia e accessibilità richiedono prove reali in Windows; l’automazione non sostituisce la matrice fisica.
 

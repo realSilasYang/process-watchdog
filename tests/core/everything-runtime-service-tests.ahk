@@ -14,6 +14,7 @@ class FakeEverythingRuntimeHost {
         this.ExistingFiles.CaseSense := "Off"
         this.Launches := []
         this.NextPID := 4321
+        this.ThrowLaunch := false
     }
 
     CollectCandidates() {
@@ -27,6 +28,8 @@ class FakeEverythingRuntimeHost {
     Launch(path, arguments, options) {
         this.Launches.Push({Path: path, Arguments: arguments,
             Options: options})
+        if this.ThrowLaunch
+            throw Error("startup denied")
         return this.NextPID
     }
 }
@@ -60,6 +63,7 @@ RunEverythingRuntimeServiceTests() {
     startResult := service.StartSilently()
     AssertEverythingRuntime(startResult.Found && startResult.Started
         && startResult.Path == expectedPath && startResult.PID == 4321
+        && InStr(startResult.DiscoverySummary, "采用：")
         && host.Launches.Length == 1
         && host.Launches[1].Arguments == "-startup"
         && host.Launches[1].Options == "Hide",
@@ -70,8 +74,28 @@ RunEverythingRuntimeServiceTests() {
         "已失效的 Everything 缓存路径没有重新验证")
     missingResult := service.StartSilently()
     AssertEverythingRuntime(!missingResult.Found && !missingResult.Started
+        && InStr(missingResult.Failure, "未在注册表")
+        && InStr(missingResult.DiscoverySummary, "已检查")
         && host.Launches.Length == 1,
-        "未找到 Everything 时仍尝试启动进程")
+        "未找到 Everything 时仍尝试启动进程或没有返回可读发现摘要")
+
+    launchFailureHost := FakeEverythingRuntimeHost()
+    launchFailureHost.Candidates := [expectedPath]
+    launchFailureHost.ExistingFiles[expectedPath] := true
+    launchFailureHost.ThrowLaunch := true
+    launchFailureService := EverythingRuntimeService({
+        CollectCandidates: ObjBindMethod(launchFailureHost,
+            "CollectCandidates"),
+        FileExists: ObjBindMethod(launchFailureHost, "FileExists"),
+        Launch: ObjBindMethod(launchFailureHost, "Launch")
+    })
+    launchFailureResult := launchFailureService.StartSilently()
+    AssertEverythingRuntime(launchFailureResult.Found
+        && !launchFailureResult.Started
+        && launchFailureResult.Path == expectedPath
+        && launchFailureResult.Failure == "startup denied"
+        && InStr(launchFailureResult.DiscoverySummary, expectedPath),
+        "Everything 启动失败时没有保留路径、失败原因和发现摘要")
 
     AssertEverythingRuntime(
         service.NormalizeExecutableCandidate(

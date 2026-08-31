@@ -3,8 +3,8 @@
 ; 只接管每个菜单项的尺寸与像素绘制，让字号、行距和深浅色外观可由应用统一控制。
 
 class ContextMenuPresenter {
-    static FontSizePt := 10
-    static ItemHeightDip := 30
+    static FontSizePt := 11
+    static ItemHeightDip := 32
     static SeparatorHeightDip := 10
     static OuterVerticalPaddingDip := 5
     static HorizontalPaddingDip := 12

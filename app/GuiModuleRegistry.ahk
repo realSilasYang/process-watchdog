@@ -6,17 +6,21 @@ class GuiModuleRegistry {
     __New(mainGui) {
         this.display := CustomDisplayDialog(mainGui)
         this.environment := EnvironmentSettingsDialog(mainGui)
-        this.maintenance := MaintenanceSettingsDialog(mainGui)
         this.log := LogWindow(mainGui)
         this.batchOutputLogNotice := BatchOutputLogNoticeWindow(mainGui)
         this.settings := SettingsWindow(mainGui)
+        this.about := AboutWindow(mainGui)
         this.help := HelpWindow(mainGui)
         this.supportInfo := SupportInfoWindow(mainGui)
         this.donation := DonationWindow(mainGui)
         this.addItem := AddItemDialog(mainGui)
         this.tooltip := DarkTooltipWindow()
         this.historyToast := HistoryToastWindow()
+        this.targetRelocation := TargetRelocationPrompt(mainGui)
         this.stopped := false
+        if App.HasOwnProp("targetRelocationService")
+            SetTimer(ObjBindMethod(App.targetRelocationService,
+                "RedeliverPending"), -1)
     }
 
     HideTransientWindows() {
@@ -34,14 +38,15 @@ class GuiModuleRegistry {
         try this.log.Close()
         try this.batchOutputLogNotice.Close()
         try this.settings.Close()
+        try this.donation.Close()
+        try this.about.Close()
         try this.help.Close()
         try this.supportInfo.Close()
-        try this.donation.Close()
         try this.display.Close()
         try this.environment.Close()
-        try this.maintenance.Close()
         try this.tooltip.Close()
         try this.historyToast.Close()
+        try this.targetRelocation.Shutdown()
     }
 }
 
@@ -113,6 +118,7 @@ FormatRuntimeErrorDetails(runtimeError) {
 
 ShutdownApplicationUi(*) {
     try SetTimer(UpdateCountdownUI, 0)
+    try ShutdownMainListSmoothScroll()
     try ShutdownContextMenuPresenter()
     if IsSet(App) {
         dpiRebuildTimer := App.iconResources.CancelDpiRebuild()
@@ -125,6 +131,8 @@ ShutdownApplicationUi(*) {
         try App.fileScanner.Shutdown()
     if !IsSet(Main)
         return
+    if Main.contextPopup
+        try Main.contextPopup.Dispose()
     if Main.listSelectionPresenter
         try Main.listSelectionPresenter.Dispose()
     try UnregisterGuiControls(Main.gui.Hwnd)
@@ -170,13 +178,14 @@ ReleaseApplicationMutex() {
 }
 
 ShutdownApplicationResources(*) {
+    if IsSet(App) && App.HasOwnProp("manualStopReconcileTimer")
+        try SetTimer(App.manualStopReconcileTimer, 0)
     if App.appsDirty
         try SaveAppsToIni(false)
     try SetTimer(App.configSaveRetryTimer, 0)
     try App.ClearPendingProcessSnapshot()
     try App.applicationUpdateService.Shutdown()
     try App.svgRenderer.Shutdown()
-    try LocalizationService.ShutdownUiFonts()
     ReleaseApplicationMutex()
     try ReleaseWindowIcons(A_ScriptHwnd)
 }

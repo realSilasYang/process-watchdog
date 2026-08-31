@@ -1,4 +1,6 @@
 <div align="center">
+  <img src="../assets/app/watchdog-logo.png" width="112" alt="Biểu trưng Process Watchdog Assistant">
+
   <p><a href="../README.md">简体中文</a> · <a href="./README.zh-HK.md">繁體中文（香港）</a> · <a href="./README.zh-TW.md">繁體中文（台灣）</a> · <a href="./README.en.md">English</a> · <a href="./README.ja.md">日本語</a> · <strong>Tiếng Việt</strong> · <a href="./README.ko.md">한국어</a> · <a href="./README.es.md">Español</a> · <a href="./README.fr.md">Français</a> · <a href="./README.pt-BR.md">Português</a> · <a href="./README.ru.md">Русский</a> · <a href="./README.de.md">Deutsch</a> · <a href="./README.it.md">Italiano</a></p>
 
   <h1>Trợ lý giám sát tiến trình</h1>
@@ -28,27 +30,29 @@ Trợ lý giám sát tiến trình dành cho các ứng dụng, tập lệnh và
 
 Trợ lý không chỉ dựa vào tên tiến trình. Nó kết hợp đường dẫn đầy đủ, danh tính tạo tiến trình, đích thật của lối tắt và bằng chứng dòng lệnh. Nếu bằng chứng chưa đủ, trợ lý sẽ chờ lần kiểm tra tiếp theo thay vì coi trạng thái chưa rõ là đã dừng.
 
-Dự án có giao diện sáng và tối, khôi phục tự động, bảo vệ khi cập nhật phần mềm, nhật ký chạy, hoàn tác và làm lại, tên và biểu tượng hiển thị tùy chỉnh, cùng gói Windows x64 có SPDX SBOM, tổng kiểm SHA-256 và thông tin nguồn gốc bản dựng.
-
+Dự án có giao diện sáng và tối, khôi phục tự động, nhật ký chạy, hoàn tác và làm lại, tên và biểu tượng hiển thị tùy chỉnh, cùng gói Windows x64 có SPDX SBOM, tổng kiểm SHA-256 và thông tin nguồn gốc bản dựng.
 # Tổng quan giao diện
 
 <p align="center">
-  <img src="images/process-watchdog-overview.png" alt="Cửa sổ chính của Process Watchdog Assistant" width="100%">
+  <img src="images/process-watchdog-overview.png" alt="Cửa sổ chính giao diện tối của Process Watchdog Assistant" width="100%">
 </p>
 
-Cửa sổ chính hiển thị thứ tự mục giám sát, biểu tượng ứng dụng, tên, yêu cầu đặc quyền và trạng thái hiện tại. Thanh lệnh có các thao tác Thêm, Xóa, Tạm dừng, Cài đặt, Thông tin trợ giúp và Ủng hộ; từ Thông tin trợ giúp có thể mở hướng dẫn hoặc nhật ký chạy. Thanh dưới cùng tổng hợp số mục đang chạy, đang khôi phục, đang cập nhật, tạm dừng và thất bại; nhật ký giải thích bằng chứng đứng sau từng trạng thái bất thường.
+<p align="center">
+  <img src="images/process-watchdog-overview-light.png" alt="Cửa sổ chính của Process Watchdog Assistant" width="100%">
+</p>
+
+Cửa sổ chính hiển thị thứ tự đối tượng giám sát, biểu tượng ứng dụng, tên, yêu cầu đặc quyền và trạng thái hiện tại. Thanh lệnh có Thêm, Xóa, Tạm dừng, Cài đặt, Trợ giúp và Giới thiệu; Trợ giúp mở hướng dẫn, nhật ký chạy hoặc trang phản hồi, còn Giới thiệu tập hợp phiên bản, môi trường chạy, cập nhật, dự án và Ủng hộ. Thanh dưới cùng tổng hợp số đối tượng đang chạy, đang khôi phục, tạm dừng và thất bại; nhật ký giải thích bằng chứng đứng sau từng trạng thái bất thường.
 
 ## Điểm nổi bật
 
 - Giám sát đích EXE, AHK, Python, JavaScript, PowerShell, BAT, CMD và LNK.
 - Dùng ba kết quả `Running`, `Stopped`, `Unknown`; trạng thái chưa rõ không bao giờ tự động kích hoạt khởi động lại mù quáng.
 - Mỗi đích có bộ điều khiển, thế hệ và mã tác vụ riêng; lệnh gọi lại cũ bị vô hiệu ngay sau khi tạm dừng, xóa hoặc đổi đường dẫn.
-- Có thể yêu cầu quyền quản trị. Trợ lý báo khi tiến trình đang chạy không đủ quyền và sẽ nâng quyền khi người dùng khởi động lại thủ công.
-- Bảo vệ khi cập nhật mặc định tắt. Khi bật, trợ lý kết hợp tiến trình cập nhật, quan hệ cha con, hoạt động thư mục cài đặt và độ ổn định của tệp trước khi tạm dừng hoặc tiếp tục giám sát.
+- Có thể yêu cầu quyền quản trị. Trợ lý báo khi tiến trình đang chạy không đủ quyền và sẽ nâng quyền cho lần khởi chạy được giám sát tiếp theo.
 - Thay thế cấu hình theo giao dịch nguyên tử. Bản ghi không phân tích được sẽ chuyển vào `[Recovery]` thay vì bị bỏ mất.
 - Tìm ứng dụng chỉ qua dịch vụ Everything, không quét toàn bộ ổ đĩa bằng cơ chế tích hợp và không giới hạn số kết quả. Tập kết quả lớn được thêm theo từng đợt ngắn để việc lấy biểu tượng không làm treo giao diện.
-- Hỗ trợ tiếng Trung giản thể, tiếng Trung phồn thể Hồng Kông, tiếng Trung phồn thể Đài Loan, tiếng Anh, tiếng Nhật, tiếng Việt, tiếng Hàn, tiếng Tây Ban Nha, tiếng Pháp, tiếng Bồ Đào Nha Brazil, tiếng Nga, tiếng Đức và tiếng Ý. Mặc định giao diện theo ngôn ngữ Windows, ngôn ngữ chưa hỗ trợ sẽ dùng tiếng Anh; người dùng cũng có thể chọn trong mục Chung. Thay đổi ngôn ngữ và phông nội dung có hiệu lực ngay trong tiến trình hiện tại, không dừng hay khởi tạo lại tác vụ giám sát.
-- Ở chế độ “Theo mặc định của ngôn ngữ”, trợ lý ưu tiên PingFang, SF Pro Text, Harano Aji Gothic hoặc Apple SD Gothic Neo. Nếu máy chưa cài, tài nguyên đi kèm có giấy phép thương mại hoặc OFL được nạp riêng cho tiến trình, sau đó mới lui về họ Noto tương ứng. Phông nội dung áp dụng cho phần thân, ô nhập, danh sách và thông tin Giới thiệu; nút, thẻ Cài đặt và thanh trạng thái cửa sổ chính luôn dùng phông UI Windows in đậm tương ứng với ngôn ngữ hiện tại.
+- Hỗ trợ tiếng Trung giản thể, tiếng Trung phồn thể Hồng Kông, tiếng Trung phồn thể Đài Loan, tiếng Anh, tiếng Nhật, tiếng Việt, tiếng Hàn, tiếng Tây Ban Nha, tiếng Pháp, tiếng Bồ Đào Nha Brazil, tiếng Nga, tiếng Đức và tiếng Ý. Mặc định giao diện theo ngôn ngữ Windows, ngôn ngữ chưa hỗ trợ sẽ dùng tiếng Anh; người dùng cũng có thể chọn trong mục Hiển thị. Thay đổi ngôn ngữ và phông nội dung có hiệu lực ngay trong tiến trình hiện tại, không dừng hay khởi tạo lại tác vụ giám sát.
+- Ở chế độ “Theo mặc định của ngôn ngữ”, trợ lý chỉ dùng phông đã cài trong Windows: thử PingFang, SF Pro Text, Harano Aji Gothic hoặc Apple SD Gothic Neo trước, rồi đến họ Noto tương ứng và cuối cùng là phông hệ thống Windows. Phông tùy chọn phải được cài vào Windows trước; trợ lý không nạp riêng phông từ thư mục của mình. Phông nội dung áp dụng cho phần thân, ô nhập, danh sách và thông tin Giới thiệu; nút, thẻ Cài đặt và thanh trạng thái cửa sổ chính luôn dùng phông UI Windows in đậm tương ứng với ngôn ngữ hiện tại.
 - Giao diện sáng/tối hỗ trợ thu nhỏ cửa sổ con độc lập, dựng lại biểu tượng theo DPI, nút bo góc và biểu tượng tùy chỉnh.
 - Gói chẩn đoán chỉ được tạo trên máy và không tự tải lên; hiện vật phát hành chính thức có thể được xác minh độc lập.
 
@@ -66,14 +70,14 @@ Phù hợp với ứng dụng, tập lệnh và lối tắt thông thường c�
 ---
 
 **[Hướng dẫn sử dụng](#hướng-dẫn-sử-dụng)**<br>
-[Cài đặt](#1-cài-đặt-và-lần-chạy-đầu) · [Quản lý mục](#2-thêm-và-quản-lý-mục) · [Trạng thái](#3-trạng-thái-và-khôi-phục) · [Bảo vệ cập nhật](#4-bảo-vệ-khi-cập-nhật) · [Cài đặt](#5-cài-đặt) · [Nhật ký](#6-nhật-ký-chẩn-đoán-và-quyền-riêng-tư)
+[Cài đặt](#1-cài-đặt-và-lần-chạy-đầu) · [Quản lý mục](#2-thêm-và-quản-lý-mục) · [Trạng thái](#3-trạng-thái-và-khôi-phục) · [Cài đặt](#4-cài-đặt) · [Nhật ký](#5-nhật-ký-chẩn-đoán-và-quyền-riêng-tư)
 
 **[Hướng dẫn dành cho nhà phát triển](#hướng-dẫn-dành-cho-nhà-phát-triển)**<br>
 [Thư mục](#1-thư-mục-và-trách-nhiệm) · [Ranh giới đúng đắn](#2-ranh-giới-đúng-đắn) · [Xác minh](#3-lệnh-xác-minh) · [Phát hành](#4-phát-hành-và-đóng-góp)
 
 # Ủng hộ dự án
 
-Trợ lý giám sát tiến trình sẽ luôn là phần mềm nguồn mở. Việc bảo trì lâu dài phụ thuộc vào sự ủng hộ và động viên của cộng đồng. Nếu trợ lý đã giúp bạn tiết kiệm thời gian tìm lỗi hoặc khôi phục ứng dụng, bạn có thể tự nguyện ủng hộ bằng một trong hai mã QR dưới đây. Khoản ủng hộ được dùng cho bảo trì, kiểm thử tương thích và các bản phát hành tiếp theo.
+Nếu trợ lý đã giúp bạn tiết kiệm thời gian tìm lỗi hoặc khôi phục ứng dụng, hãy ủng hộ tác giả qua một trong hai mã QR dưới đây. Vui lòng chọn cách ủng hộ:
 
 <p align="center">
   <img src="../assets/donate/微信个人收款码.png" width="220" alt="Mã QR ủng hộ qua WeChat Pay">
@@ -85,11 +89,11 @@ Trợ lý giám sát tiến trình sẽ luôn là phần mềm nguồn mở. Vi�
 
 ## 1. Cài đặt và lần chạy đầu
 
-1. Trong [Releases](https://github.com/realSilasYang/process-watchdog/releases), hãy chọn một trong ba bản: EXE độc lập, ZIP di động đầy đủ hoặc ZIP mã nguồn đầy đủ.
-2. EXE độc lập không cần AutoHotkey và ở lần chạy đầu sẽ cài phần tải đã xác minh vào `%LOCALAPPDATA%\ProcessWatchdog\Standalone`; ZIP di động chạy trong thư mục được giải nén đầy đủ; ZIP mã nguồn cần AutoHotkey v2 x64.
+1. Trong [Releases](https://github.com/realSilasYang/process-watchdog/releases), hãy chọn ZIP di động đầy đủ hoặc ZIP mã nguồn đầy đủ. Gói phông chữ tùy chọn không phải là phiên bản chương trình thứ ba.
+2. ZIP di động chạy sau khi giải nén đầy đủ và không cần cài AutoHotkey riêng; ZIP mã nguồn cần AutoHotkey v2 x64. Phông chữ phải được cài vào Windows nhưng không bắt buộc để chạy chương trình; tìm kiếm ứng dụng cũng cần [Everything chính thức mới nhất](https://www.voidtools.com/downloads/).
 3. Chạy `进程守护小助手.exe`. Ứng dụng yêu cầu quyền quản trị, sau đó hiển thị cửa sổ chính hoặc nằm trong khay hệ thống tùy cài đặt.
 4. Chọn Thêm để chọn đích, hoặc kéo tệp được hỗ trợ vào cửa sổ chính.
-5. Mở Nhật ký để xem bằng chứng danh tính, kiểm tra trạng thái, lần thử khôi phục và tín hiệu cập nhật thực tế.
+5. Mở Nhật ký để xem bằng chứng danh tính, kiểm tra trạng thái, lần thử khôi phục thực tế.
 
 Để chạy từ mã nguồn, hãy cài AutoHotkey v2 x64 rồi chạy `进程守护小助手.ahk`. Nếu sao chép kho mã bằng Git, bạn cũng phải cài Git LFS và chạy `git lfs pull` để nhận tệp phông chữ đầy đủ thay vì tệp con trỏ LFS. Gói ZIP mã nguồn đính kèm Release đã chứa các tài nguyên này nên không cần Git LFS. Bản phát hành chính thức đã nhúng môi trường AutoHotkey vượt qua toàn bộ kiểm thử, nên người dùng thông thường không cần cài AutoHotkey riêng.
 
@@ -112,13 +116,13 @@ Trợ lý giám sát tiến trình sẽ luôn là phần mềm nguồn mở. Vi�
 | Thêm | Chọn đích, tìm ứng dụng đã cài hoặc nhập thư mục; mặc định bao gồm thư mục con |
 | Xóa | Xóa các mục đã chọn; hỗ trợ chọn nhiều và hoàn tác |
 | Tạm dừng / Tiếp tục | Chỉ đổi trạng thái giám sát tự động, không đóng đích đang chạy; lựa chọn hỗn hợp được đảo từng mục |
-| Cài đặt | Cấu hình Chung, Giám sát & khởi chạy, Chính sách dừng, Nhật ký và Giới thiệu |
-| Thông tin trợ giúp | Chọn hướng dẫn tích hợp, nhật ký chạy hoặc trang phản hồi GitHub |
-| Ủng hộ | Hiện mã QR WeChat Pay và Alipay để hỗ trợ bảo trì |
+| Cài đặt | Cấu hình Hiển thị, Khởi động, Giám sát, Chính sách dừng và Nhật ký |
+| Trợ giúp | Chọn hướng dẫn tích hợp, nhật ký chạy hoặc trang phản hồi GitHub |
+| Giới thiệu | Xem phiên bản và môi trường chạy, kiểm tra cập nhật, mở dự án hoặc chuyển đến Ủng hộ |
 
 Mỗi mục có thể đặt tệp vào để khởi chạy, thư mục làm việc, đối số và yêu cầu quyền quản trị. LNK vẫn là tệp khởi chạy, còn đường dẫn chương trình thật được lưu riêng để nhận diện tiến trình; vì vậy không cần thay lối tắt gián tiếp do trình cài đặt tạo bằng một EXE nội bộ dễ thay đổi.
 
-Nhấp phải một mục để mở vị trí tệp, khởi động lại, sửa đường dẫn, cấu hình nhận diện tiến trình và thiết lập khởi chạy; thay đổi yêu cầu quản trị; cấu hình bảo vệ cập nhật; hoặc tùy chỉnh tên và biểu tượng chỉ dùng trong cửa sổ chính. Tùy chỉnh hiển thị không ảnh hưởng đến danh tính đích, cách khởi chạy hay bảo vệ cập nhật. Nếu hiển thị đang là mặc định, thao tác khôi phục mặc định sẽ bị vô hiệu.
+Nhấp phải một mục để mở vị trí tệp, kết thúc chạy đích, sửa đường dẫn, cấu hình nhận diện tiến trình và thiết lập khởi chạy, thay đổi yêu cầu quản trị hoặc tùy chỉnh tên và biểu tượng chỉ dùng trong cửa sổ chính. Kết thúc chạy cũng tạm dừng giám sát để đích không tự khởi động lại. Tùy chỉnh hiển thị không ảnh hưởng đến danh tính đích hay cách khởi chạy. Nếu hiển thị đang là mặc định, thao tác khôi phục mặc định sẽ bị vô hiệu.
 
 Chỉ mục BAT và CMD mới hiện thêm lệnh Xem nhật ký đầu ra của tập lệnh; các loại đích khác không hiện lệnh này. Tệp nhật ký riêng chỉ được tạo khi trợ lý thực sự khởi chạy mục đó và thu cả đầu ra chuẩn lẫn lỗi chuẩn. Một tiến trình tập lệnh đã chạy sẵn sẽ không tự động có tệp này.
 
@@ -134,44 +138,30 @@ Trạng thái trong danh sách mô tả bằng chứng hiện có và bước ti
 | Đang chạy (không khớp quyền) | Tiến trình tồn tại nhưng không đáp ứng yêu cầu quản trị đã đặt |
 | Đang chờ trạng thái / Có thể đã dừng | Bằng chứng chưa đủ hoặc vừa thấy tiến trình thoát; trợ lý đang kiểm tra lại và không khởi chạy trùng ngay |
 | Đang khởi chạy / Đếm ngược thử lại | Đã xác nhận cần khôi phục và đang chờ lần thử tiếp theo theo chuỗi độ trễ |
-| Đang cập nhật / Xác nhận độ ổn định của tệp | Bảo vệ cập nhật tạm dừng tự động khởi chạy cho đến khi hoạt động kết thúc và tệp ổn định |
 | Đã tạm dừng | Tạm dừng kiểm tra và khôi phục tự động nhưng không đóng tiến trình đích |
 | Đã dừng / Khởi chạy thất bại / Hết thời gian chờ | Khôi phục chưa thành công hoặc cần xác nhận; xem nhật ký để biết bằng chứng và nguyên nhân |
 
 Chuỗi độ trễ thử lại mặc định là 1, 10 và 60 giây. Sau chuỗi nhanh, độ trễ cuối được dùng lại để tránh vòng lặp khởi chạy liên tục. Xóa, tạm dừng, đổi đường dẫn hoặc hoàn tác sẽ vô hiệu tác vụ đã lên lịch và kết quả bất đồng bộ cũ.
 
-## 4. Bảo vệ khi cập nhật
-
-Bảo vệ khi cập nhật mặc định tắt và phải được bật riêng cho từng mục:
-
-1. Nhấp phải đích và mở Bảo vệ khi cập nhật.
-2. Bật tự động nhận biết cập nhật và bảo vệ quá trình khởi chạy.
-3. Kiểm tra phạm vi cài đặt, cửa sổ phát hiện thoát, thời gian chờ ổn định tệp và thời gian chờ cập nhật tối đa.
-4. Lưu rồi để ứng dụng thực hiện một lần cập nhật thật theo cách bình thường. Trợ lý kết hợp tiến trình cập nhật, quan hệ cha con, hoạt động thư mục, thông báo tệp và đặc điểm trình cập nhật đã học để quyết định bắt đầu bảo vệ.
-
-Sau khi xác nhận cập nhật, tự động khởi chạy được tạm giữ. Giám sát chỉ tiếp tục khi hoạt động đã kết thúc và tệp đích ổn định. Nếu phát hiện hết thời gian hoặc sai thực tế, dùng Kết thúc chờ cập nhật và tiếp tục giám sát. Trợ lý vẫn kiểm tra tệp vào có an toàn trước khi khôi phục.
-
-Đây không phải trình cài đặt đa năng hay công cụ quản lý dịch vụ Windows. Với ứng dụng di động, trình cập nhật nằm ngoài thư mục cài đặt hoặc trình khởi chạy đặc biệt, hãy xem nhật ký trước khi chỉnh phạm vi và quy tắc.
-
-## 5. Cài đặt
+## 4. Cài đặt
 
 | Nhóm | Tùy chọn |
 | --- | --- |
-| Chung | Lối tắt Màn hình nền và menu Bắt đầu, tác vụ tự khởi động, hai hành vi khi khởi động, ngôn ngữ, phông nội dung và chủ đề |
-| Giám sát & khởi chạy | Khoảng kiểm tra tiến trình, chuỗi độ trễ tự khởi động lại sau sự cố và việc bao gồm thư mục con khi nhập |
+| Hiển thị | Ngôn ngữ giao diện, phông nội dung và chủ đề |
+| Khởi động | Lối tắt Màn hình nền và menu Bắt đầu, tác vụ tự khởi động và hai hành vi khi khởi động |
+| Giám sát | Khoảng kiểm tra tiến trình, chuỗi độ trễ tự khởi động lại sau sự cố và việc bao gồm thư mục con khi nhập |
 | Chính sách dừng | Thời gian chờ đóng ứng dụng GUI/CLI và quyền buộc kết thúc sau khi hết thời gian |
 | Nhật ký | Xóa khi khởi động, giới hạn mục hiển thị, số ngày giữ nhật ký hàng loạt và đường dẫn lưu |
-| Giới thiệu | Phiên bản ứng dụng/môi trường, kiểm tra cập nhật ngay và liên kết dự án nguồn mở |
 
 Cửa sổ cài đặt kiểm tra phạm vi số. Chú thích trong `watchdog.ini` nằm bên cạnh đúng phần và mục tương ứng; nên dùng giao diện để tránh làm hỏng trường đã mã hóa. Xem [Cấu hình, sao lưu và khôi phục](en/configuration.md).
 
-## 6. Nhật ký, chẩn đoán và quyền riêng tư
+## 5. Nhật ký, chẩn đoán và quyền riêng tư
 
 Nhật ký chạy cho phép chọn và sao chép văn bản, phóng to và đổi kích thước. Thanh cuộn chỉ hiện khi cần và nội dung nhật ký không thể sửa.
 
 Với lỗi khó xác định, có thể xuất gói chẩn đoán cục bộ từ cửa sổ nhật ký. Gói này có thông tin ứng dụng, Windows, AutoHotkey, DPI, handle tài nguyên, giai đoạn giám sát, cảnh báo cấu hình và tóm tắt nhật ký hiện tại, nhưng không tự tải lên.
 
-Cấu hình cá nhân nằm trong `watchdog.ini` ở thư mục chạy thực tế; phiên cập nhật chưa hoàn tất nằm trong `watchdog.maintenance.ini` cùng nơi. Bản di động và mã nguồn dùng thư mục tệp vào của chúng; EXE độc lập luôn dùng `%LOCALAPPDATA%\ProcessWatchdog\Standalone`. Cả hai tệp bị Git bỏ qua và không có trong bản phát hành.
+Cấu hình cá nhân nằm trong `watchdog.ini` ở thư mục chạy thực tế. Bản di động và mã nguồn dùng thư mục tệp vào của chúng. Tệp này bị Git bỏ qua và không có trong bản phát hành.
 
 EXE di động và tệp vào mã nguồn chỉ dùng chung trạng thái khi ở cùng thư mục; EXE độc lập không dùng cấu hình cạnh tệp khởi động đã tải xuống. Khóa toàn máy ngăn nhiều hình thức chạy cùng lúc; lối tắt và tác vụ theo lịch trỏ tới hình thức chạy thực tế được tích hợp gần nhất. Xem [Cấu hình, sao lưu và khôi phục](en/configuration.md) và [Cài đặt, nâng cấp và gỡ bỏ](en/installation.md).
 
@@ -192,7 +182,7 @@ process-watchdog/
 ├─ assets/                  biểu tượng, ảnh ủng hộ và phông nạp riêng
 ├─ config/                  cấu hình mẫu hiện tại có chú thích tại chỗ
 ├─ docs/                    tài liệu người dùng, kiến trúc, đa ngôn ngữ, hình ảnh và quản trị
-├─ src/                     cấu hình, lõi, chẩn đoán, thực thi, kiểm tra, bảo vệ cập nhật, nền tảng, UI và tự cập nhật
+├─ src/                     cấu hình, lõi, chẩn đoán, thực thi, kiểm tra, nền tảng, UI và tự cập nhật
 ├─ runtime/                 trình hỗ trợ cập nhật nền dùng chung cho EXE và mã nguồn
 ├─ tests/                   kiểm thử lõi, GUI, phát hành và kho mã
 ├─ third_party/             DLL, giấy phép và danh mục phụ thuộc đã khóa
@@ -207,7 +197,7 @@ Tập lệnh gốc chỉ nạp mô-đun, nối phụ thuộc và khởi động 
 - Danh tính đích, tệp khởi chạy và tùy chỉnh hiển thị độc lập; cài đặt hiển thị không được thay đổi quyết định giám sát.
 - `Running`, `Stopped`, `Unknown` là kết quả bằng chứng bên ngoài; chỉ trạng thái dừng đã xác nhận mới được vào quy trình khôi phục.
 - Mọi bộ hẹn giờ, lệnh gọi lại, trình theo dõi tệp, tiến trình làm việc, cửa sổ và tài nguyên gốc đều phải có đường dọn dẹp lặp lại an toàn.
-- Ảnh chụp cấu hình, mục giám sát và cài đặt bảo vệ cập nhật được xác nhận trong cùng một giao dịch; kiểm thử không được đọc hay ghi đè `watchdog.ini` cá nhân.
+- Ảnh chụp cấu hình, đối tượng giám sát được xác nhận trong cùng một giao dịch; kiểm thử không được đọc hay ghi đè `watchdog.ini` cá nhân.
 - Không đưa lại cách cuộn mượt bằng ảnh chụp GDI đã bị loại bỏ; ListView và nhật ký giữ cuộn gốc.
 - Tuyên bố về DPI, biểu tượng, chế độ tối, phân cấp cửa sổ và khả năng tiếp cận phải có bằng chứng trên Windows và tỷ lệ thật; tự động hóa không thay thế ma trận màn hình vật lý.
 

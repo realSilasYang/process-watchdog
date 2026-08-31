@@ -2,7 +2,7 @@
 #Warn All, StdOut
 
 ; 验证目标文件指纹、可启动性、稳定时间与安装目录归属。
-; 文件替换中的短暂缺失和读取失败必须作为不确定证据，不能提前结束升级保护。
+; 文件替换中的短暂缺失和读取失败必须作为不确定证据。
 
 #Include ..\..\src\Platform\Win32.ahk
 #Include ..\..\src\Inspection\TargetFileInspector.ahk
@@ -39,6 +39,7 @@ RunTargetFileInspectorTests() {
     inspector := CreateTargetFileInspectorForTest()
     testId := DllCall("kernel32\GetCurrentProcessId", "UInt")
     scriptPath := A_Temp "\watchdog-target-file-" testId ".ahk"
+    renamedScriptPath := A_Temp "\watchdog-target-file-renamed-" testId ".ahk"
     sameSizePath := A_Temp "\watchdog-target-same-size-" testId ".ahk"
     emptyPath := A_Temp "\watchdog-target-empty-" testId ".ahk"
     damagedExePath := A_Temp "\watchdog-target-damaged-" testId ".exe"
@@ -46,7 +47,7 @@ RunTargetFileInspectorTests() {
     directoryPath := A_Temp "\watchdog-target-directory-" testId ".exe"
     try {
         for path in [scriptPath, sameSizePath, emptyPath, damagedExePath,
-            missingPath]
+            missingPath, renamedScriptPath]
             try FileDelete(path)
         try DirDelete(directoryPath)
         FileAppend("#Requires AutoHotkey v2.0`n", scriptPath, "UTF-8")
@@ -64,17 +65,28 @@ RunTargetFileInspectorTests() {
         FileAppend("; changed`n", scriptPath, "UTF-8")
         secondFingerprint := inspector.GetFingerprint(scriptPath)
         AssertTargetFileInspector(firstFingerprint != "MISSING"
-            && InStr(firstFingerprint, "||")
+            && InStr(firstFingerprint, "|")
             && secondFingerprint != firstFingerprint,
             "文件指纹没有稳定标识文件或检测内容变化")
         sameSizeBefore := inspector.GetFingerprint(sameSizePath)
+        contentBefore := inspector.GetContentSignature(sameSizePath)
+        AssertTargetFileInspector(contentBefore.Available
+            && contentBefore.FileSize == 4
+            && contentBefore.ContentHash
+                == "63C1DD951FFEDF6F7FD968AD4EFA39B8ED584F162F46E715114EE184F8DE9201",
+            "SHA-256 内容身份计算错误")
         Sleep(20)
         sameSizeFile := FileOpen(sameSizePath, "w", "UTF-8-RAW")
         sameSizeFile.Write("BBBB")
         sameSizeFile.Close()
         sameSizeAfter := inspector.GetFingerprint(sameSizePath)
+        contentAfter := inspector.GetContentSignature(sameSizePath)
         AssertTargetFileInspector(sameSizeAfter != sameSizeBefore,
             "同秒同尺寸覆盖没有被高精度文件时间识别")
+        AssertTargetFileInspector(contentAfter.Available
+            && contentAfter.FileSize == contentBefore.FileSize
+            && contentAfter.ContentHash != contentBefore.ContentHash,
+            "同尺寸内容变化没有改变 SHA-256 内容身份")
         AssertTargetFileInspector(
             inspector.GetFingerprint("C:\Link\App.lnk")
                 == inspector.GetFingerprint(A_AhkPath),
@@ -110,9 +122,16 @@ RunTargetFileInspectorTests() {
             && !inspector.IsWithinRoot("C:\Product2\App.exe", "C:\Product")
             && !inspector.IsWithinRoot("", "C:\Product"),
             "路径作用根边界判断错误")
+
+        FileMove(scriptPath, renamedScriptPath)
+        AssertTargetFileInspector(inspector.GetFingerprint(scriptPath)
+                == "MISSING"
+            && inspector.GetFingerprint(renamedScriptPath) != "MISSING",
+            "文件改名后的轻量指纹可用性错误")
+        FileMove(renamedScriptPath, scriptPath)
     } finally {
         for path in [scriptPath, sameSizePath, emptyPath, damagedExePath,
-            missingPath]
+            missingPath, renamedScriptPath]
             try FileDelete(path)
         try DirDelete(directoryPath)
     }

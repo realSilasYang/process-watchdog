@@ -17,24 +17,23 @@ official Release. It does not claim that a source user's local AutoHotkey is the
 latest version. Conversely, updating local AutoHotkey does not change the
 assistant version or its changelog.
 
-## The three downloads
+## The two program editions
 
-| Item | Standalone EXE | Complete portable ZIP | Complete source ZIP |
-| --- | --- | --- | --- |
-| Entry | One-file bootstrapper anywhere; starts the real EXE under local app data | `进程守护小助手.exe` in the fully extracted directory | Local `AutoHotkey64.exe` plus `进程守护小助手.ahk` |
-| AutoHotkey source | Embedded and installed under the stable root | Embedded in the EXE | The AutoHotkey v2 x64 installation on this computer |
-| Separate AutoHotkey installation | Not required | Not required | Required |
-| Assistant automatic update | Updates the inner compiled installation; an older bootstrapper never downgrades it | Updates the compiled files in the extracted directory | Safely fast-forwards a Git checkout or downloads and verifies the source package, then validates and restarts with the same interpreter |
-| AutoHotkey updated with the assistant | Yes | Yes | No; the user maintains the local interpreter separately |
-| Configuration directory | `%LOCALAPPDATA%\ProcessWatchdog\Standalone` | Directory containing the portable EXE | Directory containing the AHK entry |
+| Item | Complete portable ZIP | Complete source ZIP |
+| --- | --- | --- |
+| Entry | `进程守护小助手.exe` in the fully extracted directory | Local `AutoHotkey64.exe` plus `进程守护小助手.ahk` |
+| AutoHotkey source | Embedded in the EXE | The AutoHotkey v2 x64 installation on this computer |
+| Separate AutoHotkey installation | Not required | Required |
+| Assistant automatic update | Updates the compiled files in the extracted directory | Safely fast-forwards a Git checkout or downloads and verifies the source package, then validates and restarts with the same interpreter |
+| AutoHotkey updated with the assistant | Yes | No; the user maintains the local interpreter separately |
+| Configuration directory | Directory containing the portable EXE | Directory containing the AHK entry |
 
-All three downloads run the same functional code and configuration format, but
-state is shared only when the real runtime directory is shared. Files beside the
-downloaded standalone bootstrapper do not participate. A portable EXE and source
+Both program editions run the same functional code and configuration format, but
+state is shared only when the real runtime directory is shared. A portable EXE and source
 entry in one directory share personal state, release resources, and one update
 manifest. A global single-instance lock prevents concurrent forms. Keep long-lived
 installations under different runtime roots and recreate or switch shortcuts and
-the scheduled task from General for the form used every day.
+the scheduled task from Startup for the form used every day.
 
 Automatic update accepts only canonical `major.minor.patch` stable versions and
 requires the target to be newer. It verifies checksums, package form, entry version,
@@ -60,9 +59,9 @@ The workflow then:
    source, computes SHA-256 values, and freezes one `toolchain.resolved.json`.
 4. Uses that one snapshot for core validation, real GUI smoke, resource soaking,
    and two reproducible builds.
-5. Embeds that AutoHotkey runtime only after every gate passes. The three user
-   editions go to GitHub Releases, checksums and the SBOM remain in the complete
-   Actions build artifact, and provenance covers the three user editions.
+5. Embeds that AutoHotkey runtime only after every gate passes. The two program
+   editions and optional font package go to GitHub Releases, checksums and the SBOM
+   remain in the complete Actions artifact, and provenance covers all three assets.
 
 The official EXE therefore contains the latest stable AutoHotkey selected and
 validated when that assistant release began. It does not follow later upstream
@@ -71,8 +70,9 @@ assistant release resolves it again, passes the tests, and publishes a new packa
 
 ## Where users can inspect the versions
 
-- Assistant Settings → About shows the current assistant version, EXE/source
-  form, and actual AutoHotkey runtime; the update-check button is on the same page.
+- Main window → About shows the current assistant version, EXE/source form, and
+  actual AutoHotkey runtime; update checking, the project link, and Donate are on
+  the same child window.
 - The same summary is written to the runtime log at every startup.
 - EXE file properties contain the compiled assistant version; source mode uses
   the `VERSION` file beside the entry script.
@@ -85,3 +85,7 @@ assistant release resolves it again, passes the tests, and publishes a new packa
 Most users should choose the complete Windows x64 ZIP, which needs no separate
 AutoHotkey installation. Choose source mode only when reading, modifying, or
 directly running the AHK source, and maintain AutoHotkey v2 x64 separately.
+The optional font package is not a program edition. After installation into Windows,
+it supplies preferred and Noto fallback families for the existing priority rules.
+Application search requires the [latest official Everything release](https://www.voidtools.com/downloads/);
+`Everything64.dll` is only an IPC client and cannot replace its index and service.

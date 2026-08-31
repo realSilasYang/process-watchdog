@@ -16,9 +16,6 @@ $version = (Get-Content -LiteralPath (Join-Path $projectRoot 'VERSION') `
 $dependencyLock = Get-Content -LiteralPath `
     (Join-Path $projectRoot 'third_party\dependencies.lock.json') `
     -Raw -Encoding UTF8 | ConvertFrom-Json
-$fontMetadata = Get-Content -LiteralPath `
-    (Join-Path $projectRoot 'assets\fonts\metadata.json') `
-    -Raw -Encoding UTF8 | ConvertFrom-Json
 $toolchainLock = Get-Content -LiteralPath $ResolvedToolchainPath `
     -Raw -Encoding UTF8 | ConvertFrom-Json
 $changeLog = Get-Content -LiteralPath (Join-Path $projectRoot 'CHANGELOG.md') `
@@ -73,38 +70,6 @@ foreach ($dependency in $dependencyLock.dependencies) {
         spdxElementId = $applicationId
         relationshipType = 'DEPENDS_ON'
         relatedSpdxElement = $dependencyId
-    }
-}
-
-# 字体虽然位于 assets 而不是 third_party，但会随程序运行并影响界面输出，必须像
-# DLL 一样进入物料清单，避免发行包只校验二进制库却遗漏大体积字体资源。
-foreach ($font in $fontMetadata.fonts) {
-    $index++
-    $fontId = "SPDXRef-Font-$index"
-    $packages += [ordered]@{
-        SPDXID = $fontId
-        name = [string]$font.name
-        versionInfo = [string]$font.version
-        downloadLocation = [string]$font.source
-        filesAnalyzed = $false
-        licenseConcluded = [string]$font.license
-        licenseDeclared = [string]$font.license
-        copyrightText = [string]$font.copyright
-        comment = if ($font.PSObject.Properties.Name -contains
-                'authorization') {
-            [string]$font.authorization
-        } else {
-            'Open font distributed with its complete license text.'
-        }
-        checksums = @([ordered]@{
-            algorithm = 'SHA256'
-            checksumValue = [string]$font.sha256
-        })
-    }
-    $relationships += [ordered]@{
-        spdxElementId = $applicationId
-        relationshipType = 'DEPENDS_ON'
-        relatedSpdxElement = $fontId
     }
 }
 
@@ -200,12 +165,7 @@ $document = [ordered]@{
     }
     packages = $packages
     relationships = $relationships
-    hasExtractedLicensingInfos = @([ordered]@{
-        licenseId = 'LicenseRef-Commercial-Apple-Fonts'
-        name = 'Commercial Apple font redistribution authorization'
-        extractedText = 'The project owner has confirmed commercial authorization to distribute the identified PingFang, SF Pro Text, and Apple SD Gothic Neo files as components of Process Watchdog. The project license does not grant recipients separate extraction, resale, sublicensing, or reuse rights for these fonts.'
-        comment = 'The underlying commercial agreement contains non-public terms. Exact files and hashes are recorded in assets/fonts/metadata.json; the public boundary is documented in assets/fonts/COMMERCIAL-LICENSE-NOTICE.en.md.'
-    })
+    hasExtractedLicensingInfos = @()
 }
 
 $parentDirectory = Split-Path -Parent ([System.IO.Path]::GetFullPath($OutputPath))

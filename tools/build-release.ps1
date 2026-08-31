@@ -4,7 +4,9 @@
 
 [CmdletBinding()]
 param(
-    [string]$OutputDirectory = "",
+    [Parameter(Mandatory)]
+    [ValidateNotNullOrEmpty()]
+    [string]$OutputDirectory,
     [string]$AutoHotkeyPath = "",
     [string]$CompilerPath = "",
     [string]$AutoHotkeySourcePath = "",
@@ -33,11 +35,7 @@ function Write-CanonicalJson {
 }
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$outputRoot = if ($OutputDirectory) {
-    [System.IO.Path]::GetFullPath($OutputDirectory)
-} else {
-    Join-Path $projectRoot 'dist'
-}
+$outputRoot = [System.IO.Path]::GetFullPath($OutputDirectory)
 $version = (Get-Content -LiteralPath (Join-Path $projectRoot 'VERSION') `
     -Raw -Encoding UTF8).Trim()
 if ($version -notmatch `
@@ -141,19 +139,28 @@ New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
 $packageName = "process-watchdog-$version-windows-x64"
 $packageDirectory = Assert-OutputPath (Join-Path $outputRoot $packageName)
 $zipPath = Assert-OutputPath (Join-Path $outputRoot "$packageName.zip")
-$standaloneExecutablePath = Assert-OutputPath `
-    (Join-Path $outputRoot "$packageName.exe")
 $sourcePackageName = "process-watchdog-$version-source"
 $sourcePackageDirectory = Assert-OutputPath `
     (Join-Path $outputRoot $sourcePackageName)
 $sourceZipPath = Assert-OutputPath `
     (Join-Path $outputRoot "$sourcePackageName.zip")
-$standaloneSbomPath = Assert-OutputPath `
+$fontPackageName = "fonts"
+$fontPackageDirectory = Assert-OutputPath `
+    (Join-Path $outputRoot $fontPackageName)
+$fontZipPath = Assert-OutputPath `
+    (Join-Path $outputRoot "$fontPackageName.zip")
+$releaseSbomPath = Assert-OutputPath `
     (Join-Path $outputRoot "$packageName.spdx.json")
 $checksumsPath = Assert-OutputPath (Join-Path $outputRoot 'SHA256SUMS.txt')
-foreach ($path in @($packageDirectory, $zipPath, $standaloneExecutablePath,
-        $sourcePackageDirectory, $sourceZipPath, $standaloneSbomPath,
-        $checksumsPath)) {
+$obsoleteSingleFileExecutablePath = Assert-OutputPath (Join-Path $outputRoot "$packageName.exe")
+$obsoleteVersionedFontDirectory = Assert-OutputPath `
+    (Join-Path $outputRoot "process-watchdog-$version-fonts")
+$obsoleteVersionedFontZipPath = Assert-OutputPath `
+    (Join-Path $outputRoot "process-watchdog-$version-fonts.zip")
+foreach ($path in @($packageDirectory, $zipPath, $sourcePackageDirectory,
+        $sourceZipPath, $fontPackageDirectory, $fontZipPath,
+        $releaseSbomPath, $checksumsPath, $obsoleteSingleFileExecutablePath,
+        $obsoleteVersionedFontDirectory, $obsoleteVersionedFontZipPath)) {
     if (Test-Path -LiteralPath $path) {
         [void](Assert-OutputPath $path)
         Remove-Item -LiteralPath $path -Recurse -Force
@@ -310,6 +317,12 @@ foreach ($directory in @('assets', 'config', 'docs', 'runtime',
     Copy-Item -LiteralPath (Join-Path $projectRoot $directory) `
         -Destination $packageDirectory -Recurse
 }
+# 字体是独立的可选下载。程序只使用 Windows 已安装字体，两个程序包都不能
+# 暗中保留字体副本。
+$packagedFontDirectory = Join-Path $packageDirectory 'assets\fonts'
+if (Test-Path -LiteralPath $packagedFontDirectory) {
+    Remove-Item -LiteralPath $packagedFontDirectory -Recurse -Force
+}
 $packageCommunityDirectory = Join-Path $packageDirectory '.github'
 New-Item -ItemType Directory -Force `
     -Path $packageCommunityDirectory | Out-Null
@@ -376,7 +389,7 @@ $packageSbomPath = Join-Path $packageDirectory 'SBOM.spdx.json'
 & (Join-Path $PSScriptRoot 'generate-sbom.ps1') `
     -OutputPath $packageSbomPath `
     -ResolvedToolchainPath $resolvedToolchainPath
-Copy-Item -LiteralPath $packageSbomPath -Destination $standaloneSbomPath
+Copy-Item -LiteralPath $packageSbomPath -Destination $releaseSbomPath
 
 # 源码发行包使用与仓库相同的可运行布局，供非 Git 源码安装执行校验更新。
 New-Item -ItemType Directory -Force -Path $sourcePackageDirectory | Out-Null
@@ -389,6 +402,10 @@ foreach ($directory in @('.github', 'app', 'assets', 'config', 'docs',
         'runtime', 'src', 'tests', 'third_party', 'tools')) {
     Copy-Item -LiteralPath (Join-Path $projectRoot $directory) `
         -Destination $sourcePackageDirectory -Recurse
+}
+$sourceFontDirectory = Join-Path $sourcePackageDirectory 'assets\fonts'
+if (Test-Path -LiteralPath $sourceFontDirectory) {
+    Remove-Item -LiteralPath $sourceFontDirectory -Recurse -Force
 }
 $sourceUpdateManifest = [ordered]@{
     schemaVersion = 1
@@ -404,6 +421,14 @@ $sourceUpdateManifest = [ordered]@{
 Write-CanonicalJson $sourceUpdateManifest `
     (Join-Path $sourcePackageDirectory 'update-manifest.json') 5
 
+# 可选字体包保持仓库中的 assets/fonts 布局，使 metadata.json 的相对路径、
+# 许可证和授权说明可以直接交叉核验。字体必须先安装到 Windows，程序不会
+# 从该 ZIP 或自身目录私有加载字体。
+New-Item -ItemType Directory -Force -Path `
+    (Join-Path $fontPackageDirectory 'assets') | Out-Null
+Copy-Item -LiteralPath (Join-Path $projectRoot 'assets\fonts') `
+    -Destination (Join-Path $fontPackageDirectory 'assets') -Recurse
+
 if (-not $SkipStartupValidation) {
     & (Join-Path $PSScriptRoot 'invoke-startup-validation.ps1') `
         -ExecutablePath $executablePath
@@ -412,7 +437,8 @@ if (-not $SkipStartupValidation) {
 $archiveWriter = Join-Path $PSScriptRoot 'new-release-archive.ps1'
 foreach ($archiveSpec in @(
         @($packageDirectory, $zipPath),
-        @($sourcePackageDirectory, $sourceZipPath))) {
+        @($sourcePackageDirectory, $sourceZipPath),
+        @($fontPackageDirectory, $fontZipPath))) {
     & $canonicalPowerShell -NoLogo -NoProfile -NonInteractive `
         -ExecutionPolicy Bypass -File $archiveWriter `
         -SourceDirectory $archiveSpec[0] -ArchivePath $archiveSpec[1]
@@ -420,110 +446,41 @@ foreach ($archiveSpec in @(
         throw "Canonical archive host failed with exit code $LASTEXITCODE."
     }
 }
-# 独立 EXE 使用一个很小的 AHK 启动器内嵌完整便携 ZIP。首次运行时，启动器
-# 把经过 SHA-256 校验的载荷事务安装到 LOCALAPPDATA 的稳定目录；此后内层正式
-# 程序继续使用同一份个人配置和既有自动更新流程。
-$payloadSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $zipPath).Hash
-$standaloneScratchRoot = Join-Path $projectRoot '.build\standalone'
-if (Test-Path -LiteralPath $standaloneScratchRoot) {
-    Remove-Item -LiteralPath $standaloneScratchRoot -Recurse -Force
-}
-New-Item -ItemType Directory -Force -Path $standaloneScratchRoot | Out-Null
-$standaloneSourcePath = Join-Path $standaloneScratchRoot 'StandaloneLauncher.ahk'
-$standaloneScratchOutput = Join-Path $standaloneScratchRoot 'StandaloneLauncher.exe'
-$standalonePayloadPath = Join-Path $standaloneScratchRoot 'payload.zip'
-$standaloneInstallerPath = Join-Path $standaloneScratchRoot `
-    'standalone-install.ps1'
-$standaloneIconPath = Join-Path $standaloneScratchRoot 'watchdog.ico'
-Copy-Item -LiteralPath $zipPath -Destination $standalonePayloadPath
-Copy-Item -LiteralPath (Join-Path $projectRoot `
-    'runtime\standalone-install.ps1') -Destination $standaloneInstallerPath
-Copy-Item -LiteralPath (Join-Path $projectRoot 'assets\app\watchdog.ico') `
-    -Destination $standaloneIconPath
-$standaloneTemplate = Get-Content -LiteralPath (Join-Path $projectRoot `
-    'runtime\standalone-launcher.ahk') -Raw -Encoding UTF8
-foreach ($placeholder in @('__PAYLOAD_VERSION__', '__PAYLOAD_SHA256__',
-        '__PAYLOAD_ENTRY__')) {
-    if (-not $standaloneTemplate.Contains($placeholder)) {
-        throw "Standalone launcher template is missing: $placeholder"
-    }
-}
-$standaloneSource = $standaloneTemplate.Replace('__PAYLOAD_VERSION__', $version).Replace('__PAYLOAD_SHA256__', $payloadSha256).Replace('__PAYLOAD_ENTRY__', $executableName)
-[System.IO.File]::WriteAllText($standaloneSourcePath, $standaloneSource,
-    $script:utf8WithBom)
-
-$standaloneSubstituteProcess = Start-Process -FilePath 'subst.exe' `
-    -ArgumentList "$buildDriveLetter`:", $projectRoot -PassThru -Wait `
-    -WindowStyle Hidden
-if ($standaloneSubstituteProcess.ExitCode -ne 0) {
-    throw "Unable to allocate deterministic build drive $buildDriveLetter`: for standalone compilation."
-}
-try {
-    & $canonicalPowerShell -NoLogo -NoProfile -NonInteractive `
-        -ExecutionPolicy Bypass -File `
-        (Join-Path $PSScriptRoot 'invoke-release-compiler.ps1') `
-        -CompilerPath (ConvertTo-CompilerPath $CompilerPath) `
-        -SourcePath (ConvertTo-CompilerPath $standaloneSourcePath) `
-        -OutputPath (ConvertTo-CompilerPath $standaloneScratchOutput) `
-        -IconPath (ConvertTo-CompilerPath $standaloneIconPath) `
-        -BasePath (ConvertTo-CompilerPath $AutoHotkeyPath) `
-        -WorkingDirectory (ConvertTo-CompilerPath $standaloneScratchRoot)
-    if ($LASTEXITCODE -ne 0) {
-        throw "Standalone compiler host failed with exit code $LASTEXITCODE."
-    }
-    Copy-Item -LiteralPath $standaloneScratchOutput `
-        -Destination $standaloneExecutablePath
-} finally {
-    $removeStandaloneDrive = Start-Process -FilePath 'subst.exe' `
-        -ArgumentList "$buildDriveLetter`:", '/D' -PassThru -Wait `
-        -WindowStyle Hidden
-    if ($removeStandaloneDrive.ExitCode -ne 0) {
-        Write-Warning "Unable to remove standalone build drive $buildDriveLetter`: ."
-    }
-    if (Test-Path -LiteralPath $standaloneScratchRoot) {
-        Remove-Item -LiteralPath $standaloneScratchRoot -Recurse -Force
-    }
-    $standaloneScratchParent = Split-Path -Parent $standaloneScratchRoot
-    if ((Test-Path -LiteralPath $standaloneScratchParent -PathType Container) `
-        -and -not (Get-ChildItem -LiteralPath $standaloneScratchParent -Force)) {
-        Remove-Item -LiteralPath $standaloneScratchParent -Force
-    }
-}
-
 $zipHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zipPath).Hash
-$executableHash = (Get-FileHash -Algorithm SHA256 `
-    -LiteralPath $standaloneExecutablePath).Hash
 $sourceZipHash = (Get-FileHash -Algorithm SHA256 `
     -LiteralPath $sourceZipPath).Hash
+$fontZipHash = (Get-FileHash -Algorithm SHA256 `
+    -LiteralPath $fontZipPath).Hash
 $sbomHash = (Get-FileHash -Algorithm SHA256 `
-    -LiteralPath $standaloneSbomPath).Hash
+    -LiteralPath $releaseSbomPath).Hash
 @(
     "$zipHash  $([System.IO.Path]::GetFileName($zipPath))"
-    "$executableHash  $([System.IO.Path]::GetFileName($standaloneExecutablePath))"
     "$sourceZipHash  $([System.IO.Path]::GetFileName($sourceZipPath))"
-    "$sbomHash  $([System.IO.Path]::GetFileName($standaloneSbomPath))"
+    "$fontZipHash  $([System.IO.Path]::GetFileName($fontZipPath))"
+    "$sbomHash  $([System.IO.Path]::GetFileName($releaseSbomPath))"
 ) |
     Set-Content -LiteralPath $checksumsPath -Encoding ASCII
 
 Write-Host "Release package: $zipPath"
-Write-Host "Standalone executable: $standaloneExecutablePath"
 Write-Host "Source package: $sourceZipPath"
-Write-Host "Release SBOM: $standaloneSbomPath"
+Write-Host "Optional font package: $fontZipPath"
+Write-Host "Release SBOM: $releaseSbomPath"
 Write-Host "ZIP SHA-256: $zipHash"
-Write-Host "EXE SHA-256: $executableHash"
 Write-Host "Source ZIP SHA-256: $sourceZipHash"
+Write-Host "Font ZIP SHA-256: $fontZipHash"
 Write-Host "SBOM SHA-256: $sbomHash"
 [pscustomobject]@{
     Version = $version
     PackageDirectory = $packageDirectory
     ZipPath = $zipPath
-    ExecutablePath = $standaloneExecutablePath
     SourcePackageDirectory = $sourcePackageDirectory
     SourceZipPath = $sourceZipPath
-    SbomPath = $standaloneSbomPath
+    FontPackageDirectory = $fontPackageDirectory
+    FontZipPath = $fontZipPath
+    SbomPath = $releaseSbomPath
     ChecksumsPath = $checksumsPath
     Sha256 = $zipHash
-    ExecutableSha256 = $executableHash
     SourceSha256 = $sourceZipHash
+    FontSha256 = $fontZipHash
     SbomSha256 = $sbomHash
 }

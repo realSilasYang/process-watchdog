@@ -41,14 +41,11 @@ UpdateStatsUI() {
     paused := 0
     stopped := 0
     pending := 0
-    updating := 0
     invalid := 0
 
     for _, obj in App.appStates {
         if (!obj.Enabled) {
             paused++
-        } else if App.maintenanceCoordinator.IsBlocking(obj) {
-            updating++
         } else if obj.MissingSinceTicks || obj.Phase == GuardPhase.Exhausted {
             invalid++
         } else if obj.Phase == GuardPhase.Running {
@@ -69,35 +66,38 @@ UpdateStatsUI() {
         {Text: ResolveMainStatsLabel(Tr("统计：运行"), "统计：运行",
                 "运行中") colon running,
             IconPath: GetApplicationAssetPath(
-                "ui-icons\lucide\circle-check-big.svg")},
+                "ui-icons\lucide\circle-check-big.svg"),
+            IconColorRole: "SuccessIcon"},
         {Text: ResolveMainStatsLabel(Tr("统计：暂停"), "统计：暂停",
                 "已暂停") colon paused,
             IconPath: GetApplicationAssetPath(
-                "ui-icons\lucide\circle-pause.svg")},
+                "ui-icons\lucide\circle-pause.svg"),
+            IconColorRole: "PauseIcon"},
         {Text: ResolveMainStatsLabel(Tr("统计：停止"), "统计：停止",
                 "已停止") colon stopped,
-            IconPath: GetApplicationAssetPath("ui-icons\lucide\ban.svg")},
+            IconPath: GetApplicationAssetPath("ui-icons\lucide\ban.svg"),
+            IconColorRole: "DangerIcon"},
         {Text: ResolveMainStatsLabel(Tr("统计：恢复"), "统计：恢复",
                 "恢复中") colon pending,
             IconPath: GetApplicationAssetPath(
-                "ui-icons\lucide\hourglass.svg")},
-        {Text: ResolveMainStatsLabel(Tr("统计：升级"), "统计：升级",
-                "升级中") colon updating,
-            IconPath: GetApplicationAssetPath(
-                "ui-icons\lucide\refresh-cw.svg")},
+                "ui-icons\lucide\hourglass.svg"),
+            IconColorRole: "InitializingIcon"},
         {Text: ResolveMainStatsLabel(Tr("统计：失效"), "统计：失效",
                 "已失效") colon invalid,
             IconPath: GetApplicationAssetPath(
-                "ui-icons\lucide\circle-x.svg")},
+                "ui-icons\lucide\circle-x.svg"),
+            IconColorRole: "DangerIcon"},
         {Text: ResolveMainStatsLabel(Tr("统计：总计"), "统计：总计",
                 "总计") colon total,
             IconPath: GetApplicationAssetPath(
-                "ui-icons\lucide\target.svg"), SeparatorBefore: true}
+                "ui-icons\lucide\target.svg"),
+            IconColorRole: "DisplayIcon", SeparatorBefore: true}
     ]
     if App.appsDirty {
         statusItems.Push({Text: Tr("配置未保存"),
             IconPath: GetApplicationAssetPath(
-                "ui-icons\lucide\triangle-alert.svg")})
+                "ui-icons\lucide\triangle-alert.svg"),
+            IconColorRole: "WarningIcon"})
     }
     statsStr := ""
     for index, item in statusItems {
@@ -108,10 +108,39 @@ UpdateStatsUI() {
     }
     if Main.statsPresenter {
         Main.statsPresenter.SetItems(statusItems, statsStr)
+        EnsureMainStatusBarMinimumWidth()
     } else if Main.statsText.Text != statsStr {
         ; 测试替身或极早启动阶段没有自绘投影时仍保留完整纯文本回退。
         Main.statsText.Text := statsStr
     }
+}
+
+EnsureMainStatusBarMinimumWidth() {
+    if !IsSet(Main) || !IsObject(Main.gui)
+        || !Main.HasOwnProp("statsPresenter")
+        || !IsObject(Main.statsPresenter)
+        return false
+    footerWidth := Main.statsPresenter.GetMinimumWidthDip()
+    if footerWidth <= 0
+        return false
+    if !Main.gui.Hwnd
+        return true
+    try isVisible := DllCall("user32\IsWindowVisible", "Ptr", Main.gui.Hwnd,
+        "Int") != 0
+    catch
+        isVisible := false
+    if !isVisible || DllCall("user32\IsIconic", "Ptr", Main.gui.Hwnd,
+            "Int") || DllCall("user32\IsZoomed", "Ptr", Main.gui.Hwnd,
+            "Int")
+        return true
+    ; 运行中只更新原生最小约束，不主动 Show 扩大窗口。状态栏绘制会在
+    ; 客户区不足时裁切文本；异步统计刷新不得覆盖用户刚调整的窗口尺寸。
+    minimumWidth := Max(UiScaleService.Scale(
+        WindowLayoutService.StructuralMinimumWidth),
+        footerWidth + UiScaleService.Scale(20))
+    minimumHeight := UiScaleService.Scale(300)
+    try Main.gui.Opt("+MinSize" minimumWidth "x" minimumHeight)
+    return true
 }
 
 ResolveMainStatsLabel(translated, translationKey, simplifiedFallback) {
@@ -136,10 +165,37 @@ UpdateState(updPath, statusStr, expectedState := "",
     if statusKindChanged
         stateObj.StatusKind := statusKind
     if (stateChanged || statusKindChanged || forceProjection) {
-        row := FindRow(updPath)
-        if (row > 0)
-            SetMainListStatus(row, statusStr)
+        ProjectMainListStatusByPath(updPath, statusStr)
     }
+    return true
+}
+
+ProjectMainListStatusByPath(path, statusText) {
+    path := NormalizeTargetPath(path)
+    if path == "" || !IsSet(Main) || !IsObject(Main)
+        || !Main.HasOwnProp("lv") || !IsObject(Main.lv)
+        || !Main.HasOwnProp("listProjection")
+        || !IsObject(Main.listProjection)
+        return false
+    ; 状态排序由独立的一次性定时器执行。必须把“按路径找行”和整组
+    ; ListView 写入放在同一不可打断区间，否则排序刚移动行时，旧行号
+    ; 可能把别的对象更新掉，真正对象就会一直保留旧的“结束运行”文本。
+    previousCritical := A_IsCritical
+    Critical("On")
+    try {
+        row := FindRow(path)
+        if (row > 0 && NormalizeTargetPath(Main.lv.GetText(row, 3)) == path)
+            SetMainListStatus(row, statusText)
+        else {
+            Main.listProjection.Rebuild(Main.lv)
+            row := FindRow(path)
+            if (row > 0
+                && NormalizeTargetPath(Main.lv.GetText(row, 3)) == path)
+                SetMainListStatus(row, statusText)
+            else
+                return false
+        }
+    } finally Critical(previousCritical ? previousCritical : "Off")
     return true
 }
 
@@ -212,10 +268,6 @@ StopTargetProcess(pid, expectedCreationIdentity := "") {
     return result
 }
 
-GracefulStop(pid, expectedCreationIdentity := "") {
-    return StopTargetProcess(pid, expectedCreationIdentity).Stopped
-}
-
 ElevatedKillProcess(pid, expectedCreationIdentity := "") {
     errorMessage := ""
     return App.targetStopper.TerminateVerifiedProcess(pid,
@@ -232,7 +284,6 @@ LogMsg(msg) {
 
 BuildDiagnosticStateSummary() {
     phaseCounts := Map()
-    maintenanceCounts := Map()
     enabledCount := 0
     pausedCount := 0
     for path, stateObj in App.appStates {
@@ -245,11 +296,6 @@ BuildDiagnosticStateSummary() {
             phase := "unavailable"
         phaseCounts[phase] := phaseCounts.Has(phase)
             ? phaseCounts[phase] + 1 : 1
-        try maintenancePhaseValue := String(stateObj.MaintenanceMode)
-        catch
-            maintenancePhaseValue := "unavailable"
-        maintenanceCounts[maintenancePhaseValue] := maintenanceCounts.Has(
-            maintenancePhaseValue) ? maintenanceCounts[maintenancePhaseValue] + 1 : 1
     }
 
     text := "TargetCount=" App.appStates.Count "`r`n"
@@ -262,10 +308,14 @@ BuildDiagnosticStateSummary() {
         . "RecoveryEntries=" App.configRecoveryEntries.Length "`r`n"
         . "LogEntries=" App.logMessages.Length "`r`n"
         . "LogRevision=" App.logRevision "`r`n"
+    if App.HasOwnProp("guardWorkGate")
+        text .= App.guardWorkGate.BuildDiagnosticText()
+    if App.HasOwnProp("processSnapshots")
+        text .= App.processSnapshots.BuildDiagnosticText()
+    if App.HasOwnProp("fileScanner")
+        text .= App.fileScanner.BuildDiagnosticText()
     for phase, count in phaseCounts
         text .= "GuardPhase." phase "=" count "`r`n"
-    for phase, count in maintenanceCounts
-        text .= "MaintenancePhase." phase "=" count "`r`n"
     return text
 }
 

@@ -64,6 +64,79 @@ AssertRoundedButtonSurfaceColor(color) {
     }
 }
 
+AssertCenteredClearMark() {
+    width := 24
+    height := 24
+    testGui := Gui("+ToolWindow")
+    button := testGui.Add("Text", "w24 h24", "✕")
+    state := {
+        ctrl: button,
+        normal: "000000",
+        current: "000000",
+        parentColor: "000000",
+        textColor: "FFFFFF",
+        textAlign: "center",
+        textInsetDip: 0,
+        clearMarkSizeDip: 16,
+        clearMarkStrokeDip: 2
+    }
+    screenDc := DllCall("user32\GetDC", "Ptr", 0, "Ptr")
+    targetDc := screenDc ? DllCall("gdi32\CreateCompatibleDC",
+        "Ptr", screenDc, "Ptr") : 0
+    targetBitmap := targetDc ? DllCall("gdi32\CreateCompatibleBitmap",
+        "Ptr", screenDc, "Int", width, "Int", height, "Ptr") : 0
+    previousBitmap := 0
+    try {
+        AssertRoundedButtonRenderer(screenDc && targetDc && targetBitmap,
+            "无法创建清除标记像素验证画布")
+        previousBitmap := DllCall("gdi32\SelectObject", "Ptr", targetDc,
+            "Ptr", targetBitmap, "Ptr")
+        AssertRoundedButtonRenderer(
+            RoundedButtonRenderer.Draw(targetDc, width, height, state),
+            "无法绘制清除标记")
+
+        minimumX := width
+        minimumY := height
+        maximumX := -1
+        maximumY := -1
+        visiblePixels := 0
+        Loop height {
+            y := A_Index - 1
+            Loop width {
+                x := A_Index - 1
+                if DllCall("gdi32\GetPixel", "Ptr", targetDc,
+                        "Int", x, "Int", y, "UInt") == 0
+                    continue
+                minimumX := Min(minimumX, x)
+                minimumY := Min(minimumY, y)
+                maximumX := Max(maximumX, x)
+                maximumY := Max(maximumY, y)
+                visiblePixels++
+            }
+        }
+        centerX := (minimumX + maximumX) / 2
+        centerY := (minimumY + maximumY) / 2
+        AssertRoundedButtonRenderer(visiblePixels > 0
+                && Abs(centerX - width / 2) <= 1
+                && Abs(centerY - height / 2) <= 1,
+            "清除标记的可见边界没有与按钮几何中心对齐")
+        AssertRoundedButtonRenderer(minimumX >= 2 && minimumY >= 2
+                && maximumX <= width - 3 && maximumY <= height - 3,
+            "清除标记没有保留稳定的四周留白")
+    } finally {
+        if previousBitmap
+            DllCall("gdi32\SelectObject", "Ptr", targetDc,
+                "Ptr", previousBitmap)
+        if targetBitmap
+            DllCall("gdi32\DeleteObject", "Ptr", targetBitmap)
+        if targetDc
+            DllCall("gdi32\DeleteDC", "Ptr", targetDc)
+        if screenDc
+            DllCall("user32\ReleaseDC", "Ptr", 0, "Ptr", screenDc)
+        try testGui.Destroy()
+    }
+}
+
 AssertRoundedSelectionMask() {
     screenDc := DllCall("user32\GetDC", "Ptr", 0, "Ptr")
     targetDc := screenDc ? DllCall("gdi32\CreateCompatibleDC",
@@ -200,7 +273,103 @@ AssertRoundedButtonSvgImage() {
     }
 }
 
-AssertVisualTextCenter(fontName, pointSize, fontWeight, dpi, text) {
+MeasureLeadingCommandSymbolPixels(symbol) {
+    width := 40
+    height := 30
+    screenDc := DllCall("user32\GetDC", "Ptr", 0, "Ptr")
+    targetDc := screenDc ? DllCall("gdi32\CreateCompatibleDC",
+        "Ptr", screenDc, "Ptr") : 0
+    targetBitmap := targetDc ? DllCall("gdi32\CreateCompatibleBitmap",
+        "Ptr", screenDc, "Int", width, "Int", height, "Ptr") : 0
+    previousBitmap := 0
+    backgroundBrush := 0
+    try {
+        AssertRoundedButtonRenderer(screenDc && targetDc && targetBitmap,
+            "无法创建状态按钮符号像素画布")
+        previousBitmap := DllCall("gdi32\SelectObject", "Ptr", targetDc,
+            "Ptr", targetBitmap, "Ptr")
+        backgroundBrush := DllCall("gdi32\CreateSolidBrush", "UInt", 0,
+            "Ptr")
+        canvasRect := Buffer(16, 0)
+        NumPut("Int", width, canvasRect, 8)
+        NumPut("Int", height, canvasRect, 12)
+        DllCall("user32\FillRect", "Ptr", targetDc, "Ptr", canvasRect,
+            "Ptr", backgroundBrush)
+        AssertRoundedButtonRenderer(
+            RoundedButtonRenderer.DrawLeadingCommandSymbol(targetDc, symbol,
+                10, 0, 30, height, "FFFFFF", 10),
+            "无法绘制状态按钮符号：" symbol)
+
+        minimumX := width
+        minimumY := height
+        maximumX := -1
+        maximumY := -1
+        visiblePixels := 0
+        Loop height {
+            y := A_Index - 1
+            Loop width {
+                x := A_Index - 1
+                if DllCall("gdi32\GetPixel", "Ptr", targetDc,
+                        "Int", x, "Int", y, "UInt") == 0
+                    continue
+                minimumX := Min(minimumX, x)
+                minimumY := Min(minimumY, y)
+                maximumX := Max(maximumX, x)
+                maximumY := Max(maximumY, y)
+                visiblePixels++
+            }
+        }
+        AssertRoundedButtonRenderer(visiblePixels > 0,
+            "状态按钮符号没有可见像素：" symbol)
+        return {
+            Left: minimumX,
+            Top: minimumY,
+            Right: maximumX,
+            Bottom: maximumY,
+            Width: maximumX - minimumX + 1,
+            Height: maximumY - minimumY + 1,
+            CenterX: (minimumX + maximumX) / 2,
+            CenterY: (minimumY + maximumY) / 2,
+            PixelCount: visiblePixels
+        }
+    } finally {
+        if backgroundBrush
+            DllCall("gdi32\DeleteObject", "Ptr", backgroundBrush)
+        if previousBitmap
+            DllCall("gdi32\SelectObject", "Ptr", targetDc,
+                "Ptr", previousBitmap)
+        if targetBitmap
+            DllCall("gdi32\DeleteObject", "Ptr", targetBitmap)
+        if targetDc
+            DllCall("gdi32\DeleteDC", "Ptr", targetDc)
+        if screenDc
+            DllCall("user32\ReleaseDC", "Ptr", 0, "Ptr", screenDc)
+    }
+}
+
+AssertLeadingCommandSymbolGeometry() {
+    referenceBounds := MeasureLeadingCommandSymbolPixels("▶")
+    for symbol in ["⏸", "▶"] {
+        bounds := symbol == "▶" ? referenceBounds
+            : MeasureLeadingCommandSymbolPixels(symbol)
+        weightRatio := bounds.PixelCount / referenceBounds.PixelCount
+        AssertRoundedButtonRenderer(
+            Abs(bounds.Width - referenceBounds.Width) <= 1
+                && Abs(bounds.Height - referenceBounds.Height) <= 1,
+            "主命令按钮符号的外接尺寸不一致：" symbol)
+        AssertRoundedButtonRenderer(
+            Abs(bounds.CenterX - referenceBounds.CenterX) <= 0.5
+                && Abs(bounds.CenterY - referenceBounds.CenterY) <= 0.5,
+            "主命令按钮符号的可见中心不一致：" symbol)
+        AssertRoundedButtonRenderer(weightRatio >= 0.7
+                && weightRatio <= 1.4,
+            "主命令按钮符号的视觉重量差异过大：" symbol "／"
+                weightRatio)
+    }
+}
+
+AssertVisualTextCenter(fontName, pointSize, fontWeight, dpi, text,
+    useRasterMeasurement := false) {
     width := Max(160, Round(160 * dpi / 96))
     height := Max(40, Round(40 * dpi / 96))
     pixelHeight := Max(1, Round(pointSize * dpi / 72))
@@ -228,8 +397,11 @@ AssertVisualTextCenter(fontName, pointSize, fontWeight, dpi, text) {
         DllCall("gdi32\SetBkMode", "Ptr", targetDc, "Int", 1)
         DllCall("gdi32\SetTextColor", "Ptr", targetDc,
             "UInt", 0x00FFFFFF)
-        textRect := TextVisualAlignment.CreateCenteredTextRect(targetDc,
-            text, 0, 0, width, height)
+        textRect := useRasterMeasurement
+            ? TextVisualAlignment.CreateRasterCenteredTextRect(targetDc,
+                text, 0, 0, width, height)
+            : TextVisualAlignment.CreateCenteredTextRect(targetDc,
+                text, 0, 0, width, height)
         DllCall("user32\DrawTextW", "Ptr", targetDc, "Str", text,
             "Int", -1, "Ptr", textRect, "UInt", 0x00000825, "Int")
 
@@ -272,10 +444,15 @@ AssertVisualTextCenter(fontName, pointSize, fontWeight, dpi, text) {
 
 AssertTextVisualAlignment() {
     TextVisualAlignment.InkBoundsCache.Clear()
+    TextVisualAlignment.RasterInkBoundsCache.Clear()
     systemFont := LocalizationService.GetLanguageSystemUiFontName()
-    AssertVisualTextCenter(systemFont, 10, 700, 96, Tr("帮助信息"))
-    AssertVisualTextCenter(systemFont, 10, 700, 288, Tr("帮助信息"))
+    AssertVisualTextCenter(systemFont, 10, 700, 96, Tr("帮助"))
+    AssertVisualTextCenter(systemFont, 10, 700, 288, Tr("帮助"))
     AssertVisualTextCenter("Segoe UI", 10, 700, 96, "Settings")
+    AssertVisualTextCenter(systemFont, 10, 700, 96, "➕", true)
+    AssertVisualTextCenter(systemFont, 10, 700, 288, "🗑️", true)
+    rasterCachedCount := TextVisualAlignment.RasterInkBoundsCache.Count
+    AssertVisualTextCenter(systemFont, 10, 700, 288, "🗑️", true)
     cachedCount := TextVisualAlignment.InkBoundsCache.Count
     delta := TextVisualAlignment.MeasureFontInkCenterDelta(
         systemFont, 12, 400, 96,
@@ -285,6 +462,10 @@ AssertTextVisualAlignment() {
     AssertRoundedButtonRenderer(cachedCount > 0
         && TextVisualAlignment.InkBoundsCache.Count >= cachedCount,
         "字形视觉中心缓存没有复用已测量字体与文本")
+    AssertRoundedButtonRenderer(rasterCachedCount >= 2
+        && TextVisualAlignment.RasterInkBoundsCache.Count
+            == rasterCachedCount,
+        "回退字符图标的栅格墨迹缓存没有复用已测量字体与文本")
 }
 
 AssertLucideSvgAssets() {
@@ -307,7 +488,7 @@ AssertLucideSvgAssets() {
         "settings.svg", "shield-alert.svg", "shield-ellipsis.svg",
         "sliders-horizontal.svg", "square-plus.svg",
         "target.svg", "timer.svg", "trash-2.svg",
-        "triangle-alert-red.svg", "triangle-alert-timeout.svg",
+        "triangle-alert-red.svg",
         "triangle-alert.svg", "undo-2.svg", "wand-sparkles.svg"
     ]
     try {
@@ -449,6 +630,103 @@ AssertRoundedButtonAccessibility() {
     }
 }
 
+AssertStatusBarGapLayout() {
+    testGui := Gui("+ToolWindow")
+    statusText := testGui.Add("Text", "w1000 h20")
+    presenter := SvgStatusBarPresenter(statusText)
+    try {
+        presenter.SetItems([
+            {Text: "运行中: 13", IconPath: ""},
+            {Text: "已暂停: 0", IconPath: ""},
+            {Text: "已停止: 0", IconPath: ""}
+        ])
+        measuredWidth := presenter.GetMinimumWidthDip()
+        AssertRoundedButtonRenderer(measuredWidth > 20,
+            "状态栏没有根据实际控件字体测量最小宽度")
+
+        evenLayout := presenter.CalculateGapLayout(1000, 500, 6)
+        AssertRoundedButtonRenderer(evenLayout.BaseGap == 100
+                && evenLayout.ExtraGaps == 0,
+            "状态栏没有平均分配可用宽度")
+
+        remainderLayout := presenter.CalculateGapLayout(1003, 500, 6)
+        AssertRoundedButtonRenderer(remainderLayout.BaseGap == 100
+                && remainderLayout.ExtraGaps == 3
+                && remainderLayout.BaseGap * 5
+                    + remainderLayout.ExtraGaps == 503,
+            "状态栏没有完整分配剩余像素")
+
+        overflowLayout := presenter.CalculateGapLayout(400, 500, 6)
+        AssertRoundedButtonRenderer(overflowLayout.BaseGap == 0
+                && overflowLayout.ExtraGaps == 0,
+            "状态栏内容超宽时仍增加了额外间距")
+
+        singleLayout := presenter.CalculateGapLayout(1000, 120, 1)
+        AssertRoundedButtonRenderer(singleLayout.BaseGap == 0
+                && singleLayout.ExtraGaps == 0,
+            "单项说明标签生成了无效间距")
+    } finally {
+        presenter.Dispose()
+        try testGui.Destroy()
+    }
+}
+
+AssertScaledChoiceButtonTextRendering() {
+    previousScale := UiScaleService.GetRequested()
+    previousTheme := UiThemeService.GetRequestedTheme()
+    testGui := Gui("+ToolWindow", "Choice button text rendering")
+    button := ""
+    buttonDc := 0
+    try {
+        UiScaleService.Configure(200)
+        UiThemeService.Configure("dark")
+        testGui.BackColor := UiThemeService.Color("Window")
+        testGui.SetFont("s10 c" UiThemeService.Color("Text"))
+        button := testGui.Add("Text", "x20 y20 w100 h30 Center 0x200 Background"
+            UiThemeService.Color("Primary") " c"
+            UiThemeService.Color("ButtonText"), "立即恢复")
+        RegisterHoverButton(button, UiThemeService.Color("Primary"))
+        testGui.Show(ScaleApplicationShowOptions("w140 h70"))
+        ApplyApplicationWindowScale(testGui)
+        AssertRoundedButtonRenderer(RefreshDarkChoiceButtons([button],
+            testGui.Hwnd), "缩放后恢复选择按钮没有提交重绘")
+        SetTimer(RefreshDarkChoiceButtons.Bind([button], testGui.Hwnd), -1)
+        SetTimer(RefreshDarkChoiceButtons.Bind([button], testGui.Hwnd), -25)
+        Sleep(75)
+        buttonDc := DllCall("user32\GetDC", "Ptr", button.Hwnd, "Ptr")
+        clientRect := Buffer(16, 0)
+        AssertRoundedButtonRenderer(buttonDc
+            && DllCall("user32\GetClientRect", "Ptr", button.Hwnd,
+                "Ptr", clientRect, "Int"),
+            "无法读取缩放后恢复选择按钮的客户区")
+        width := NumGet(clientRect, 8, "Int")
+        height := NumGet(clientRect, 12, "Int")
+        lightPixelCount := 0
+        Loop height {
+            y := A_Index - 1
+            Loop width {
+                x := A_Index - 1
+                pixel := DllCall("gdi32\GetPixel", "Ptr", buttonDc,
+                    "Int", x, "Int", y, "UInt")
+                if ((pixel & 0xFF) >= 220
+                    && ((pixel >> 8) & 0xFF) >= 220
+                    && ((pixel >> 16) & 0xFF) >= 220)
+                    lightPixelCount++
+            }
+        }
+        AssertRoundedButtonRenderer(lightPixelCount > 20,
+            "200% 缩放下恢复选择按钮没有绘制可见文字")
+    } finally {
+        if buttonDc
+            DllCall("user32\ReleaseDC", "Ptr", button.Hwnd,
+                "Ptr", buttonDc)
+        try UnregisterGuiControls(testGui.Hwnd)
+        try testGui.Destroy()
+        UiScaleService.Configure(previousScale)
+        UiThemeService.Configure(previousTheme)
+    }
+}
+
 RunRoundedButtonRendererTests() {
     AssertRoundedButtonRenderer(RoundedButtonRenderer.EnsureStarted(),
         "GDI+ 按钮渲染器无法初始化")
@@ -466,10 +744,14 @@ RunRoundedButtonRendererTests() {
     UiThemeService.Configure("light")
     AssertRoundedButtonSurfaceColor(UiThemeService.Color("DeleteDisabled"))
     AssertRoundedButtonSurfaceColor(UiThemeService.Color("PauseDisabled"))
+    AssertCenteredClearMark()
     AssertRoundedSelectionMask()
     AssertRoundedButtonSvgImage()
+    AssertLeadingCommandSymbolGeometry()
     AssertTextVisualAlignment()
     AssertLucideSvgAssets()
     AssertRoundedButtonAccessibility()
+    AssertStatusBarGapLayout()
+    AssertScaledChoiceButtonTextRendering()
     RoundedButtonRenderer.Shutdown()
 }

@@ -54,8 +54,11 @@ RunApplicationConfigServiceTests() {
             && repository.Read("Settings", "UiLanguage", "") == "auto"
             && repository.Read("Settings", "UiFont", "") == "auto"
             && repository.Read("Settings", "Theme", "") == "auto"
+            && repository.Read("Settings", "UiScale", "") == "100"
             && repository.Read("Settings", "RecursiveBatchImport", "") == "1"
             && repository.Read("Settings", "CheckUpdatesOnStartup", "") == "1"
+            && repository.Read("Settings", "RunAsAdministrator", "") == "1"
+            && repository.Read("Settings", "AskBeforeRestartFromStopCount", "") == "2"
             && repository.Read("Settings", "PreferEverything", "") == ""
             && repository.Read("Settings", "NativeScanTimeoutSeconds", "") == ""
             && repository.Read("Settings", "EverythingMaxResults", "") == "",
@@ -72,22 +75,28 @@ RunApplicationConfigServiceTests() {
             {Key: "UiLanguage", Value: "unsupported"},
             {Key: "UiFont", Value: "__Watchdog_Missing_Font__"},
             {Key: "Theme", Value: "unsupported"},
+            {Key: "UiScale", Value: 133},
             {Key: "CheckInterval", Value: 10},
             {Key: "RetrySequence", Value: "broken"},
+            {Key: "AskBeforeRestartFromStopCount", Value: 0},
             {Key: "LogDirectory", Value: "   "},
             {Key: "GracefulStopSeconds", Value: 999},
-            {Key: "ShowAtStartup", Value: "invalid"}
+            {Key: "ShowAtStartup", Value: "invalid"},
+            {Key: "RunAsAdministrator", Value: "invalid"}
         ])
         loaded := settingsService.Load()
         AssertApplicationConfig(loaded.UiLanguage == "auto"
             && loaded.UiFont == "auto"
             && loaded.Theme == "auto"
+            && loaded.UiScale == 100
             && loaded.CheckInterval == 2000
             && loaded.RetrySequence == "1, 10, 60"
             && loaded.RetryDelayArray.Length == 3
+            && loaded.AskBeforeRestartFromStopCount == 2
             && loaded.LogDirectory == defaultLogDirectory
             && loaded.GracefulStopSeconds == 3
-            && !loaded.ShowAtStartup,
+            && !loaded.ShowAtStartup
+            && loaded.RunAsAdministrator,
             "损坏或越界的运行参数没有逐字段回退默认值")
 
         candidate := settingsService.CreateDefaults()
@@ -99,8 +108,11 @@ RunApplicationConfigServiceTests() {
         candidate.UiLanguage := "ja-JP"
         candidate.UiFont := selectedFont
         candidate.Theme := "light"
+        candidate.UiScale := 125
         candidate.RetrySequence := "1, 2"
+        candidate.AskBeforeRestartFromStopCount := 5
         candidate.ShowAtStartup := true
+        candidate.RunAsAdministrator := false
         candidate.CheckUpdatesOnStartup := false
         candidate.LogDirectory := " D:\Logs "
         saved := settingsService.Save(candidate)
@@ -109,13 +121,18 @@ RunApplicationConfigServiceTests() {
         AssertApplicationConfig(runtime.uiLanguage == "ja-JP"
             && runtime.uiFont == selectedFont
             && runtime.uiTheme == "light"
+            && runtime.uiScale == 125
             && runtime.checkInterval == 750
             && runtime.retryDelayArray.Length == 2
             && runtime.retryDelayArray[2] == 2000
+            && runtime.askBeforeRestartFromStopCount == 5
             && runtime.showAtStartup
+            && !runtime.runAsAdministrator
             && !runtime.checkUpdatesOnStartup
             && runtime.logDirectory == "D:\Logs"
-            && repository.Read("Settings", "UiLanguage", "") == "ja-JP",
+            && repository.Read("Settings", "UiLanguage", "") == "ja-JP"
+            && repository.Read("Settings", "RunAsAdministrator", "") == "0"
+            && repository.Read("Settings", "AskBeforeRestartFromStopCount", "") == "5",
             "有效运行参数没有统一校验、保存并应用到运行态")
 
         originalFont := repository.Read("Settings", "UiFont", "")
@@ -140,6 +157,17 @@ RunApplicationConfigServiceTests() {
             "无效界面主题仍被保存或污染了已有配置")
         candidate.Theme := "light"
 
+        originalScale := repository.Read("Settings", "UiScale", "")
+        candidate.UiScale := 133
+        invalidScaleRejected := false
+        try settingsService.Save(candidate)
+        catch
+            invalidScaleRejected := true
+        AssertApplicationConfig(invalidScaleRejected
+            && repository.Read("Settings", "UiScale", "") == originalScale,
+            "不支持的界面缩放仍被保存或污染了已有配置")
+        candidate.UiScale := 125
+
         originalInterval := repository.Read("Settings", "CheckInterval", "")
         candidate.CheckInterval := 1
         rejected := false
@@ -150,6 +178,19 @@ RunApplicationConfigServiceTests() {
             && repository.Read("Settings", "CheckInterval", "")
                 == originalInterval,
             "越界运行参数仍污染了已保存设置")
+
+        originalAskBeforeRestartFromStopCount := repository.Read("Settings",
+            "AskBeforeRestartFromStopCount", "")
+        candidate.CheckInterval := 750
+        candidate.AskBeforeRestartFromStopCount := 10000
+        rejected := false
+        try settingsService.Save(candidate)
+        catch
+            rejected := true
+        AssertApplicationConfig(rejected
+            && repository.Read("Settings", "AskBeforeRestartFromStopCount", "")
+                == originalAskBeforeRestartFromStopCount,
+            "询问起始停止次数越界仍污染了已保存设置")
 
         repository.WriteValues("Layout", [
             {Key: "GuiW", Value: "bad"},
@@ -163,14 +204,15 @@ RunApplicationConfigServiceTests() {
             && layout.Column1 == 500 && layout.Column2 == 250,
             "损坏布局没有逐字段限制到安全默认值")
         repository.WriteValue("Layout", "Col2W", "bad")
-        AssertApplicationConfig(layoutService.Load().Column2 == 180,
+        AssertApplicationConfig(layoutService.Load().Column2 == 200,
             "损坏的状态列宽度没有回退到收窄后的默认值")
-        layoutService.Save({Width: 580, Height: 300,
+        minimumWindowWidth := WindowLayoutService.StructuralMinimumWidth
+        layoutService.Save({Width: minimumWindowWidth, Height: 300,
             Column1: 250, Column2: 180})
         reloadedLayout := layoutService.Load()
         layoutRuntime := {}
         layoutService.Apply(layoutRuntime, reloadedLayout)
-        AssertApplicationConfig(layoutRuntime.savedWidth == 580
+        AssertApplicationConfig(layoutRuntime.savedWidth == minimumWindowWidth
             && layoutRuntime.savedHeight == 300
             && layoutRuntime.savedColumn1 == 250
             && layoutRuntime.savedColumn2 == 180,
@@ -183,6 +225,14 @@ RunApplicationConfigServiceTests() {
         AssertApplicationConfig(narrowColumnRejected
             && layoutService.Load().Column2 == 180,
             "状态列接受了低于可读下限的宽度或污染了已保存布局")
+        narrowWindowRejected := false
+        try layoutService.Save({Width: minimumWindowWidth - 1, Height: 300,
+            Column1: 250, Column2: 180})
+        catch
+            narrowWindowRejected := true
+        AssertApplicationConfig(narrowWindowRejected
+                && layoutService.Load().Width == minimumWindowWidth,
+            "主窗口接受了低于首帧结构下限的宽度或污染了已保存布局")
     } finally {
         try FileDelete(configPath)
         Loop Files, configPath ".tmp.*"

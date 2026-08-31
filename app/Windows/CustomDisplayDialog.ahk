@@ -1,5 +1,5 @@
 ; 主列表自定义名称与图标窗口。
-; 这里保存的内容只改变主窗口展示，不修改启动入口、进程身份或升级保护判断；
+; 这里保存的内容只改变主窗口展示，不修改启动入口或进程身份判断；
 ; 默认值与当前展示一致时恢复按钮保持不可用，避免制造没有实际变化的配置记录。
 
 class CustomDisplayDialog extends ManagedWindow {
@@ -34,7 +34,7 @@ class CustomDisplayDialog extends ManagedWindow {
             InitializeApplicationWindow(this.gui)
 
             this.gui.Add("Text", "x20 y14 w" (windowWidth - 40)
-                " h20 BackgroundTrans", Tr("守护目标："))
+                " h20 BackgroundTrans", Tr("守护对象："))
             targetInput := AddCenteredSingleLineEdit(this.gui,
                 20, 38, windowWidth - 40, 26, path, "ReadOnly",
                 UiThemeService.Color("Surface"))
@@ -73,7 +73,7 @@ class CustomDisplayDialog extends ManagedWindow {
             actionStartX := Round((windowWidth - 170) / 2)
             btnSave := this.gui.Add("Text",
                 "x" actionStartX " y212 w80 h28 Center 0x200 Background"
-                    UiThemeService.Color("Primary") " c"
+                    UiThemeService.Color("Save") " c"
                     UiThemeService.Color("ButtonText"),
                 Tr("保存"))
             btnCancel := this.gui.Add("Text",
@@ -87,8 +87,9 @@ class CustomDisplayDialog extends ManagedWindow {
             for button in [this.defaultNameButton, btnBrowse,
                 this.defaultIconButton, btnCancel]
                 RegisterHoverButton(button, UiThemeService.Color("Toolbar"))
-            RegisterHoverButton(btnSave, UiThemeService.Color("Primary"))
-            SetButtonLucideIcon(btnBrowse, "folder-open.svg", 14, 6)
+            RegisterHoverButton(btnSave, UiThemeService.Color("Save"))
+            SetButtonLucideIcon(btnBrowse, "folder-open.svg", 14, 6,
+                "theme:BrowseIcon")
             RegisterButtonClick(this.defaultNameButton,
                 ObjBindMethod(this, "UseDefaultName"))
             RegisterButtonClick(btnBrowse, ObjBindMethod(this, "BrowseIcon"))
@@ -179,9 +180,13 @@ class CustomDisplayDialog extends ManagedWindow {
     SaveTransaction() {
         if !this.IsOpen() || !this.state
             return
+        priorDisplay := this.state.HasOwnProp("DisplayConfig")
+            ? App.displayConfigCodec.Normalize(this.state.DisplayConfig)
+            : App.displayConfigCodec.CreateDefault()
         nextDisplay := App.displayConfigCodec.Normalize({
             Name: this.nameEdit.Value,
-            IconPath: this.iconEdit.Value
+            IconPath: this.iconEdit.Value,
+            SequenceColor: priorDisplay.SequenceColor
         })
         if (nextDisplay.IconPath != ""
             && !CustomIconSourceExists(nextDisplay.IconPath)) {
@@ -195,9 +200,6 @@ class CustomDisplayDialog extends ManagedWindow {
                 Tr("不支持的图标格式"), "Error", this.gui)
             return
         }
-        priorDisplay := this.state.HasOwnProp("DisplayConfig")
-            ? App.displayConfigCodec.Normalize(this.state.DisplayConfig)
-            : App.displayConfigCodec.CreateDefault()
         if App.displayConfigCodec.Equals(priorDisplay, nextDisplay) {
             if App.appsDirty && !SaveAppsToIni() {
                 ShowDarkMsgBoxDeferred(Tr("保存显示设置失败，请查看运行日志。"),

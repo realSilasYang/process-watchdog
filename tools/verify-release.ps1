@@ -6,15 +6,16 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$PackageDirectory,
     [Parameter(Mandatory = $true)]
-    [string]$StandaloneExecutablePath,
-    [Parameter(Mandatory = $true)]
     [string]$SourcePackageDirectory,
+    [Parameter(Mandatory = $true)]
+    [string]$FontPackageDirectory,
     [Parameter(Mandatory = $true)]
     [string]$ResolvedToolchainPath
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
+Import-Module (Join-Path $PSScriptRoot 'ReleaseEngineering.psm1') -Force
 $packageRoot = [System.IO.Path]::GetFullPath($PackageDirectory)
 if (-not (Test-Path -LiteralPath $packageRoot -PathType Container)) {
     throw "Release package directory does not exist: $packageRoot"
@@ -24,6 +25,54 @@ $version = (Get-Content -LiteralPath (Join-Path $projectRoot 'VERSION') `
 $sourceToolLock = Get-Content -LiteralPath $ResolvedToolchainPath `
     -Raw -Encoding UTF8 | ConvertFrom-Json
 $autoHotkeySourceRelativePath = "licenses\sources\AutoHotkey-$($sourceToolLock.tools.autoHotkey.version)-source.zip"
+
+function Assert-NoLocalWatchdogState {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Root,
+        [Parameter(Mandatory = $true)]
+        [string]$PackageLabel
+    )
+
+    $forbiddenNames = @('watchdog.ini')
+    $matches = @(Get-ChildItem -LiteralPath $Root -Recurse -Force -File |
+        Where-Object { $_.Name -in $forbiddenNames })
+    if ($matches.Count -gt 0) {
+        $rootPrefix = [System.IO.Path]::GetFullPath($Root).TrimEnd('\') + '\'
+        $relativePaths = @($matches | ForEach-Object {
+            $_.FullName.Substring($rootPrefix.Length)
+        }) -join ', '
+        throw "$PackageLabel contains local runtime state: $relativePaths"
+    }
+}
+
+function Assert-EmptyPackagedWatchlistExample {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Root,
+        [Parameter(Mandatory = $true)]
+        [string]$PackageLabel
+    )
+
+    $examplePath = Join-Path $Root 'config\watchdog.example.ini'
+    if (-not (Test-Path -LiteralPath $examplePath -PathType Leaf)) {
+        throw "$PackageLabel is missing config/watchdog.example.ini."
+    }
+    $exampleText = Get-Content -LiteralPath $examplePath -Raw -Encoding Unicode
+    foreach ($sectionName in @('Apps', 'Display', 'Launch',
+            'Identity', 'Recovery')) {
+        $sectionPattern = '(?ms)^\[' + [regex]::Escape($sectionName) +
+            '\]\s*\r?\n(?<Body>.*?)(?=^\[|\z)'
+        $sectionMatch = [regex]::Match($exampleText, $sectionPattern)
+        if (-not $sectionMatch.Success) {
+            throw "$PackageLabel example is missing [$sectionName]."
+        }
+        if ($sectionMatch.Groups['Body'].Value -match
+                '(?m)^\s*[^;\s][^=\r\n]*=') {
+            throw "$PackageLabel example contains local records in [$sectionName]."
+        }
+    }
+}
 $mainScript = Get-ChildItem -LiteralPath $projectRoot -Filter '*.ahk' -File |
     Where-Object { $_.Name -notlike '_*' } |
     Select-Object -First 1
@@ -43,8 +92,6 @@ $requiredPaths = @(
     'update-manifest.json',
     'runtime\application-update.ps1',
     'runtime\application-update.strings.json',
-    'runtime\standalone-install.ps1',
-    'runtime\standalone-launcher.ahk',
     'licenses\AutoHotkey-LICENSE.txt',
     $autoHotkeySourceRelativePath,
     '.github\CONTRIBUTING.md',
@@ -57,10 +104,13 @@ $requiredPaths = @(
     '.github\SUPPORT.en.md',
     'config\watchdog.example.ini',
     'assets\app\watchdog.ico',
+    'assets\app\watchdog-logo.png',
     'assets\donate\微信个人收款码.png',
     'assets\donate\微信个人收款码-界面.png',
+    'assets\donate\微信个人收款码-浅色界面.png',
     'assets\donate\支付宝个人收款码.png',
     'assets\donate\支付宝个人收款码-界面.png',
+    'assets\donate\支付宝个人收款码-浅色界面.png',
     'assets\ui-icons\README.md',
     'assets\ui-icons\external-link.svg',
     'assets\ui-icons\lucide\LICENSE.txt',
@@ -104,23 +154,9 @@ $requiredPaths = @(
     'assets\ui-icons\lucide\timer.svg',
     'assets\ui-icons\lucide\trash-2.svg',
     'assets\ui-icons\lucide\triangle-alert-red.svg',
-    'assets\ui-icons\lucide\triangle-alert-timeout.svg',
     'assets\ui-icons\lucide\triangle-alert.svg',
     'assets\ui-icons\lucide\undo-2.svg',
     'assets\ui-icons\lucide\wand-sparkles.svg',
-    'assets\fonts\AppleSDGothicNeo-Regular.ttf',
-    'assets\fonts\COMMERCIAL-LICENSE-NOTICE.md',
-    'assets\fonts\COMMERCIAL-LICENSE-NOTICE.en.md',
-    'assets\fonts\HaranoAjiGothic-Regular.otf',
-    'assets\fonts\NotoSans-Variable.ttf',
-    'assets\fonts\NotoSansCJK.ttc',
-    'assets\fonts\PingFang.ttc',
-    'assets\fonts\SF-Pro-Text-Bold.otf',
-    'assets\fonts\SF-Pro-Text-Regular.otf',
-    'assets\fonts\metadata.json',
-    'assets\fonts\OFL-1.1.txt',
-    'assets\fonts\README.md',
-    'assets\fonts\README.en.md',
     'third_party\dependencies.lock.json',
     'third_party\resvg\resvg.dll',
     'third_party\everything\Everything64.dll',
@@ -132,6 +168,7 @@ $requiredPaths = @(
     'docs\project\THIRD_PARTY_NOTICES.md',
     'docs\project\THIRD_PARTY_NOTICES.en.md',
     'docs\images\process-watchdog-overview.png',
+    'docs\images\process-watchdog-overview-light.png',
     'docs\en\quick-start.md',
     'docs\en\versioning.md',
     'docs\en\installation.md',
@@ -158,32 +195,14 @@ foreach ($relativePath in $requiredPaths) {
         throw "Release package is missing: $relativePath"
     }
 }
-foreach ($forbiddenPath in @('watchdog.ini', 'watchdog.maintenance.ini')) {
-    if (Test-Path -LiteralPath (Join-Path $packageRoot $forbiddenPath)) {
-        throw "Release package contains local runtime state: $forbiddenPath"
-    }
-}
+Assert-NoLocalWatchdogState -Root $packageRoot -PackageLabel 'Release package'
+Assert-EmptyPackagedWatchlistExample -Root $packageRoot `
+    -PackageLabel 'Release package'
 foreach ($obsoletePath in @(
         'README.en.md', 'CHANGELOG.en.md', 'watchdog.ico',
         'watchdog.example.ini', 'docs\development')) {
     if (Test-Path -LiteralPath (Join-Path $packageRoot $obsoletePath)) {
         throw "Release package contains an obsolete layout path: $obsoletePath"
-    }
-}
-
-function Get-FontFileFamilyNames {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$FontPath
-    )
-
-    Add-Type -AssemblyName System.Drawing
-    $collection = [System.Drawing.Text.PrivateFontCollection]::new()
-    try {
-        $collection.AddFontFile($FontPath)
-        return @($collection.Families | ForEach-Object Name | Sort-Object -Unique)
-    } finally {
-        $collection.Dispose()
     }
 }
 
@@ -202,7 +221,7 @@ function Test-FontMetadataFamilies {
     }
     $actualFamilies = [System.Collections.Generic.HashSet[string]]::new(
         [System.StringComparer]::OrdinalIgnoreCase)
-    foreach ($familyName in (Get-FontFileFamilyNames -FontPath $fontPath)) {
+    foreach ($familyName in (Get-OpenTypeFamilyNames -FontPath $fontPath)) {
         [void]$actualFamilies.Add([string]$familyName)
     }
     foreach ($declaredFamily in $declaredFamilies) {
@@ -220,109 +239,6 @@ $executable = $executables[0]
 if ($executable.VersionInfo.FileVersion -ne "$version.0" -or
     $executable.VersionInfo.ProductVersion -ne "$version.0") {
     throw "Executable version metadata does not match VERSION $version."
-}
-$standaloneExecutable = Get-Item -LiteralPath `
-    ([System.IO.Path]::GetFullPath($StandaloneExecutablePath))
-$expectedStandaloneName = "process-watchdog-$version-windows-x64.exe"
-if (-not $standaloneExecutable.PSIsContainer -and
-    $standaloneExecutable.Name -cne $expectedStandaloneName) {
-    throw "Standalone executable name is not stable: $($standaloneExecutable.Name)"
-}
-if ($standaloneExecutable.PSIsContainer) {
-    throw "Standalone executable path is not a file: $StandaloneExecutablePath"
-}
-if ($standaloneExecutable.VersionInfo.FileVersion -ne "$version.0" -or
-    $standaloneExecutable.VersionInfo.ProductVersion -ne "$version.0") {
-    throw "Standalone executable version metadata does not match VERSION $version."
-}
-$portableZipPath = [System.IO.Path]::ChangeExtension(
-    $standaloneExecutable.FullName, '.zip')
-if (-not (Test-Path -LiteralPath $portableZipPath -PathType Leaf)) {
-    throw 'Standalone executable verification requires the portable ZIP beside it.'
-}
-if ((Get-FileHash -Algorithm SHA256 -LiteralPath $executable.FullName).Hash `
-        -eq (Get-FileHash -Algorithm SHA256 `
-            -LiteralPath $standaloneExecutable.FullName).Hash) {
-    throw 'Standalone executable is still the resource-dependent portable executable.'
-}
-if ($standaloneExecutable.Length -le
-        (Get-Item -LiteralPath $portableZipPath).Length) {
-    throw 'Standalone executable does not appear to contain the complete portable payload.'
-}
-
-# 只把独立 EXE 复制进空目录，并把 LOCALAPPDATA 指向隔离沙箱。成功启动校验
-# 证明它没有暗中依赖发布目录旁的 assets、runtime 或 third_party；第二次启动
-# 同时确认启动器不会覆盖已经存在的个人配置。
-$standaloneSandbox = Join-Path $env:TEMP `
-    ('ProcessWatchdogStandaloneReleaseTest-' +
-        [Guid]::NewGuid().ToString('N'))
-$standaloneEmptyDirectory = Join-Path $standaloneSandbox 'empty'
-$standaloneLocalAppData = Join-Path $standaloneSandbox 'local-app-data'
-New-Item -ItemType Directory -Force `
-    -Path $standaloneEmptyDirectory, $standaloneLocalAppData | Out-Null
-$isolatedStandalone = Join-Path $standaloneEmptyDirectory `
-    $standaloneExecutable.Name
-Copy-Item -LiteralPath $standaloneExecutable.FullName `
-    -Destination $isolatedStandalone
-try {
-    foreach ($validationPass in 1..2) {
-        if ($validationPass -eq 2) {
-            $extractedRoot = Join-Path $standaloneLocalAppData `
-                'ProcessWatchdog\Standalone'
-            $personalConfigPath = Join-Path $extractedRoot 'watchdog.ini'
-            $personalConfigContent = "[Settings]`r`nSentinel=preserve`r`n"
-            [System.IO.File]::WriteAllText($personalConfigPath, $personalConfigContent, [System.Text.Encoding]::Unicode)
-            $personalConfigHash = (Get-FileHash -Algorithm SHA256 `
-                -LiteralPath $personalConfigPath).Hash
-        }
-        & (Join-Path $PSScriptRoot 'invoke-startup-validation.ps1') `
-            -ExecutablePath $isolatedStandalone `
-            -WorkingDirectory $standaloneEmptyDirectory `
-            -LocalAppData $standaloneLocalAppData `
-            -TimeoutSeconds 180 `
-            -FailureLabel 'Standalone empty-directory validation'
-    }
-    $extractedRoot = Join-Path $standaloneLocalAppData `
-        'ProcessWatchdog\Standalone'
-    foreach ($requiredExtractedPath in @('VERSION', 'assets', 'runtime',
-            'third_party', '.standalone-payload.sha256')) {
-        if (-not (Test-Path -LiteralPath `
-                (Join-Path $extractedRoot $requiredExtractedPath))) {
-            throw "Standalone payload did not extract: $requiredExtractedPath"
-        }
-    }
-    if ((Get-FileHash -Algorithm SHA256 `
-            -LiteralPath (Join-Path $extractedRoot 'watchdog.ini')).Hash `
-            -ne $personalConfigHash) {
-        throw 'Standalone relaunch overwrote personal configuration.'
-    }
-
-    # 模拟自动更新已把稳定目录推进到更高版本，但其中一个资源随后损坏。
-    # 当前较旧启动器可以报错，却绝不能用自己的旧载荷覆盖该安装。
-    [System.IO.File]::WriteAllText((Join-Path $extractedRoot 'VERSION'),
-        "999.0.0`r`n", [System.Text.UTF8Encoding]::new($false))
-    Remove-Item -LiteralPath (Join-Path $extractedRoot 'assets') `
-        -Recurse -Force
-    try {
-        & (Join-Path $PSScriptRoot 'invoke-startup-validation.ps1') `
-            -ExecutablePath $isolatedStandalone `
-            -WorkingDirectory $standaloneEmptyDirectory `
-            -LocalAppData $standaloneLocalAppData `
-            -TimeoutSeconds 180 `
-            -FailureLabel 'Standalone downgrade protection validation'
-    } catch {
-        # 较新安装缺少资源时内层启动校验可以失败；这里只验证旧启动器没有降级。
-    }
-    if ((Get-Content -LiteralPath (Join-Path $extractedRoot 'VERSION') `
-            -Raw -Encoding UTF8).Trim() -cne '999.0.0' -or
-        (Test-Path -LiteralPath (Join-Path $extractedRoot 'assets'))) {
-        throw 'Standalone launcher downgraded a newer incomplete installation.'
-    }
-} finally {
-    if (Test-Path -LiteralPath $standaloneSandbox) {
-        Remove-Item -LiteralPath $standaloneSandbox -Recurse -Force `
-            -ErrorAction SilentlyContinue
-    }
 }
 $manifest = Get-Content -LiteralPath `
     (Join-Path $packageRoot 'build-manifest.json') -Raw -Encoding UTF8 |
@@ -363,8 +279,7 @@ if ($updateManifest.schemaVersion -ne 1 -or
     $updateManifest.packageKind -ne 'compiled' -or
     $updateManifest.version -ne $version -or
     $updateManifest.entry -cne $executable.Name -or
-    'watchdog.ini' -in $updateManifest.managedPaths -or
-    'watchdog.maintenance.ini' -in $updateManifest.managedPaths) {
+    'watchdog.ini' -in $updateManifest.managedPaths) {
     throw 'Compiled update manifest is unsafe or inconsistent.'
 }
 $expectedCompiledManagedPaths = @(
@@ -387,25 +302,10 @@ $sbom = Get-Content -LiteralPath (Join-Path $packageRoot 'SBOM.spdx.json') `
 if ($sbom.spdxVersion -ne 'SPDX-2.3') {
     throw 'Release SPDX SBOM is invalid or incomplete.'
 }
-$commercialFontLicense = $sbom.hasExtractedLicensingInfos |
-    Where-Object {
-        $_.licenseId -eq 'LicenseRef-Commercial-Apple-Fonts'
-    } | Select-Object -First 1
-if (-not $commercialFontLicense -or
-    [string]::IsNullOrWhiteSpace([string]$commercialFontLicense.extractedText)) {
-    throw 'Release SBOM does not define the commercial font LicenseRef.'
-}
 $expectedPackageNames = @(
     'process-watchdog',
     'resvg C API',
     'Everything SDK DLL',
-    'Apple SD Gothic Neo',
-    'Harano Aji Gothic',
-    'Noto Sans',
-    'Noto Sans CJK',
-    'PingFang',
-    'SF Pro Text Bold',
-    'SF Pro Text Regular',
     'AutoHotkey',
     'Ahk2Exe',
     'actionlint',
@@ -497,16 +397,26 @@ foreach ($markdownFile in Get-ChildItem -LiteralPath $packageRoot `
         }
     }
 }
-# 同时核对文件、来源元数据和 SBOM 三个视角，防止只替换字体文件却忘记更新
-# 哈希或许可证声明。
+# 字体不属于任何程序包。独立字体包保留原 assets/fonts 布局，并以来源元数据、
+# 哈希、真实家族名和许可证共同验收。
+foreach ($applicationRoot in @($packageRoot,
+        [System.IO.Path]::GetFullPath($SourcePackageDirectory))) {
+    if (Test-Path -LiteralPath (Join-Path $applicationRoot 'assets\fonts')) {
+        throw "Application package unexpectedly contains fonts: $applicationRoot"
+    }
+}
+$fontRoot = [System.IO.Path]::GetFullPath($FontPackageDirectory)
+if (-not (Test-Path -LiteralPath $fontRoot -PathType Container)) {
+    throw "Font package directory does not exist: $fontRoot"
+}
 $fontMetadata = Get-Content -LiteralPath `
-    (Join-Path $packageRoot 'assets\fonts\metadata.json') `
+    (Join-Path $fontRoot 'assets\fonts\metadata.json') `
     -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($fontMetadata.schemaVersion -ne 1 -or $fontMetadata.fonts.Count -ne 7) {
     throw 'Packaged font metadata is invalid or incomplete.'
 }
 foreach ($font in $fontMetadata.fonts) {
-    $fontPath = Join-Path $packageRoot `
+    $fontPath = Join-Path $fontRoot `
         ([string]$font.path -replace '/', '\')
     $fontLicense = [string]$font.license
     if ((Get-FileHash -Algorithm SHA256 -LiteralPath $fontPath).Hash -ne `
@@ -517,15 +427,7 @@ foreach ($font in $fontMetadata.fonts) {
             [string]::IsNullOrWhiteSpace([string]$font.authorization))) {
         throw "Packaged font provenance mismatch: $($font.name)"
     }
-    $fontPackage = $sbom.packages |
-        Where-Object { $_.name -eq [string]$font.name } |
-        Select-Object -First 1
-    if (-not $fontPackage -or
-        $fontPackage.checksums[0].checksumValue -ne [string]$font.sha256 -or
-        $fontPackage.licenseDeclared -ne $fontLicense) {
-        throw "Packaged font SBOM entry mismatch: $($font.name)"
-    }
-    Test-FontMetadataFamilies -Root $packageRoot -Font $font
+    Test-FontMetadataFamilies -Root $fontRoot -Font $font
 }
 $expectedFontAssetNames = @(
     'AppleSDGothicNeo-Regular.ttf',
@@ -543,14 +445,14 @@ $expectedFontAssetNames = @(
     'README.md'
 )
 $actualFontAssetNames = @(Get-ChildItem -LiteralPath `
-    (Join-Path $packageRoot 'assets\fonts') -File | ForEach-Object Name |
+    (Join-Path $fontRoot 'assets\fonts') -File | ForEach-Object Name |
     Sort-Object)
 $fontAssetDifference = @(Compare-Object -CaseSensitive `
     -ReferenceObject ($expectedFontAssetNames | Sort-Object) `
     -DifferenceObject $actualFontAssetNames)
 if ($fontAssetDifference.Count -ne 0 -or
     $actualFontAssetNames.Count -ne $expectedFontAssetNames.Count) {
-    throw 'Release package contains a missing or unapproved font asset.'
+    throw 'Optional font package contains a missing or unapproved font asset.'
 }
 
 $sourceRoot = [System.IO.Path]::GetFullPath($SourcePackageDirectory)
@@ -563,8 +465,6 @@ foreach ($relativePath in @(
         'src\Update\ApplicationVersionInfo.ahk',
         'runtime\application-update.ps1',
         'runtime\application-update.strings.json',
-        'runtime\standalone-install.ps1',
-        'runtime\standalone-launcher.ahk',
         'tools\build-release.ps1',
         'tools\invoke-startup-validation.ps1',
         'third_party\resvg\resvg.dll', 'update-manifest.json')) {
@@ -575,32 +475,10 @@ foreach ($relativePath in @(
 if (Get-ChildItem -LiteralPath $sourceRoot -File -Filter '*.exe') {
     throw 'Source release package contains a root executable.'
 }
-$sourceFontDirectory = Join-Path $sourceRoot 'assets\fonts'
-$sourceFontMetadataPath = Join-Path $sourceFontDirectory 'metadata.json'
-$sourceFontAssetNames = @(Get-ChildItem -LiteralPath $sourceFontDirectory -File |
-    ForEach-Object Name | Sort-Object)
-$sourceFontAssetDifference = @(Compare-Object -CaseSensitive `
-    -ReferenceObject ($expectedFontAssetNames | Sort-Object) `
-    -DifferenceObject $sourceFontAssetNames)
-if ($sourceFontAssetDifference.Count -ne 0 -or
-    $sourceFontAssetNames.Count -ne $expectedFontAssetNames.Count) {
-    throw 'Source release package contains a missing or unapproved font asset.'
-}
-$sourceFontMetadata = Get-Content -LiteralPath $sourceFontMetadataPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if ($sourceFontMetadata.schemaVersion -ne 1 -or
-    $sourceFontMetadata.fonts.Count -ne 7) {
-    throw 'Source font metadata is invalid or incomplete.'
-}
-foreach ($font in $sourceFontMetadata.fonts) {
-    $sourceFontPath = Join-Path $sourceRoot ([string]$font.path -replace '/', '\')
-    $sourceFontHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $sourceFontPath).Hash
-    if ($sourceFontHash -ne [string]$font.sha256) {
-        throw "Source font provenance mismatch: $($font.name)"
-    }
-    Test-FontMetadataFamilies -Root $sourceRoot -Font $font
-}
-foreach ($forbiddenPath in @('watchdog.ini', 'watchdog.maintenance.ini',
-        '.git', '.tools', 'dist')) {
+Assert-NoLocalWatchdogState -Root $sourceRoot -PackageLabel 'Source release'
+Assert-EmptyPackagedWatchlistExample -Root $sourceRoot `
+    -PackageLabel 'Source release'
+foreach ($forbiddenPath in @('.git', '.tools', 'dist')) {
     if (Test-Path -LiteralPath (Join-Path $sourceRoot $forbiddenPath)) {
         throw "Source release contains local or generated state: $forbiddenPath"
     }
@@ -615,8 +493,7 @@ if ($sourceVersion -ne $version -or
     $sourceUpdateManifest.packageKind -ne 'source' -or
     $sourceUpdateManifest.version -ne $version -or
     $sourceUpdateManifest.entry -cne $mainScript.Name -or
-    'watchdog.ini' -in $sourceUpdateManifest.managedPaths -or
-    'watchdog.maintenance.ini' -in $sourceUpdateManifest.managedPaths) {
+    'watchdog.ini' -in $sourceUpdateManifest.managedPaths) {
     throw 'Source update manifest is unsafe or inconsistent.'
 }
 $expectedSourceManagedPaths = @(

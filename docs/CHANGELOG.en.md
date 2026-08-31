@@ -7,6 +7,454 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.1.4] - 2026-08-31
+
+### 🚀 Improvements
+
+- **Recovery-confirmation wording:** Interface and documentation wording now consistently says “Ask before every recovery,” accurately describing when confirmation occurs.
+
+### 🐛 Fixed
+
+- **Isolated batch startup and recovery:** During the first batch startup or recovery of monitored targets, a script or application launch failure is recorded and retried for that target only, without interrupting startup or recovery of the remaining targets.
+- **Fully concurrent batch stops:** Stopping multiple or all targets remains fully concurrent, with errors isolated per target; raising the AutoHotkey thread capacity prevents trailing list items from remaining on “Stopping” during large batches because of the default thread limit.
+
+---
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides preferred and fallback interface fonts that must be installed into Windows first; it is not required to run the application.
+- **`process-watchdog-2.1.4-source.zip` (complete source edition):** Includes the AHK source, modules, tests, and documentation without fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64 locally.
+- **`process-watchdog-2.1.4-windows-x64.zip` (complete portable edition, recommended):** Includes the EXE, documentation, licenses, and required runtime resources without fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([latest version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application search; the bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+## 🎉 Version [2.1.3] - 2026-08-23
+
+### 🐛 Fixed
+
+- **Scaled window persistence:** Main-window dimensions are normalized back to the configured 96-DPI layout units when UI scaling is enabled, so reopening no longer compounds the runtime scale.
+- **Tray restoration:** Runtime layout state is synchronized at hide time, and restoring from the tray uses the latest saved dimensions instead of stale values.
+- **Resize constraints:** Resize snapping and minimum-size handling now understand UI scaling without asynchronously expanding the user's custom window size.
+
+---
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides preferred and fallback interface fonts that must be installed into Windows first; it is not required to run the application.
+- **`process-watchdog-2.1.3-source.zip` (complete source edition):** Includes the AHK source, modules, tests, and documentation without fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64 locally.
+- **`process-watchdog-2.1.3-windows-x64.zip` (complete portable edition, recommended):** Includes the EXE, documentation, licenses, and required runtime resources without fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([latest version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application search; the bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+## 🎉 Version [2.1.2] - 2026-08-21
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides preferred and fallback fonts that must be installed into Windows first; it is not required to run the application.
+- **`process-watchdog-2.1.2-source.zip` (complete source edition):** Includes the AHK source, modules, tests, and documentation without fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64 locally.
+- **`process-watchdog-2.1.2-windows-x64.zip` (complete portable edition, recommended):** Includes the EXE, documentation, licenses, and required runtime resources without fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([official latest version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application search; the bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### ✨ Added
+
+- **Recovery-confirmation start count:** Monitoring settings now accept a `1-9999` start count for targets with “Ask before every recovery” enabled, determining which confirmed stop first opens the recovery choice; the default is `2`, and older configurations use that default when the key is absent.
+
+### 🚀 Improvements
+
+- **Synchronized stop counting:** Toggling recovery confirmation for an item, changing its start count, or resetting a guard attempt starts a new stop-count round instead of reusing stale state; the setting is also included in save, undo, and restore flows.
+
+### 🐛 Fixed
+
+- **Recovery buttons at high scale:** Recovery-choice prompts now submit a complete button redraw immediately after scaling, preventing the first frame at ratios such as 200% from showing only the button surface until the pointer moves over it.
+
+## 🎉 Version [2.1.1] - 2026-08-19
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides preferred and fallback fonts that must be installed into Windows first; it is not required to run the application.
+- **`process-watchdog-2.1.1-source.zip` (complete source edition):** Includes the AHK source, modules, tests, and documentation without fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64 locally.
+- **`process-watchdog-2.1.1-windows-x64.zip` (complete portable edition, recommended):** Includes the EXE, documentation, licenses, and required runtime resources without fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([official latest version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application search; the bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### ⚠️ Important Notes
+
+- **Upgrade protection removed:** Software upgrade protection and its maintenance sessions are no longer available. The first launch removes the legacy `watchdog.maintenance.ini` and the `[Maintenance]` section in `watchdog.ini`; back up those files before upgrading if an unfinished session record must be kept, otherwise the legacy session data is deleted.
+
+---
+
+### ✨ Added
+
+- **Per-target recovery confirmation:** A main-list context-menu action enables “Ask before every recovery” for individual monitored targets. When such a target stops, the reminder offers immediate recovery, one- or three-minute delays, and pause guarding; all other targets continue to recover silently without extra prompts.
+- **Interface scaling:** Display settings now provide scales from 80% to 200%; windows, controls, fonts, icons, and popups adapt together to the selected scale.
+- **Restart-decision status dot:** Targets that ask before recovery receive a green dot by default. A custom dot overrides it, and clearing a custom dot restores the default state indicator.
+
+---
+
+### 🚀 Improvements
+
+- **Clearer running-process loading:** The application now deduplicates usable processes and determines the final total before rendering the list. Loading shows accurate progress only, avoiding changing totals and partial rows during selection.
+- **More compact settings window:** The four Display fields use less vertical space while the Startup layout keeps its original spacing. The window is smaller without clipping log paths or action buttons.
+- **Removed upgrade-protection remnants:** Upgrade-protection code, tests, icons, and documentation have been removed so configuration and release packages retain only the state required for current monitoring.
+
+---
+
+### 🐛 Fixed
+
+- **Immediate pause-state synchronization:** Changing pause state from the list or its context menu now immediately refreshes the main status, pause command, and selection visuals.
+- **Reliable recovery-decision reminder:** The reminder shows its title, monitored display name, and yellow warning symbol correctly, then focuses and moves the pointer to “Recover now.”
+- **Buttons after restoring a window:** Main and child windows now refresh their buttons and list surface when shown again, so controls do not require pointer movement before rendering completely.
+
+## 🎉 Version [2.1.0] - 2026-08-15
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides preferred and fallback fonts that must be installed into Windows first; it is not required to run the application.
+- **`process-watchdog-2.1.0-source.zip` (complete source edition):** Includes the AHK source, modules, tests, and documentation without fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64 locally.
+- **`process-watchdog-2.1.0-windows-x64.zip` (complete portable edition, recommended):** Includes the EXE, documentation, licenses, and required runtime resources without fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([official latest version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application search; the bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### ✨ Added
+
+- **Configurable administrator mode for the assistant:** The Startup page now includes “Run as administrator.” It remains enabled by default; disabling it runs the assistant with the current user token, while enabling it again performs a safe UAC handoff and synchronizes existing or newly created scheduled tasks to the same privilege level.
+- **Batch sequence-dot colors:** The main-list context popup offers seven dark/light theme colors plus a clear action. Right-clicking an already selected row preserves the multi-selection so one color can be applied to several monitored targets at once. Dot colors affect display only, never process matching, launching, or update protection.
+- **Dynamic inertial main-list scrolling:** Wheel input accelerates and decelerates according to input speed for smoother continuous movement. Reordering, window teardown, and list boundaries stop the motion promptly and restore the system timer resolution.
+
+---
+
+### 🚀 Improvements
+
+- **More compact and stable context menu:** Ordinary commands again use localized Emoji text and all separators are removed. Only “Set sequence dot” uses the enlarged theme-colored palette icon; the popup retains its no-activate behavior, rounded hover background, and right-aligned check marks.
+- **Natural multi-selection behavior:** Right-clicking a selected row no longer collapses the current multi-selection, while right-clicking an unselected row still selects only that row. Selected rows no longer show the native focus rectangle, and sequence dots are rendered through the list subitem drawing pipeline.
+- **Stronger release-state isolation:** Portable and source packages recursively reject `watchdog.ini` and `watchdog.maintenance.ini`, and verify that the monitored-app, maintenance, display, launch, identity, and recovery sections of the example configuration contain no local records.
+
+---
+
+### 🐛 Fixed
+
+- **Buttons render immediately after a window is recalled:** Restoring from the taskbar, recalling the app from another instance, or showing a child window again refreshes rounded buttons immediately instead of requiring the pointer to pass over each control.
+- **Context-popup teardown no longer reads an invalid window:** Closing the popup snapshots and validates its native handle so timers and pointer callbacks cannot access an already destroyed GUI and repeatedly raise “Gui has no window.”
+- **Centered clear-dot mark:** The clear button now draws its cross from the control's geometric center, independent of font, language, or DPI baselines.
+
+---
+
+## 🎉 Version [2.0.13] - 2026-08-13
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides preferred and fallback fonts that must be installed into Windows first; it is not required to run the application.
+- **`process-watchdog-2.0.13-source.zip` (complete source edition):** Includes the AHK source, modules, tests, and documentation without fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64 locally.
+- **`process-watchdog-2.0.13-windows-x64.zip` (complete portable edition, recommended):** Includes the EXE, documentation, licenses, and required runtime resources without fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([official latest version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application search; the bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### 🚀 Improvements
+
+- **Reliable shortcut creation:** Desktop and Start menu entries are created and verified as one transaction. If either fails, previous shortcuts are restored, preventing partial results, and successful entries notify Windows Shell immediately.
+
+---
+
+### 🐛 Fixed
+
+- **Unrelated AHK taskbar icons are no longer contaminated:** The source edition uses a stable product-specific Windows identity, and its shortcuts target the assistant script directly while retaining the product icon. They no longer associate that icon with the shared AutoHotkey interpreter. Precisely matched legacy shortcuts are migrated automatically.
+
+---
+
+## 🎉 Version [2.0.12] - 2026-08-12
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides preferred and fallback fonts that must be installed into Windows first; it is not required to run the application.
+- **`process-watchdog-2.0.12-source.zip` (complete source edition):** Includes the AHK source, modules, tests, and documentation without fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64 locally.
+- **`process-watchdog-2.0.12-windows-x64.zip` (complete portable edition, recommended):** Includes the EXE, documentation, licenses, and required runtime resources without fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([official latest version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application search; the bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### 🚀 Improvements
+
+- **Complete light-theme adaptation:** Windows, text fields, list states, the status bar, and semantic icons now receive targeted light colors only where contrast was insufficient or a color conflicted with the background. The existing dark palette, original dark-mode icon pixels, and dark QR assets remain unchanged.
+- **Reliable theme-switch rendering:** Theme-specific icons now use distinct cache identities and refresh promptly after a theme change instead of retaining colors from the previous theme. Status and action icons use clear semantic colors on light backgrounds.
+- **More readable light hover previews:** Light mode uses a pale blue-gray background, near-black 10 pt UI text, comfortable padding, and automatic wrapping up to 420 DIP while retaining delayed display, mouse pass-through, and Windows 11 system rounding. Dark-mode behavior remains unchanged.
+- **More compact donation window:** The divider and nearby excess whitespace are removed, the window is narrower, and dedicated QR images are used in light mode. The revised prompt is synchronized across all 13 UI languages.
+
+---
+
+### 🐛 Fixed
+
+- **No stale colors after theme changes:** Fixed some window buttons, status-bar icons, and list icons not immediately applying the active theme after switching between light and dark modes.
+- **Restored light-theme contrast:** Fixed insufficient contrast or visual conflicts affecting some read-only text, decorative backgrounds, and hover previews on light backgrounds without changing established dark-mode styling.
+
+---
+
+## 🎉 Version [2.0.11] - 2026-08-11
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides preferred and fallback fonts that must be installed into Windows first; it is not required to run the application.
+- **`process-watchdog-2.0.11-source.zip` (complete source edition):** Includes the AHK source, modules, tests, and documentation without fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64 locally.
+- **`process-watchdog-2.0.11-windows-x64.zip` (complete portable edition, recommended):** Includes the EXE, documentation, licenses, and required runtime resources without fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([official latest version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application search; the bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### ✨ Added
+
+- **Version-directory update relocation:** For direct-file targets installed under version directories such as `2.0.10` or `v2.0.11`, update protection can search the same parent directory for exactly one same-named entry after target-file changes are confirmed. It records and continuously verifies that candidate's SHA-256 before asking the user to update the monitored path; multiple candidates, duplicate copies, or incomplete scans are never guessed.
+
+---
+
+### 🚀 Improvements
+
+- **Broader update-protection evidence:** Watcher overflow, same-named files in subdirectories, and changes to configuration, resources, or archives during an active update now trigger timely verification. Once target-footprint changes are confirmed, recent installer processes proxied by system installer services can also be recognized without install-path arguments, while ordinary writes in shared install roots remain excluded.
+- **Explainable and resumable updater learning:** A dedicated updater confirmed during a real update is learned as a full executable path scoped to its installation root. Global installer tools, temporary-directory programs, and process names alone cannot become permanent evidence. An unfinished session preserves transient updater identities and pending learning candidates across an assistant restart, then commits them only after the update completes successfully.
+- **Process recognition for restricted image paths:** Process image lookup now has a device-path fallback. Only during a confirmed update, and only for one same-named process, the assistant may use the pre-update PID creation identity or a recent start time to confirm recovery, reducing update timeouts when the application is already running.
+- **More efficient maintenance scanning and clearer diagnostics:** Multi-target scans reuse common candidates and parsed command-line paths, while a full process snapshot is considered only for the target with confirmed update-footprint activity. Diagnostic bundles now include work-gate owner, contention, and hold times plus categorized process-snapshot and file-scan worker failures, retries, and recent successes.
+- **Release font restoration no longer depends on LFS quota:** CI, scheduled soaks, release dry runs, and formal releases now restore complete fonts from the latest published `fonts.zip` and verify every SHA-256 against current metadata. Oversized fonts remain tracked through LFS in Git, but exhausted remote LFS transfer quota no longer blocks testing and packaging of already verified font assets.
+- **Clearer update-protection settings:** The three timing labels no longer use colons and align with their inputs, installation-directory action buttons retain their full labels, and the spacing below Clear Records is tighter.
+
+---
+
+### 🐛 Fixed
+
+- **Running applications no longer time out after an update:** Fixed some applications already running after an update while a temporarily inaccessible process image path kept the assistant waiting until update protection timed out. Ambiguous same-name candidates or unverifiable creation identities still remain unknown and are never adopted blindly.
+- **Background-worker failures remain observable:** Process snapshot and content-scan workers now distinguish launch failure, exit without a result, timeout, malformed output, and cancellation. A malformed file-scan result is no longer left in a pending state after its worker has exited.
+
+---
+
+## 🎉 Version [2.0.10] - 2026-08-08
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides the preferred and fallback fonts for installation into Windows; it is not required to run the application.
+- **`process-watchdog-2.0.10-source.zip` (complete source package):** Includes the AHK source, modules, tests, and documentation without fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+- **`process-watchdog-2.0.10-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, and runtime resources without fonts; no AutoHotkey installation is required, and it is intended for long-term use after full extraction.
+- **Everything ([latest official version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application searches. The bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### 🚀 Improved
+
+- **Clearer settings categories:** The former General and Monitoring & Startup pages are reorganized into separate Display, Startup, and Monitoring pages, forming five responsibility-focused tabs together with Stop Policy and Logs. Scheduled-task status is queried only after opening Startup, so the initial Settings window no longer waits for that check.
+- **More compact settings forms:** Descriptive fields now place their labels above their values, align each page to a shared left edge, and center the group by its longest control. Startup options are stacked vertically, while path fields and dividers use the space their content needs with less unused spacing.
+- **More consistent visual hierarchy:** Display adds semantically colored icons for display, language, font, and theme; text-only Save buttons share a deep-green background; and the main-list pseudo-header centers its labels without changing the alignment of underlying data columns.
+- **Updated interface overview:** Every localized README continues to share one main-window preview, now showing the current interface with common watched-target types and distinct runtime states.
+
+---
+
+### 🐛 Fixed
+
+- **Selectable text and stable first paint:** Every editable and read-only text box now supports direct text selection. Decorative backgrounds no longer intercept mouse drags or repaint over inputs later, so text is complete as soon as a window opens instead of appearing only after hover.
+
+---
+
+## 🎉 Version [2.0.9] - 2026-08-05
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides the preferred and fallback fonts for installation into Windows; it is not required to run the application.
+- **`process-watchdog-2.0.9-source.zip` (complete source package):** Includes the AHK source, modules, tests, and documentation without fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+- **`process-watchdog-2.0.9-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, and runtime resources without fonts; no AutoHotkey installation is required, and it is intended for long-term use after full extraction.
+- **Everything ([latest official version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application searches. The bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### 🐛 Fixed
+
+- **More stable continuous main-window resizing:** Right-side buttons, the list, and the pseudo-header now move and refresh only their affected regions, while the parent window and stable left-side controls avoid whole-window redraw suspension, preventing flicker and stale trails during dragging.
+
+---
+
+### 🚀 Improved
+
+- **Full product name in child-window titles:** Settings plus update confirmation and error windows now begin with the full Process Watchdog Assistant name in every interface language.
+
+---
+
+## 🎉 Version [2.0.8] - 2026-08-03
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides the preferred and fallback fonts for installation into Windows; it is not required to run the application.
+- **`process-watchdog-2.0.8-source.zip` (complete source package):** Includes the AHK source, modules, tests, and documentation without fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+- **`process-watchdog-2.0.8-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, and runtime resources without fonts; no AutoHotkey installation is required, and it is intended for long-term use after full extraction.
+- **Everything ([latest official version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application searches. The bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### ✨ Added
+
+- **Manual restart for watched targets:** The context menu now includes Restart, which closes the current target under the configured stop policy and launches it again. Paused targets resume monitoring as part of the operation, while upgrade protection or an uncertain process identity prevents unsafe termination.
+
+---
+
+### 🚀 Improvements
+
+- **Context actions follow the operating workflow:** Restart, Stop Running, Edit Full Path, and Open File Location now appear in that order, and Process Identification and Launch Settings appears before the administrator toggle so frequent actions are easier to find.
+- **Clearer application-icon rendering:** The main list prefers a real native frame with an appropriate size from ICO, EXE, DLL, and CPL resources, then applies high-quality scaling instead of accepting a system-prescaled image with blurred or distorted edges.
+- **Consolidated About and support entry points:** About replaces the former Donate button in the main window and opens a dedicated child window for version, runtime, update checking, Donate, and project access. Help and Donate terminology plus feedback and project hover hints are streamlined consistently.
+- **More stable font-list browsing:** The UI content-font list displays a fixed 12 rows and preserves the user's current scroll position after installed fonts are refreshed instead of jumping back to the selected item.
+- **More recognizable update icon:** The refresh icon now uses the existing blue-violet update semantic while retaining the ordinary toolbar-button background and text treatment.
+
+## 🎉 Version [2.0.7] - 2026-08-01
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides the preferred and fallback fonts for installation into Windows; it is not required to run the application.
+- **`process-watchdog-2.0.7-source.zip` (complete source package):** Includes the AHK source, modules, tests, and documentation without fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+- **`process-watchdog-2.0.7-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, and runtime resources without fonts; no AutoHotkey installation is required, and it is intended for long-term use after full extraction.
+- **Everything ([latest official version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application searches. The bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### 🚀 Improvements
+
+- **More explainable process-identification diagnostics:** When startup is delayed because an existing process cannot be verified reliably, the log now records the observation source, reason, and reason code, with throttling for repeated causes so command-line, process-path, snapshot, and probe-configuration uncertainty is easier to separate.
+- **More transparent content-relocation flow:** Content-based moved-target recovery now records missing-state stabilization, search roots, scan method, failed or timed-out scans, rejected candidates, duplicate copies, and misses so users are not left with a black-box “no relocation” result.
+- **Clearer Everything dependency experience:** Program search distinguishes the bundled `Everything64.dll` from the Everything application itself, tries to locate and start Everything when the background instance is not responding, and shows specific error meanings, discovery details, or the official download entry when recovery fails.
+- **More readable main interface:** The status-information column default width increases from 180 to 200, and the README interface overview now uses the current main-window screenshot.
+- **Cleaner release-engineering output:** Reproducible builds now default to a controlled temporary directory and clean it up automatically, while CI, dry-run, and formal release workflows explicitly write to `dist` so local preflight runs do not leave build artifacts behind.
+
+---
+
+### 🐛 Fixed
+
+- **Everything failure-message stability:** Fixed Everything-unavailable diagnostic text composition that could trigger an AutoHotkey ternary-expression parse error.
+- **About-page information-column layout:** Version and runtime information columns now use the About page divider bounds, preventing the row from crossing the divider or inheriting the settings-form right margin.
+- **Open File Location file-manager routing:** Explorer still selects the file when it is the system default file manager; otherwise the default file manager opens the containing directory.
+
+## 🎉 Version [2.0.6] - 2026-07-31
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides the preferred and fallback fonts for installation into Windows; it is not required to run the application.
+- **`process-watchdog-2.0.6-source.zip` (complete source package):** Includes the AHK source, modules, tests, and documentation without fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+- **`process-watchdog-2.0.6-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, and runtime resources without fonts; no AutoHotkey installation is required, and it is intended for long-term use after full extraction.
+- **Everything ([latest official version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application searches. The bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
+---
+
+### ⚠️ Important Notes
+
+- **Release asset change:** Starting with v2.0.6, the standalone EXE is no longer provided. Upgrades must use either the complete portable package or the source package.
+- **Font-loading change:** Application packages no longer include or privately load fonts. To retain the prior preferred-font appearance, the optional font package must be downloaded and installed into Windows.
+
+---
+
+### 🚀 Improvements
+
+- **Simplified program editions:** The release pipeline now builds only the complete portable and source editions. The standalone EXE wrapper, installation script, and corresponding tests have been removed so the same application no longer has three delivery paths.
+- **System fonts and optional font package:** Runtime selection now considers only fonts installed in Windows while preserving the existing priority order. Preferred and fallback fonts are distributed separately and no longer appear in application packages or the SBOM.
+- **Everything acquisition guidance:** Installation, configuration, and release documentation consistently links to the latest official version and explains that Everything itself supplies indexing and the background service while the bundled DLL only provides IPC.
+- **Converged release pipeline:** Builds, reproducibility checks, asset inventories, downloaded-release verification, and the GitHub Release workflow now consistently validate the two application editions and optional font package, with obsolete standalone-EXE branches removed.
+
+---
+
+### 🐛 Fixed
+
+- **Main-list focus clearing:** Clicking an empty main-window surface or empty ListView area now clears both ListView focus and its focused item, preventing a selected target from retaining keyboard-operation focus.
+- **Main-window title-bar actions:** Focus-clearing routing no longer intercepts non-client mouse messages, restoring native Windows behavior for minimizing, closing, dragging, and resizing the main window.
+
+## 🎉 Version [2.0.5] - 2026-07-31
+
+### 📦 Release Assets
+
+- **`process-watchdog-2.0.5-windows-x64.exe` (standalone executable):** Requires no AutoHotkey installation and runs immediately after download; intended for a quick trial or users who need a single program file.
+- **`process-watchdog-2.0.5-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, fonts, and runtime resources; intended for long-term use after full extraction or for manual deployment.
+- **`process-watchdog-2.0.5-source.zip` (complete source package):** Includes the AHK source, modules, tests, documentation, and fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+
+---
+
+### ✨ Added
+
+- **Content-based moved-target recovery:** Directly added programs and scripts retain an exact-size and SHA-256 content baseline. After the file or a parent folder is renamed, or the file moves across folders or volumes, the monitored path can be updated once unchanged content is confirmed, including moves made while the assistant was closed. File names, file IDs, and directory notifications are not identity evidence.
+- **Dark native path editing:** The main list's in-place full-path editor now uses the active input background and text colors consistently from the context menu, double-click, and F2.
+
+---
+
+### 🚀 Improvements
+
+- **Efficient conservative relocation scans:** The nearest surviving directory is scanned first. Broader searches use Everything to narrow candidates by compatible extension and exact size before a separate worker computes complete hashes. Multiple identical copies or an incomplete scan never cause a guessed relocation.
+- **Batch path editing:** During multi-selection full-path editing, Enter saves the current item and advances to the next; Escape still cancels only the current edit.
+- **True stop-target command:** Stop Running replaces Restart in the context menu. It pauses monitoring before applying the configured stop policy so the target is not immediately launched again.
+- **System shortcuts and feedback:** Shortcut creation independently writes and verifies both the desktop entry and the Start menu All apps entry, then notifies Windows Shell. Success hides the action button and shows the complete confirmation text; error dialogs align the icon, message, and buttons consistently.
+- **Dark first-frame presentation:** Before the main window first becomes visible, its title bar, list, header, status bar, and command buttons are painted while DWM composition is cloaked, reducing white startup frames in dark mode.
+- **Downloaded-release final audit:** After the formal workflow matches the local build against GitHub metadata and publishes the Release, it downloads the hosted standalone EXE, portable ZIP, and source ZIP, checks their digests again, extracts both archives, and reruns the complete package verifier. The dynamic formal-release toolchain snapshot remains distinct from the pinned ordinary-CI snapshot so the audit cannot use the wrong reference.
+
+---
+
+### 🐛 Fixed
+
+- **Guard-state convergence:** Fixed a content-relocation callback argument mismatch that aborted the main monitor before process observation, leaving several running targets in Initializing, and fixed missing targets oscillating between Waiting for process state and Missing.
+- **Main-window first display:** Fixed command buttons other than Add occasionally remaining blank until hover or click, and fixed delayed initial status-bar content.
+- **Consistent path-edit entry:** Fixed F2 falling through to the ListView default handler and creating a second light editor. Theme changes also refresh an active in-place editor.
+- **Reload and shortcut errors:** Reload handoff now targets an explicit window handle and tolerates the old window exiting between operations, preventing Target window not found. Shortcut failures now identify the entry that was not completed.
+
+## 🎉 Version [2.0.4] - 2026-07-30
+
+### 📦 Release Assets
+
+- **`process-watchdog-2.0.4-windows-x64.exe` (standalone executable):** Requires no AutoHotkey installation and runs immediately after download; intended for a quick trial or users who need a single program file.
+- **`process-watchdog-2.0.4-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, fonts, and runtime resources; intended for long-term use after full extraction or for manual deployment.
+- **`process-watchdog-2.0.4-source.zip` (complete source package):** Includes the AHK source, modules, tests, documentation, and fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+
+---
+
+### ✨ Added
+
+- **Main-list keyboard control:** When the main list has focus, Space pauses or resumes monitoring for the selected targets. Multiple selections and mixed states are toggled item by item, while key-repeat messages are suppressed to prevent rapid state reversal.
+
+---
+
+### 🚀 Improvements
+
+- **Watched-target terminology:** The interface, logs, configuration comments, and all thirteen README languages now use terminology that consistently identifies a watched target, instead of switching among application, monitored item, and project in the same context.
+- **Branding and interface overview:** Refreshed the high-resolution transparent logo and application icon used by the README, application windows, tray, taskbar, and release packages. The README overview now also shows the current main window.
+- **Release-note structure:** Existing and future release notes keep automated validation inventories out of the user-facing change summary, preserving clear sections for version changes and the three downloads while detailed evidence remains in project records and Actions logs.
+- **Release-preflight reliability:** Added a single local preflight entry point that prepares a checksum-verified portable PowerShell 7, refreshes the build tools, and runs the complete release gates in sequence. Packaged-font validation now reads OpenType metadata directly instead of depending on localized family names returned by a particular PowerShell, .NET, or Windows display language.
+
+---
+
+### 🐛 Fixed
+
+- **Log-path action alignment:** Aligned the Browse button on the Log settings page with the left edge of its path field so the action remains visually connected to the setting it changes.
+
+## 🎉 Version [2.0.3] - 2026-07-29
+
+### 📦 Release Assets
+
+- **`process-watchdog-2.0.3-windows-x64.exe` (standalone executable):** Requires no AutoHotkey installation and runs immediately after download; intended for a quick trial or users who need a single program file.
+- **`process-watchdog-2.0.3-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, fonts, and runtime resources; intended for long-term use after full extraction or for manual deployment.
+- **`process-watchdog-2.0.3-source.zip` (complete source package):** Includes the AHK source, modules, tests, documentation, and fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+
+---
+
+### ✨ Added
+
+- **Renamed and moved target recovery**: A directly added program or script can be recovered after it is renamed, its parent directory is renamed, or it is moved within the same volume while the assistant is running, when the file system permits reopening files by Windows file ID. When that capability is unavailable, only a complete Windows rename event is accepted as fallback evidence; similar names are never guessed.
+- **Path confirmation and history**: Detection freezes restart work only for the affected item and presents the previous path, new path, and evidence in a localized confirmation window. Confirmation changes only the monitored path, preserves the name, icon, arguments, environment, runtime, and update-protection settings, and supports undo and redo.
+
+---
+
+### 🚀 Improvements
+
+- **Main-window command buttons**: Add, Pause/Resume, and Delete now use fixed icon slots. Pause and Resume use a common geometric canvas, while character icons are centered from their rendered raster ink. Text and icons no longer shift across state changes, theme switches, or high-DPI redraws.
+- **Target-state presentation**: Waiting for path confirmation has a dedicated status icon and exception priority. List sorting, the status bar, and the supervisor now distinguish a missing target, pending confirmation, and normal initialization.
+- **README branding and interface overview**: All thirteen language home pages now use the same centered high-resolution transparent logo, following the CodeBookmark structure, and continue to share the updated current main-window preview.
+- **Donation copy**: The Donate button now uses a shorter tooltip, while the donation window and all thirteen README languages guide users directly to the available support methods.
+
+---
+
+### 🐛 Fixed
+
+- **Resume after a paused target was renamed**: Fixed an item remaining indefinitely in Initializing after its target was renamed while monitoring was paused. A stale directory-activity signal no longer blocks recovery when update protection is disabled.
+- **Missing-target detection order**: File identity is checked before restart decisions when the target was renamed but its old process is still alive, process snapshots are temporarily unavailable, or a single-instance notice has just closed. This prevents path changes from being treated as application stops and avoids duplicate launches.
+- **Transactional path migration**: Manual path edits and automatic recovery now share target-conflict, shortcut, and runtime-configuration validation. A failed configuration write rolls the whole transition back, preventing disagreement among the list, runtime state, and INI persistence.
+
 ## 🎉 Version [2.0.2] - 2026-07-29
 
 ### 📦 Release Assets
@@ -253,7 +701,23 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.2...HEAD
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.4...HEAD
+[2.1.4]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.4
+[2.1.3]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.3
+[2.1.2]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.2
+[2.1.1]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.1
+[2.1.0]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.0
+[2.0.13]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.0.13
+[2.0.12]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.11...v2.0.12
+[2.0.11]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.10...v2.0.11
+[2.0.10]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.9...v2.0.10
+[2.0.9]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.8...v2.0.9
+[2.0.8]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.7...v2.0.8
+[2.0.7]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.6...v2.0.7
+[2.0.6]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.5...v2.0.6
+[2.0.5]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.4...v2.0.5
+[2.0.4]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.3...v2.0.4
+[2.0.3]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.2...v2.0.3
 [2.0.2]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/realSilasYang/process-watchdog/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/realSilasYang/process-watchdog/compare/v1.0.0...v2.0.0

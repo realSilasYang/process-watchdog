@@ -1,4 +1,4 @@
-; 单个守护项的进程身份与启动环境设置窗口。
+; 单个守护对象的进程身份与启动环境设置窗口。
 ; 快捷方式继续作为稳定的启动入口，解析后的真实进程只负责运行状态判断；直接脚本
 ; 可交给任意可执行运行时启动，工作目录、两级参数与环境变量均不改变探活身份。
 
@@ -61,7 +61,7 @@ class EnvironmentSettingsDialog extends ManagedWindow {
             InitializeApplicationWindow(this.gui, "norm s10")
 
             this.gui.Add("Text", "x" contentX " y14 w" contentWidth
-                " h20 BackgroundTrans", Tr("守护目标："))
+                " h20 BackgroundTrans", Tr("守护对象："))
             targetInput := AddCenteredSingleLineEdit(this.gui, contentX, 36,
                 contentWidth, 26, path, "ReadOnly",
                 UiThemeService.Color("Surface"))
@@ -93,13 +93,13 @@ class EnvironmentSettingsDialog extends ManagedWindow {
             actionStartX := Round((windowWidth - 170) / 2)
             btnSave := this.gui.Add("Text", "x" actionStartX
                 " y" actionY " w80 h28 Center 0x200 Background"
-                    UiThemeService.Color("Primary") " c"
+                    UiThemeService.Color("Save") " c"
                     UiThemeService.Color("ButtonText"), Tr("保存"))
             btnCancel := this.gui.Add("Text", "x" (actionStartX + 90)
                 " y" actionY " w80 h28 Center 0x200 Background"
                     UiThemeService.Color("Toolbar") " c"
                     UiThemeService.Color("ToolbarText"), Tr("取消"))
-            RegisterHoverButton(btnSave, UiThemeService.Color("Primary"))
+            RegisterHoverButton(btnSave, UiThemeService.Color("Save"))
             RegisterHoverButton(btnCancel, UiThemeService.Color("Toolbar"))
             RegisterButtonClick(btnSave, ObjBindMethod(this, "Save"),
                 ButtonFeedbackMode.Dismissive)
@@ -192,7 +192,8 @@ class EnvironmentSettingsDialog extends ManagedWindow {
         RegisterHoverButton(this.resolutionActionButton,
             UiThemeService.Color("Toolbar"))
         SetButtonLucideIcon(this.resolutionActionButton,
-            isManual ? "folder-open.svg" : "scan-search.svg", 14, 6)
+            isManual ? "folder-open.svg" : "scan-search.svg", 14, 6,
+            isManual ? "theme:BrowseIcon" : "theme:QueryIcon")
         RegisterButtonClick(this.resolutionActionButton,
             ObjBindMethod(this, "HandleResolutionAction"))
 
@@ -218,7 +219,7 @@ class EnvironmentSettingsDialog extends ManagedWindow {
     BuildDirectIdentitySection(x, width, path) {
         this.gui.Add("Text", "x" x " y114 w" width
             " h42 BackgroundTrans c" UiThemeService.Color("HintText"),
-            Tr("该项目直接启动并监控同一个目标，无需额外识别真实进程。"))
+            Tr("该守护对象直接启动并监控同一个目标，无需额外识别真实进程。"))
         this.gui.Add("Text", "x" x " y172 w" width
             " h20 BackgroundTrans", Tr("用于判断运行状态的目标："))
         directInput := AddCenteredSingleLineEdit(this.gui, x, 195, width,
@@ -268,7 +269,8 @@ class EnvironmentSettingsDialog extends ManagedWindow {
                 Tr("参数顺序为：启动程序参数、目标路径、目标参数；例如 Java 使用 -jar。"))
             RegisterHoverButton(btnBrowseRuntime,
                 UiThemeService.Color("Toolbar"))
-            SetButtonLucideIcon(btnBrowseRuntime, "folder-open.svg", 14, 6)
+            SetButtonLucideIcon(btnBrowseRuntime, "folder-open.svg", 14, 6,
+                "theme:BrowseIcon")
             RegisterButtonClick(btnBrowseRuntime,
                 ObjBindMethod(this, "BrowseRuntime"))
             workDirLabelY := 371
@@ -330,7 +332,8 @@ class EnvironmentSettingsDialog extends ManagedWindow {
             SetDarkControl(inputControl.Hwnd)
         RegisterHoverButton(btnBrowseWorkDir,
             UiThemeService.Color("Toolbar"))
-        SetButtonLucideIcon(btnBrowseWorkDir, "folder-open.svg", 14, 6)
+        SetButtonLucideIcon(btnBrowseWorkDir, "folder-open.svg", 14, 6,
+            "theme:BrowseIcon")
         RegisterButtonClick(btnBrowseWorkDir,
             ObjBindMethod(this, "BrowseWorkDir"))
         this.envEdit.OnEvent("Change",
@@ -351,7 +354,7 @@ class EnvironmentSettingsDialog extends ManagedWindow {
             this.currentResolutionSource := "用户指定"
             this.resolutionActionButton.Text := Tr("选择程序")
             SetButtonLucideIcon(this.resolutionActionButton,
-                "folder-open.svg", 14, 6)
+                "folder-open.svg", 14, 6, "theme:BrowseIcon")
             this.UpdateResolutionPresentation()
             return
         }
@@ -361,7 +364,7 @@ class EnvironmentSettingsDialog extends ManagedWindow {
             UiThemeService.Color("Surface"))
         this.resolutionActionButton.Text := Tr("重新识别")
         SetButtonLucideIcon(this.resolutionActionButton,
-            "scan-search.svg", 14, 6)
+            "scan-search.svg", 14, 6, "theme:QueryIcon")
         this.RefreshAutomaticResolution()
     }
 
@@ -538,8 +541,8 @@ class EnvironmentSettingsDialog extends ManagedWindow {
                 conflictPath := App.targetIdentityService.FindConflict(
                     resolvedTarget, path)
                 if (conflictPath != "") {
-                    ShowDarkMsgBoxDeferred(Tr("该真实进程已由其他监控项守护。"),
-                        Tr("监控目标重复"), "Error", this.gui)
+                    ShowDarkMsgBoxDeferred(Tr("该真实进程已由其他守护对象守护。"),
+                        Tr("守护对象重复"), "Error", this.gui)
                     return
                 }
             }
@@ -606,7 +609,6 @@ class EnvironmentSettingsDialog extends ManagedWindow {
         priorPhase := stateObj.Phase
         if identityChanged {
             stateObj.CancelScheduledTasks()
-            App.maintenanceCoordinator.CleanupTarget(path, stateObj, false)
             ClearStateProcessIdentity(stateObj)
             stateObj.ResetGuardAttemptState()
         }
@@ -622,23 +624,9 @@ class EnvironmentSettingsDialog extends ManagedWindow {
         App.targetSpecsService.Get(path, stateObj, true)
         if identityChanged {
             stateObj.OneShot := IsOneShotTarget(path, resolvedTarget)
-            stateObj.MaintenanceConfig := App.maintenanceConfigCodec
-                .NormalizeSnapshot(stateObj.MaintenanceConfig, path,
-                    resolvedTarget)
-            fingerprintTarget := resolvedTarget != "" ? resolvedTarget : path
-            refreshedFingerprint := App.targetFileInspector.GetFingerprint(
-                fingerprintTarget)
-            stateObj.SafetyFingerprint := refreshedFingerprint
-            stateObj.MaintenanceBaselineFingerprint := refreshedFingerprint
-            stateObj.SafetyStableSince := GetTickCount64()
-            stateObj.MaintenanceFingerprintCheckedTicks := 0
-            stateObj.MaintenanceReadyCheckedTicks := 0
-            if stateObj.Enabled && stateObj.MaintenanceConfig.Enabled
-                App.maintenanceCoordinator.EnsureWatcher(path, stateObj)
-            App.maintenanceCoordinator.SaveJournal()
+            RefreshMainSequenceVisual(path)
 
-            if (stateObj.Enabled
-                && !App.maintenanceCoordinator.IsBlocking(stateObj)) {
+            if stateObj.Enabled {
                 if StateProcessIdentityIsValid(path, stateObj) {
                     UpdateRunningState(path, stateObj, stateObj.Generation)
                 } else if !(stateObj.OneShot

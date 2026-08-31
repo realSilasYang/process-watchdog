@@ -13,9 +13,10 @@ breaking changes or mandatory upgrade actions.
 
 ### 📦 Release Assets
 
-- **`process-watchdog-X.Y.Z-windows-x64.exe` (standalone executable):** Requires no AutoHotkey installation and runs immediately after download; intended for a quick trial or users who need a single program file.
-- **`process-watchdog-X.Y.Z-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, fonts, and runtime resources; intended for long-term use after full extraction or for manual deployment.
-- **`process-watchdog-X.Y.Z-source.zip` (complete source package):** Includes the AHK source, modules, tests, documentation, and fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+- **`fonts.zip` (optional font package):** Supplies preferred and fallback UI fonts for installation into Windows; it is not required to run the program.
+- **`process-watchdog-X.Y.Z-source.zip` (complete source package):** Includes AHK source, modules, tests, and documentation but no fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64.
+- **`process-watchdog-X.Y.Z-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, and runtime resources but no fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([latest official release](https://www.voidtools.com/downloads/)):** Supplies the index and background service for application search. The bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
 
 ---
 
@@ -50,7 +51,9 @@ breaking changes or mandatory upgrade actions.
   file version, and Git tag; build tooling uses this format for SBOM timestamps.
 - Every formal version keeps `📦 Release Assets` and lists all three exact file
   names, edition roles, included content, AutoHotkey requirements, and intended
-  use. Release validation rejects a generic “see attachments” entry.
+  use. List them in GitHub's fixed display order: `fonts.zip`, source ZIP,
+  portable ZIP, followed by Everything as an explicit Markdown link. Release
+  validation rejects a generic “see attachments” entry.
 - `⚠️ Important Notes` is an optional warning section and is omitted by default.
   Add it only when existing data or configuration is incompatible, data may be
   lost, minimum-environment or privilege changes are breaking, changed defaults
@@ -62,13 +65,17 @@ breaking changes or mandatory upgrade actions.
   section precedes standard categories. Remove the heading when no item qualifies.
 - Standard categories are `✨ Added`, `🚀 Improvements`, and `🐛 Fixed`; remove
   empty categories. `🔒 Security` appears only after coordinated disclosure.
+- Neither changelogs nor Release notes may contain a `✅ Validation Scope` section
+  or enumerate test counts, soak iterations, build hashes, or incomplete manual
+  matrices. Keep that evidence in dedicated validation records, CI/Release
+  Actions logs, and complete build artifacts.
 - Start each item with a bold feature or problem phrase, then explain the
   user-visible change, scope, and benefit in complete English.
 - Combine commits for one feature. Do not list commit subjects, filenames,
   internal classes, variable names, or pure refactoring. Mention internal work
   only when it changes reliability, performance, compatibility, or maintenance boundaries.
-- A change to configuration, defaults, privileges, system integration, update
-  protection, or minimum environment explains old-data handling, backup needs,
+- A change to configuration, defaults, privileges, system integration, or
+  minimum environment explains old-data handling, backup needs,
   and failure recovery.
 - For GUI, DPI, dark mode, and multi-monitor work, claim only the physically
   verified range. Mark untested combinations in Release notes and the manual matrix.
@@ -89,9 +96,10 @@ breaking changes or mandatory upgrade actions.
 
 ### 📦 Release Assets
 
-- **`process-watchdog-1.0.1-windows-x64.exe` (standalone executable):** Requires no AutoHotkey installation and runs immediately after download; intended for a quick trial or users who need a single program file.
-- **`process-watchdog-1.0.1-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, fonts, and runtime resources; intended for long-term use after full extraction or for manual deployment.
-- **`process-watchdog-1.0.1-source.zip` (complete source package):** Includes the AHK source, modules, tests, documentation, and fonts for review, development, or source execution; requires AutoHotkey v2 x64 on the computer.
+- **`fonts.zip` (optional font package):** Supplies preferred and fallback UI fonts for installation into Windows; it is not required to run the program.
+- **`process-watchdog-1.0.1-source.zip` (complete source package):** Includes AHK source, modules, tests, and documentation but no fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64.
+- **`process-watchdog-1.0.1-windows-x64.zip` (complete portable package, recommended):** Includes the EXE, documentation, licenses, and runtime resources but no fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([latest official release](https://www.voidtools.com/downloads/)):** Supplies the index and background service for application search. The bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
 
 ---
 

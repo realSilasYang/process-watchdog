@@ -106,16 +106,31 @@ function Save-RemoteFile {
         [string]$DisplayName
     )
 
-    if (Test-Path -LiteralPath $Path) {
-        Remove-Item -LiteralPath $Path -Force
+    $downloadPath = "$Path.download"
+    foreach ($candidatePath in @($Path, $downloadPath)) {
+        if (Test-Path -LiteralPath $candidatePath) {
+            Remove-Item -LiteralPath $candidatePath -Force
+        }
     }
-    Write-Host "Downloading $DisplayName..."
-    Invoke-WebRequest -UseBasicParsing -Uri $Uri -OutFile $Path `
-        -TimeoutSec 180
-    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
-        throw "$DisplayName download did not create a file."
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        try {
+            Write-Host "Downloading $DisplayName (attempt $attempt/3)..."
+            Invoke-WebRequest -UseBasicParsing -Uri $Uri `
+                -OutFile $downloadPath -TimeoutSec 180
+            if (-not (Test-Path -LiteralPath $downloadPath -PathType Leaf)) {
+                throw "$DisplayName download did not create a file."
+            }
+            Move-Item -LiteralPath $downloadPath -Destination $Path -Force
+            return (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash
+        } catch {
+            Remove-Item -LiteralPath $downloadPath -Force `
+                -ErrorAction SilentlyContinue
+            if ($attempt -eq 3) {
+                throw
+            }
+            Start-Sleep -Seconds $attempt
+        }
     }
-    return (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash
 }
 
 function Expand-ResolvedTool {

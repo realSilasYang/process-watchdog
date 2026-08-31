@@ -1,8 +1,10 @@
-; 目标文件与安装足迹检查器。
-; 提供文件指纹、可启动性、稳定时间和目录归属判断，供升级保护确认文件替换完成；
-; 读取失败以不确定结果返回，避免安装过程中的短暂缺失触发错误重新启动。
+; 目标文件内容与可启动性检查器。
 
 class TargetFileInspector {
+    static ContentHashAlgorithm := "SHA256"
+    static ContentHashLength := 32
+    static ContentReadBufferSize := 1024 * 1024
+
     __New(callbacks) {
         this.Callbacks := callbacks
     }
@@ -16,17 +18,12 @@ class TargetFileInspector {
         try fileSize := FileGetSize(path)
         catch
             return "MISSING"
-        try modifiedTime := FileGetTime(path, "M")
-        catch
-            return "MISSING"
-        volumeSerial := 0
-        fileIndexHigh := 0
-        fileIndexLow := 0
+        modifiedTime := ""
         fileHandle := DllCall("kernel32\CreateFileW", "WStr", path,
             "UInt", 0, "UInt", Win32.FILE_SHARE_ALL, "Ptr", 0,
             "UInt", Win32.OPEN_EXISTING, "UInt", Win32.FILE_ATTRIBUTE_NORMAL,
             "Ptr", 0, "Ptr")
-        if (fileHandle && fileHandle != -1) {
+        if fileHandle && fileHandle != -1 {
             try {
                 fileInfo := Buffer(52, 0)
                 if DllCall("kernel32\GetFileInformationByHandle", "Ptr",
@@ -34,17 +31,191 @@ class TargetFileInspector {
                     modifiedTime := Format("{:08X}{:08X}",
                         NumGet(fileInfo, 24, "UInt"),
                         NumGet(fileInfo, 20, "UInt"))
-                    volumeSerial := NumGet(fileInfo, 28, "UInt")
-                    fileIndexHigh := NumGet(fileInfo, 44, "UInt")
-                    fileIndexLow := NumGet(fileInfo, 48, "UInt")
                 }
-            } finally {
-                DllCall("kernel32\CloseHandle", "Ptr", fileHandle)
+            } finally DllCall("kernel32\CloseHandle", "Ptr", fileHandle)
+        }
+        if modifiedTime == "" {
+            try modifiedTime := FileGetTime(path, "M")
+            catch
+                return "MISSING"
+        }
+        return fileSize "|" modifiedTime
+    }
+
+    GetContentSignature(path) {
+        metadata := this.GetContentMetadata(path)
+        if !metadata.Available
+            return this.MissingContentSignature()
+        contentHash := TargetFileInspector.ComputeContentHash(metadata.Path)
+        if contentHash == ""
+            return this.MissingContentSignature()
+        return {
+            Available: true,
+            Path: metadata.Path,
+            FileSize: metadata.FileSize,
+            ModifiedTime: metadata.ModifiedTime,
+            ContentHash: contentHash
+        }
+    }
+
+    GetContentMetadata(path) {
+        if !this.Callbacks.IsSupportedTarget.Call(path)
+            return {Available: false, Path: "", FileSize: 0,
+                ModifiedTime: ""}
+        path := this.Callbacks.GetSubjectPath.Call(path)
+        if !FileExist(path) || DirExist(path)
+            return {Available: false, Path: "", FileSize: 0,
+                ModifiedTime: ""}
+        try fileSize := FileGetSize(path)
+        catch
+            return {Available: false, Path: "", FileSize: 0,
+                ModifiedTime: ""}
+        try modifiedTime := FileGetTime(path, "M")
+        catch
+            modifiedTime := ""
+        return {Available: true, Path: path, FileSize: fileSize,
+            ModifiedTime: modifiedTime}
+    }
+
+    GetRelocationSearchRoots(path) {
+        roots := []
+        seen := Map()
+        seen.CaseSense := "Off"
+        SplitPath(path, , &directory)
+        candidate := RTrim(directory, "\")
+        while candidate != "" && !DirExist(candidate) {
+            SplitPath(candidate, , &parent)
+            parent := RTrim(parent, "\")
+            if parent == candidate
+                break
+            candidate := parent
+        }
+        if candidate != "" && DirExist(candidate) {
+            canonical := this.Callbacks.CanonicalPath.Call(candidate)
+            roots.Push(candidate)
+            seen[canonical] := true
+        }
+        try driveLetters := DriveGetList()
+        catch
+            driveLetters := ""
+        Loop Parse, driveLetters {
+            driveRoot := A_LoopField ":\"
+            try driveStatus := DriveGetStatus(driveRoot)
+            catch
+                continue
+            if driveStatus != "Ready"
+                continue
+            try driveType := DriveGetType(driveRoot)
+            catch
+                continue
+            if !RegExMatch(driveType, "i)^(Fixed|Removable|Network|RAMDisk)$")
+                continue
+            canonical := this.Callbacks.CanonicalPath.Call(driveRoot)
+            if !seen.Has(canonical) {
+                roots.Push(driveRoot)
+                seen[canonical] := true
             }
         }
-        return fileSize "|" modifiedTime "||"
-            . Format("{:08X}{:08X}{:08X}", volumeSerial, fileIndexHigh,
-                fileIndexLow)
+        return roots
+    }
+
+    GetContentHash(path) {
+        signature := this.GetContentSignature(path)
+        return signature.Available ? signature.ContentHash : ""
+    }
+
+    static ComputeContentHash(path) {
+        if !FileExist(path) || DirExist(path)
+            return ""
+        algorithmHandle := 0
+        hashHandle := 0
+        fileHandle := 0
+        try {
+            status := DllCall("bcrypt\BCryptOpenAlgorithmProvider",
+                "Ptr*", &algorithmHandle, "WStr",
+                TargetFileInspector.ContentHashAlgorithm, "Ptr", 0,
+                "UInt", 0, "Int")
+            if status != 0 || !algorithmHandle
+                return ""
+            objectLength := TargetFileInspector.GetBCryptUIntProperty(
+                algorithmHandle, "ObjectLength")
+            hashLength := TargetFileInspector.GetBCryptUIntProperty(
+                algorithmHandle, "HashDigestLength")
+            if objectLength <= 0
+                || hashLength != TargetFileInspector.ContentHashLength
+                return ""
+            hashObject := Buffer(objectLength, 0)
+            status := DllCall("bcrypt\BCryptCreateHash", "Ptr",
+                algorithmHandle, "Ptr*", &hashHandle, "Ptr",
+                hashObject.Ptr, "UInt", hashObject.Size, "Ptr", 0,
+                "UInt", 0, "UInt", 0, "Int")
+            if status != 0 || !hashHandle
+                return ""
+            fileHandle := DllCall("kernel32\CreateFileW", "WStr", path,
+                "UInt", 0x80000000, "UInt", Win32.FILE_SHARE_ALL,
+                "Ptr", 0, "UInt", Win32.OPEN_EXISTING,
+                "UInt", 0x08000000, "Ptr", 0,
+                "Ptr")
+            if !fileHandle || fileHandle == -1
+                return ""
+            readBuffer := Buffer(TargetFileInspector.ContentReadBufferSize,
+                0)
+            loop {
+                bytesRead := 0
+                if !DllCall("kernel32\ReadFile", "Ptr", fileHandle,
+                    "Ptr", readBuffer.Ptr, "UInt", readBuffer.Size,
+                    "UInt*", &bytesRead, "Ptr", 0, "Int")
+                    return ""
+                if !bytesRead
+                    break
+                status := DllCall("bcrypt\BCryptHashData", "Ptr",
+                    hashHandle, "Ptr", readBuffer.Ptr, "UInt", bytesRead,
+                    "UInt", 0, "Int")
+                if status != 0
+                    return ""
+            }
+            digest := Buffer(hashLength, 0)
+            status := DllCall("bcrypt\BCryptFinishHash", "Ptr",
+                hashHandle, "Ptr", digest.Ptr, "UInt", digest.Size,
+                "UInt", 0, "Int")
+            if status != 0
+                return ""
+            result := ""
+            Loop digest.Size
+                result .= Format("{:02X}", NumGet(digest, A_Index - 1,
+                    "UChar"))
+            return result
+        } catch {
+            return ""
+        } finally {
+            if fileHandle && fileHandle != -1
+                DllCall("kernel32\CloseHandle", "Ptr", fileHandle)
+            if hashHandle
+                DllCall("bcrypt\BCryptDestroyHash", "Ptr", hashHandle)
+            if algorithmHandle
+                DllCall("bcrypt\BCryptCloseAlgorithmProvider", "Ptr",
+                    algorithmHandle, "UInt", 0)
+        }
+    }
+
+    static GetBCryptUIntProperty(handle, propertyName) {
+        valueBuffer := Buffer(4, 0)
+        copied := 0
+        status := DllCall("bcrypt\BCryptGetProperty", "Ptr", handle,
+            "WStr", propertyName, "Ptr", valueBuffer.Ptr, "UInt",
+            valueBuffer.Size, "UInt*", &copied, "UInt", 0, "Int")
+        return status == 0 && copied == 4
+            ? NumGet(valueBuffer, 0, "UInt") : 0
+    }
+
+    MissingContentSignature() {
+        return {
+            Available: false,
+            Path: "",
+            FileSize: 0,
+            ModifiedTime: "",
+            ContentHash: ""
+        }
     }
 
     IsReady(path) {

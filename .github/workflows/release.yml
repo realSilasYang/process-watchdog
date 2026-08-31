@@ -23,7 +23,21 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-          lfs: true
+          lfs: false
+
+      - name: Restore verified font archive cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/font-assets
+          key: ${{ runner.os }}-fonts-${{ hashFiles('assets/fonts/metadata.json') }}
+
+      - name: Restore release-verified font assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          .\tools\restore-font-assets.ps1
+          -Repository '${{ github.repository }}'
 
       - name: Resolve resumable release state
         id: release_meta
@@ -57,15 +71,16 @@ jobs:
           -ActionlintPath '${{ steps.toolchain.outputs.actionlint }}'
           -GitleaksPath '${{ steps.toolchain.outputs.gitleaks }}'
           -SoakSeconds 15
+          -OutputDirectory dist
           -SecondPowerShellPath powershell.exe
 
-      - name: Attest the three user editions
+      - name: Attest the two program editions and optional font package
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4
         with:
           subject-path: |
-            dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.exe
-            dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.zip
+            dist/fonts.zip
             dist/process-watchdog-${{ steps.release_meta.outputs.version }}-source.zip
+            dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.zip
 
       - name: Preserve all build outputs
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -76,7 +91,7 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-      - name: Upload only the three user editions to a draft
+      - name: Upload the two program editions and optional font package to a draft
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
           tag_name: ${{ steps.release_meta.outputs.tag }}
@@ -88,9 +103,9 @@ jobs:
           body_path: docs/release-notes/v${{ steps.release_meta.outputs.version }}.md
           fail_on_unmatched_files: true
           files: |
-            dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.exe
-            dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.zip
+            dist/fonts.zip
             dist/process-watchdog-${{ steps.release_meta.outputs.version }}-source.zip
+            dist/process-watchdog-${{ steps.release_meta.outputs.version }}-windows-x64.zip
 
       - name: Audit draft against source and local hashes
         shell: pwsh
@@ -112,3 +127,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: .\tools\verify-published-release.ps1
+
+      - name: Download and audit the public packages
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          .\tools\verify-downloaded-release.ps1
+          -Version '${{ steps.release_meta.outputs.version }}'
+          -CommitSha '${{ github.sha }}'
+          -Repository '${{ github.repository }}'

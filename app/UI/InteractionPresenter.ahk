@@ -8,6 +8,8 @@
 class TextVisualAlignment {
     static InkBoundsCache := Map()
     static InkBoundsCacheLimit := 512
+    static RasterInkBoundsCache := Map()
+    static RasterInkBoundsCacheLimit := 128
 
     static MeasureText(hdc, text) {
         if !hdc || text == ""
@@ -114,6 +116,128 @@ class TextVisualAlignment {
 
     static CreateCenteredTextRect(hdc, text, left, top, right, bottom) {
         offset := this.GetTextCenterOffset(hdc, text, bottom - top)
+        rect := Buffer(16, 0)
+        NumPut("Int", left, "Int", top + offset,
+            "Int", right, "Int", bottom + offset, rect)
+        return rect
+    }
+
+    ; GDI 的字体链接会在主字体缺少 Emoji 时静默换用回退字体，但
+    ; GetGlyphOutline 仍可能返回主字体的缺字符框，导致测得的重心与实际画面
+    ; 不一致。固定槽字符图标首次出现时画入一个很小的内存 DIB，读取真实墨迹
+    ; 上下边界并缓存；悬浮、按下和后续重绘不再重复分配或扫描像素。
+    static MeasureRasterInkBounds(hdc, text) {
+        if !hdc || text == ""
+            return false
+        textMetrics := Buffer(64, 0)
+        if !DllCall("gdi32\GetTextMetricsW", "Ptr", hdc,
+                "Ptr", textMetrics, "Int")
+            return false
+        extent := this.MeasureText(hdc, text)
+        lineHeight := extent.Height > 0 ? extent.Height
+            : NumGet(textMetrics, 0, "Int")
+        if lineHeight <= 0
+            return false
+        cacheKey := this.GetFontCacheKey(hdc, textMetrics)
+            . Chr(30) . "raster" Chr(30) . text
+        if this.RasterInkBoundsCache.Has(cacheKey)
+            return this.RasterInkBoundsCache[cacheKey]
+
+        margin := Max(4, Ceil(lineHeight / 2))
+        canvasWidth := Max(1, extent.Width + margin * 2)
+        canvasHeight := Max(1, lineHeight + margin * 2)
+        measureDc := DllCall("gdi32\CreateCompatibleDC", "Ptr", hdc,
+            "Ptr")
+        sourceFont := DllCall("gdi32\GetCurrentObject", "Ptr", hdc,
+            "UInt", 6, "Ptr") ; OBJ_FONT：复制当前控件实际使用的字体。
+        bitmapInfo := Buffer(40, 0)
+        NumPut("UInt", 40, bitmapInfo, 0)
+        NumPut("Int", canvasWidth, bitmapInfo, 4)
+        NumPut("Int", -canvasHeight, bitmapInfo, 8)
+        NumPut("UShort", 1, bitmapInfo, 12)
+        NumPut("UShort", 32, bitmapInfo, 14)
+        pixelAddress := 0
+        bitmap := measureDc ? DllCall("gdi32\CreateDIBSection",
+            "Ptr", measureDc, "Ptr", bitmapInfo, "UInt", 0,
+            "Ptr*", &pixelAddress, "Ptr", 0, "UInt", 0, "Ptr") : 0
+        previousBitmap := 0
+        previousFont := 0
+        try {
+            if !measureDc || !sourceFont || !bitmap || !pixelAddress
+                return false
+            previousBitmap := DllCall("gdi32\SelectObject", "Ptr",
+                measureDc, "Ptr", bitmap, "Ptr")
+            previousFont := DllCall("gdi32\SelectObject", "Ptr",
+                measureDc, "Ptr", sourceFont, "Ptr")
+            DllCall("gdi32\PatBlt", "Ptr", measureDc,
+                "Int", 0, "Int", 0, "Int", canvasWidth,
+                "Int", canvasHeight, "UInt", 0x00000042, "Int") ; 黑色填充。
+            DllCall("gdi32\SetBkMode", "Ptr", measureDc, "Int", 1)
+            DllCall("gdi32\SetTextColor", "Ptr", measureDc,
+                "UInt", 0x00FFFFFF)
+            drawRect := Buffer(16, 0)
+            NumPut("Int", margin, "Int", margin,
+                "Int", margin + Max(1, extent.Width),
+                "Int", margin + lineHeight, drawRect)
+            ; DT_SINGLELINE／DT_NOCLIP／DT_NOPREFIX：让字体链接后的字形完整落在
+            ; 外围留白中，避免测量画布本身裁掉左右悬伸。
+            DllCall("user32\DrawTextW", "Ptr", measureDc,
+                "Str", text, "Int", -1, "Ptr", drawRect,
+                "UInt", 0x00000920, "Int")
+
+            minimumY := canvasHeight
+            maximumY := -1
+            Loop canvasHeight {
+                y := A_Index - 1
+                rowOffset := y * canvasWidth * 4
+                Loop canvasWidth {
+                    x := A_Index - 1
+                    pixel := NumGet(pixelAddress,
+                        rowOffset + x * 4, "UInt") & 0x00FFFFFF
+                    if !pixel
+                        continue
+                    minimumY := Min(minimumY, y)
+                    maximumY := Max(maximumY, y)
+                }
+            }
+            if maximumY < minimumY
+                return false
+            result := {
+                Top: minimumY - margin,
+                Bottom: maximumY - margin + 1,
+                LineHeight: lineHeight
+            }
+            if this.RasterInkBoundsCache.Count
+                    >= this.RasterInkBoundsCacheLimit
+                this.RasterInkBoundsCache.Clear()
+            this.RasterInkBoundsCache[cacheKey] := result
+            return result
+        } finally {
+            if previousFont
+                DllCall("gdi32\SelectObject", "Ptr", measureDc,
+                    "Ptr", previousFont, "Ptr")
+            if previousBitmap
+                DllCall("gdi32\SelectObject", "Ptr", measureDc,
+                    "Ptr", previousBitmap, "Ptr")
+            if bitmap
+                DllCall("gdi32\DeleteObject", "Ptr", bitmap)
+            if measureDc
+                DllCall("gdi32\DeleteDC", "Ptr", measureDc)
+        }
+    }
+
+    static GetRasterTextCenterOffset(hdc, text, containerHeight) {
+        bounds := this.MeasureRasterInkBounds(hdc, text)
+        if !bounds || containerHeight <= 0
+            return 0
+        lineTop := Floor((containerHeight - bounds.LineHeight) / 2)
+        currentInkCenter := lineTop + (bounds.Top + bounds.Bottom) / 2
+        return Round(containerHeight / 2 - currentInkCenter)
+    }
+
+    static CreateRasterCenteredTextRect(hdc, text, left, top, right,
+        bottom) {
+        offset := this.GetRasterTextCenterOffset(hdc, text, bottom - top)
         rect := Buffer(16, 0)
         NumPut("Int", left, "Int", top + offset,
             "Int", right, "Int", bottom + offset, rect)
@@ -238,6 +362,89 @@ class RoundedButtonRenderer {
             "UInt", 0, "Str", icon.fontName, "Ptr")
     }
 
+    ; 暂停和恢复不能直接依赖字体字形：同一字号下双竖线的墨迹宽度远小于
+    ; 播放三角形。这里把两者绘制在同一个正方形画布内；添加、删除等已经确认
+    ; 的字符图标保留原造型，只复用外层的固定图标槽、中心和图文间距。
+    static DrawLeadingCommandSymbol(hdc, symbol, left, top, right, bottom,
+        color, visualSize) {
+        normalizedSymbol := StrReplace(symbol, Chr(0xFE0F))
+        if normalizedSymbol != "⏸" && normalizedSymbol != "▶"
+            return false
+        availableWidth := right - left
+        availableHeight := bottom - top
+        if !hdc || availableWidth <= 0 || availableHeight <= 0
+            return false
+        try visualSize := Max(6.0, Min(visualSize + 0,
+            availableWidth, availableHeight))
+        catch
+            return false
+        if !this.EnsureStarted()
+            return false
+
+        graphics := 0
+        brush := 0
+        path := 0
+        try {
+            if DllCall("gdiplus\GdipCreateFromHDC", "Ptr", hdc,
+                    "Ptr*", &graphics, "UInt") || !graphics
+                return false
+            if DllCall("gdiplus\GdipCreateSolidFill", "UInt",
+                    this.ColorToArgb(color), "Ptr*", &brush, "UInt") || !brush
+                return false
+            DllCall("gdiplus\GdipSetSmoothingMode", "Ptr", graphics,
+                "Int", 4)
+            DllCall("gdiplus\GdipSetPixelOffsetMode", "Ptr", graphics,
+                "Int", 4)
+
+            visualLeft := (left + right - visualSize) / 2.0
+            visualTop := (top + bottom - visualSize) / 2.0
+            if normalizedSymbol == "⏸" {
+                ; 两条竖线占据与三角形相同的完整外接宽度；约 56% 的填充面积
+                ; 与三角形的 50% 接近，切换时不会产生明显的大小和轻重变化。
+                barWidth := visualSize * 0.28
+                firstStatus := DllCall("gdiplus\GdipFillRectangle",
+                    "Ptr", graphics, "Ptr", brush,
+                    "Float", visualLeft, "Float", visualTop,
+                    "Float", barWidth, "Float", visualSize, "UInt")
+                secondStatus := DllCall("gdiplus\GdipFillRectangle",
+                    "Ptr", graphics, "Ptr", brush,
+                    "Float", visualLeft + visualSize - barWidth,
+                    "Float", visualTop, "Float", barWidth,
+                    "Float", visualSize, "UInt")
+                return firstStatus == 0 && secondStatus == 0
+            }
+
+            if DllCall("gdiplus\GdipCreatePath", "Int", 0,
+                    "Ptr*", &path, "UInt") || !path
+                return false
+            visualRight := visualLeft + visualSize
+            visualBottom := visualTop + visualSize
+            visualCenterY := visualTop + visualSize / 2.0
+            if DllCall("gdiplus\GdipAddPathLine", "Ptr", path,
+                    "Float", visualLeft, "Float", visualTop,
+                    "Float", visualRight, "Float", visualCenterY,
+                    "UInt")
+                || DllCall("gdiplus\GdipAddPathLine", "Ptr", path,
+                    "Float", visualRight, "Float", visualCenterY,
+                    "Float", visualLeft, "Float", visualBottom,
+                    "UInt")
+                || DllCall("gdiplus\GdipClosePathFigure", "Ptr", path,
+                    "UInt")
+                return false
+            return DllCall("gdiplus\GdipFillPath", "Ptr", graphics,
+                "Ptr", brush, "Ptr", path, "UInt") == 0
+        } catch {
+            return false
+        } finally {
+            if path
+                DllCall("gdiplus\GdipDeletePath", "Ptr", path)
+            if brush
+                DllCall("gdiplus\GdipDeleteBrush", "Ptr", brush)
+            if graphics
+                DllCall("gdiplus\GdipDeleteGraphics", "Ptr", graphics)
+        }
+    }
+
     static DrawPixelImage(hdc, image, x, y, width, height) {
         if !IsObject(image) || !image.HasOwnProp("Pixels")
             || !image.HasOwnProp("Width") || !image.HasOwnProp("Height")
@@ -345,14 +552,17 @@ class RoundedButtonRenderer {
             DllCall("gdiplus\GdipSetSmoothingMode", "Ptr", graphics, "Int", 4)
             DllCall("gdiplus\GdipSetPixelOffsetMode", "Ptr", graphics, "Int", 4)
             DllCall("gdiplus\GdipSetCompositingQuality", "Ptr", graphics, "Int", 2)
-            parentColor := UiThemeService.Color("Window")
+            parentColor := state.HasOwnProp("parentColor")
+                ? state.parentColor : UiThemeService.Color("Window")
             DllCall("gdiplus\GdipGraphicsClear", "Ptr", graphics,
                 "UInt", this.ColorToArgb(parentColor))
 
             dpi := DllCall("user32\GetDpiForWindow", "Ptr", state.ctrl.Hwnd, "UInt")
             if !dpi
                 dpi := 96
-            radius := Max(3, Round(this.RadiusDip * dpi / 96))
+            radiusDip := state.HasOwnProp("radiusDip")
+                ? state.radiusDip : this.RadiusDip
+            radius := Max(3, Round(radiusDip * dpi / 96))
             path := this.CreateRoundedPath(width, height, radius)
             if !path
                 return false
@@ -391,11 +601,18 @@ class RoundedButtonRenderer {
             textColor := state.HasOwnProp("textColor") ? state.textColor : "FFFFFF"
             if this.IsDisabled(state)
                 textColor := this.MixColor(textColor,
-                    UiThemeService.Color("Window"), 0.58)
+                    state.HasOwnProp("parentColor")
+                        ? state.parentColor : UiThemeService.Color("Window"),
+                    0.58)
             DllCall("gdi32\SetTextColor", "Ptr", hdc, "UInt", this.ColorToBgr(textColor))
             dpi := DllCall("user32\GetDpiForWindow", "Ptr", state.ctrl.Hwnd, "UInt")
             if !dpi
                 dpi := 96
+            if state.HasOwnProp("clearMarkSizeDip") {
+                this.DrawCenteredClearMark(hdc, width, height, state,
+                    textColor, dpi)
+                return
+            }
             horizontalInsetDip := state.HasOwnProp("textInsetDip")
                 ? state.textInsetDip : 4
             horizontalInset := Max(3, Round(horizontalInsetDip * dpi / 96))
@@ -411,6 +628,49 @@ class RoundedButtonRenderer {
                 textFlags |= 0x00000002
             else if textAlign != "left"
                 textFlags |= 0x00000001
+            ; 状态按钮可能复用宽度不同的字符图标。视觉层去掉 Emoji 变体标记，
+            ; 再以固定符号字体和固定槽位绘制：暂停显示无框双竖线，且切换到播放
+            ; 三角形或反转符号时正文起点与整组内容重心都保持稳定。
+            if state.HasOwnProp("leadingTextSlotDip")
+                && RegExMatch(text, "^(\S+)\s+(.+)$", &leadingMatch) {
+                leadingText := leadingMatch[1]
+                bodyText := leadingMatch[2]
+                availableWidth := Max(1, width - horizontalInset * 2)
+                slotWidth := Min(availableWidth, Max(1, Round(
+                    state.leadingTextSlotDip * dpi / 96)))
+                gap := Min(Max(0, availableWidth - slotWidth), Max(0,
+                    Round(state.leadingTextGapDip * dpi / 96)))
+                bodyExtent := this.MeasureText(hdc, bodyText)
+                contentWidth := Min(availableWidth,
+                    slotWidth + gap + bodyExtent.Width)
+                if textAlign == "left"
+                    contentX := horizontalInset
+                else if textAlign == "right"
+                    contentX := width - horizontalInset - contentWidth
+                else
+                    contentX := Floor((width - contentWidth) / 2)
+
+                visualSize := Max(1, Round(
+                    state.leadingTextVisualSizeDip * dpi / 96))
+                if !this.DrawLeadingCommandSymbol(hdc, leadingText,
+                        contentX, 0, contentX + slotWidth, height,
+                        textColor, visualSize) {
+                    leadingRect := TextVisualAlignment
+                        .CreateRasterCenteredTextRect(
+                        hdc, leadingText, contentX, 0,
+                        contentX + slotWidth, height)
+                    DllCall("user32\DrawTextW", "Ptr", hdc,
+                        "Str", leadingText, "Int", -1,
+                        "Ptr", leadingRect, "UInt", 0x00000825,
+                        "Int")
+                }
+                bodyLeft := contentX + slotWidth + gap
+                bodyRect := TextVisualAlignment.CreateCenteredTextRect(hdc,
+                    bodyText, bodyLeft, 0, contentX + contentWidth, height)
+                DllCall("user32\DrawTextW", "Ptr", hdc, "Str", bodyText,
+                    "Int", -1, "Ptr", bodyRect, "UInt", 0x00008824, "Int")
+                return
+            }
             if state.HasOwnProp("buttonImage") {
                 image := state.buttonImage
                 if !IsObject(image) || !image.HasOwnProp("Width")
@@ -462,6 +722,35 @@ class RoundedButtonRenderer {
                 return
             }
             if !state.HasOwnProp("buttonIcon") {
+                if state.HasOwnProp("rightText")
+                    && String(state.rightText) != "" {
+                    rightSlotWidthDip := state.HasOwnProp("rightTextWidthDip")
+                        ? state.rightTextWidthDip : 24
+                    rightGapDip := state.HasOwnProp("rightTextGapDip")
+                        ? state.rightTextGapDip : 8
+                    rightInsetDip := state.HasOwnProp("rightTextInsetDip")
+                        ? state.rightTextInsetDip : horizontalInsetDip
+                    rightSlotWidth := Max(12,
+                        Round(rightSlotWidthDip * dpi / 96))
+                    rightGap := Max(0, Round(rightGapDip * dpi / 96))
+                    rightInset := Max(3, Round(rightInsetDip * dpi / 96))
+                    bodyRight := Max(horizontalInset,
+                        width - rightInset - rightSlotWidth - rightGap)
+                    bodyRect := Buffer(16, 0)
+                    NumPut("Int", horizontalInset, "Int", 0,
+                        "Int", bodyRight, "Int", height, bodyRect)
+                    DllCall("user32\DrawTextW", "Ptr", hdc, "Str", text,
+                        "Int", -1, "Ptr", bodyRect, "UInt", textFlags,
+                        "Int")
+                    rightRect := Buffer(16, 0)
+                    NumPut("Int", width - rightInset - rightSlotWidth,
+                        "Int", 0, "Int", width - rightInset,
+                        "Int", height, rightRect)
+                    DllCall("user32\DrawTextW", "Ptr", hdc,
+                        "Str", String(state.rightText), "Int", -1,
+                        "Ptr", rightRect, "UInt", 0x00008826, "Int")
+                    return
+                }
                 DllCall("user32\DrawTextW", "Ptr", hdc, "Str", text,
                     "Int", -1, "Ptr", textRect, "UInt", textFlags, "Int")
                 return
@@ -516,6 +805,67 @@ class RoundedButtonRenderer {
                 DllCall("gdi32\SelectObject", "Ptr", hdc, "Ptr", previousFont, "Ptr")
             if iconFont
                 DllCall("gdi32\DeleteObject", "Ptr", iconFont)
+        }
+    }
+
+    static DrawCenteredClearMark(hdc, width, height, state, color, dpi) {
+        if !hdc || width <= 0 || height <= 0 || !this.EnsureStarted()
+            return false
+        stroke := Max(1.0, state.clearMarkStrokeDip * dpi / 96)
+        offset := stroke / (2.0 * Sqrt(2.0))
+        edgeInset := Max(2.0, 2.0 * dpi / 96)
+        maximumSize := Max(1.0, Min(width, height)
+            - 2.0 * (edgeInset + offset + 1.0))
+        size := Min(maximumSize, Max(4.0,
+            state.clearMarkSizeDip * dpi / 96))
+        halfSize := size / 2.0
+        centerX := width / 2.0
+        centerY := height / 2.0
+        graphics := 0
+        brush := 0
+        firstStroke := Buffer(32, 0)
+        secondStroke := Buffer(32, 0)
+        NumPut("Float", centerX - halfSize - offset,
+            "Float", centerY - halfSize + offset,
+            "Float", centerX + halfSize - offset,
+            "Float", centerY + halfSize + offset,
+            "Float", centerX + halfSize + offset,
+            "Float", centerY + halfSize - offset,
+            "Float", centerX - halfSize + offset,
+            "Float", centerY - halfSize - offset, firstStroke)
+        NumPut("Float", centerX + halfSize - offset,
+            "Float", centerY - halfSize - offset,
+            "Float", centerX - halfSize - offset,
+            "Float", centerY + halfSize - offset,
+            "Float", centerX - halfSize + offset,
+            "Float", centerY + halfSize + offset,
+            "Float", centerX + halfSize + offset,
+            "Float", centerY - halfSize + offset, secondStroke)
+        try {
+            if DllCall("gdiplus\GdipCreateFromHDC", "Ptr", hdc,
+                    "Ptr*", &graphics, "UInt") || !graphics
+                return false
+            if DllCall("gdiplus\GdipCreateSolidFill", "UInt",
+                    this.ColorToArgb(color), "Ptr*", &brush, "UInt") || !brush
+                return false
+            DllCall("gdiplus\GdipSetSmoothingMode", "Ptr", graphics,
+                "Int", 4)
+            DllCall("gdiplus\GdipSetPixelOffsetMode", "Ptr", graphics,
+                "Int", 4)
+            firstStatus := DllCall("gdiplus\GdipFillPolygon", "Ptr", graphics,
+                "Ptr", brush, "Ptr", firstStroke, "Int", 4,
+                "Int", 0, "UInt")
+            secondStatus := DllCall("gdiplus\GdipFillPolygon", "Ptr", graphics,
+                "Ptr", brush, "Ptr", secondStroke, "Int", 4,
+                "Int", 0, "UInt")
+            return firstStatus == 0 && secondStatus == 0
+        } catch {
+            return false
+        } finally {
+            if brush
+                DllCall("gdiplus\GdipDeleteBrush", "Ptr", brush)
+            if graphics
+                DllCall("gdiplus\GdipDeleteGraphics", "Ptr", graphics)
         }
     }
 
@@ -701,6 +1051,103 @@ class RoundedButtonInputRouter {
     }
 }
 
+; 单行输入框的外层底色只负责装饰。它必须始终位于真实 Edit 后方且不参与
+; 命中测试，否则背景的鼠标消息或延迟重绘会打断原生拖选并覆盖输入框像素。
+class TextInputDecorationRouter {
+    static SubclassId := 0x544944 ; "TID"
+    static callbackPtr := 0
+    static Decorations := Map()
+
+    static EnsureCallback() {
+        if this.callbackPtr
+            return true
+        try this.callbackPtr := CallbackCreate(
+            TextInputDecorationSubclassProc, "", 6)
+        catch
+            this.callbackPtr := 0
+        return this.callbackPtr != 0
+    }
+
+    static EnableSiblingClipping(hWnd) {
+        if !hWnd || !DllCall("user32\IsWindow", "Ptr", hWnd, "Int")
+            return false
+        style := DllCall("user32\GetWindowLongPtrW", "Ptr", hWnd,
+            "Int", Win32.GWL_STYLE, "Ptr")
+        if !(style & Win32.WS_CLIPSIBLINGS) {
+            DllCall("user32\SetWindowLongPtrW", "Ptr", hWnd,
+                "Int", Win32.GWL_STYLE,
+                "Ptr", style | Win32.WS_CLIPSIBLINGS, "Ptr")
+        }
+        currentStyle := DllCall("user32\GetWindowLongPtrW", "Ptr", hWnd,
+            "Int", Win32.GWL_STYLE, "Ptr")
+        return !!(currentStyle & Win32.WS_CLIPSIBLINGS)
+    }
+
+    static Attach(backgroundHwnd, editHwnd) {
+        if !backgroundHwnd || !editHwnd
+            || !DllCall("user32\IsWindow", "Ptr", backgroundHwnd, "Int")
+            || !DllCall("user32\IsWindow", "Ptr", editHwnd, "Int")
+            || DllCall("user32\GetParent", "Ptr", backgroundHwnd, "Ptr")
+                != DllCall("user32\GetParent", "Ptr", editHwnd, "Ptr")
+            || !this.EnsureCallback()
+            return false
+
+        this.Detach(backgroundHwnd)
+        if !this.EnableSiblingClipping(backgroundHwnd)
+            || !this.EnableSiblingClipping(editHwnd)
+            return false
+        if !DllCall("comctl32\SetWindowSubclass", "Ptr", backgroundHwnd,
+                "Ptr", this.callbackPtr, "UPtr", this.SubclassId,
+                "UPtr", editHwnd, "Int")
+            return false
+
+        this.Decorations[backgroundHwnd] := editHwnd
+        ; hWndInsertAfter=editHwnd：背景紧邻输入框并位于其后方。
+        if !DllCall("user32\SetWindowPos", "Ptr", backgroundHwnd,
+                "Ptr", editHwnd, "Int", 0, "Int", 0, "Int", 0, "Int", 0,
+                "UInt", 0x0013, "Int") { ; 保持尺寸、位置和激活状态不变。
+            this.Detach(backgroundHwnd)
+            return false
+        }
+        return true
+    }
+
+    static Detach(backgroundHwnd) {
+        if this.Decorations.Has(backgroundHwnd)
+            this.Decorations.Delete(backgroundHwnd)
+        if backgroundHwnd && this.callbackPtr
+            && DllCall("user32\IsWindow", "Ptr", backgroundHwnd, "Int") {
+            DllCall("comctl32\RemoveWindowSubclass", "Ptr", backgroundHwnd,
+                "Ptr", this.callbackPtr, "UPtr", this.SubclassId, "Int")
+        }
+    }
+
+    static DetachGui(guiHwnd) {
+        handles := []
+        for backgroundHwnd, editHwnd in this.Decorations {
+            if !DllCall("user32\IsWindow", "Ptr", backgroundHwnd, "Int")
+                || !DllCall("user32\IsWindow", "Ptr", editHwnd, "Int")
+                || DllCall("user32\GetAncestor", "Ptr", backgroundHwnd,
+                    "UInt", 2, "Ptr") == guiHwnd
+                handles.Push(backgroundHwnd)
+        }
+        for backgroundHwnd in handles
+            this.Detach(backgroundHwnd)
+    }
+
+    static Shutdown() {
+        handles := []
+        for backgroundHwnd, _ in this.Decorations
+            handles.Push(backgroundHwnd)
+        for backgroundHwnd in handles
+            this.Detach(backgroundHwnd)
+        if this.callbackPtr {
+            CallbackFree(this.callbackPtr)
+            this.callbackPtr := 0
+        }
+    }
+}
+
 ; 指针命中、悬浮提示和输入光标根据原生子控件句柄统一分发。
 IsRoundedButtonInputRouted(hwnd) {
     if !App.uiInteractions.HasButton(hwnd)
@@ -739,6 +1186,19 @@ HandleButtonMouseLeave(hwnd) {
 OnGlobalPointerDown(wParam, lParam, msg, hwnd) {
     if App.uiInteractions.HasButton(hwnd) && !IsRoundedButtonInputRouted(hwnd)
         BeginButtonPress(hwnd)
+
+    ; 主窗口空白表面和列表自身的空白区都应让 ListView 完全失焦。
+    ; 这里保留选中行，仅移除键盘焦点和焦点行；列表空白区还要阻止原生
+    ; ListView 在本次按下消息结束时再次抢回焦点。
+    if IsSet(Main) && IsObject(Main.lv) && Main.lv.Hwnd {
+        passiveSurfaces := []
+        if Main.HasOwnProp("statsText") && IsObject(Main.statsText)
+            passiveSurfaces.Push(Main.statsText.Hwnd)
+        blankResult := ListViewFocusService.HandleBlankPointerDown(
+            Main.lv, Main.gui.Hwnd, hwnd, lParam, msg, passiveSurfaces)
+        if blankResult != ListViewFocusService.NoAction
+            return 0
+    }
 
     PruneTextInputCursorStates()
     if App.uiInteractions.HasTextInput(hwnd) {
@@ -936,7 +1396,7 @@ RegisterTextInputHwnd(textEditHwnd, hideCaret := false, useArrowCursor := false)
     })
 }
 
-RegisterTextInputHitTarget(backgroundControl, inputControl) {
+RegisterTextInputDecoration(backgroundControl, inputControl) {
     try backgroundHwnd := backgroundControl.Hwnd
     catch
         return
@@ -944,16 +1404,14 @@ RegisterTextInputHitTarget(backgroundControl, inputControl) {
     catch
         return
     if !backgroundHwnd || !textEditHwnd
-        return
-    PruneTextInputCursorStates()
-    App.uiInteractions.RegisterTextInput(backgroundHwnd,
-        {editHwnd: textEditHwnd})
-    backgroundControl.OnEvent("Click", PlaceTextCaretAtPointer.Bind(inputControl))
+        return false
+    return TextInputDecorationRouter.Attach(backgroundHwnd, textEditHwnd)
 }
 
 UnregisterGuiControls(guiHwnd) {
     if !guiHwnd
         return
+    TextInputDecorationRouter.DetachGui(guiHwnd)
     hoverHandles := []
     for controlHwnd, _ in App.uiInteractions.Buttons {
         if (!DllCall("user32\IsWindow", "Ptr", controlHwnd, "Int")
@@ -992,35 +1450,6 @@ PruneTextInputCursorStates() {
         App.uiInteractions.RemoveTextInput(targetHwnd)
 }
 
-PlaceTextCaretAtPointer(inputControl, *) {
-    try textEditHwnd := inputControl.Hwnd
-    catch
-        return
-    if !IsControlEffectivelyEnabled(textEditHwnd)
-        return
-
-    cursorPoint := Buffer(8, 0)
-    editRect := Buffer(16, 0)
-    if !DllCall("user32\GetCursorPos", "Ptr", cursorPoint, "Int")
-        return
-    if !DllCall("user32\ScreenToClient", "Ptr", textEditHwnd, "Ptr", cursorPoint, "Int")
-        return
-    if !DllCall("user32\GetClientRect", "Ptr", textEditHwnd, "Ptr", editRect, "Int")
-        return
-
-    clientWidth := NumGet(editRect, 8, "Int")
-    clientHeight := NumGet(editRect, 12, "Int")
-    if (clientWidth <= 0 || clientHeight <= 0)
-        return
-    pointerX := Max(0, Min(NumGet(cursorPoint, 0, "Int"), clientWidth - 1))
-    pointerY := Floor(clientHeight / 2)
-    packedPoint := (pointerX & 0xFFFF) | ((pointerY & 0xFFFF) << 16)
-
-    ControlFocus(inputControl)
-    characterIndex := SendMessage(Win32.EM_CHARFROMPOS, 0, packedPoint, textEditHwnd) & 0xFFFF
-    SendMessage(Win32.EM_SETSEL, characterIndex, characterIndex, textEditHwnd)
-}
-
 ScheduleHideTextCaret(textEditHwnd) {
     if textEditHwnd
         SetTimer(HideTextCaret.Bind(textEditHwnd), -10)
@@ -1051,6 +1480,107 @@ GetButtonColorLuma(color) {
     green := (colorValue >> 8) & 0xFF
     blue := colorValue & 0xFF
     return red * 299 + green * 587 + blue * 114
+}
+
+GetButtonColorRelativeLuminance(color) {
+    colorValue := ParseButtonColorValue(color)
+    if (colorValue < 0)
+        return -1
+    components := []
+    for shift in [16, 8, 0] {
+        component := ((colorValue >> shift) & 0xFF) / 255
+        components.Push(component <= 0.04045
+            ? component / 12.92
+            : ((component + 0.055) / 1.055) ** 2.4)
+    }
+    return components[1] * 0.2126 + components[2] * 0.7152
+        + components[3] * 0.0722
+}
+
+GetButtonColorContrastRatio(firstColor, secondColor) {
+    firstLuminance := GetButtonColorRelativeLuminance(firstColor)
+    secondLuminance := GetButtonColorRelativeLuminance(secondColor)
+    if firstLuminance < 0 || secondLuminance < 0
+        return 0
+    lighter := Max(firstLuminance, secondLuminance)
+    darker := Min(firstLuminance, secondLuminance)
+    return (lighter + 0.05) / (darker + 0.05)
+}
+
+TintButtonIconSnapshot(snapshot, color) {
+    colorValue := ParseButtonColorValue(color)
+    if colorValue < 0 || !IsObject(snapshot)
+        || !snapshot.HasOwnProp("Width") || !snapshot.HasOwnProp("Height")
+        || !snapshot.HasOwnProp("Pixels")
+        return false
+    red := (colorValue >> 16) & 0xFF
+    green := (colorValue >> 8) & 0xFF
+    blue := colorValue & 0xFF
+    pixels := Buffer(snapshot.Width * snapshot.Height * 4, 0)
+    Loop snapshot.Width * snapshot.Height {
+        offset := (A_Index - 1) * 4
+        alpha := NumGet(snapshot.Pixels, offset + 3, "UChar")
+        if !alpha
+            continue
+        ; SvgRenderLibrary 返回预乘 BGRA；着色后仍保持预乘格式，供 GDI+
+        ; 直接以 SourceOver 合成到圆角按钮表面。
+        NumPut("UChar", Round(blue * alpha / 255), pixels, offset)
+        NumPut("UChar", Round(green * alpha / 255), pixels, offset + 1)
+        NumPut("UChar", Round(red * alpha / 255), pixels, offset + 2)
+        NumPut("UChar", alpha, pixels, offset + 3)
+    }
+    return {Width: snapshot.Width, Height: snapshot.Height, Pixels: pixels}
+}
+
+ResolveButtonImageTintColor(state, image) {
+    if !IsObject(image) || !image.HasOwnProp("tintMode")
+        return ""
+    switch image.tintMode {
+        case "auto":
+            return state.HasOwnProp("textColor")
+                ? state.textColor : UiThemeService.Color("ButtonText")
+        case "theme":
+            ; 深色主题直接复用资源原始像素，确保启用浅色适配不会改变既有样式。
+            if UiThemeService.IsDark()
+                return "source"
+            tintColor := UiThemeService.Color(image.tintRole)
+            backgroundColor := state.HasOwnProp("normal")
+                ? state.normal : UiThemeService.Color("Window")
+            ; 语义色优先；活动标签或特殊按钮底色使其低于非文本图形的
+            ; 3:1 对比度时，才回退到该按钮已经校验过的文字色。
+            if GetButtonColorContrastRatio(tintColor, backgroundColor) < 3
+                && state.HasOwnProp("textColor")
+                return state.textColor
+            return tintColor
+        case "explicit":
+            return image.requestedTint
+    }
+    return ""
+}
+
+RefreshButtonImageTint(state) {
+    if !IsObject(state) || !state.HasOwnProp("buttonImage")
+        return false
+    image := state.buttonImage
+    if !IsObject(image) || !image.HasOwnProp("tintMode")
+        || image.tintMode == "none"
+        return false
+    tintColor := ResolveButtonImageTintColor(state, image)
+    if tintColor == ""
+        return false
+    if image.HasOwnProp("resolvedTint")
+        && StrLower(image.resolvedTint) == StrLower(tintColor)
+        return false
+    resolvedSnapshot := tintColor == "source"
+        ? image.sourceSnapshot
+        : TintButtonIconSnapshot(image.sourceSnapshot, tintColor)
+    if !resolvedSnapshot
+        return false
+    image.Width := resolvedSnapshot.Width
+    image.Height := resolvedSnapshot.Height
+    image.Pixels := resolvedSnapshot.Pixels
+    image.resolvedTint := tintColor
+    return true
 }
 
 DarkenButtonColor(color, factor := 0.86) {
@@ -1120,7 +1650,12 @@ ButtonControlSubclassProc(hWnd, message, wParam, lParam, subclassId, referenceDa
             case Win32.WM_MOUSELEAVE:
                 HandleButtonMouseLeave(hWnd)
             case Win32.WM_LBUTTONDOWN, Win32.WM_LBUTTONDBLCLK:
-                DllCall("user32\SetFocus", "Ptr", hWnd, "Ptr")
+                if App.uiInteractions.HasButton(hWnd) {
+                    downState := App.uiInteractions.GetButton(hWnd)
+                    if !(downState.HasOwnProp("noFocus")
+                            && downState.noFocus)
+                        DllCall("user32\SetFocus", "Ptr", hWnd, "Ptr")
+                }
                 BeginButtonPress(hWnd)
                 return 0
             case Win32.WM_LBUTTONUP:
@@ -1149,6 +1684,20 @@ ButtonControlSubclassProc(hWnd, message, wParam, lParam, subclassId, referenceDa
     }
     return DllCall("comctl32\DefSubclassProc", "Ptr", hWnd, "UInt", message,
         "Ptr", wParam, "Ptr", lParam, "Ptr")
+}
+
+TextInputDecorationSubclassProc(hWnd, message, wParam, lParam,
+    subclassId, referenceData) {
+    try {
+        if message == Win32.WM_NCHITTEST
+            return Win32.HTTRANSPARENT
+        if message == Win32.WM_NCDESTROY
+            TextInputDecorationRouter.Detach(hWnd)
+    } catch {
+        ; Win32 子类回调不能让 AHK 异常越过原生窗口过程边界。
+    }
+    return DllCall("comctl32\DefSubclassProc", "Ptr", hWnd,
+        "UInt", message, "UPtr", wParam, "Ptr", lParam, "Ptr")
 }
 
 EnableRoundedButtonRendering(ctrl) {
@@ -1192,6 +1741,48 @@ RedrawRoundedButton(hWnd) {
             "UInt", Win32.RDW_BUTTON_REFRESH, "Int")
 }
 
+; 字体缩放后的 Static owner-draw 控件偶发只保留表面层。可见且已注册的按钮可
+; 直接提交一帧完整像素，作为 WM_DRAWITEM 重绘请求之外的确定性回退。
+RenderRoundedButtonNow(hWnd) {
+    if !hWnd || !DllCall("user32\IsWindowVisible", "Ptr", hWnd, "Int")
+        || !App.uiInteractions.HasButton(hWnd)
+        return false
+    state := App.uiInteractions.GetButton(hWnd)
+    if !state.HasOwnProp("roundedOwnerDraw") || !state.roundedOwnerDraw
+        return false
+    clientRect := Buffer(16, 0)
+    if !DllCall("user32\GetClientRect", "Ptr", hWnd, "Ptr", clientRect,
+        "Int")
+        return false
+    width := NumGet(clientRect, 8, "Int")
+    height := NumGet(clientRect, 12, "Int")
+    if width <= 0 || height <= 0
+        return false
+    hdc := DllCall("user32\GetDC", "Ptr", hWnd, "Ptr")
+    if !hdc
+        return false
+    try return RoundedButtonRenderer.Draw(hdc, width, height, state)
+    finally DllCall("user32\ReleaseDC", "Ptr", hWnd, "Ptr", hdc)
+}
+
+RedrawVisibleRoundedButtons(controls) {
+    if Type(controls) != "Array"
+        return false
+    redrawnAny := false
+    for control in controls {
+        try controlHwnd := control.Hwnd
+        catch
+            continue
+        if !controlHwnd || !DllCall("user32\IsWindowVisible", "Ptr",
+            controlHwnd, "Int") {
+            continue
+        }
+        RedrawRoundedButton(controlHwnd)
+        redrawnAny := true
+    }
+    return redrawnAny
+}
+
 OnDrawRoundedButton(wParam, lParam, msg, hwnd) {
     if !lParam
         return
@@ -1224,6 +1815,7 @@ OnRoundedButtonFocusChanged(wParam, lParam, msg, hwnd) {
 }
 
 ShutdownRoundedButtonRenderer(*) {
+    TextInputDecorationRouter.Shutdown()
     RoundedButtonInputRouter.Shutdown()
     RoundedButtonRenderer.Shutdown()
     ControlAccessibilityService.Shutdown()
@@ -1273,6 +1865,58 @@ RegisterHoverButton(ctrl, normalColor := "333333", hoverColor := "", pressedColo
         RedrawRoundedButton(hWnd)
 }
 
+; 为“字符图标 + 文案”按钮锁定图标槽宽。控件文本和无障碍名称仍保留完整
+; 字符串，只有圆角按钮的绘制布局被拆开，因此不会改变本地化或键盘交互。
+SetButtonLeadingTextSlot(ctrl, slotDip := 20, gapDip := 4,
+    visualSizeDip := 10) {
+    try hWnd := ctrl.Hwnd
+    catch
+        return false
+    if !App.uiInteractions.HasButton(hWnd)
+        return false
+    state := App.uiInteractions.GetButton(hWnd)
+    if !state.HasOwnProp("roundedOwnerDraw") || !state.roundedOwnerDraw
+        return false
+    try {
+        slotDip := Max(1, slotDip + 0)
+        gapDip := Max(0, gapDip + 0)
+        visualSizeDip := Max(6, visualSizeDip + 0)
+    } catch {
+        return false
+    }
+    slotDip := UiScaleService.Scale(slotDip)
+    gapDip := UiScaleService.Scale(gapDip)
+    visualSizeDip := UiScaleService.Scale(visualSizeDip)
+    state.leadingTextSlotDip := slotDip
+    state.leadingTextGapDip := gapDip
+    state.leadingTextVisualSizeDip := visualSizeDip
+    RedrawRoundedButton(hWnd)
+    return true
+}
+
+; 字体排版框并不等于叉号的可见边界。清除标记由按钮绘制器按控件几何中心
+; 画两条斜线，避免字体、语言或 DPI 改变时产生垂直基线偏移。
+SetButtonClearMark(ctrl, sizeDip := 16, strokeDip := 2) {
+    try hWnd := ctrl.Hwnd
+    catch
+        return false
+    if !App.uiInteractions.HasButton(hWnd)
+        return false
+    state := App.uiInteractions.GetButton(hWnd)
+    if !state.HasOwnProp("roundedOwnerDraw") || !state.roundedOwnerDraw
+        return false
+    try {
+        state.clearMarkSizeDip := Max(4, sizeDip + 0)
+        state.clearMarkStrokeDip := Max(1, strokeDip + 0)
+    } catch {
+        return false
+    }
+    state.clearMarkSizeDip := UiScaleService.Scale(state.clearMarkSizeDip)
+    state.clearMarkStrokeDip := UiScaleService.Scale(state.clearMarkStrokeDip)
+    RedrawRoundedButton(hWnd)
+    return true
+}
+
 ; 图标与正文分别使用符号字体和当前语言的系统 UI 字体，避免 Emoji 字体回退
 ; 造成图标过小、字重不一致或基线漂移。尺寸以 DIP 保存并随窗口 DPI 缩放。
 SetButtonIcon(ctrl, glyph, fontName := "Segoe MDL2 Assets", sizeDip := 14,
@@ -1291,6 +1935,8 @@ SetButtonIcon(ctrl, glyph, fontName := "Segoe MDL2 Assets", sizeDip := 14,
     } catch {
         return false
     }
+    sizeDip := UiScaleService.Scale(sizeDip)
+    gapDip := UiScaleService.Scale(gapDip)
     if (glyph == "" || fontName == "")
         return false
     state.buttonIcon := {
@@ -1329,7 +1975,8 @@ ClearButtonIcon(ctrl) {
 ; SVG 只在按钮创建时通过 resvg 解析一次，状态对象持有渲染后的预乘 BGRA
 ; Buffer。每次重绘只进行内存像素合成，不读取文件、不重新解析 SVG，也不持有
 ; HBITMAP／HICON，窗口销毁并注销交互状态后即可自动释放全部图像内存。
-SetButtonSvgIcon(ctrl, svgPath, sizeDip := 14, gapDip := 7) {
+SetButtonSvgIcon(ctrl, svgPath, sizeDip := 14, gapDip := 7,
+    tintColor := "none") {
     try hWnd := ctrl.Hwnd
     catch
         return false
@@ -1342,17 +1989,48 @@ SetButtonSvgIcon(ctrl, svgPath, sizeDip := 14, gapDip := 7) {
         sizeDip := Max(8, sizeDip + 0)
         gapDip := Max(0, gapDip + 0)
         svgPath := String(svgPath)
+        requestedTint := Trim(String(tintColor))
     } catch {
         return false
     }
+    sizeDip := UiScaleService.Scale(sizeDip)
+    gapDip := UiScaleService.Scale(gapDip)
     if svgPath == "" || !FileExist(svgPath) || DirExist(svgPath)
         return false
+    tintMode := StrLower(requestedTint)
+    tintRole := ""
+    if tintMode == "" || tintMode == "none" {
+        tintMode := "none"
+        requestedTint := ""
+    } else if tintMode == "auto" {
+        tintMode := "auto"
+        requestedTint := ""
+    } else if RegExMatch(requestedTint, "i)^theme:(.+)$", &tintMatch) {
+        tintMode := "theme"
+        tintRole := Trim(tintMatch[1])
+        if tintRole == "" || !UiThemeService.HasColor(tintRole)
+            return false
+        requestedTint := ""
+    } else {
+        colorValue := ParseButtonColorValue(requestedTint)
+        if colorValue < 0
+            return false
+        tintMode := "explicit"
+        requestedTint := Format("{:06X}", colorValue)
+    }
     if state.HasOwnProp("buttonImage")
         && state.buttonImage.HasOwnProp("sourcePath")
         && state.buttonImage.sourcePath == svgPath
         && state.buttonImage.sizeDip == sizeDip
         && state.buttonImage.gapDip == gapDip
+        && state.buttonImage.HasOwnProp("tintMode")
+        && state.buttonImage.tintMode == tintMode
+        && state.buttonImage.tintRole == tintRole
+        && state.buttonImage.requestedTint == requestedTint {
+        if RefreshButtonImageTint(state)
+            RedrawRoundedButton(hWnd)
         return true
+    }
     dpi := DllCall("user32\GetDpiForWindow", "Ptr", hWnd, "UInt")
     if !dpi
         dpi := 96
@@ -1363,13 +2041,23 @@ SetButtonSvgIcon(ctrl, svgPath, sizeDip := 14, gapDip := 7) {
     snapshot := App.svgRenderer.RenderFile(svgPath, dpi, renderSize)
     if !snapshot
         return false
-    state.buttonImage := {
+    image := {
         Width: snapshot.Width,
         Height: snapshot.Height,
         Pixels: snapshot.Pixels,
         sizeDip: sizeDip,
         gapDip: gapDip,
-        sourcePath: svgPath
+        sourcePath: svgPath,
+        sourceSnapshot: snapshot,
+        tintMode: tintMode,
+        tintRole: tintRole,
+        requestedTint: requestedTint,
+        resolvedTint: ""
+    }
+    state.buttonImage := image
+    if tintMode != "none" && !RefreshButtonImageTint(state) {
+        state.DeleteProp("buttonImage")
+        return false
     }
     if state.HasOwnProp("buttonIcon")
         state.DeleteProp("buttonIcon")
@@ -1379,14 +2067,15 @@ SetButtonSvgIcon(ctrl, svgPath, sizeDip := 14, gapDip := 7) {
 
 ; 全应用的 Lucide 功能图标统一从受许可的资源目录解析。窗口只声明图标文件名
 ; 与排版尺寸，不再各自拼接资源路径，便于复用同一语义资源并集中审计发行内容。
-SetButtonLucideIcon(ctrl, iconName, sizeDip := 14, gapDip := 7) {
+SetButtonLucideIcon(ctrl, iconName, sizeDip := 14, gapDip := 7,
+    tintColor := "none") {
     try iconName := String(iconName)
     catch
         return false
     if iconName == "" || InStr(iconName, "\") || InStr(iconName, "/")
         return false
     return SetButtonSvgIcon(ctrl, GetApplicationAssetPath(
-        "ui-icons\lucide\" iconName), sizeDip, gapDip)
+        "ui-icons\lucide\" iconName), sizeDip, gapDip, tintColor)
 }
 
 ; 悬浮提示跟随按钮交互状态注册，不由具体窗口另建计时器。这样托管窗口销毁并
@@ -1572,6 +2261,7 @@ SetButtonTextColor(ctrl, color) {
     if App.uiInteractions.HasButton(hWnd) {
         state := App.uiInteractions.GetButton(hWnd)
         state.textColor := color
+        RefreshButtonImageTint(state)
         if state.HasOwnProp("roundedOwnerDraw") && state.roundedOwnerDraw {
             RedrawRoundedButton(hWnd)
             return true
@@ -1754,7 +2444,7 @@ EndButtonPress() {
 }
 
 CanHoverButton(state) {
-    ; 删除/暂停在没有选中项目时只是灰色提示态，不显示可用按钮的悬浮反馈。
+    ; 删除/暂停在没有选中守护对象时只是灰色提示态，不显示可用按钮的悬浮反馈。
     if IsSet(Main) && (state.ctrl == Main.btnDel || state.ctrl == Main.btnPause)
         return Main.lv.GetNext(0) > 0
     return true

@@ -35,17 +35,98 @@ class ApplicationWindowPresenter {
     static Show(guiObj, options := "") {
         if !IsObject(guiObj)
             return false
-        showOptions := Trim(String(options))
+        showOptions := UiScaleService.ScaleShowOptions(options)
         if this.AutomationHidden
             && !RegExMatch(showOptions, "i)(^|\s)Hide(?:\s|$)")
             showOptions := Trim("Hide " showOptions)
         guiObj.Show(showOptions)
+        UiScaleService.ApplyWindow(guiObj)
+        if RegExMatch(showOptions, "i)(^|\s)AutoSize(?:\s|$)")
+            guiObj.Show(showOptions)
+        if !RegExMatch(showOptions, "i)(^|\s)Hide(?:\s|$)") {
+            RefreshRoundedButtonsAfterShow(guiObj)
+            expectedHwnd := guiObj.Hwnd
+            SetTimer(ObjBindMethod(this, "RefreshPresentedWindow",
+                guiObj, expectedHwnd), -1)
+        }
         return true
+    }
+
+    static RefreshPresentedWindow(guiObj, expectedHwnd, *) {
+        if !IsObject(guiObj) || !expectedHwnd
+            return false
+        try currentHwnd := guiObj.Hwnd
+        catch
+            return false
+        if currentHwnd != expectedHwnd
+            || !DllCall("user32\IsWindow", "Ptr", expectedHwnd, "Int")
+            || !DllCall("user32\IsWindowVisible", "Ptr", expectedHwnd,
+                "Int")
+            return false
+        ; Show 返回时 Windows 偶尔尚未完成首帧布局。下一消息循环先让父窗口
+        ; 及子控件整体失效，再重绘 owner-draw 按钮，避免按钮停留为白色底块。
+        DllCall("user32\RedrawWindow", "Ptr", expectedHwnd, "Ptr", 0,
+            "Ptr", 0, "UInt", Win32.RDW_LAYOUT_REFRESH, "Int")
+        return RedrawVisibleRoundedButtonsForWindow(expectedHwnd)
     }
 }
 
 ShowApplicationWindow(guiObj, options := "") {
     return ApplicationWindowPresenter.Show(guiObj, options)
+}
+
+RefreshRoundedButtonsAfterShow(guiObj) {
+    if !IsObject(guiObj)
+        return false
+    try rootHwnd := guiObj.Hwnd
+    catch
+        return false
+    if !rootHwnd || !IsSet(App) || !IsObject(App.uiInteractions)
+        return false
+    return RedrawVisibleRoundedButtonsForWindow(rootHwnd)
+}
+
+RedrawVisibleRoundedButtonsForWindow(rootHwnd) {
+    if !rootHwnd || !IsSet(App) || !IsObject(App.uiInteractions)
+        return false
+    redrawnAny := false
+    for buttonHwnd, state in App.uiInteractions.Buttons {
+        if !buttonHwnd || !DllCall("user32\IsWindow", "Ptr", buttonHwnd,
+                "Int")
+            continue
+        try isRounded := state.HasOwnProp("roundedOwnerDraw")
+            && state.roundedOwnerDraw
+        catch
+            isRounded := false
+        if !isRounded
+            continue
+        ancestor := DllCall("user32\GetAncestor", "Ptr", buttonHwnd,
+            "UInt", 2, "Ptr")
+        if ancestor != rootHwnd
+            continue
+        if !DllCall("user32\IsWindowVisible", "Ptr", buttonHwnd, "Int")
+            continue
+        RedrawRoundedButton(buttonHwnd)
+        redrawnAny := true
+    }
+    return redrawnAny
+}
+
+OnApplicationWindowActivated(wParam, lParam, message, hwnd) {
+    if (wParam & 0xFFFF) == 0 || !hwnd
+        return
+    rootHwnd := DllCall("user32\GetAncestor", "Ptr", hwnd,
+        "UInt", 2, "Ptr")
+    if !rootHwnd
+        rootHwnd := hwnd
+    processId := 0
+    DllCall("user32\GetWindowThreadProcessId", "Ptr", rootHwnd,
+        "UInt*", &processId, "UInt")
+    if processId != DllCall("kernel32\GetCurrentProcessId", "UInt")
+        return
+    ; 任务栏还原和其它实例唤起不会经过 Gui.Show。激活消息到达时同步刷新
+    ; 当前窗口的可见 owner-draw 按钮，避免它们等到首次鼠标移动才获得重绘。
+    RedrawVisibleRoundedButtonsForWindow(rootHwnd)
 }
 
 InitializeApplicationWindow(guiObj, fontOptions := "s10",
@@ -116,7 +197,8 @@ SetWindowIcon(hWnd, iconPath) {
 SetDarkListView(hLV) {
     if !hLV
         return
-    ; 控件首次显示时可能被系统重新套用主题，因此显示前后各应用一次。
+    ; 普通对话框通常会在这次异步重申前完成 Show；主窗口启动阶段更长，
+    ; 因而首次可见帧还会在 DWM 遮蔽期间显式重申一次，不能依赖此计时器。
     ApplyDarkListViewTheme(hLV)
     SetTimer(ApplyDarkListViewTheme.Bind(hLV), -100)
 }
@@ -133,6 +215,12 @@ CreateMainImageList(statusIconIndices) {
     if !dpi
         dpi := 96
     iconResources.UpdateMainIconMetrics(dpi)
+    if IsSet(UiScaleService) && UiScaleService.GetFactor() != 1 {
+        iconResources.MainIconPixelSize := UiScaleService.Scale(
+            iconResources.MainIconPixelSize)
+        iconResources.MainIconCellPixelSize := UiScaleService.Scale(
+            iconResources.MainIconCellPixelSize)
+    }
     iconSizeApplied := false
     try iconSizeApplied := DllCall("comctl32\ImageList_SetIconSize",
         "Ptr", imageList, "Int", iconResources.MainIconCellPixelSize,
@@ -248,12 +336,19 @@ GetPreferredMainIcon(filePath, &useHighQualityResampling := false) {
         || extension == "dll" || extension == "cpl" {
         targetSize := App.iconResources.MainIconPixelSize
         preferredSize := SelectHighQualityMainIconSourceSize(targetSize)
+        exactIcon := 0
+        try exactIcon := extension == "ico"
+            ? CreateExactIconFromIco(sourcePath, preferredSize)
+            : CreateExactIconFromResourceContainer(sourcePath,
+                iconSource.Index, preferredSize)
+        if exactIcon {
+            useHighQualityResampling := true
+            return exactIcon
+        }
         fallbackSize := SelectClosestIconSourceSize(targetSize)
         sourceSizes := preferredSize == fallbackSize
             ? [preferredSize] : [preferredSize, fallbackSize]
-        ; 主列表最终会经过 WIC 高质量缩小。优先请求约两倍尺寸，可避开部分
-        ; 程序专为小尺寸准备、但质量反而较差的资源；若高分辨率请求失败，
-        ; 再回退到贴近显示尺寸的资源，兼容只提供旧式小图标的程序。
+        ; 无法解析旧式资源容器时才交给系统提取，并保留贴近显示尺寸的回退。
         for sourceSize in sourceSizes {
             hIcon := 0
             iconResourceId := 0
@@ -283,7 +378,202 @@ SelectClosestIconSourceSize(targetSize) {
 }
 
 SelectHighQualityMainIconSourceSize(targetSize) {
-    return SelectClosestIconSourceSize(Max(targetSize, Ceil(targetSize * 2)))
+    ; 四倍源尺寸能让圆弧和斜边在高 DPI 下获得稳定的子像素覆盖；资源枚举器
+    ; 只会选择文件中真实存在的帧，不会为了满足此尺寸先制造一张放大图。
+    return SelectClosestIconSourceSize(Max(targetSize, Ceil(targetSize * 4)))
+}
+
+IsFullColorIconCandidate(candidate) {
+    return candidate.BitsPerPixel == 0 || candidate.BitsPerPixel >= 24
+}
+
+FindPreferredIconCandidateIndex(candidates, preferredSize) {
+    bestIndex := 0
+    for candidateIndex, candidate in candidates {
+        if !bestIndex {
+            bestIndex := candidateIndex
+            continue
+        }
+        best := candidates[bestIndex]
+        candidateSize := Max(candidate.Width, candidate.Height)
+        bestSize := Max(best.Width, best.Height)
+        candidateLargeEnough := candidateSize >= preferredSize
+        bestLargeEnough := bestSize >= preferredSize
+        if candidateLargeEnough != bestLargeEnough {
+            if candidateLargeEnough
+                bestIndex := candidateIndex
+            continue
+        }
+        if candidateSize != bestSize {
+            if (candidateLargeEnough && candidateSize < bestSize)
+                || (!candidateLargeEnough && candidateSize > bestSize)
+                bestIndex := candidateIndex
+            continue
+        }
+        candidateFullColor := IsFullColorIconCandidate(candidate)
+        bestFullColor := IsFullColorIconCandidate(best)
+        if candidateFullColor != bestFullColor {
+            if candidateFullColor
+                bestIndex := candidateIndex
+            continue
+        }
+        if candidate.BitsPerPixel > best.BitsPerPixel
+            || (candidate.BitsPerPixel == best.BitsPerPixel
+                && candidate.DataSize > best.DataSize)
+            bestIndex := candidateIndex
+    }
+    return bestIndex
+}
+
+CreateIconFromResourcePixels(resourcePointer, resourceSize, candidate) {
+    if !resourcePointer || resourceSize <= 0
+        return 0
+    try return DllCall("user32\CreateIconFromResourceEx",
+        "Ptr", resourcePointer, "UInt", resourceSize, "Int", true,
+        "UInt", 0x00030000, "Int", candidate.Width,
+        "Int", candidate.Height, "UInt", 0, "Ptr")
+    catch
+        return 0
+}
+
+CreateExactIconFromIco(filePath, preferredSize) {
+    try icoData := FileRead(filePath, "RAW")
+    catch
+        return 0
+    if !IsObject(icoData) || icoData.Size < 22
+        || NumGet(icoData, 0, "UShort") != 0
+        || NumGet(icoData, 2, "UShort") != 1
+        return 0
+    entryCount := NumGet(icoData, 4, "UShort")
+    if entryCount <= 0 || 6 + entryCount * 16 > icoData.Size
+        return 0
+    candidates := []
+    Loop entryCount {
+        entryOffset := 6 + (A_Index - 1) * 16
+        width := NumGet(icoData, entryOffset, "UChar")
+        height := NumGet(icoData, entryOffset + 1, "UChar")
+        dataSize := NumGet(icoData, entryOffset + 8, "UInt")
+        dataOffset := NumGet(icoData, entryOffset + 12, "UInt")
+        if dataSize <= 0 || dataOffset > icoData.Size
+            || dataSize > icoData.Size - dataOffset
+            continue
+        candidates.Push({
+            Width: width ? width : 256,
+            Height: height ? height : 256,
+            BitsPerPixel: NumGet(icoData, entryOffset + 6, "UShort"),
+            DataSize: dataSize,
+            DataOffset: dataOffset
+        })
+    }
+    while candidates.Length {
+        candidateIndex := FindPreferredIconCandidateIndex(candidates,
+            preferredSize)
+        if !candidateIndex
+            break
+        candidate := candidates.RemoveAt(candidateIndex)
+        iconHandle := CreateIconFromResourcePixels(
+            icoData.Ptr + candidate.DataOffset, candidate.DataSize, candidate)
+        if iconHandle
+            return iconHandle
+    }
+    return 0
+}
+
+CaptureIconGroupResourceName(names, moduleHandle, resourceType,
+    resourceName, context) {
+    try names.Push(resourceName <= 0xFFFF
+        ? {IsInteger: true, Value: resourceName}
+        : {IsInteger: false, Value: StrGet(resourceName, "UTF-16")})
+    return true
+}
+
+ResolveIconGroupResourceName(moduleHandle, iconIndex) {
+    if iconIndex < 0
+        return {IsInteger: true, Value: -iconIndex}
+    names := []
+    callback := CallbackCreate(CaptureIconGroupResourceName.Bind(names), , 4)
+    try DllCall("kernel32\EnumResourceNamesW", "Ptr", moduleHandle,
+        "Ptr", Win32.RT_GROUP_ICON, "Ptr", callback, "Ptr", 0, "Int")
+    finally CallbackFree(callback)
+    return iconIndex < names.Length ? names[iconIndex + 1] : 0
+}
+
+FindIconResource(moduleHandle, resourceName, resourceType) {
+    if !IsObject(resourceName)
+        return 0
+    try return resourceName.IsInteger
+        ? DllCall("kernel32\FindResourceW", "Ptr", moduleHandle,
+            "Ptr", resourceName.Value, "Ptr", resourceType, "Ptr")
+        : DllCall("kernel32\FindResourceW", "Ptr", moduleHandle,
+            "WStr", resourceName.Value, "Ptr", resourceType, "Ptr")
+    catch
+        return 0
+}
+
+CreateExactIconFromResourceContainer(filePath, iconIndex, preferredSize) {
+    loadFlags := Win32.LOAD_LIBRARY_AS_DATAFILE
+        | Win32.LOAD_LIBRARY_AS_IMAGE_RESOURCE
+    try moduleHandle := DllCall("kernel32\LoadLibraryExW", "WStr", filePath,
+        "Ptr", 0, "UInt", loadFlags, "Ptr")
+    catch
+        return 0
+    if !moduleHandle
+        return 0
+    try {
+        groupName := ResolveIconGroupResourceName(moduleHandle, iconIndex)
+        groupResource := FindIconResource(moduleHandle, groupName,
+            Win32.RT_GROUP_ICON)
+        if !groupResource
+            return 0
+        groupSize := DllCall("kernel32\SizeofResource", "Ptr", moduleHandle,
+            "Ptr", groupResource, "UInt")
+        groupHandle := DllCall("kernel32\LoadResource", "Ptr", moduleHandle,
+            "Ptr", groupResource, "Ptr")
+        groupPointer := groupHandle
+            ? DllCall("kernel32\LockResource", "Ptr", groupHandle, "Ptr") : 0
+        if !groupPointer || groupSize < 20
+            return 0
+        entryCount := NumGet(groupPointer, 4, "UShort")
+        if entryCount <= 0 || 6 + entryCount * 14 > groupSize
+            return 0
+        candidates := []
+        Loop entryCount {
+            entryOffset := 6 + (A_Index - 1) * 14
+            width := NumGet(groupPointer, entryOffset, "UChar")
+            height := NumGet(groupPointer, entryOffset + 1, "UChar")
+            candidates.Push({
+                Width: width ? width : 256,
+                Height: height ? height : 256,
+                BitsPerPixel: NumGet(groupPointer, entryOffset + 6, "UShort"),
+                DataSize: NumGet(groupPointer, entryOffset + 8, "UInt"),
+                ResourceId: NumGet(groupPointer, entryOffset + 12, "UShort")
+            })
+        }
+        while candidates.Length {
+            candidateIndex := FindPreferredIconCandidateIndex(candidates,
+                preferredSize)
+            if !candidateIndex
+                break
+            candidate := candidates.RemoveAt(candidateIndex)
+            iconResource := DllCall("kernel32\FindResourceW",
+                "Ptr", moduleHandle, "Ptr", candidate.ResourceId,
+                "Ptr", Win32.RT_ICON, "Ptr")
+            if !iconResource
+                continue
+            iconSize := DllCall("kernel32\SizeofResource", "Ptr", moduleHandle,
+                "Ptr", iconResource, "UInt")
+            iconResourceHandle := DllCall("kernel32\LoadResource",
+                "Ptr", moduleHandle, "Ptr", iconResource, "Ptr")
+            iconPointer := iconResourceHandle
+                ? DllCall("kernel32\LockResource", "Ptr", iconResourceHandle,
+                    "Ptr") : 0
+            iconHandle := CreateIconFromResourcePixels(iconPointer,
+                iconSize, candidate)
+            if iconHandle
+                return iconHandle
+        }
+        return 0
+    } finally DllCall("kernel32\FreeLibrary", "Ptr", moduleHandle)
 }
 
 EnsureIconResampler() {
@@ -1209,7 +1499,7 @@ CreateShellSvgPaddedIcon(filePath, iconSize, cellSize, offsetX := "",
 }
 
 CreateSvgPaddedIcon(filePath, iconSize, cellSize, useStatusQuality := false,
-    offsetX := "", offsetY := "") {
+    offsetX := "", offsetY := "", tintColor := "") {
     ; 状态图标使用更高的超采样倍率后再由 WIC Fant 缩小，可显著改善
     ; 小尺寸圆弧和斜边；普通自定义 SVG 保持原开销，避免大量导入时变慢。
     renderSize := useStatusQuality
@@ -1218,6 +1508,11 @@ CreateSvgPaddedIcon(filePath, iconSize, cellSize, useStatusQuality := false,
     snapshot := App.svgRenderer.RenderFile(filePath,
         App.iconResources.MainDpi, renderSize)
     if snapshot {
+        if tintColor != "" {
+            tintedSnapshot := TintButtonIconSnapshot(snapshot, tintColor)
+            if tintedSnapshot
+                snapshot := tintedSnapshot
+        }
         renderedIcon := CreatePixelSnapshotPaddedIcon(snapshot,
             iconSize, cellSize, 0, offsetX, offsetY)
         if renderedIcon
@@ -1344,19 +1639,40 @@ StatusIconResourceFiles() {
         GuardStatusKind.TargetMissing, "circle-x.svg",
         GuardStatusKind.ProgramMissing, "file-x-2.svg",
         GuardStatusKind.ScriptMissing, "file-code-2.svg",
-        GuardStatusKind.SafeStartWait, "shield-ellipsis.svg",
+        GuardStatusKind.RelocationPending, "repeat-2.svg",
         GuardStatusKind.LaunchRetry, "rotate-ccw.svg",
-        GuardStatusKind.MaintenanceArbitrating,
-            "scan-search.svg",
-        GuardStatusKind.MaintenanceUpdating, "refresh-cw.svg",
-        GuardStatusKind.MaintenanceFileWaiting, "file-clock.svg",
-        GuardStatusKind.MaintenanceStabilizing,
-            "file-clock.svg",
-        GuardStatusKind.MaintenanceRecovering, "timer.svg",
-        GuardStatusKind.MaintenanceTimedOut, "triangle-alert-timeout.svg",
         GuardStatusKind.Unknown, "circle-info-unknown.svg"
     )
     return resourceFiles
+}
+
+StatusIconColorRoles() {
+    static colorRoles := Map(
+        GuardStatusKind.Initializing, "InitializingIcon",
+        GuardStatusKind.Running, "SuccessIcon",
+        GuardStatusKind.PermissionMismatch, "PermissionIcon",
+        GuardStatusKind.Paused, "PauseIcon",
+        GuardStatusKind.SuspectedStop, "DangerIcon",
+        GuardStatusKind.WaitingObservation, "WaitingIcon",
+        GuardStatusKind.StartCountdown, "WaitingIcon",
+        GuardStatusKind.RetryCountdown, "WaitingIcon",
+        GuardStatusKind.CoolingDown, "WaitingIcon",
+        GuardStatusKind.Starting, "StartupIcon",
+        GuardStatusKind.Verifying, "QueryIcon",
+        GuardStatusKind.TargetMissing, "DangerIcon",
+        GuardStatusKind.ProgramMissing, "DangerIcon",
+        GuardStatusKind.ScriptMissing, "DangerIcon",
+        GuardStatusKind.RelocationPending, "RelocationIcon",
+        GuardStatusKind.LaunchRetry, "DangerIcon",
+        GuardStatusKind.Unknown, "UnknownIcon"
+    )
+    return colorRoles
+}
+
+GetStatusIconColor(statusKind) {
+    colorRoles := StatusIconColorRoles()
+    return colorRoles.Has(statusKind)
+        ? UiThemeService.Color(colorRoles[statusKind]) : ""
 }
 
 GetStatusIconResourcePath(statusKind) {
@@ -1379,10 +1695,12 @@ CreateStatusResourceIcon(statusKind, glyphSize, cellSize, offsetY := "") {
     resourcePath := GetStatusIconResourcePath(statusKind)
     if resourcePath == "" || !FileExist(resourcePath)
         return 0
-    ; 状态图标全部来自随项目分发的 SVG 资源。CreateSvgPaddedIcon 只负责
-    ; 使用 resvg/WIC 解码、缩放和居中，不再在运行时计算任何图标几何。
+    ; SVG 文件保留深色主题原有语义色；浅色主题只在像素快照层替换为同语义
+    ; 的高对比色，不改写资源，也不在运行时计算任何图标几何。
+    tintColor := UiThemeService.IsDark()
+        ? "" : GetStatusIconColor(statusKind)
     return CreateSvgPaddedIcon(resourcePath, glyphSize, cellSize, true,
-        "", offsetY)
+        "", offsetY, tintColor)
 }
 
 StatusIconVisualScale(statusKind) {
@@ -1503,6 +1821,9 @@ RefreshMainStatusIconAlignment() {
                 Main.lv.IL := imageList
             }
         }
+        if succeeded
+            Main.statusIconTheme := UiThemeService.IsDark()
+                ? "dark" : "light"
         return succeeded
     } finally {
         if redrawSuspended
@@ -1544,7 +1865,7 @@ AddMainAdminOverlayIcon(imageList) {
     if !badgeIndex
         return false
     ; 图像列表索引从 0 开始，AHK 的 IL_Add 返回值从 1 开始。overlay 槽 1
-    ; 由每一行的 LVIS_OVERLAYMASK 独立启停，不会污染普通项目图标。
+    ; 由每一行的 LVIS_OVERLAYMASK 独立启停，不会污染普通守护对象图标。
     return DllCall("comctl32\ImageList_SetOverlayImage", "Ptr", imageList,
         "Int", badgeIndex - 1, "Int", 1, "Int") != 0
 }
@@ -1621,8 +1942,11 @@ CreateHighQualityPaddedIcon(hIcon, iconSize, cellSize, offsetX := "",
         initializeScaler := NumGet(scalerVtable, 8 * A_PtrSize, "Ptr")
         scaledWidth := iconSize
         scaledHeight := iconSize
+        interpolationMode := (scaledWidth < sourceWidth
+            || scaledHeight < sourceHeight) ? 3 : 2
         if DllCall(initializeScaler, "Ptr", wicScaler, "Ptr", wicSource,
-            "UInt", scaledWidth, "UInt", scaledHeight, "Int", 3, "Int") < 0
+            "UInt", scaledWidth, "UInt", scaledHeight,
+            "Int", interpolationMode, "Int") < 0
             return 0
         scaledPixels := Buffer(scaledWidth * scaledHeight * 4, 0)
         copyPixels := NumGet(scalerVtable, 7 * A_PtrSize, "Ptr")
@@ -1919,8 +2243,6 @@ GetMainStatusVisualKind(stateObj) {
         return GuardStatusKind.Unknown
     if !stateObj.Enabled || stateObj.Phase == GuardPhase.Paused
         return GuardStatusKind.Paused
-    if stateObj.MaintenanceMode == MaintenancePhase.TimedOut
-        return GuardStatusKind.MaintenanceTimedOut
     if stateObj.MissingSinceTicks
         && stateObj.StatusKind != GuardStatusKind.ProgramMissing
         && stateObj.StatusKind != GuardStatusKind.ScriptMissing
@@ -1933,14 +2255,6 @@ GetMainStatusVisualKind(stateObj) {
         return stateObj.StatusKind
     ; 兼容仅构造核心控制器、尚未发布首条展示状态的极早阶段。正式更新
     ; 都会显式携带 StatusKind，因此这里不会把不同用户状态重新合并。
-    if stateObj.MaintenanceMode == MaintenancePhase.Arbitrating
-        return GuardStatusKind.MaintenanceArbitrating
-    if stateObj.MaintenanceMode == MaintenancePhase.Updating
-        return GuardStatusKind.MaintenanceUpdating
-    if stateObj.MaintenanceMode == MaintenancePhase.Stabilizing
-        return GuardStatusKind.MaintenanceStabilizing
-    if stateObj.MaintenanceMode == MaintenancePhase.Recovering
-        return GuardStatusKind.MaintenanceRecovering
     switch stateObj.Phase {
         case GuardPhase.Running:
             return GuardStatusKind.Running
@@ -1969,27 +2283,21 @@ GetMainStatusSemanticPriority(statusKind) {
     ; 数值越小越靠前。具体异常先于未知异常，恢复与等待过程居中，暂停和
     ; 正常运行置后；排序完全依赖稳定语义键，不受界面语言或状态文案影响。
     static priorities := Map(
-        GuardStatusKind.MaintenanceTimedOut, 1,
         GuardStatusKind.PermissionMismatch, 2,
         GuardStatusKind.TargetMissing, 3,
         GuardStatusKind.ProgramMissing, 4,
         GuardStatusKind.ScriptMissing, 5,
-        GuardStatusKind.SuspectedStop, 6,
-        GuardStatusKind.LaunchRetry, 7,
-        GuardStatusKind.CoolingDown, 8,
-        GuardStatusKind.RetryCountdown, 9,
-        GuardStatusKind.Unknown, 10,
-        GuardStatusKind.MaintenanceArbitrating, 20,
-        GuardStatusKind.MaintenanceUpdating, 21,
-        GuardStatusKind.MaintenanceFileWaiting, 22,
-        GuardStatusKind.MaintenanceStabilizing, 23,
-        GuardStatusKind.MaintenanceRecovering, 24,
-        GuardStatusKind.SafeStartWait, 30,
-        GuardStatusKind.WaitingObservation, 31,
-        GuardStatusKind.StartCountdown, 32,
-        GuardStatusKind.Starting, 33,
-        GuardStatusKind.Verifying, 34,
-        GuardStatusKind.Initializing, 35,
+        GuardStatusKind.RelocationPending, 6,
+        GuardStatusKind.SuspectedStop, 7,
+        GuardStatusKind.LaunchRetry, 8,
+        GuardStatusKind.CoolingDown, 9,
+        GuardStatusKind.RetryCountdown, 10,
+        GuardStatusKind.Unknown, 11,
+        GuardStatusKind.WaitingObservation, 30,
+        GuardStatusKind.StartCountdown, 31,
+        GuardStatusKind.Starting, 32,
+        GuardStatusKind.Verifying, 33,
+        GuardStatusKind.Initializing, 34,
         GuardStatusKind.Paused, 40,
         GuardStatusKind.Running, 50)
     return priorities.Has(statusKind)
@@ -2064,6 +2372,130 @@ SetMainListSubItemIcon(row, iconIndex) {
     if updated
         ScheduleMainListNativeSurfaceRefresh()
     return updated
+}
+
+DrawMainListSubItem(listView, notification) {
+    subItemOffset := A_PtrSize == 8 ? 88 : 56
+    column := NumGet(notification, subItemOffset, "Int") + 1
+    if column != MainWindow.SequenceColumn
+        return ""
+    return DrawMainSequenceSubItem(listView, notification)
+}
+
+DrawMainSequenceSubItem(listView, notification) {
+    itemSpecOffset := A_PtrSize == 8 ? 56 : 36
+    row := NumGet(notification, itemSpecOffset, "UPtr") + 1
+    if row < 1 || row > listView.GetCount()
+        return Win32.CDRF_SKIPDEFAULT
+    cellRect := GetMainListSubItemRect(listView, row,
+        MainWindow.SequenceColumn)
+    hdcOffset := A_PtrSize == 8 ? 32 : 16
+    hdc := NumGet(notification, hdcOffset, "Ptr")
+    if !IsObject(cellRect) || !hdc
+        return Win32.CDRF_SKIPDEFAULT
+
+    text := listView.GetText(row, MainWindow.SequenceColumn)
+    path := listView.GetText(row, 3)
+    colorKey := GetMainSequenceColorKey(path)
+    if colorKey == ""
+        return Win32.CDRF_DODEFAULT
+    font := SendMessage(Win32.WM_GETFONT, 0, 0, listView.Hwnd)
+    previousFont := font ? DllCall("gdi32\SelectObject", "Ptr", hdc,
+        "Ptr", font, "Ptr") : 0
+    previousBkMode := DllCall("gdi32\SetBkMode", "Ptr", hdc,
+        "Int", 1, "Int")
+    previousTextColor := DllCall("gdi32\SetTextColor", "Ptr", hdc,
+        "UInt", ColorRefFromHex(UiThemeService.Color("Text")), "UInt")
+    try {
+        extent := RoundedButtonRenderer.MeasureText(hdc, text)
+        dpi := DllCall("user32\GetDpiForWindow", "Ptr", listView.Hwnd,
+            "UInt")
+        if !dpi
+            dpi := 96
+        dotSize := Max(4, Round(MainWindow.SequenceDotDiameterDip
+            * dpi / 96))
+        selectionInset := Max(2, Round(
+            ListViewSelectionPresenter.HorizontalInsetDip * dpi / 96))
+        cellWidth := cellRect.Right - cellRect.Left
+        textLeft := cellRect.Left
+            + Max(0, Floor((cellWidth - extent.Width) / 2))
+        dotLeft := cellRect.Left + selectionInset
+        dotTop := cellRect.Top + Max(0, Floor(
+            (cellRect.Bottom - cellRect.Top - dotSize) / 2))
+        brush := DllCall("gdi32\CreateSolidBrush", "UInt",
+            ColorRefFromHex(MainSequenceColorPalette.Color(colorKey)), "Ptr")
+        if brush {
+            previousBrush := DllCall("gdi32\SelectObject", "Ptr", hdc,
+                "Ptr", brush, "Ptr")
+            nullPen := DllCall("gdi32\GetStockObject", "Int", 8, "Ptr")
+            previousPen := nullPen ? DllCall("gdi32\SelectObject", "Ptr",
+                hdc, "Ptr", nullPen, "Ptr") : 0
+            try DllCall("gdi32\Ellipse", "Ptr", hdc,
+                "Int", dotLeft, "Int", dotTop,
+                "Int", dotLeft + dotSize, "Int", dotTop + dotSize)
+            finally {
+                if previousPen
+                    DllCall("gdi32\SelectObject", "Ptr", hdc, "Ptr",
+                        previousPen, "Ptr")
+                if previousBrush
+                    DllCall("gdi32\SelectObject", "Ptr", hdc, "Ptr",
+                        previousBrush, "Ptr")
+                DllCall("gdi32\DeleteObject", "Ptr", brush)
+            }
+        }
+        if text != "" {
+            textRect := Buffer(16, 0)
+            NumPut("Int", textLeft, textRect, 0)
+            NumPut("Int", cellRect.Top, textRect, 4)
+            NumPut("Int", Min(cellRect.Right,
+                textLeft + extent.Width), textRect, 8)
+            NumPut("Int", cellRect.Bottom, textRect, 12)
+            DllCall("user32\DrawTextW", "Ptr", hdc, "Str", text,
+                "Int", StrLen(text), "Ptr", textRect,
+                "UInt", 0x00000824, "Int")
+        }
+    } finally {
+        DllCall("gdi32\SetTextColor", "Ptr", hdc,
+            "UInt", previousTextColor)
+        DllCall("gdi32\SetBkMode", "Ptr", hdc,
+            "Int", previousBkMode)
+        if previousFont
+            DllCall("gdi32\SelectObject", "Ptr", hdc, "Ptr",
+                previousFont, "Ptr")
+    }
+    return Win32.CDRF_SKIPDEFAULT
+}
+
+GetMainListSubItemRect(listView, row, column) {
+    if !IsObject(listView) || !listView.Hwnd || row < 1 || column < 1
+        return ""
+    rect := Buffer(16, 0)
+    NumPut("Int", 0, rect, 0)
+    NumPut("Int", column - 1, rect, 4)
+    if !SendMessage(Win32.LVM_GETSUBITEMRECT, row - 1, rect.Ptr, ,
+            listView.Hwnd)
+        return ""
+    return {
+        Left: NumGet(rect, 0, "Int"),
+        Top: NumGet(rect, 4, "Int"),
+        Right: NumGet(rect, 8, "Int"),
+        Bottom: NumGet(rect, 12, "Int")
+    }
+}
+
+GetMainSequenceColorKey(path) {
+    path := NormalizeTargetPath(path)
+    if path == "" || !App.appStates.Has(path)
+        return ""
+    stateObj := App.appStates[path]
+    if !stateObj.HasOwnProp("DisplayConfig")
+        return ""
+    display := App.displayConfigCodec.Normalize(stateObj.DisplayConfig)
+    ; 空值表示沿用询问守护的默认绿点；none 是用户明确清除，不能再回退。
+    if display.SequenceColor == ""
+        return stateObj.HasOwnProp("AskBeforeRestart")
+            && stateObj.AskBeforeRestart ? "sage" : ""
+    return MainSequenceColorPalette.Resolve(display.SequenceColor)
 }
 
 SetMainListStatus(row, statusText) {
@@ -2345,7 +2777,7 @@ AddCenteredSingleLineEdit(guiObj, x, y, width, outerHeight, value := "", extraOp
     inputEditControl := guiObj.Add("Edit", editOptions, value)
     SetSingleLineEditHorizontalMargins(inputEditControl.Hwnd)
     RegisterTextInputControl(inputEditControl)
-    RegisterTextInputHitTarget(background, inputEditControl)
+    RegisterTextInputDecoration(background, inputEditControl)
     return {Background: background, Edit: inputEditControl}
 }
 

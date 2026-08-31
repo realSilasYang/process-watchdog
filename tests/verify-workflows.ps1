@@ -63,12 +63,13 @@ Assert-WorkflowContains 'ci.yml' $ci @(
     '.\tests\verify-fast.ps1'
     '.\tests\verify-windows-integration.ps1'
     '.\tests\reproducible-build.ps1'
+    '-OutputDirectory dist'
     '-SecondPowerShellPath powershell.exe'
     'path: dist/**'
     'include-hidden-files: true'
     'fetch-depth: 0'
     'lfs: false'
-    'lfs: true'
+    '.\tools\restore-font-assets.ps1'
     '  verify:'
     '    name: verify'
     '    if: always()'
@@ -93,10 +94,13 @@ Assert-WorkflowContains 'release-dry-run.yml' $dryRun @(
     '.\tools\resolve-release-state.ps1'
     '-RefreshBuildTools'
     '.\tools\invoke-release-validation.ps1'
+    '-OutputDirectory dist'
     '-SecondPowerShellPath powershell.exe'
     'path: dist/**'
     'include-hidden-files: true'
     'fetch-depth: 0'
+    'lfs: false'
+    '.\tools\restore-font-assets.ps1'
 )
 foreach ($forbidden in @('softprops/action-gh-release@',
         'gh release edit', 'contents: write',
@@ -108,10 +112,12 @@ foreach ($forbidden in @('softprops/action-gh-release@',
 
 $release = Get-WorkflowText 'release.yml'
 $versionExpression = '${{ steps.release_meta.outputs.version }}'
+$commitExpression = '${{ github.sha }}'
+$repositoryExpression = '${{ github.repository }}'
 $userAssets = @(
-    "dist/process-watchdog-$versionExpression-windows-x64.exe"
-    "dist/process-watchdog-$versionExpression-windows-x64.zip"
+    'dist/fonts.zip'
     "dist/process-watchdog-$versionExpression-source.zip"
+    "dist/process-watchdog-$versionExpression-windows-x64.zip"
 )
 Assert-WorkflowContains 'release.yml' $release @(
     'workflow_dispatch:'
@@ -125,9 +131,16 @@ Assert-WorkflowContains 'release.yml' $release @(
     '.\tools\verify-release-draft.ps1'
     '--draft=false'
     '.\tools\verify-published-release.ps1'
+    '.\tools\verify-downloaded-release.ps1'
+    "-Version '$versionExpression'"
+    "-CommitSha '$commitExpression'"
+    "-Repository '$repositoryExpression'"
+    '-OutputDirectory dist'
     '-SecondPowerShellPath powershell.exe'
     'include-hidden-files: true'
     'fetch-depth: 0'
+    'lfs: false'
+    '.\tools\restore-font-assets.ps1'
 )
 foreach ($asset in $userAssets) {
     if (([regex]::Matches($release, [regex]::Escape($asset))).Count -ne 2) {
@@ -136,7 +149,7 @@ foreach ($asset in $userAssets) {
 }
 if ($release.Contains('dist/*.spdx.json') -or
     $release.Contains('dist/SHA256SUMS.txt')) {
-    throw 'GitHub Release 只能上传独立 EXE、便携 ZIP 和源码 ZIP。'
+    throw 'GitHub Release 只能上传便携 ZIP、源码 ZIP 和可选字体 ZIP。'
 }
 if ($release -match '(?m)^\s*push:\s*$' -or
     $release -match '(?m)^\s*schedule:\s*$') {
@@ -147,6 +160,8 @@ $soak = Get-WorkflowText 'soak.yml'
 Assert-WorkflowContains 'soak.yml' $soak @(
     'tools\ci-toolchain.resolved.json'
     'actions/cache@'
+    'lfs: false'
+    '.\tools\restore-font-assets.ps1'
 )
 
 Write-Host "GitHub Actions 工作流已通过 actionlint $($toolLock.tools.actionlint.version) 与发布边界检查。"

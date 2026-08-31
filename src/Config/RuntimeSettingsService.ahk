@@ -24,12 +24,19 @@ class RuntimeSettingsService {
                 defaults.UiFont),
             Theme: this.Repository.Read("Settings", "Theme",
                 defaults.Theme),
+            UiScale: this.Repository.ReadBoundedInt("Settings", "UiScale",
+                defaults.UiScale, 80, 200),
             CheckInterval: this.Repository.ReadBoundedInt("Settings",
                 "CheckInterval", defaults.CheckInterval, 500, 86400000),
             RetrySequence: this.Repository.Read("Settings", "RetrySequence",
                 defaults.RetrySequence),
+            AskBeforeRestartFromStopCount: this.Repository.ReadBoundedInt(
+                "Settings", "AskBeforeRestartFromStopCount",
+                defaults.AskBeforeRestartFromStopCount, 1, 9999),
             ShowAtStartup: this.Repository.ReadBool("Settings",
                 "ShowAtStartup", defaults.ShowAtStartup),
+            RunAsAdministrator: this.Repository.ReadBool("Settings",
+                "RunAsAdministrator", defaults.RunAsAdministrator),
             CheckUpdatesOnStartup: this.Repository.ReadBool("Settings",
                 "CheckUpdatesOnStartup", defaults.CheckUpdatesOnStartup),
             RecursiveBatchImport: this.Repository.ReadBool("Settings",
@@ -55,6 +62,8 @@ class RuntimeSettingsService {
             settings.UiFont, defaults.UiFont)
         settings.Theme := UiThemeService.NormalizeRequestedTheme(
             settings.Theme, defaults.Theme)
+        settings.UiScale := this.NormalizeUiScale(settings.UiScale,
+            defaults.UiScale)
         try settings.LogDirectory := Trim(String(settings.LogDirectory))
         catch
             settings.LogDirectory := defaults.LogDirectory
@@ -83,10 +92,14 @@ class RuntimeSettingsService {
         runtime.uiLanguage := settings.UiLanguage
         runtime.uiFont := settings.UiFont
         runtime.uiTheme := settings.Theme
+        runtime.uiScale := settings.UiScale
         runtime.checkInterval := settings.CheckInterval
         runtime.retrySequence := settings.RetrySequence
         runtime.retryDelayArray := this.CloneArray(settings.RetryDelayArray)
+        runtime.askBeforeRestartFromStopCount :=
+            settings.AskBeforeRestartFromStopCount
         runtime.showAtStartup := !!settings.ShowAtStartup
+        runtime.runAsAdministrator := !!settings.RunAsAdministrator
         runtime.checkUpdatesOnStartup := !!settings.CheckUpdatesOnStartup
         runtime.recursiveBatchImport := !!settings.RecursiveBatchImport
         runtime.logMaxEntries := settings.LogMaxEntries
@@ -109,10 +122,15 @@ class RuntimeSettingsService {
             UiLanguage: this.RequireUiLanguage(settings),
             UiFont: this.RequireUiFont(settings),
             Theme: this.RequireTheme(settings),
+            UiScale: this.RequireUiScale(settings),
             CheckInterval: this.RequireInteger(settings, "CheckInterval",
                 500, 86400000),
             RetrySequence: this.RequireText(settings, "RetrySequence"),
+            AskBeforeRestartFromStopCount: this.RequireInteger(settings,
+                "AskBeforeRestartFromStopCount", 1, 9999),
             ShowAtStartup: this.RequireBoolean(settings, "ShowAtStartup"),
+            RunAsAdministrator: this.RequireBoolean(settings,
+                "RunAsAdministrator"),
             CheckUpdatesOnStartup: this.RequireBoolean(settings,
                 "CheckUpdatesOnStartup"),
             RecursiveBatchImport: this.RequireBoolean(settings,
@@ -143,10 +161,13 @@ class RuntimeSettingsService {
             UiLanguage: "auto",
             UiFont: "auto",
             Theme: "auto",
+            UiScale: 100,
             CheckInterval: 2000,
             RetrySequence: "1, 10, 60",
             RetryDelayArray: [1000, 10000, 60000],
+            AskBeforeRestartFromStopCount: 2,
             ShowAtStartup: false,
+            RunAsAdministrator: true,
             CheckUpdatesOnStartup: true,
             RecursiveBatchImport: true,
             LogMaxEntries: 500,
@@ -164,13 +185,18 @@ class RuntimeSettingsService {
             {Key: "UiLanguage", Value: settings.UiLanguage},
             {Key: "UiFont", Value: settings.UiFont},
             {Key: "Theme", Value: settings.Theme},
+            {Key: "UiScale", Value: settings.UiScale},
             {Key: "CheckInterval", Value: settings.CheckInterval},
-            {Key: "RetrySequence", Value: settings.RetrySequence}
+            {Key: "RetrySequence", Value: settings.RetrySequence},
+            {Key: "AskBeforeRestartFromStopCount",
+                Value: settings.AskBeforeRestartFromStopCount}
         ]
         if includeReloadMarker
             entries.Push({Key: "ShowAfterReload", Value: 0})
         entries.Push(
             {Key: "ShowAtStartup", Value: settings.ShowAtStartup ? 1 : 0},
+            {Key: "RunAsAdministrator",
+                Value: settings.RunAsAdministrator ? 1 : 0},
             {Key: "CheckUpdatesOnStartup",
                 Value: settings.CheckUpdatesOnStartup ? 1 : 0},
             {Key: "RecursiveBatchImport",
@@ -242,6 +268,27 @@ class RuntimeSettingsService {
             throw ValueError("运行参数不是支持的界面主题: "
                 String(settings.Theme))
         return normalized
+    }
+
+    RequireUiScale(settings) {
+        if !settings.HasOwnProp("UiScale")
+            throw ValueError("缺少运行参数: UiScale")
+        normalized := this.NormalizeUiScale(settings.UiScale, 0)
+        if !normalized
+            throw ValueError("运行参数不是支持的界面缩放: "
+                String(settings.UiScale))
+        return normalized
+    }
+
+    NormalizeUiScale(value, fallback := 100) {
+        try parsed := Integer(value)
+        catch
+            return fallback
+        for choice in [80, 90, 100, 110, 125, 150, 175, 200] {
+            if parsed == choice
+                return choice
+        }
+        return fallback
     }
 
     CloneArray(values) {

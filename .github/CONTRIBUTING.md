@@ -58,9 +58,10 @@ Gitleaks，不需要把第三方 DLL 加入系统 `PATH`。正式发布会强制
 | DPI、暗色模式、窗口层级或可访问性 | 填写 Windows 版本、缩放比例和物理显示器证据 |
 | 构建、依赖、SBOM 或发行包 | 运行 `tests/reproducible-build.ps1` 和发行结构校验 |
 
-普通 CI 按同一规则自动分层：快速门禁始终运行；只有运行时变更才下载 LFS 字体并
-执行真实 Windows／GUI；主分支非文档变更和发行工程相关 Pull Request 才做双宿主
-可复现构建。正式发布不跳层，会重新运行完整发布门禁。
+普通 CI 按同一规则自动分层：快速门禁始终运行；只有运行时变更才从最新正式字体包
+恢复并按当前清单校验完整字体，然后执行真实 Windows／GUI；主分支非文档变更和发行
+工程相关 Pull Request 才做双宿主可复现构建。正式发布不跳层，会重新运行完整发布
+门禁。字体在 Git 中仍由 LFS 跟踪，但 CI 和发布不消耗 LFS 下载配额。
 
 完整 GUI 人工范围见 `tests/gui/MANUAL-REGRESSION.md`。自动化不能替代真实 DPI、
 多显示器、高对比度、触控板或屏幕阅读器验证；未覆盖的组合必须明确写出。
@@ -68,8 +69,8 @@ Gitleaks，不需要把第三方 DLL 加入系统 `PATH`。正式发布会强制
 ## 提交与 Pull Request
 
 Pull Request 应说明问题、用户可见变化、关键设计、兼容性、实际验证命令和未覆盖
-风险。涉及界面时附经过脱敏的截图或录屏；涉及配置时说明对 `watchdog.ini`、
-`watchdog.maintenance.ini`、备份和恢复的影响。
+风险。涉及界面时附经过脱敏的截图或录屏；涉及配置时说明对 `watchdog.ini`、备份和
+恢复的影响。
 
 用户可见变化必须同步更新 README、CHANGELOG 和对应使用文档。新增版本按
 [更新日志模板](../docs/changelog-template.md)整理；普通 Pull Request 不应创建版本

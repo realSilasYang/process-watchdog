@@ -8,7 +8,7 @@
 
 ## Compatibility and data impact
 
-<!-- Cover watchdog.ini, watchdog.maintenance.ini, monitoring semantics, update protection, system integration, and existing data. Write “None” when appropriate. -->
+<!-- Cover watchdog.ini, monitoring semantics, system integration, and existing data. Write “None” when appropriate. -->
 
 - [ ] Configuration remains compatible, or migration, backup, and failure recovery are documented
 - [ ] Display name and icon do not change target identity, launch entry, or monitoring
@@ -22,7 +22,7 @@
 - [ ] For real GUI work, ran `tests/run-gui-tests.ps1` and checked GDI/USER handles
 - [ ] For release-boundary work, ran `tests/reproducible-build.ps1`
 - [ ] Updated both README languages, both changelogs, and matching documents
-- [ ] Did not commit personal configuration, sessions, paths, arguments, credentials, build products, or probes
+- [ ] Did not commit personal configuration, paths, arguments, credentials, build products, or probes
 
 Commands and results:
 

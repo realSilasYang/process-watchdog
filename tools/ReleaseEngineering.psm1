@@ -4,6 +4,167 @@
 
 Set-StrictMode -Version Latest
 
+if (-not ('ProcessWatchdog.Release.OpenTypeFamilyReader' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+
+namespace ProcessWatchdog.Release
+{
+    public static class OpenTypeFamilyReader
+    {
+        public static string[] Read(string path)
+        {
+            string fullPath = Path.GetFullPath(path);
+            byte[] data = File.ReadAllBytes(fullPath);
+            if (data.Length < 12)
+                throw new InvalidDataException("OpenType font file is truncated: " + fullPath);
+
+            List<int> fontOffsets = new List<int>();
+            if (ReadTag(data, 0) == "ttcf")
+            {
+                uint fontCount = ReadUInt32(data, 8);
+                if (fontCount == 0 || fontCount > 4096 ||
+                    12L + (4L * fontCount) > data.Length)
+                    throw new InvalidDataException(
+                        "OpenType collection has an invalid font directory: " + fullPath);
+                for (uint index = 0; index < fontCount; index++)
+                {
+                    uint value = ReadUInt32(data, checked(12 + (int)(4 * index)));
+                    if (value > Int32.MaxValue || (long)value + 12 > data.Length)
+                        throw new InvalidDataException(
+                            "OpenType collection contains an invalid font offset: " + fullPath);
+                    fontOffsets.Add((int)value);
+                }
+            }
+            else
+            {
+                fontOffsets.Add(0);
+            }
+
+            HashSet<string> families = new HashSet<string>(
+                StringComparer.OrdinalIgnoreCase);
+            foreach (int fontOffset in fontOffsets)
+            {
+                string signature = ReadTag(data, fontOffset);
+                bool trueType = data[fontOffset] == 0 &&
+                    data[fontOffset + 1] == 1 &&
+                    data[fontOffset + 2] == 0 &&
+                    data[fontOffset + 3] == 0;
+                if (!trueType && signature != "OTTO" &&
+                    signature != "true" && signature != "typ1")
+                    throw new InvalidDataException(
+                        "OpenType collection contains an unsupported font face: " + fullPath);
+
+                int tableCount = ReadUInt16(data, fontOffset + 4);
+                if (tableCount == 0 ||
+                    (long)fontOffset + 12L + (16L * tableCount) > data.Length)
+                    throw new InvalidDataException(
+                        "OpenType font has an invalid table directory: " + fullPath);
+
+                int nameTableOffset = -1;
+                int nameTableLength = 0;
+                for (int tableIndex = 0; tableIndex < tableCount; tableIndex++)
+                {
+                    int recordOffset = checked(fontOffset + 12 + (16 * tableIndex));
+                    if (ReadTag(data, recordOffset) != "name")
+                        continue;
+                    uint offsetValue = ReadUInt32(data, recordOffset + 8);
+                    uint lengthValue = ReadUInt32(data, recordOffset + 12);
+                    if (offsetValue > Int32.MaxValue || lengthValue > Int32.MaxValue ||
+                        (long)offsetValue + lengthValue > data.Length || lengthValue < 6)
+                        throw new InvalidDataException(
+                            "OpenType font has an invalid name table: " + fullPath);
+                    nameTableOffset = (int)offsetValue;
+                    nameTableLength = (int)lengthValue;
+                    break;
+                }
+                if (nameTableOffset < 0)
+                    throw new InvalidDataException(
+                        "OpenType font has no name table: " + fullPath);
+
+                int nameCount = ReadUInt16(data, nameTableOffset + 2);
+                int stringStorageOffset = ReadUInt16(data, nameTableOffset + 4);
+                if (6L + (12L * nameCount) > nameTableLength ||
+                    stringStorageOffset < 6 + (12 * nameCount) ||
+                    stringStorageOffset > nameTableLength)
+                    throw new InvalidDataException(
+                        "OpenType font has invalid name records: " + fullPath);
+
+                for (int nameIndex = 0; nameIndex < nameCount; nameIndex++)
+                {
+                    int recordOffset = checked(nameTableOffset + 6 + (12 * nameIndex));
+                    int platformId = ReadUInt16(data, recordOffset);
+                    int nameId = ReadUInt16(data, recordOffset + 6);
+                    if ((nameId != 1 && nameId != 16 && nameId != 21) ||
+                        (platformId != 0 && platformId != 3))
+                        continue;
+                    int stringLength = ReadUInt16(data, recordOffset + 8);
+                    int stringOffset = ReadUInt16(data, recordOffset + 10);
+                    if (stringLength == 0)
+                        continue;
+                    long stringStart = (long)nameTableOffset +
+                        stringStorageOffset + stringOffset;
+                    long stringEnd = stringStart + stringLength;
+                    if ((stringLength % 2) != 0 || stringStart < nameTableOffset ||
+                        stringEnd > (long)nameTableOffset + nameTableLength)
+                        throw new InvalidDataException(
+                            "OpenType font has an invalid family-name record: " + fullPath);
+                    string family = Encoding.BigEndianUnicode.GetString(
+                        data, checked((int)stringStart), stringLength).Trim('\0').Trim();
+                    if (family.Length != 0)
+                        families.Add(family);
+                }
+            }
+
+            if (families.Count == 0)
+                throw new InvalidDataException(
+                    "OpenType font exposes no Unicode family names: " + fullPath);
+            return families.OrderBy(value => value, StringComparer.Ordinal).ToArray();
+        }
+
+        private static ushort ReadUInt16(byte[] data, int offset)
+        {
+            EnsureRange(data, offset, 2);
+            return (ushort)((data[offset] << 8) | data[offset + 1]);
+        }
+
+        private static uint ReadUInt32(byte[] data, int offset)
+        {
+            EnsureRange(data, offset, 4);
+            return ((uint)data[offset] << 24) |
+                ((uint)data[offset + 1] << 16) |
+                ((uint)data[offset + 2] << 8) |
+                data[offset + 3];
+        }
+
+        private static string ReadTag(byte[] data, int offset)
+        {
+            EnsureRange(data, offset, 4);
+            return Encoding.ASCII.GetString(data, offset, 4);
+        }
+
+        private static void EnsureRange(byte[] data, long offset, long length)
+        {
+            if (offset < 0 || length < 0 || offset + length > data.Length)
+                throw new InvalidDataException(
+                    "OpenType record points outside the font file.");
+        }
+    }
+}
+'@
+}
+
+function Get-OpenTypeFamilyNames {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$FontPath)
+
+    return @([ProcessWatchdog.Release.OpenTypeFamilyReader]::Read($FontPath))
+}
+
 function Test-CanonicalReleaseVersion {
     [CmdletBinding()]
     param([AllowEmptyString()][string]$Version)
@@ -20,9 +181,9 @@ function Get-ReleaseArtifactNames {
         throw "VERSION 不是规范的三段语义化版本：$Version"
     }
     return @(
-        "process-watchdog-$Version-windows-x64.exe"
-        "process-watchdog-$Version-windows-x64.zip"
+        'fonts.zip'
         "process-watchdog-$Version-source.zip"
+        "process-watchdog-$Version-windows-x64.zip"
     )
 }
 
@@ -83,7 +244,7 @@ function Assert-ReleaseArtifactInventory {
         -ReferenceObject $expectedNames -DifferenceObject $sortedActualNames)
     if ($difference.Count -ne 0 -or
         $sortedActualNames.Count -ne $expectedNames.Count) {
-        throw "Release 附件必须且只能是三种用户版本；实际为：$($sortedActualNames -join '、')"
+        throw "Release 附件必须且只能是完整便携版、完整源码版和可选字体包；实际为：$($sortedActualNames -join '、')"
     }
 
     $localRoot = ""
@@ -211,6 +372,25 @@ function Normalize-ReleaseBody {
     return ($Text -replace "`r`n", "`n").TrimEnd("`r", "`n")
 }
 
+function Assert-ReleaseNotesNoValidationSection {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$BodyPath
+    )
+
+    if (-not (Test-Path -LiteralPath $BodyPath -PathType Leaf)) {
+        throw "发行说明不存在：$BodyPath"
+    }
+    $body = Get-Content -LiteralPath $BodyPath -Raw -Encoding UTF8
+    $validationHeadingPattern =
+        '(?mi)^##\s+(?:✅\s*)?(?:验证范围|驗證範圍|测试范围|測試範圍|' +
+        'Validation\s+Scope|Verification\s+Scope|Test\s+Coverage)\s*\r?$'
+    if ($body -match $validationHeadingPattern) {
+        throw ('发行说明不得包含验证范围章节；自动化结果、人工矩阵和未覆盖环境' +
+            '应记录在专门的验证证据与 Actions 日志中。')
+    }
+}
+
 function Assert-ReleaseNotesImportantSection {
     [CmdletBinding()]
     param(
@@ -231,7 +411,7 @@ function Assert-ReleaseNotesImportantSection {
 
     $heading = $headings[0]
     $regularHeading = [regex]::Match($body,
-        '(?m)^## (?:✨ 新增|🚀 优化|🐛 修复|✅ 验证范围|🔒 安全)\r?$')
+        '(?m)^## (?:✨ 新增|🚀 优化|🐛 修复|🔒 安全)\r?$')
     if ($regularHeading.Success -and $heading.Index -gt $regularHeading.Index) {
         throw '“⚠️ 重要说明”必须位于常规变更章节之前。'
     }
@@ -287,6 +467,7 @@ function Assert-ReleaseNotesContent {
     if ($body -notmatch "(?m)^# 🎉 进程守护小助手 v$escapedVersion\r?$") {
         throw '发行说明必须保留带 🎉 的版本标题。'
     }
+    Assert-ReleaseNotesNoValidationSection -BodyPath $BodyPath
     Assert-ReleaseNotesImportantSection -BodyPath $BodyPath
     $assetHeadings = [regex]::Matches($body,
         '(?m)^## 📦 发布物说明\r?$')
@@ -302,20 +483,22 @@ function Assert-ReleaseNotesContent {
 
     $specifications = @(
         @{
-            Name = "process-watchdog-$Version-windows-x64.exe"
-            Required = @('独立可执行版', '无需安装 AutoHotkey', '快速体验')
-        }
-        @{
-            Name = "process-watchdog-$Version-windows-x64.zip"
-            Required = @('完整便携版', 'EXE', '说明文档', '许可证', '字体',
-                '运行所需资源', '长期使用', '手动部署')
+            Name = 'fonts.zip'
+            Required = @('可选字体包', '首选字体', '回退字体',
+                '安装到 Windows', '不是程序运行必需')
         }
         @{
             Name = "process-watchdog-$Version-source.zip"
             Required = @('完整源码版', 'AHK 源码', '模块', '测试', '文档',
-                '字体', '审阅', '开发', 'AutoHotkey v2 x64')
+                '不含字体', '审阅', '开发', 'AutoHotkey v2 x64')
+        }
+        @{
+            Name = "process-watchdog-$Version-windows-x64.zip"
+            Required = @('完整便携版', 'EXE', '说明文档', '许可证',
+                '运行所需资源', '无需安装 AutoHotkey', '不含字体')
         }
     )
+    $lastItemIndex = -1
     foreach ($specification in $specifications) {
         $name = [string]$specification.Name
         $lines = [regex]::Matches($sectionText,
@@ -323,10 +506,27 @@ function Assert-ReleaseNotesContent {
         if ($lines.Count -ne 1) {
             throw "发布物说明必须且只能逐项说明一次：$name"
         }
+        if ($lines[0].Index -le $lastItemIndex) {
+            throw '发布物说明必须按 GitHub Assets 的固定文件名顺序排列：字体包、源码版、便携版。'
+        }
+        $lastItemIndex = $lines[0].Index
         foreach ($requiredText in $specification.Required) {
             if (-not $lines[0].Value.Contains([string]$requiredText)) {
                 throw "发布物说明不完整：$name 缺少必要信息：$requiredText"
             }
+        }
+    }
+    $everythingLines = [regex]::Matches($sectionText,
+        '(?m)^- \*\*Everything（\[官方最新版\]\(https://www\.voidtools\.com/downloads/\)）\*\*：[^\r\n]*\r?$')
+    if ($everythingLines.Count -ne 1 -or
+        $everythingLines[0].Index -le $lastItemIndex) {
+        throw 'Everything 必须使用规范 Markdown 链接并排在三个 GitHub 附件之后。'
+    }
+    foreach ($requiredEverythingText in @('Everything', '程序搜索', '后台服务',
+            'Everything64.dll', '不能替代',
+            'https://www.voidtools.com/downloads/')) {
+        if (-not $sectionText.Contains($requiredEverythingText)) {
+            throw "发布物说明缺少 Everything 用途或官方下载信息：$requiredEverythingText"
         }
     }
 }
@@ -389,9 +589,11 @@ function Assert-ReleaseRecord {
 }
 
 Export-ModuleMember -Function @(
+    'Get-OpenTypeFamilyNames'
     'Test-CanonicalReleaseVersion'
     'Get-ReleaseArtifactNames'
     'Assert-ReleaseArtifactInventory'
+    'Assert-ReleaseNotesNoValidationSection'
     'Assert-ReleaseNotesImportantSection'
     'Assert-ReleaseNotesContent'
     'Resolve-ReleaseState'

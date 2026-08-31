@@ -248,19 +248,19 @@ class WatchdogConfigRepository {
                 this.Text("; 本区保存运行参数；以分号开头的注释不会参与软件读取。"),
                 this.Text("; 布尔值使用 1 表示开启、0 表示关闭，建议优先通过设置界面修改。")]},
             {Name: "Apps", Lines: [
-                this.Text("; 每个 AppN 对应一个监控项，九个字段使用竖线分隔。"),
+                this.Text("; 每个 AppN 对应一个守护对象，九个字段使用竖线分隔。"),
                 this.Text("; 格式：启用状态｜管理员运行｜目标路径｜工作目录｜启动参数｜环境变量｜快捷方式真实目标｜手动目标标记｜快捷方式参数。"),
                 this.Text("; 布尔值使用 1 表示开启、0 表示关闭；<HEX> 内容由软件自动编码和解码。")]},
-            {Name: "Maintenance", Lines: [
-                this.Text("; AppN 与 [Apps] 中同名项目一一对应，值为软件升级保护的 <HEX> 编码结构。"),
-                this.Text("; 内部字段包括 Enabled、RootIsCustom、DetectionSeconds、StableSeconds、MaxWaitSeconds、InstallRoot 和 Actor。"),
-                this.Text("; 建议通过“软件升级保护”界面修改，不要直接编辑编码内容。")]},
             {Name: "Display", Lines: [
-                this.Text("; 仅保存主窗口显示名称和图标来源，不参与进程识别、启动或升级保护。"),
-                this.Text("; AppN 与 [Apps] 中同名项目一一对应；留空的项目使用目标自身的名称和图标。")]},
+                this.Text("; 仅保存主窗口显示名称、图标来源和序号圆点颜色，不参与进程识别或启动。"),
+                this.Text("; AppN 与 [Apps] 中同名的守护对象一一对应；三个字段依次为名称、图标路径和圆点颜色。"),
+                this.Text("; 名称与图标路径使用 <HEX> 编码且留空时沿用目标信息；圆点留空或 none 表示不显示。")]},
             {Name: "Launch", Lines: [
-                this.Text("; AppN 与 [Apps] 中同名项目一一对应，依次保存启动程序或解释器路径及其参数。"),
+                this.Text("; AppN 与 [Apps] 中同名的守护对象一一对应，依次保存启动程序或解释器路径及其参数。"),
                 this.Text("; 两个字段均为 <HEX> 编码；留空时由小助手按目标类型使用默认启动方式。")]},
+            {Name: "Identity", Lines: [
+                this.Text("; AppN 与 [Apps] 中同名的直接文件目标一一对应，依次保存文件大小和 SHA-256 内容哈希。"),
+                this.Text("; 此节由小助手自动维护，用于在文件或目录改名、跨目录或跨磁盘移动后确认内容未变；请勿手动编辑。")]},
             {Name: "Recovery", Lines: [
                 this.Text("; 无法安全解析的监控记录会暂存于此，避免静默丢失；正常情况下无需手动修改。")]}
         ]
@@ -272,6 +272,8 @@ class WatchdogConfigRepository {
                 this.Text("; UiLanguage：界面语言；auto 表示跟随系统，也可填写受支持的语言代码。")]},
             {Section: "Settings", Key: "UiFont", Lines: [
                 this.Text("; UiFont：界面字体；auto 表示使用当前语言的默认字体，也可填写本机已安装字体名称。")]},
+            {Section: "Settings", Key: "UiScale", Lines: [
+                this.Text("; UiScale：界面缩放百分比，支持 80、90、100、110、125、150、175、200。")]},
             {Section: "Settings", Key: "Theme", Lines: [
                 this.Text("; Theme：界面主题；auto 表示跟随 Windows 系统，light 表示浅色，dark 表示深色。")]},
             {Section: "Settings", Key: "CheckInterval", Lines: [
@@ -280,6 +282,8 @@ class WatchdogConfigRepository {
                 this.Text("; CheckUpdatesOnStartup：启动后是否在后台检查小助手新版。")]},
             {Section: "Settings", Key: "RetrySequence", Lines: [
                 this.Text("; RetrySequence：重启等待秒数，逗号分隔，最多 10 项，每项范围 1～86400。")]},
+            {Section: "Settings", Key: "AskBeforeRestartFromStopCount",
+                Lines: [this.Text("; AskBeforeRestartFromStopCount：开启“每次恢复前询问”时，从第几次确认停止开始显示恢复选择，范围 1～9999。")]},
             {Section: "Settings", Key: "ShowAfterReload", Lines: [
                 this.Text("; ShowAfterReload：内部重载标记，重载完成后会自动恢复为 0。")]},
             {Section: "Settings", Key: "AllowForceTerminate", Lines: [
@@ -300,6 +304,8 @@ class WatchdogConfigRepository {
                 this.Text("; RecursiveBatchImport：批量导入文件夹时是否递归扫描子目录。")]},
             {Section: "Settings", Key: "ShowAtStartup", Lines: [
                 this.Text("; ShowAtStartup：启动后是否显示主窗口。")]},
+            {Section: "Settings", Key: "RunAsAdministrator", Lines: [
+                this.Text("; RunAsAdministrator：小助手启动时是否请求管理员权限；计划任务使用相同权限级别。")]},
             {Section: "Layout", Key: "GuiH", Lines: [
                 this.Text("; GuiH：主窗口高度，按 96 DPI 逻辑像素保存。")]},
             {Section: "Layout", Key: "Col1W", Lines: [

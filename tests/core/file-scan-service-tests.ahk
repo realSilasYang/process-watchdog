@@ -18,6 +18,7 @@ class FileScanTestState {
         this.LaunchCount := 0
         this.LastCommand := ""
         this.Logs := []
+        this.HashClockAdvance := 0
     }
 }
 
@@ -28,6 +29,7 @@ class TestFileScanService extends FileScanService {
         this.HandleStatus := Map()
         this.TerminatedHandles := []
         this.ClosedHandles := []
+        this.IndexedCandidates := ""
     }
 
     OpenWorkerHandle(pid) {
@@ -51,6 +53,13 @@ class TestFileScanService extends FileScanService {
     CloseWorkerHandle(handle) {
         if handle
             this.ClosedHandles.Push(handle)
+    }
+
+    QueryEverythingCandidates(rootPath, previousPath, expectedSize) {
+        if Type(this.IndexedCandidates) == "Array"
+            return {Available: true, Paths: this.IndexedCandidates.Clone()}
+        return super.QueryEverythingCandidates(rootPath, previousPath,
+            expectedSize)
     }
 }
 
@@ -102,9 +111,27 @@ FileScanTestLog(state, message) {
     state.Logs.Push(message)
 }
 
-CreateFileScanTestService(state, rootPath, scriptPath) {
+FileScanTestContentHash(path) {
+    try content := FileRead(path, "UTF-8")
+    catch
+        return ""
+    return content == "content-match"
+        ? "C" . Format("{:063}", 0) : ""
+}
+
+FileScanTestTimedContentHash(state, path) {
+    contentHash := FileScanTestContentHash(path)
+    state.Now += state.HashClockAdvance
+    return contentHash
+}
+
+CreateFileScanTestService(state, rootPath, scriptPath,
+    candidateExclusionRoots := "") {
+    if Type(candidateExclusionRoots) != "Array"
+        candidateExclusionRoots := []
     return TestFileScanService({
         CanonicalPath: FileScanTestCanonical,
+        ComputeContentHash: FileScanTestTimedContentHash.Bind(state),
         GetCreationIdentity: FileScanTestIdentity.Bind(state),
         Log: FileScanTestLog.Bind(state),
         Now: FileScanTestNow.Bind(state),
@@ -115,7 +142,8 @@ CreateFileScanTestService(state, rootPath, scriptPath) {
         InterpreterPath: A_AhkPath,
         Compiled: false,
         ScriptWindow: 77,
-        TempDirectory: rootPath
+        TempDirectory: rootPath,
+        CandidateExclusionRoots: candidateExclusionRoots
     })
 }
 
@@ -209,6 +237,65 @@ RunFileScanServiceTests() {
             && oversizedPaths.Length == 0,
             "超出协议上限的声明数量仍被接受")
 
+        contentRoot := rootPath "\content"
+        historyDirectory := rootPath
+            . "\AppData\Roaming\Code\User\History\-63aa655c"
+        gitDirectory := rootPath "\repository\.git\objects"
+        cacheDirectory := rootPath "\worker-cache"
+        for directory in [contentRoot, historyDirectory, gitDirectory,
+                cacheDirectory]
+            DirCreate(directory)
+        acceptedCandidate := contentRoot "\Bandicam 窗口管理.ahk"
+        historyCandidate := historyDirectory "\fmuK.ahk"
+        gitCandidate := gitDirectory "\copy.ahk"
+        cacheCandidate := cacheDirectory "\copy.ahk"
+        for candidatePath in [acceptedCandidate, historyCandidate,
+                gitCandidate, cacheCandidate]
+            FileAppend("content-match", candidatePath, "UTF-8")
+        contentService := CreateFileScanTestService(state, rootPath,
+            scriptPath, [cacheDirectory])
+        expectedContentHash := FileScanTestContentHash(acceptedCandidate)
+        expectedContentSize := FileGetSize(acceptedCandidate)
+        contentOutput := rootPath "\content-result.tmp"
+        AssertFileScan(contentService.IsPathWithinRoot(acceptedCandidate,
+                rootPath)
+            && !contentService.IsPathWithinRoot(
+                rootPath "-other\copy.ahk", rootPath),
+            "内容候选的搜索根边界判断错误")
+        AssertFileScan(contentService.WriteContentMatchWorkerFile(
+                contentOutput, rootPath, rootPath "\Bandicam窗口管理.ahk",
+                expectedContentSize, expectedContentHash, false, 5),
+            "内容迁移候选扫描结果写入失败")
+        contentPaths := contentService.ReadResult(contentOutput,
+            &contentTruncated, &contentReady)
+        AssertFileScan(contentReady && !contentTruncated
+            && contentPaths.Length == 1
+            && FileScanTestCanonical(contentPaths[1])
+                == FileScanTestCanonical(acceptedCandidate),
+            "VS Code 历史、版本库或缓存副本仍参与内容迁移候选计数")
+        contentService.Shutdown()
+
+        timeoutState := FileScanTestState()
+        timeoutService := CreateFileScanTestService(timeoutState, rootPath,
+            scriptPath)
+        secondIndexedCandidate := contentRoot "\second-copy.ahk"
+        FileAppend("content-match", secondIndexedCandidate, "UTF-8")
+        timeoutService.IndexedCandidates := [acceptedCandidate,
+            secondIndexedCandidate]
+        timeoutState.HashClockAdvance := 2000
+        timeoutOutput := rootPath "\content-timeout-result.tmp"
+        AssertFileScan(timeoutService.WriteContentMatchWorkerFile(
+                timeoutOutput, rootPath,
+                rootPath "\Bandicam窗口管理.ahk", expectedContentSize,
+                expectedContentHash, true, 1),
+            "索引内容候选超时结果写入失败")
+        timeoutPaths := timeoutService.ReadResult(timeoutOutput,
+            &timeoutTruncated, &timeoutReady)
+        AssertFileScan(timeoutReady && timeoutTruncated
+            && timeoutPaths.Length == 1,
+            "索引候选未完成哈希时被错误标记为完整扫描")
+        timeoutService.Shutdown()
+
         state.ThrowIdentity := true
         firstJob := service.Start(rootPath, true, 10, 5)
         secondJob := service.Start(rootPath, true, 10, 5)
@@ -241,9 +328,61 @@ RunFileScanServiceTests() {
         failedService := CreateFileScanTestService(failedState, rootPath,
             scriptPath)
         AssertFileScan(failedService.Start(rootPath, true, 10, 5)
-            == "" && failedState.Logs.Length == 1,
+            == "" && failedState.Logs.Length == 1
+            && failedService.LastWorkerFailureReason == "LaunchFailed",
             "工作器启动异常没有被隔离并记录")
         failedService.Shutdown()
+
+        diagnosticState := FileScanTestState()
+        diagnosticService := CreateFileScanTestService(diagnosticState,
+            rootPath, scriptPath)
+        timedOutJob := diagnosticService.StartContentMatch(rootPath,
+            rootPath "\old.exe", expectedContentSize, expectedContentHash,
+            false, 1)
+        diagnosticState.Now := timedOutJob.DeadlineTicks
+        timedOutResult := diagnosticService.PollContentMatch(timedOutJob)
+        AssertFileScan(timedOutResult.Ready && timedOutResult.Failed
+            && timedOutResult.FailureReason == "TimedOut"
+            && diagnosticService.LastWorkerFailureReason == "TimedOut",
+            "内容扫描超时没有返回并保留结构化失败原因")
+
+        exitedJob := diagnosticService.StartContentMatch(rootPath,
+            rootPath "\old.exe", expectedContentSize, expectedContentHash,
+            false, 5)
+        diagnosticService.HandleStatus[exitedJob.Handle] := 0
+        exitedResult := diagnosticService.PollContentMatch(exitedJob)
+        AssertFileScan(exitedResult.Ready && exitedResult.Failed
+            && exitedResult.FailureReason == "ExitedWithoutResult",
+            "内容扫描工作器无结果退出没有与超时区分")
+
+        identityOnlyJob := {Pid: 2147483000, Handle: 0,
+            Path: rootPath "\identity-only-no-result.tmp",
+            CreationIdentity: "OLD", DeadlineTicks: diagnosticState.Now + 5000,
+            Kind: "ContentMatch"}
+        identityOnlyResult := diagnosticService.PollContentMatch(
+            identityOnlyJob)
+        AssertFileScan(identityOnlyResult.Ready && identityOnlyResult.Failed
+            && identityOnlyResult.FailureReason == "ExitedWithoutResult",
+            "无进程句柄时没有通过 PID 与创建身份识别工作器退出")
+
+        malformedJob := diagnosticService.StartContentMatch(rootPath,
+            rootPath "\old.exe", expectedContentSize, expectedContentHash,
+            false, 5)
+        FileAppend("BROKEN`r`n", malformedJob.Path, "UTF-16")
+        malformedResult := diagnosticService.PollContentMatch(malformedJob)
+        AssertFileScan(malformedResult.Ready && malformedResult.Failed
+            && malformedResult.FailureReason == "MalformedResult",
+            "内容扫描损坏结果没有返回结构化失败原因")
+
+        cancelledJob := diagnosticService.StartContentMatch(rootPath,
+            rootPath "\old.exe", expectedContentSize, expectedContentHash,
+            false, 5)
+        AssertFileScan(diagnosticService.StopContentMatch(cancelledJob)
+            && diagnosticService.LastWorkerFailureReason == "Cancelled"
+            && InStr(diagnosticService.BuildDiagnosticText(),
+                "FileScanWorker.FailureByReason.TimedOut=1"),
+            "主动取消内容扫描没有记录状态，或诊断文本缺少分类计数")
+        diagnosticService.Shutdown()
 
         raceState := FileScanTestState()
         raceService := CreateFileScanTestService(raceState, rootPath,

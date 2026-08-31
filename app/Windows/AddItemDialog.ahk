@@ -1,8 +1,10 @@
-; 添加守护项窗口。
+; 添加守护对象窗口。
 ; 支持直接选择目标、批量导入和应用搜索；异步扫描以会话代际隔离，窗口关闭后
 ; 迟到的工作器结果只能被丢弃，不能继续写入控件或重复提交撤销记录。
 
 class AddItemDialog extends ManagedWindow {
+    static ConfirmColor := "567D6F"
+
     __New(mainGui) {
         this.owner := mainGui
         this.edit := ""
@@ -44,7 +46,7 @@ class AddItemDialog extends ManagedWindow {
             return
         }
 
-        if !this.CreateOwnedGui(this.owner, "-MinimizeBox -MaximizeBox", Tr("添加监控项"))
+        if !this.CreateOwnedGui(this.owner, "-MinimizeBox -MaximizeBox", Tr("添加守护对象"))
             return
         try {
         this.gui.OnEvent("Escape", ObjBindMethod(this, "Close"))
@@ -74,8 +76,8 @@ class AddItemDialog extends ManagedWindow {
         hintHeight := isCompact ? 42 : 62
         inputY := hintY + hintHeight + 4
         batchStatusY := inputY + 29
-        this.normalActionButtonY := inputY + 36
-        this.batchActionButtonY := batchStatusY + 20
+        this.normalActionButtonY := inputY + 40
+        this.batchActionButtonY := batchStatusY + 24
         this.normalWindowHeight := this.normalActionButtonY + 41
         this.batchWindowHeight := this.batchActionButtonY + 41
         this.pathHint := this.gui.Add("Text", "x20 y" hintY " w" contentWidth
@@ -98,7 +100,7 @@ class AddItemDialog extends ManagedWindow {
         this.okButton := this.gui.Add("Text", "x" actionGroupX
             " y" this.normalActionButtonY " w" actionButtonWidth
             " h26 Center 0x200 Background"
-            UiThemeService.Color("Primary") " c"
+            AddItemDialog.ConfirmColor " c"
             UiThemeService.Color("ButtonText"), Tr("确 定"))
         this.cancelButton := this.gui.Add("Text", "x"
             (actionGroupX + actionButtonWidth + actionButtonGap)
@@ -108,10 +110,12 @@ class AddItemDialog extends ManagedWindow {
             UiThemeService.Color("ToolbarText"), Tr("取 消"))
         RegisterHoverButton(this.searchButton, UiThemeService.Color("Toolbar"))
         RegisterHoverButton(this.browseButton, UiThemeService.Color("Toolbar"))
-        RegisterHoverButton(this.okButton, UiThemeService.Color("Primary"))
+        RegisterHoverButton(this.okButton, AddItemDialog.ConfirmColor)
         RegisterHoverButton(this.cancelButton, UiThemeService.Color("Toolbar"))
-        SetButtonLucideIcon(this.searchButton, "search.svg", 14, 6)
-        SetButtonLucideIcon(this.browseButton, "folder-open.svg", 14, 6)
+        SetButtonLucideIcon(this.searchButton, "search.svg", 14, 6,
+            "theme:SearchIcon")
+        SetButtonLucideIcon(this.browseButton, "folder-open.svg", 14, 6,
+            "theme:BrowseIcon")
         RegisterButtonClick(this.searchButton, ObjBindMethod(this.search, "Show"))
         RegisterButtonClick(this.browseButton, ObjBindMethod(this, "ShowBrowseMenu"))
         RegisterButtonClick(this.okButton, ObjBindMethod(this, "Confirm"), ButtonFeedbackMode.Dismissive)
@@ -127,10 +131,18 @@ class AddItemDialog extends ManagedWindow {
     }
 
     ShowBrowseMenu(*) {
+        browseMenu := this.BuildBrowseMenu()
+        browseMenu.Show()
+    }
+
+    BuildBrowseMenu() {
         browseMenu := Menu()
+        browseMenu.Add(Tr("获取正在运行的所有进程"),
+            ObjBindMethod(this.search, "ShowRunningProcesses"))
+        browseMenu.Add()
         browseMenu.Add(Tr("📄 浏览文件..."), ObjBindMethod(this, "BrowseFile"))
         browseMenu.Add(Tr("📂 浏览文件夹..."), ObjBindMethod(this, "BrowseDir"))
-        browseMenu.Show()
+        return browseMenu
     }
 
     BrowseFile(*) {
@@ -426,7 +438,7 @@ class AddItemDialog extends ManagedWindow {
             this.Close()
             return
         }
-        if !App.guardWorkGate.TryEnter()
+        if !App.guardWorkGate.TryEnter("BatchImport")
             return
         try this.ConsumeBatchImportCore()
         finally App.guardWorkGate.Leave()
@@ -451,7 +463,7 @@ class AddItemDialog extends ManagedWindow {
                     if !this.IsBatchSessionCurrent(sessionId)
                         return
                     if RegisterApp(resolvedPath, 1, 0, resolvedWorkDir,
-                        "", "", "", "", false, shortcutArgs) {
+                        "", "", "", false, shortcutArgs) {
                         this.batchAddedCount++
                         this.batchAddedPaths.Push(resolvedPath)
                     }
@@ -498,7 +510,7 @@ class AddItemDialog extends ManagedWindow {
                 CreateAppHistoryAction("add", addedPaths))
             SaveAppsToIni()
         }
-        message := Tr("已添加 {1} 个监控项。", addedCount)
+        message := Tr("已添加 {1} 个守护对象。", addedCount)
         if wasTruncated
             message .= Tr(" 扫描达到时间或数量上限，结果已截断。")
         LogMsg(message)
@@ -550,7 +562,7 @@ class AddItemDialog extends ManagedWindow {
         if this.IsBatchSessionCurrent(failureSessionId) {
             message := context Tr("。")
             if addedCount
-                message .= Tr(" 已保留并保存此前添加的 {1} 个监控项。", addedCount)
+                message .= Tr(" 已保留并保存此前添加的 {1} 个守护对象。", addedCount)
             try ShowDarkMsgBox(message, Tr("批量导入中断"), "Error", this.gui)
         }
     }
@@ -591,7 +603,7 @@ class AddItemDialog extends ManagedWindow {
             CommitUndoState(undoState,
                 CreateAppHistoryAction("add", addedPaths))
             SaveAppsToIni()
-            LogMsg(Tr("批量导入已取消，已保留并保存此前添加的 {1} 个监控项。",
+            LogMsg(Tr("批量导入已取消，已保留并保存此前添加的 {1} 个守护对象。",
                 addedCount))
         }
         return cancelledSessionId
@@ -630,15 +642,15 @@ class AddItemDialog extends ManagedWindow {
             return false
         undoState := CaptureAppConfigState()
         if !RegisterApp(normalizedPath, 1, 0, resolvedWorkDir, "", "", "",
-            "", false, shortcutArgs) {
-            LogMsg(Tr("添加监控项失败，已回滚内存状态：{1}",
+            false, shortcutArgs) {
+            LogMsg(Tr("添加守护对象失败，已回滚内存状态：{1}",
                 normalizedPath))
             return false
         }
         CommitUndoState(undoState,
             CreateAppHistoryAction("add", normalizedPath))
         SaveAppsToIni()
-        LogMsg(Tr("手动添加监控：{1}", normalizedPath))
+        LogMsg(Tr("手动添加守护对象：{1}", normalizedPath))
         return true
     }
 

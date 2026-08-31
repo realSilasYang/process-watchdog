@@ -15,6 +15,8 @@ class ManagedWindowLifecycle {
             "UnregisterControls")
         this.ReleaseIconsCallback := this.RequireCallback(callbacks,
             "ReleaseIcons")
+        this.RefreshAfterShowCallback := this.OptionalCallback(callbacks,
+            "RefreshAfterShow")
         this.GuiFactory := IsObject(guiFactory) ? guiFactory
             : ObjBindMethod(this, "CreateNativeGui")
         this.WindowValidator := IsObject(windowValidator) ? windowValidator
@@ -25,6 +27,14 @@ class ManagedWindowLifecycle {
         if !IsObject(callbacks) || !callbacks.HasOwnProp(name)
             || !IsObject(callbacks.%name%)
             throw TypeError("缺少窗口生命周期回调: " name)
+        return callbacks.%name%
+    }
+
+    OptionalCallback(callbacks, name) {
+        if !IsObject(callbacks) || !callbacks.HasOwnProp(name)
+            return ""
+        if !IsObject(callbacks.%name%)
+            throw TypeError("窗口生命周期回调无效: " name)
         return callbacks.%name%
     }
 
@@ -53,6 +63,11 @@ class ManagedWindowLifecycle {
     ReleaseIcons(hwnd) {
         if hwnd
             this.CallSafely(this.ReleaseIconsCallback, hwnd)
+    }
+
+    RefreshAfterShow(guiObj) {
+        if IsObject(this.RefreshAfterShowCallback)
+            this.CallSafely(this.RefreshAfterShowCallback, guiObj)
     }
 
     CallSafely(callback, args*) {
@@ -118,6 +133,7 @@ class ManagedWindow {
             return true
         }
         this.gui.Show()
+        lifecycle.RefreshAfterShow(this.gui)
         return true
     }
 

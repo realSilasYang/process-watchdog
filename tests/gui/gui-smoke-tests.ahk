@@ -7,11 +7,12 @@
 
 #Include ..\..\src\Platform\Win32.ahk
 #Include ..\..\src\UI\MainListProjection.ahk
+#Include ..\..\src\UI\ListViewFocusService.ahk
+#Include ..\..\src\UI\AtomicControlLayout.ahk
 #Include ..\..\src\UI\ListViewPseudoHeader.ahk
 #Include ..\..\src\UI\WindowHierarchy.ahk
 
-; 气泡本身只依赖主题色、界面字体和可见文本规范。此测试使用最小适配器，
-; 避免启动完整守护运行时或读取用户配置。
+; 列表自绘只依赖主题色。此测试使用最小适配器，避免启动完整守护运行时或读取用户配置。
 class UiThemeService {
     static Color(name) {
         colors := Map(
@@ -19,16 +20,6 @@ class UiThemeService {
             "Tooltip", "202020", "TooltipText", "F2F2F2")
         return colors.Has(name) ? colors[name] : "F2F2F2"
     }
-}
-
-class LocalizationService {
-    static GetLanguageSystemUiFontName() {
-        return "Microsoft YaHei UI"
-    }
-}
-
-NormalizeUserVisibleParentheses(text) {
-    return text
 }
 
 class RoundedButtonRenderer {
@@ -73,7 +64,6 @@ class RoundedButtonRenderer {
 }
 
 #Include ..\..\app\UI\ListViewSelectionPresenter.ahk
-#Include ..\..\app\Windows\HistoryToastWindow.ahk
 
 ; 原生列边界的具体像素由 Windows 主题和桌面合成器决定，CI 虚拟桌面不能
 ; 稳定比较颜色。测试子类只记录生产刷新入口的真实执行次数和返回值，用来
@@ -87,6 +77,19 @@ class GuiSmokeListViewSelectionPresenter extends ListViewSelectionPresenter {
         this.nativeRefreshCount += 1
         this.lastNativeRefreshSucceeded := refreshSucceeded
         return refreshSucceeded
+    }
+}
+
+class GuiSmokeSubItemDrawProbe {
+    count := 0
+
+    Draw(listView, notification) {
+        subItemOffset := A_PtrSize == 8 ? 88 : 56
+        column := NumGet(notification, subItemOffset, "Int") + 1
+        if column != 4
+            return ""
+        this.count++
+        return Win32.CDRF_DODEFAULT
     }
 }
 
@@ -169,9 +172,20 @@ SendGuiSmokeHeaderPointerClick(cell, downMessage) {
     Sleep(20)
 }
 
+GetGuiSmokeControlRectInParent(control, parentHwnd) {
+    rect := Buffer(16, 0)
+    AssertGuiSmoke(DllCall("user32\GetWindowRect", "Ptr", control.Hwnd,
+        "Ptr", rect, "Int"), "Visible control bounds were not readable")
+    DllCall("user32\MapWindowPoints", "Ptr", 0, "Ptr", parentHwnd,
+        "Ptr", rect, "UInt", 2, "Int")
+    return {
+        Left: NumGet(rect, 0, "Int"), Top: NumGet(rect, 4, "Int"),
+        Right: NumGet(rect, 8, "Int"), Bottom: NumGet(rect, 12, "Int")
+    }
+}
+
 owner := ""
 child := ""
-historyToast := ""
 listSelectionPresenter := ""
 testFailure := ""
 try {
@@ -182,9 +196,11 @@ try {
     ownerEdit := owner.Add("Edit",
         "x16 y42 w260 h28 Background252526 cFFFFFF", "editable")
     list := owner.Add("ListView",
-        "x16 y82 w380 h120 Report +LV0x10002 -Hdr Background252526 cFFFFFF",
+        "x16 y84 w380 h118 Report +LV0x10002 -Hdr Background252526 cFFFFFF",
         ["Name", "State", "Path", "Sequence", "StatusKey"])
-    listSelectionPresenter := GuiSmokeListViewSelectionPresenter(list)
+    subItemDrawProbe := GuiSmokeSubItemDrawProbe()
+    listSelectionPresenter := GuiSmokeListViewSelectionPresenter(list, "",
+        ObjBindMethod(subItemDrawProbe, "Draw"))
     list.ModifyCol(1, 220)
     list.ModifyCol(2, 110)
     list.ModifyCol(3, 0)
@@ -206,18 +222,27 @@ try {
         RestoreColumn: 4,
         RestoreSortOptions: "Integer Center"
     })
+    AssertGuiSmoke(pseudoHeader.FontSize >= 11
+            && pseudoHeader.Height >= 32,
+        "Pseudo header retained a small font or insufficient row height")
     AssertGuiSmoke(pseudoHeader.SetBounds(16, 54, [48, 220, 110], 380),
         "Pseudo header bounds were not applied")
     for headerCell in pseudoHeader.Cells {
         headerStyle := DllCall("user32\GetWindowLongPtrW", "Ptr",
             headerCell.Hwnd, "Int", -16, "Ptr")
-        AssertGuiSmoke(!(headerStyle & 0x00010000),
-            "Pseudo header field remained keyboard-selectable through Tab")
+        AssertGuiSmoke(!(headerStyle & 0x00010000)
+                && (headerStyle & 0x3) == 0x1,
+            "Pseudo header field was not centered or remained keyboard-selectable through Tab")
         AssertGuiSmoke(SendMessage(0x0301, 0, 0, headerCell.Hwnd) == 0,
             "Pseudo header field did not reject native copy requests")
         AssertGuiSmoke(!pseudoHeader.SetCellTextNoErase(headerCell,
             headerCell.Text),
             "Unchanged pseudo header text still requested a redraw")
+    }
+    for headerColumn in pseudoHeader.Columns {
+        AssertGuiSmoke(StrLower(headerColumn.HeaderAlign) == "center"
+                && headerColumn.Padding == "",
+            "Pseudo header content retained left alignment or padding")
     }
     ReportGuiSmokeStage("header-structure")
     list.Add("", "Smoke target B", "Paused", "C:\SmokeB.exe", "1", "20")
@@ -330,7 +355,7 @@ try {
         && GetGuiSmokePathOrder(list) == customPathOrder,
         "Pseudo header pointer third click did not restore custom order")
     semanticList := owner.Add("ListView",
-        "x410 y82 w1 h1 Report -Hdr", ["Name", "State", "Path",
+        "x410 y84 w1 h1 Report -Hdr", ["Name", "State", "Path",
             "Sequence", "StatusKey"])
     semanticList.ModifyCol(5, 0)
     semanticHeader := ListViewPseudoHeader(owner, semanticList, [
@@ -374,8 +399,8 @@ try {
     actionButton := owner.Add("Text",
         "x16 y216 w88 h30 Center 0x200 Background333333 cFFFFFF",
         "Action")
-    statusBar := owner.Add("Text",
-        "x10 y250 w410 h20 Background1E1E1E cA8AAA9", "status")
+    passiveStatus := owner.Add("Text",
+        "x114 y216 w282 h30 Background1E1E1E cAAAAAA 0x200", "Status")
     ; 这组测试必须可见才能验证焦点、气泡动画和真实像素；因此显示前就把
     ; 标题栏与原生输入／列表控件设为同一深色主题，禁止测试夹具自身混搭。
     if VerCompare(A_OSVersion, "10.0.17763") >= 0 {
@@ -389,6 +414,51 @@ try {
             "Str", "DarkMode_Explorer", "Ptr", 0)
     }
     owner.Show("w430 h270")
+    visibleDpi := DllCall("user32\GetDpiForWindow", "Ptr", owner.Hwnd,
+        "UInt")
+    visibleScale := visibleDpi / 96
+    visibleHeaderWidths := [52, 216, 104]
+    AssertGuiSmoke(pseudoHeader.SetBounds(20, 54,
+        visibleHeaderWidths, 372),
+        "Visible pseudo header bounds were not applied")
+    expectedCellX := Round(20 * visibleScale)
+    for visibleIndex, headerCell in pseudoHeader.Cells {
+        headerRect := GetGuiSmokeControlRectInParent(headerCell, owner.Hwnd)
+        expectedWidth := Round(visibleHeaderWidths[visibleIndex]
+            * visibleScale)
+        AssertGuiSmoke(headerRect.Left == expectedCellX
+            && headerRect.Top == Round(54 * visibleScale)
+            && headerRect.Right - headerRect.Left == expectedWidth
+            && headerRect.Bottom - headerRect.Top
+                == Round(pseudoHeader.Height * visibleScale),
+            "Visible pseudo header deferred layout produced incorrect bounds")
+        expectedCellX += expectedWidth
+    }
+    AssertGuiSmoke(pseudoHeader.SetBounds(16, 54,
+        [48, 220, 110], 380),
+        "Visible pseudo header bounds were not restored")
+    atomicNoopResult := AtomicControlLayout.Apply(owner, [
+        {Control: pseudoHeader.Background, X: 16, Y: 54,
+            Width: 380, Height: pseudoHeader.Height},
+        {Control: pseudoHeader.Cells[1], X: 16, Y: 54,
+            Width: 48, Height: pseudoHeader.Height},
+        {Control: pseudoHeader.Cells[2], X: 64, Y: 54,
+            Width: 220, Height: pseudoHeader.Height},
+        {Control: pseudoHeader.Cells[3], X: 284, Y: 54,
+            Width: 110, Height: pseudoHeader.Height}
+    ], {ParentColor: "333333"})
+    AssertGuiSmoke(atomicNoopResult.Status == AtomicControlLayout.Unchanged,
+        "Unchanged atomic layout did not take its no-paint fast path")
+    headerDc := DllCall("user32\GetDC", "Ptr", owner.Hwnd, "Ptr")
+    AssertGuiSmoke(headerDc, "Visible pseudo header surface was not readable")
+    try {
+        AssertGuiSmoke(DllCall("gdi32\GetPixel", "Ptr", headerDc,
+                "Int", Round(392 * visibleScale),
+                "Int", Round(68 * visibleScale), "UInt")
+                == RoundedButtonRenderer.ColorToBgr("333333"),
+            "Visible pseudo header did not repaint its restored right edge")
+    } finally DllCall("user32\ReleaseDC", "Ptr", owner.Hwnd, "Ptr", headerDc)
+    ReportGuiSmokeStage("visible-header-layout")
     ; 焦点重定向必须在真实可见窗口中验证。隐藏父窗口时，Windows 可以合法
     ; 拒绝把焦点交给其子控件，不能据此判断伪表头输入保护失效。
     DllCall("user32\SetFocus", "Ptr", list.Hwnd, "Ptr")
@@ -399,6 +469,86 @@ try {
     }
     ReportGuiSmokeStage("visible-header-focus")
 
+    ; 非客户区消息必须原样交还给 Windows，否则标题栏最小化、关闭和拖动
+    ; 都会失效。客户区的主窗口、状态栏和 ListView 空白区域才交还焦点。
+    list.Modify(1, "Select Focus")
+    DllCall("user32\SetFocus", "Ptr", list.Hwnd, "Ptr")
+    nonClientResult := ListViewFocusService.HandleBlankPointerDown(list,
+        owner.Hwnd, owner.Hwnd, 0, Win32.WM_NCLBUTTONDOWN,
+        [passiveStatus.Hwnd])
+    AssertGuiSmoke(nonClientResult == ListViewFocusService.NoAction
+        && DllCall("user32\GetFocus", "Ptr") == list.Hwnd
+        && list.GetNext(0, "Focused") == 1 && list.GetNext(0) == 1,
+        "Non-client pointer down was swallowed by ListView blur routing")
+
+    rootBlurResult := ListViewFocusService.HandleBlankPointerDown(list,
+        owner.Hwnd, owner.Hwnd, 0, Win32.WM_LBUTTONDOWN,
+        [passiveStatus.Hwnd])
+    rootFocusHwnd := DllCall("user32\GetFocus", "Ptr")
+    rootFocusedRow := list.GetNext(0, "Focused")
+    rootSelectedRow := list.GetNext(0)
+    AssertGuiSmoke(rootBlurResult == ListViewFocusService.Handled
+        && rootFocusHwnd == passiveStatus.Hwnd
+        && rootFocusedRow == 0 && rootSelectedRow == 1,
+        "Clicking the main-window blank surface did not fully blur ListView: result="
+            rootBlurResult " focus=" rootFocusHwnd " sink=" passiveStatus.Hwnd
+            " focusedRow=" rootFocusedRow " selectedRow=" rootSelectedRow)
+
+    list.Modify(1, "Focus")
+    DllCall("user32\SetFocus", "Ptr", list.Hwnd, "Ptr")
+    statusBlurResult := ListViewFocusService.HandleBlankPointerDown(list,
+        owner.Hwnd, passiveStatus.Hwnd, 0, Win32.WM_LBUTTONDOWN,
+        [passiveStatus.Hwnd])
+    AssertGuiSmoke(statusBlurResult == ListViewFocusService.Handled
+        && DllCall("user32\GetFocus", "Ptr") == passiveStatus.Hwnd
+        && list.GetNext(0, "Focused") == 0 && list.GetNext(0) == 1,
+        "Clicking the passive status surface did not blur ListView")
+
+    list.Modify(1, "Focus")
+    DllCall("user32\SetFocus", "Ptr", list.Hwnd, "Ptr")
+    blankListPoint := (100 << 16) | 8
+    listBlurResult := ListViewFocusService.HandleBlankPointerDown(list,
+        owner.Hwnd, list.Hwnd, blankListPoint, Win32.WM_LBUTTONDOWN,
+        [passiveStatus.Hwnd])
+    AssertGuiSmoke(listBlurResult == ListViewFocusService.SuppressDefault
+        && DllCall("user32\GetFocus", "Ptr") == passiveStatus.Hwnd
+        && list.GetNext(0, "Focused") == 0 && list.GetNext(0) == 1,
+        "Clicking the ListView blank surface did not suppress refocus")
+
+    list.Modify(1, "Focus")
+    DllCall("user32\SetFocus", "Ptr", list.Hwnd, "Ptr")
+    rowListPoint := (10 << 16) | 8
+    rowHitResult := ListViewFocusService.HandleBlankPointerDown(list,
+        owner.Hwnd, list.Hwnd, rowListPoint, Win32.WM_LBUTTONDOWN,
+        [passiveStatus.Hwnd])
+    AssertGuiSmoke(rowHitResult == ListViewFocusService.NoAction
+        && DllCall("user32\GetFocus", "Ptr") == list.Hwnd
+        && list.GetNext(0, "Focused") == 1,
+        "Clicking a ListView item was mistaken for a blank surface")
+    ReportGuiSmokeStage("main-list-blank-focus")
+
+    list.Modify(0, "-Select -Focus")
+    list.Modify(1, "Select Focus")
+    list.Modify(2, "Select")
+    preservedContextSelection :=
+        ListViewFocusService.PrepareContextSelection(list, 1)
+    AssertGuiSmoke(preservedContextSelection
+            && list.GetNext(0) == 1 && list.GetNext(1) == 2
+            && list.GetNext(2) == 0
+            && list.GetNext(0, "Focused") == 1,
+        "Right-clicking a selected row collapsed the multi-selection")
+    list.Modify(0, "-Select -Focus")
+    list.Modify(1, "Select Focus")
+    replacedContextSelection :=
+        ListViewFocusService.PrepareContextSelection(list, 2)
+    AssertGuiSmoke(!replacedContextSelection
+            && list.GetNext(0) == 2 && list.GetNext(2) == 0
+            && list.GetNext(0, "Focused") == 2,
+        "Right-clicking an unselected row retained the previous selection")
+    list.Modify(0, "-Select -Focus")
+    list.Modify(1, "Select Focus")
+    ReportGuiSmokeStage("main-list-context-selection")
+
     AssertGuiSmoke(DllCall("user32\IsWindow", "Ptr", owner.Hwnd, "Int"),
         "Owner GUI handle was not created")
     dpi := DllCall("user32\GetDpiForWindow", "Ptr", owner.Hwnd, "UInt")
@@ -406,6 +556,8 @@ try {
     ReportGuiSmokeStage("surface-before-redraw")
     DllCall("user32\RedrawWindow", "Ptr", owner.Hwnd, "Ptr", 0,
         "Ptr", 0, "UInt", Win32.RDW_LAYOUT_REFRESH, "Int")
+    AssertGuiSmoke(subItemDrawProbe.count > 0,
+        "Visible ListView did not dispatch sequence subitem drawing")
     ReportGuiSmokeStage("surface-after-redraw")
     ownerDc := DllCall("user32\GetDC", "Ptr", owner.Hwnd, "Ptr")
     actionDc := DllCall("user32\GetDC", "Ptr", actionButton.Hwnd, "Ptr")
@@ -439,12 +591,20 @@ try {
     ; 模拟同一轮内的两次状态更新。第二次调度必须替换第一次的单次计时器，
     ; 最终只执行一次生产级整控件重绘。
     list.Modify(2, "Col2", "Updated")
-    AssertGuiSmoke(listSelectionPresenter.ScheduleNativeSurfaceRefresh(1),
+    refreshDelayMs := 25
+    AssertGuiSmoke(listSelectionPresenter.ScheduleNativeSurfaceRefresh(
+            refreshDelayMs),
         "Native ListView surface refresh was not scheduled")
-    AssertGuiSmoke(listSelectionPresenter.ScheduleNativeSurfaceRefresh(1),
+    AssertGuiSmoke(listSelectionPresenter.ScheduleNativeSurfaceRefresh(
+            refreshDelayMs),
         "Repeated native ListView surface refresh was not coalesced")
     ReportGuiSmokeStage("divider-refresh-scheduled")
-    Sleep(30)
+    refreshDeadline := A_TickCount + 1000
+    while listSelectionPresenter.nativeRefreshCount < 1
+            && A_TickCount < refreshDeadline
+        Sleep(10)
+    ; 首次回调完成后再越过一个合并窗口；若旧计时器没有被替换，计数会变成 2。
+    Sleep(refreshDelayMs * 2)
     ReportGuiSmokeStage("divider-refresh-ready")
     AssertGuiSmoke(listSelectionPresenter.nativeRefreshCount == 1
         && listSelectionPresenter.lastNativeRefreshSucceeded,
@@ -458,10 +618,17 @@ try {
         A_PtrSize == 8 ? 24 : 12)
     NumPut("UPtr", 0, selectionNotification,
         A_PtrSize == 8 ? 56 : 36)
+    selectionStateOffset := A_PtrSize == 8 ? 64 : 40
+    NumPut("UInt", Win32.CDIS_SELECTED | Win32.CDIS_FOCUS,
+        selectionNotification, selectionStateOffset)
     AssertGuiSmoke((SendMessage(Win32.LVM_GETITEMSTATE, 0,
             Win32.LVIS_SELECTED, list.Hwnd) & Win32.LVIS_SELECTED) != 0
         && listSelectionPresenter.HandleCustomDraw(list,
-            selectionNotification.Ptr) == Win32.CDRF_NOTIFYPOSTPAINT,
+            selectionNotification.Ptr)
+                == (Win32.CDRF_NOTIFYITEMDRAW
+                    | Win32.CDRF_NOTIFYPOSTPAINT)
+        && !(NumGet(selectionNotification, selectionStateOffset, "UInt")
+            & Win32.CDIS_FOCUS),
         "ListView lost rounded selection when focus moved to a context menu")
     ReportGuiSmokeStage("selection-before-redraw")
     DllCall("user32\RedrawWindow", "Ptr", list.Hwnd, "Ptr", 0,
@@ -490,6 +657,35 @@ try {
     } finally DllCall("user32\ReleaseDC", "Ptr", list.Hwnd,
         "Ptr", listDc)
     ReportGuiSmokeStage("active-selection-pixels")
+    list.Modify(1, "Focus Vis")
+    AssertGuiSmoke(list.GetNext(0) == 1
+            && list.GetNext(0, "Focused") == 1,
+        "Right-click context selection should keep the native focus row visible")
+    contextRefreshCount := listSelectionPresenter.nativeRefreshCount
+    AssertGuiSmoke(listSelectionPresenter.RefreshItem(1),
+        "Selected ListView item could not be redrawn before context menu")
+    AssertGuiSmoke(listSelectionPresenter.nativeRefreshCount
+            == contextRefreshCount,
+        "Right-click context selection must redraw the active row without a delayed full-list repaint")
+    contextListDc := DllCall("user32\GetDC", "Ptr", list.Hwnd, "Ptr")
+    try {
+        contextCornerColor := DllCall("gdi32\GetPixel", "Ptr",
+            contextListDc, "Int", NumGet(itemRect, 0, "Int") + 1,
+            "Int", NumGet(itemRect, 4, "Int") + 1, "UInt")
+        contextSelectedColor := DllCall("gdi32\GetPixel", "Ptr",
+            contextListDc, "Int",
+            NumGet(itemRect, 8, "Int") - Round(14 * dpi / 96),
+            "Int", (NumGet(itemRect, 4, "Int")
+                + NumGet(itemRect, 12, "Int")) // 2, "UInt")
+        AssertGuiSmoke(contextCornerColor
+                == RoundedButtonRenderer.ColorToBgr(
+                    UiThemeService.Color("Surface"))
+            && contextSelectedColor != RoundedButtonRenderer.ColorToBgr(
+                UiThemeService.Color("Surface")),
+            "ListView right-click selection reverted to a square background")
+    } finally DllCall("user32\ReleaseDC", "Ptr", list.Hwnd,
+        "Ptr", contextListDc)
+    ReportGuiSmokeStage("context-selection-pixels")
     DllCall("user32\SetFocus", "Ptr", ownerEdit.Hwnd, "Ptr")
     AssertGuiSmoke(listSelectionPresenter.RefreshItem(1),
         "Selected ListView item could not be redrawn after losing focus")
@@ -512,109 +708,6 @@ try {
     } finally DllCall("user32\ReleaseDC", "Ptr", list.Hwnd,
         "Ptr", inactiveListDc)
     ReportGuiSmokeStage("list-rendering")
-    try DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", owner.Hwnd,
-        "Int", 20, "Int*", 1, "Int", 4)
-    try DllCall("uxtheme\SetWindowTheme", "Ptr", list.Hwnd,
-        "Str", "DarkMode_Explorer", "Ptr", 0)
-
-    global Main := {gui: owner, statsText: statusBar}
-    DllCall("user32\SetFocus", "Ptr", ownerEdit.Hwnd, "Ptr")
-    focusBeforeToast := DllCall("user32\GetFocus", "Ptr")
-    AssertGuiSmoke(focusBeforeToast == ownerEdit.Hwnd,
-        "GUI smoke edit control could not receive focus")
-    historyToast := HistoryToastWindow()
-    AssertGuiSmoke(historyToast.Show("已撤销：添加监控项：Smoke target"),
-        "History toast could not be shown")
-    AssertGuiSmoke(historyToast.animationPhase == "show",
-        "History toast did not begin its entrance animation")
-    initialToastRect := Buffer(16, 0)
-    statusBarRect := Buffer(16, 0)
-    AssertGuiSmoke(DllCall("user32\GetWindowRect", "Ptr",
-            historyToast.gui.Hwnd, "Ptr", initialToastRect, "Int")
-        && DllCall("user32\GetWindowRect", "Ptr", statusBar.Hwnd,
-            "Ptr", statusBarRect, "Int"),
-        "History toast entrance bounds were not readable")
-    expectedToastGap := Max(1, Round(3 * dpi / 96))
-    AssertGuiSmoke(NumGet(initialToastRect, 12, "Int")
-            <= NumGet(statusBarRect, 4, "Int") - expectedToastGap,
-        "History toast entrance animation overlapped the status bar")
-    Sleep(220)
-    AssertGuiSmoke(DllCall("user32\IsWindowVisible", "Ptr",
-            historyToast.gui.Hwnd, "Int"),
-        "History toast was not visible")
-    AssertGuiSmoke(historyToast.animationPhase == "idle"
-        && historyToast.currentAlpha == 255,
-        "History toast entrance animation did not finish fully opaque")
-    AssertGuiSmoke(DllCall("user32\GetFocus", "Ptr") == focusBeforeToast,
-        "History toast stole keyboard focus")
-    AssertGuiSmoke(historyToast.textControl.Text
-            == "已撤销：添加监控项：Smoke target",
-        "History toast did not preserve the concrete action text")
-    toastWindowRect := Buffer(16, 0)
-    toastTextRect := Buffer(16, 0)
-    DllCall("user32\GetWindowRect", "Ptr", historyToast.gui.Hwnd,
-        "Ptr", toastWindowRect)
-    DllCall("user32\GetWindowRect", "Ptr", historyToast.textControl.Hwnd,
-        "Ptr", toastTextRect)
-    DllCall("user32\GetWindowRect", "Ptr", statusBar.Hwnd,
-        "Ptr", statusBarRect)
-    AssertGuiSmoke(NumGet(toastWindowRect, 0, "Int")
-            == NumGet(statusBarRect, 0, "Int")
-        && NumGet(statusBarRect, 4, "Int")
-            - NumGet(toastWindowRect, 12, "Int") == expectedToastGap,
-        "History toast was not left-aligned immediately above the status bar")
-    toastTextStyle := DllCall("user32\GetWindowLongPtrW", "Ptr",
-        historyToast.textControl.Hwnd, "Int", -16, "Ptr")
-    AssertGuiSmoke((toastTextStyle & 0x0003) == 0,
-        "History toast text was not explicitly left-aligned")
-    toastTextWidth := NumGet(toastTextRect, 8, "Int")
-        - NumGet(toastTextRect, 0, "Int")
-    AssertGuiSmoke(toastTextWidth > Round(120 * dpi / 96)
-        && NumGet(toastTextRect, 8, "Int")
-            < NumGet(toastWindowRect, 8, "Int"),
-        "History toast text control remained one-character wide or exceeded the bubble")
-    regionProbe := DllCall("gdi32\CreateRectRgn", "Int", 0, "Int", 0,
-        "Int", 1, "Int", 1, "Ptr")
-    try AssertGuiSmoke(DllCall("user32\GetWindowRgn", "Ptr",
-            historyToast.gui.Hwnd, "Ptr", regionProbe, "Int") > 0,
-        "History toast did not expose a rounded window region")
-    finally DllCall("gdi32\DeleteObject", "Ptr", regionProbe)
-
-    historyToast.Hide()
-    AssertGuiSmoke(historyToast.animationPhase == "hide",
-        "History toast did not begin its exit animation")
-    Sleep(50)
-    DllCall("user32\GetWindowRect", "Ptr", historyToast.gui.Hwnd,
-        "Ptr", toastWindowRect)
-    AssertGuiSmoke(DllCall("user32\IsWindowVisible", "Ptr",
-            historyToast.gui.Hwnd, "Int") && historyToast.currentAlpha < 255,
-        "History toast exit animation disappeared without a visible transition")
-    AssertGuiSmoke(NumGet(toastWindowRect, 12, "Int")
-            <= NumGet(statusBarRect, 4, "Int") - expectedToastGap,
-        "History toast exit animation overlapped the status bar")
-    Sleep(150)
-    AssertGuiSmoke(!DllCall("user32\IsWindowVisible", "Ptr",
-            historyToast.gui.Hwnd, "Int"),
-        "History toast exit animation did not hide the window")
-
-    historyToast.Show("已撤销：添加监控项：Smoke target")
-    Sleep(220)
-    Sleep(1700)
-    historyToast.Show("已重做：暂停：Smoke target")
-    Sleep(1820)
-    AssertGuiSmoke(DllCall("user32\IsWindowVisible", "Ptr",
-            historyToast.gui.Hwnd, "Int"),
-        "A repeated history toast did not reset the three-second timer")
-    Sleep(1700)
-    AssertGuiSmoke(!DllCall("user32\IsWindowVisible", "Ptr",
-            historyToast.gui.Hwnd, "Int"),
-        "History toast remained visible after three seconds")
-    historyToast.Close()
-    historyToast := ""
-    ReportGuiSmokeStage("history-toast")
-    WinHide("ahk_id " owner.Hwnd)
-
-    owner.Show("w430 h270")
     child := Gui("+Owner" owner.Hwnd " +Resize", "GUI smoke child")
     child.BackColor := "1E1E1E"
     child.Add("Text", "x12 y12 w180 cFFFFFF BackgroundTrans", "Child window")
@@ -676,11 +769,9 @@ try {
 } catch as testError {
     ; GUI 测试运行在无人值守的 CI 桌面上，异常必须进入标准错误并退出；
     ; 让 AHK 显示模态错误框会把真实断言伪装成外层超时。
-    testFailure := testError.File " (" testError.Line "): "
-        testError.Message "`n" testError.Stack
+    testFailure := testError.File . " (" . testError.Line . "): "
+        . testError.Message . "`n" . testError.Stack
 } finally {
-    if historyToast
-        try historyToast.Close()
     if listSelectionPresenter
         try listSelectionPresenter.Dispose()
     if child

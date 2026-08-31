@@ -22,11 +22,46 @@ $candidates = @(
     'D:\Program Files\AutoHotkey\v2\AutoHotkey64.exe',
     "$env:ProgramFiles\AutoHotkey\v2\AutoHotkey64.exe"
 ) | Where-Object { $_ }
-$ahkPath = $candidates | Where-Object {
+$sourceAhkPath = $candidates | Where-Object {
     Test-Path -LiteralPath $_ -PathType Leaf
 } | Select-Object -First 1
-if (-not $ahkPath) {
+if (-not $sourceAhkPath) {
     throw 'AutoHotkey v2 x64 interpreter was not found.'
+}
+
+# 每轮 GUI 验证使用随机中性宿主，避免用户为 AutoHotkey64.exe 配置的提权、
+# 兼容层或前次残留进程污染 Win32 窗口消息和超时清理。
+$testHostRoot = Join-Path ([System.IO.Path]::GetTempPath()) `
+    ("process-watchdog-gui-host-{0}" -f [guid]::NewGuid().ToString('N'))
+$ahkPath = Join-Path $testHostRoot `
+    ("WatchdogTestHost-{0}.exe" -f [guid]::NewGuid().ToString('N'))
+try {
+    New-Item -ItemType Directory -Path $testHostRoot -Force | Out-Null
+    Copy-Item -LiteralPath $sourceAhkPath -Destination $ahkPath -Force
+} catch {
+    Remove-Item -LiteralPath $testHostRoot -Recurse -Force `
+        -ErrorAction SilentlyContinue
+    throw
+}
+
+function Stop-GuiTestTree {
+    param([Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process)
+
+    if ($Process.HasExited) {
+        return
+    }
+    try {
+        & (Join-Path $env:SystemRoot 'System32\taskkill.exe') `
+            /PID $Process.Id /T /F 2>$null | Out-Null
+    } catch {
+    }
+    try {
+        if (-not $Process.WaitForExit(5000)) {
+            $Process.Kill()
+            [void]$Process.WaitForExit(5000)
+        }
+    } catch {
+    }
 }
 
 function Invoke-GuiTest {
@@ -50,10 +85,7 @@ function Invoke-GuiTest {
     $standardErrorTask = $process.StandardError.ReadToEndAsync()
     $timedOut = -not $process.WaitForExit($TimeoutMilliseconds)
     if ($timedOut) {
-        try {
-            $process.Kill()
-            [void]$process.WaitForExit(5000)
-        } catch {}
+        Stop-GuiTestTree $process
     }
     $stdout = $standardOutputTask.GetAwaiter().GetResult().Trim()
     $stderr = $standardErrorTask.GetAwaiter().GetResult().Trim()
@@ -72,19 +104,27 @@ function Invoke-GuiTest {
     }
 }
 
-Write-Host 'Running GUI smoke test...'
-Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\gui-smoke-tests.ahk')
-Write-Host 'Running log-window and diagnostic smoke test...'
-Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\log-window-smoke-tests.ahk')
-Write-Host 'Running 13-language production-window smoke test...'
-Invoke-GuiTest (Join-Path $PSScriptRoot `
-    'gui\localized-window-smoke-tests.ahk') -TimeoutMilliseconds 300000
-Write-Host 'Running in-process language and font hot-switch test...'
-Invoke-GuiTest (Join-Path $PSScriptRoot `
-    'gui\display-hot-switch-tests.ahk') -TimeoutMilliseconds 180000
-Write-Host "Running GUI resource soak for $SoakSeconds seconds..."
-Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\resource-soak-tests.ahk') `
-    -Arguments $SoakSeconds `
-    -TimeoutMilliseconds (($SoakSeconds + 30) * 1000)
+try {
+    Write-Host 'Running GUI smoke test...'
+    Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\gui-smoke-tests.ahk')
+    Write-Host 'Running UI scale test...'
+    Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\ui-scale-tests.ahk')
+    Write-Host 'Running history-toast interaction test...'
+    Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\history-toast-tests.ahk')
+    Write-Host 'Running shared message-box layout test...'
+    Invoke-GuiTest (Join-Path $PSScriptRoot `
+        'gui\dark-message-box-layout-tests.ahk')
+    Write-Host 'Running inline-edit dark-theme test...'
+    Invoke-GuiTest (Join-Path $PSScriptRoot `
+        'gui\inline-edit-theme-tests.ahk')
+    Write-Host 'Running log-window and diagnostic smoke test...'
+    Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\log-window-smoke-tests.ahk')
+    Write-Host "Running GUI resource soak for $SoakSeconds seconds..."
+    Invoke-GuiTest (Join-Path $PSScriptRoot 'gui\resource-soak-tests.ahk') `
+        -Arguments $SoakSeconds `
+        -TimeoutMilliseconds (($SoakSeconds + 30) * 1000)
 
-Write-Host 'GUI smoke and resource soak tests passed.'
+    Write-Host 'GUI smoke and resource soak tests passed.'
+} finally {
+    Remove-Item -LiteralPath $testHostRoot -Recurse -Force
+}

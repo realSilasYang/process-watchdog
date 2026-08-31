@@ -14,9 +14,9 @@ $ErrorActionPreference = 'Stop'
 & (Join-Path $PSScriptRoot 'static-check.ps1') `
     -SkipPackagedFontContentValidation
 & (Join-Path $PSScriptRoot 'application-update-helper-tests.ps1')
-& (Join-Path $PSScriptRoot 'standalone-installer-tests.ps1')
 & (Join-Path $PSScriptRoot 'ci-impact-tests.ps1')
 & (Join-Path $PSScriptRoot 'release-engineering-tests.ps1')
+& (Join-Path $PSScriptRoot 'font-asset-restore-tests.ps1')
 & (Join-Path $PSScriptRoot 'repository-check.ps1')
 & (Join-Path $PSScriptRoot 'verify-publication.ps1') `
     -GitleaksPath $GitleaksPath
