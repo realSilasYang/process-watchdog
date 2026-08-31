@@ -37,6 +37,25 @@ class FailingSnapshotResumeSupervisor extends TargetSupervisor {
     }
 }
 
+class BatchManualStopTestProbe {
+    Observe(*) {
+        return ProcessObservation.Running(12345, "BATCH-TEST-ID")
+    }
+}
+
+class BatchManualStopTestSpecs {
+    Get(*) {
+        return {Probe: {Kind: TargetProbeKind.ProcessName,
+            TargetPath: "batch-test"}}
+    }
+}
+
+class BatchManualStopTestStopper {
+    Stop(*) {
+        return TargetStopResult(true, TargetStopStage.AlreadyStopped)
+    }
+}
+
 RunGuardRuntimePromptTests() {
     runtime := {askBeforeRestartFromStopCount: 2}
     runtimeController := GuardRuntime(runtime, {})
@@ -72,22 +91,6 @@ RunGuardRuntimePromptTests() {
         && !manualStopSupervisor.ManualStopRequested
         && manualStopSupervisor.ManualStopGeneration == 0,
         "当前代际停止回调没有正确清理手动结束请求")
-
-    ; 代际仅因旧任务失效而漂移时，仍应允许当前手动停止事务完成收尾。
-    driftPath := "__manual-stop-generation-drift-test__"
-    driftSupervisor := TargetSupervisor()
-    driftSupervisor.ManualStopRequested := true
-    driftSupervisor.ManualStopGeneration := driftSupervisor.Generation
-    driftGeneration := driftSupervisor.ManualStopGeneration
-    driftSupervisor.Generation++
-    global App
-    App := {appStates: Map()}
-    App.appStates.CaseSense := "Off"
-    App.appStates[driftPath] := driftSupervisor
-    AssertGuardRuntimePrompt(ManualStopRequestIsCurrent(driftPath,
-        driftSupervisor, driftGeneration),
-        "手动停止事务在旧任务失效后被错误判定为过期")
-    App.appStates.Delete(driftPath)
 
     ; 同一份进程快照可能同时恢复多个目标。前一个目标调度失败时，
     ; 后一个目标仍必须保留自己的恢复任务。
@@ -126,4 +129,37 @@ RunGuardRuntimePromptTests() {
             && resumedTask is TargetScheduledTask,
             "前一个目标恢复异常干扰了后一个目标的恢复：" purpose)
     }
+
+    ; 批量手动结束必须一次性派发全部对象；每个对象的停止完成回调独立
+    ; 收尾，不能因前面的对象占用工作门而让尾部对象永久保持 Pending。
+    global App
+    batchApp := {appStates: Map(), guardWorkGate: GuardWorkGate(),
+        targetProbe: BatchManualStopTestProbe(),
+        targetSpecsService: BatchManualStopTestSpecs(),
+        targetStopper: BatchManualStopTestStopper(),
+        gracefulStopSeconds: 1, ctrlCWaitSeconds: 1,
+        allowForceTerminate: false, logMessages: [], logMaxEntries: 100,
+        logRevision: 0, shutdownStarted: false}
+    batchApp.appStates.CaseSense := "Off"
+    App := batchApp
+    batchStates := []
+    Loop 13 {
+        batchPath := "__batch-manual-stop-" A_Index "__"
+        batchState := TargetSupervisor()
+        batchState.Enabled := 0
+        batchState.ManualStopRequested := true
+        batchState.ManualStopGeneration := batchState.Generation
+        batchState.Pending := true
+        batchApp.appStates[batchPath] := batchState
+        batchStates.Push({Path: batchPath, State: batchState,
+            Generation: batchState.Generation})
+    }
+    for request in batchStates
+        SetTimer(PerformManualStop.Bind(request.Path, request.State,
+            request.Generation, 0), -1)
+    Sleep(500)
+    for request in batchStates
+        AssertGuardRuntimePrompt(!request.State.Pending
+            && !request.State.ManualStopRequested,
+            "批量结束的尾部对象没有完成独立收尾：" request.Path)
 }

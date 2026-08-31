@@ -1129,8 +1129,18 @@ BeginManualStopRequests(paths) {
                 TrDiagnostic(saveError.Message)))
         }
     }
-    for request in requests
-        ScheduleManualStopRequest(request)
+    for request in requests {
+        try {
+            SetTimer(PerformManualStop.Bind(request.Path, request.State,
+                request.Generation, 0), -1)
+        } catch as scheduleError {
+            try FinalizeManualStopFailure(request.Path, request.State,
+                request.Generation,
+                Tr("结束运行失败，目标进程未能停止：{1}", request.Path))
+            try LogMsg(Tr("后台调度任务异常（{1}）：{2}",
+                request.Path, TrDiagnostic(scheduleError.Message)))
+        }
+    }
     if requests.Length
         ScheduleManualStopReconciliation()
     if (paths.Length > 0) {
@@ -1157,8 +1167,7 @@ PerformManualStop(path, expectedSupervisor, expectedGeneration,
         if !ManualStopRequestIsCurrent(path, expectedSupervisor,
             expectedGeneration)
             return
-        stateObj.ManualStopCallbackStarted := true
-        stateObj.CancelScheduledTasks(false)
+        stateObj.CancelScheduledTasks()
         operationGeneration := stateObj.Generation
         stateObj.ManualStopGeneration := operationGeneration
         stateObj.Pending := true
@@ -1207,14 +1216,9 @@ PerformManualStop(path, expectedSupervisor, expectedGeneration,
             completionCallback := CompleteManualStopAfterStop.Bind(path,
                 stateObj, operationGeneration, pid, creationIdentity,
                 stopResult)
-            try {
-                RememberManualStopCallback(stateObj, completionCallback)
-                stateObj.ManualStopCallbackStarted := false
-                SetTimer(completionCallback, -1)
-            } catch {
-                try ClearManualStopCallback(stateObj, completionCallback)
+            try SetTimer(completionCallback, -1)
+            catch
                 completionCallback.Call()
-            }
             return
         }
         FinalizeManualStop(path, stateObj, operationGeneration)
@@ -1250,7 +1254,6 @@ CompleteManualStopAfterStop(path, expectedSupervisor,
         if !ManualStopRequestIsCurrent(path, expectedSupervisor,
             expectedGeneration)
             return
-        stateObj.ManualStopCallbackStarted := true
         if !stopResult.Stopped {
             identityStatus := App.targetStopper.GetIdentityStatus(pid,
                 creationIdentity)
@@ -1281,16 +1284,13 @@ FinalizeManualStop(path, stateObj, expectedGeneration) {
         || stateObj.Enabled {
         return false
     }
-    ClearManualStopCallback(stateObj)
-    stateObj.ManualStopCallbackStarted := false
-    projectionGeneration := stateObj.Generation
     stateObj.Pending := false
     stateObj.TargetStartTicks := 0
     stateObj.FailCount := 0
     ClearManualStopRequest(stateObj, expectedGeneration)
     try ClearStateProcessIdentity(stateObj)
     try stateObj.TransitionTo(GuardPhase.Paused)
-    try UpdateState(path, Tr("⏸️ 已暂停"), stateObj, projectionGeneration,
+    try UpdateState(path, Tr("⏸️ 已暂停"), stateObj, expectedGeneration,
         true, GuardStatusKind.Paused)
     try LogMsg(Tr("已结束运行：{1}", path))
     return true
@@ -1298,15 +1298,12 @@ FinalizeManualStop(path, stateObj, expectedGeneration) {
 FinalizeManualStopFailure(path, stateObj, expectedGeneration, logMessage) {
     if !ManualStopRequestIsCurrent(path, stateObj, expectedGeneration)
         return false
-    ClearManualStopCallback(stateObj)
-    stateObj.ManualStopCallbackStarted := false
-    projectionGeneration := stateObj.Generation
     stateObj.Pending := false
     stateObj.TargetStartTicks := 0
     ClearManualStopRequest(stateObj, expectedGeneration)
     try stateObj.TransitionTo(GuardPhase.Paused)
     try UpdateState(path, Tr("❌ 无法结束运行"), stateObj,
-        projectionGeneration, true, GuardStatusKind.Paused)
+        expectedGeneration, true, GuardStatusKind.Paused)
     try LogMsg(logMessage)
     return true
 }
@@ -1328,12 +1325,9 @@ ScheduleManualStopRetry(path, stateObj, operationGeneration, attempt) {
 TryScheduleManualStopCallback(callback, path, stateObj,
     expectedGeneration, delayMs := 100) {
     try {
-        RememberManualStopCallback(stateObj, callback)
-        stateObj.ManualStopCallbackStarted := false
         SetTimer(callback, -Max(1, delayMs))
         return true
     } catch as timerError {
-        try ClearManualStopCallback(stateObj, callback)
         if ManualStopRequestIsCurrent(path, stateObj, expectedGeneration) {
             try FinalizeManualStopFailure(path, stateObj,
                 expectedGeneration,

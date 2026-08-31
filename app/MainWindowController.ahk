@@ -663,17 +663,15 @@ ReadRegistryDefaultValue(keyName) {
 
 ManualStopRequestIsCurrent(path, stateObj, expectedGeneration := 0) {
     try {
-        manualGeneration := (IsObject(stateObj)
-            && stateObj.HasOwnProp("ManualStopGeneration"))
-            ? stateObj.ManualStopGeneration : 0
         if !IsObject(stateObj) || !App.appStates.Has(path)
             || App.appStates[path] != stateObj
             || !stateObj.ManualStopRequested
             || (App.HasOwnProp("shutdownStarted") && App.shutdownStarted)
-            || (expectedGeneration && manualGeneration
-                && manualGeneration != expectedGeneration)
-            || (expectedGeneration && stateObj.Generation != expectedGeneration
-                && manualGeneration != expectedGeneration)
+            || (expectedGeneration
+                && stateObj.Generation != expectedGeneration)
+            || (expectedGeneration && stateObj.HasOwnProp(
+                "ManualStopGeneration")
+                && stateObj.ManualStopGeneration != expectedGeneration)
             return false
         return true
     } catch {
@@ -701,54 +699,11 @@ ManualStopKnownProcessIsStopped(stateObj) {
         return false
 }
 
-RememberManualStopCallback(stateObj, callback) {
-    if !IsObject(stateObj) || !IsObject(callback)
-        return false
-    if stateObj.HasOwnProp("ManualStopCallback")
-        && IsObject(stateObj.ManualStopCallback)
-        && stateObj.ManualStopCallback != callback {
-        try SetTimer(stateObj.ManualStopCallback, 0)
-    }
-    stateObj.ManualStopCallback := callback
-    return true
-}
-
-ClearManualStopCallback(stateObj, callback := "") {
-    if !IsObject(stateObj) || !stateObj.HasOwnProp("ManualStopCallback")
-        return false
-    if IsObject(callback) && stateObj.ManualStopCallback != callback
-        return false
-    currentCallback := stateObj.ManualStopCallback
-    stateObj.ManualStopCallback := ""
-    if IsObject(currentCallback)
-        try SetTimer(currentCallback, 0)
-    return true
-}
-
-ScheduleManualStopRequest(request) {
-    callback := ""
-    try {
-        callback := PerformManualStop.Bind(request.Path, request.State,
-            request.Generation, 0)
-        RememberManualStopCallback(request.State, callback)
-        request.State.ManualStopCallbackStarted := false
-        SetTimer(callback, -1)
-    } catch as scheduleError {
-        try ClearManualStopCallback(request.State, callback)
-        try FinalizeManualStopFailure(request.Path, request.State,
-            request.Generation,
-            Tr("结束运行失败，目标进程未能停止：{1}", request.Path))
-        try LogMsg(Tr("后台调度任务异常（{1}）：{2}", request.Path,
-            TrDiagnostic(scheduleError.Message)))
-    }
-    return true
-}
-
-ScheduleManualStopReconciliation() {
+ScheduleManualStopReconciliation(delayMs := 250) {
     if !App.HasOwnProp("manualStopReconcileTimer")
         App.manualStopReconcileTimer := ReconcileManualStopStates.Bind()
     try {
-        SetTimer(App.manualStopReconcileTimer, -250)
+        SetTimer(App.manualStopReconcileTimer, -Max(1, delayMs))
         return true
     } catch as timerError {
         try LogMsg(Tr("后台调度任务异常：{1}",
@@ -771,17 +726,12 @@ ReconcileManualStopStates(*) {
             continue
         pending := true
         generation := stateObj.HasOwnProp("ManualStopGeneration")
-            ? stateObj.ManualStopGeneration : stateObj.Generation
-        ; 停止回调可能正在等待系统返回；身份复核只负责收尾已经退出的
-        ; 目标，不会启动另一条停止路径，也不会限制批量派发。
-        if generation && ManualStopKnownProcessIsStopped(stateObj) {
+            ? stateObj.ManualStopGeneration : 0
+        ; 这里只依据停止前记住的 PID 和创建身份做收尾，不会重新派发停止
+        ; 回调。这样即使完成回调在系统繁忙窗口中延迟，界面也能收敛，
+        ; 同时不会制造重复停止或改变其它对象的批量生命周期。
+        if generation && ManualStopKnownProcessIsStopped(stateObj)
             try FinalizeManualStop(path, stateObj, generation)
-        } else if stateObj.HasOwnProp("ManualStopCallback")
-            && IsObject(stateObj.ManualStopCallback)
-            && stateObj.HasOwnProp("ManualStopCallbackStarted")
-            && !stateObj.ManualStopCallbackStarted {
-            try SetTimer(stateObj.ManualStopCallback, -1)
-        }
     }
     if pending
         ScheduleManualStopReconciliation()

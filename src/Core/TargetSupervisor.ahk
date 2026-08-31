@@ -84,8 +84,6 @@ class TargetSupervisor {
         this.ManualRestartGeneration := 0
         this.ManualStopRequested := false
         this.ManualStopGeneration := 0
-        this.ManualStopCallback := ""
-        this.ManualStopCallbackStarted := false
         this.StoppedEvidenceTicks := 0
         this.AskBeforeRestart := false
         this.StopCountSinceGuardReset := 0
@@ -120,13 +118,6 @@ class TargetSupervisor {
             this.VerifyTask.Cancel()
         this.RestartTask := ""
         this.VerifyTask := ""
-        if this.HasOwnProp("ManualStopCallback")
-            && IsObject(this.ManualStopCallback) {
-            try SetTimer(this.ManualStopCallback, 0)
-            this.ManualStopCallback := ""
-        }
-        if this.HasOwnProp("ManualStopCallbackStarted")
-            this.ManualStopCallbackStarted := false
         this.ClearSnapshotCoordination()
         this.StopPromptPending := false
         this.StopPromptGeneration := 0

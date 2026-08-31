@@ -165,10 +165,37 @@ UpdateState(updPath, statusStr, expectedState := "",
     if statusKindChanged
         stateObj.StatusKind := statusKind
     if (stateChanged || statusKindChanged || forceProjection) {
-        row := FindRow(updPath)
-        if (row > 0)
-            SetMainListStatus(row, statusStr)
+        ProjectMainListStatusByPath(updPath, statusStr)
     }
+    return true
+}
+
+ProjectMainListStatusByPath(path, statusText) {
+    path := NormalizeTargetPath(path)
+    if path == "" || !IsSet(Main) || !IsObject(Main)
+        || !Main.HasOwnProp("lv") || !IsObject(Main.lv)
+        || !Main.HasOwnProp("listProjection")
+        || !IsObject(Main.listProjection)
+        return false
+    ; 状态排序由独立的一次性定时器执行。必须把“按路径找行”和整组
+    ; ListView 写入放在同一不可打断区间，否则排序刚移动行时，旧行号
+    ; 可能把别的对象更新掉，真正对象就会一直保留旧的“结束运行”文本。
+    previousCritical := A_IsCritical
+    Critical("On")
+    try {
+        row := FindRow(path)
+        if (row > 0 && NormalizeTargetPath(Main.lv.GetText(row, 3)) == path)
+            SetMainListStatus(row, statusText)
+        else {
+            Main.listProjection.Rebuild(Main.lv)
+            row := FindRow(path)
+            if (row > 0
+                && NormalizeTargetPath(Main.lv.GetText(row, 3)) == path)
+                SetMainListStatus(row, statusText)
+            else
+                return false
+        }
+    } finally Critical(previousCritical ? previousCritical : "Off")
     return true
 }
 
