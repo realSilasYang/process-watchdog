@@ -32,5 +32,5 @@ AutoHotkey64.exe /ErrorStdOut ".\进程守护小助手.ahk" --startup-validation
 开发环境可以运行：
 
 ```powershell
-.\tests\run-gui-tests.ps1 -SoakSeconds 300
+.\tests\verify-windows-integration.ps1 -SoakSeconds 300
 ```
