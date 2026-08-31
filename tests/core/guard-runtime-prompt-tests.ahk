@@ -8,8 +8,13 @@ try {
     FileAppend("GUARD_RUNTIME_PROMPT|PASS`n", "*")
     ExitApp(0)
 } catch as testError {
-    FileAppend(testError.File " (" testError.Line "): " testError.Message
-        "`n" testError.Stack "`n", "**")
+    failureText := testError.File " (" testError.Line "): "
+        . testError.Message "`n" testError.Stack "`n"
+    try FileAppend(failureText, "**")
+    catch {
+        ; 直接双击运行时没有标准错误句柄，仍要把原始失败原因展示出来。
+        try MsgBox(failureText, A_ScriptName, "Iconx")
+    }
     ExitApp(1)
 }
 
