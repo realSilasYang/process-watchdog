@@ -84,6 +84,9 @@ class TargetSupervisor {
         this.ManualRestartGeneration := 0
         this.ManualStopRequested := false
         this.ManualStopGeneration := 0
+        this.ManualStopInProgress := false
+        this.ManualStopPID := 0
+        this.ManualStopCreationIdentity := ""
         this.StoppedEvidenceTicks := 0
         this.AskBeforeRestart := false
         this.StopCountSinceGuardReset := 0
@@ -140,6 +143,9 @@ class TargetSupervisor {
         this.ManualRestartGeneration := 0
         this.ManualStopRequested := false
         this.ManualStopGeneration := 0
+        this.ManualStopInProgress := false
+        this.ManualStopPID := 0
+        this.ManualStopCreationIdentity := ""
         this.StoppedEvidenceTicks := 0
         this.StopCountSinceGuardReset := 0
         this.StopPromptPending := false

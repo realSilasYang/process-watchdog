@@ -692,9 +692,15 @@ ClearManualStopRequest(stateObj, expectedGeneration := 0) {
 }
 
 ManualStopKnownProcessIsStopped(stateObj) {
-    try return stateObj.PID && stateObj.PIDCreationIdentity
-        && App.targetStopper.GetIdentityStatus(stateObj.PID,
-            stateObj.PIDCreationIdentity) == 0
+    try {
+        if !stateObj.HasOwnProp("ManualStopPID")
+            || !stateObj.HasOwnProp("ManualStopCreationIdentity")
+            || !stateObj.ManualStopPID
+            || stateObj.ManualStopCreationIdentity == ""
+            return false
+        return App.targetStopper.GetIdentityStatus(stateObj.ManualStopPID,
+            stateObj.ManualStopCreationIdentity) == 0
+    }
     catch
         return false
 }
@@ -725,6 +731,9 @@ ReconcileManualStopStates(*) {
             || !stateObj.Pending || stateObj.Enabled
             continue
         pending := true
+        if stateObj.HasOwnProp("ManualStopInProgress")
+            && stateObj.ManualStopInProgress
+            continue
         generation := stateObj.HasOwnProp("ManualStopGeneration")
             ? stateObj.ManualStopGeneration : 0
         ; 这里只依据停止前记住的 PID 和创建身份做收尾，不会重新派发停止

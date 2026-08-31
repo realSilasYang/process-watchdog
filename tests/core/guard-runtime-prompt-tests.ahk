@@ -165,6 +165,27 @@ RunGuardRuntimePromptTests() {
     Sleep(500)
     for request in batchStates
         AssertGuardRuntimePrompt(!request.State.Pending
-            && !request.State.ManualStopRequested,
+            && !request.State.ManualStopRequested
+            && !request.State.ManualStopInProgress
+            && !request.State.ManualStopPID
+            && request.State.ManualStopCreationIdentity == "",
             "批量结束的尾部对象没有完成独立收尾：" request.Path)
+
+    ; 完成收尾不应因为其它后台任务暂时持有工作门而重新依赖定时器。
+    busyPath := "__batch-manual-stop-gate-busy__"
+    busyState := TargetSupervisor({Enabled: 0, Pending: true,
+        ManualStopRequested: true,
+        ManualStopGeneration: 1, ManualStopPID: 12345,
+        ManualStopCreationIdentity: "BATCH-TEST-ID"})
+    batchApp.appStates[busyPath] := busyState
+    AssertGuardRuntimePrompt(batchApp.guardWorkGate.TryEnter("test-blocker"),
+        "无法建立停止完成工作门竞争测试")
+    CompleteManualStopAfterStop(busyPath, busyState, 1, 12345,
+        "BATCH-TEST-ID", TargetStopResult(true,
+            TargetStopStage.AlreadyStopped))
+    batchApp.guardWorkGate.Leave()
+    AssertGuardRuntimePrompt(!busyState.Pending
+        && !busyState.ManualStopRequested
+        && !busyState.ManualStopInProgress,
+        "工作门竞争导致停止完成收尾被延迟")
 }
