@@ -1633,7 +1633,7 @@ class FrenchStrings {
             "; UiScale : pourcentage de echelle de interface, valeurs prises en charge : 80, 90, 100, 110, 125, 150, 175 et 200.")
         catalog.Set("如果设置了恢复前询问，应从第几次停止开始询问？",
             "Demander la recuperation a partir de l'arret numero :")
-        catalog.Set("停止后询问恢复的起始停止次数必须为 1-9999。",
+        catalog.Set("每次恢复前询问的起始停止次数必须为 1-9999。",
             "Le nombre d'arrets avant la confirmation de reprise doit etre compris entre 1 et 9999.")
         return catalog
     }

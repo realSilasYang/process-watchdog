@@ -113,7 +113,7 @@ class MainContextPopupWindow {
             {Text: Tr("⚙️ 进程识别与启动设置"), Action: OpenEnvSettings},
             {Text: Tr("🛡️ 以管理员身份运行"), Check: false,
                 Action: ToggleRunAsAdmin},
-            {Text: Tr("🔔 停止后每次询问恢复"), Check: false,
+            {Text: Tr("🔔 每次恢复前询问"), Check: false,
                 Action: ToggleAskBeforeRestart},
             {ColorPalette: true, Text: Tr("设置序号圆点"),
                 IconName: "palette.svg", IconColorRole: "ThemeIcon",

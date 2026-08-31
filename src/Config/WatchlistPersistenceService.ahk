@@ -120,7 +120,7 @@ class WatchlistPersistenceService {
         resolvedTarget := this.DecodeField(parts[7], "快捷方式真实目标")
         shortcutArguments := this.DecodeField(parts[9], "快捷方式参数")
         askBeforeRestart := parts.Length >= 10
-            ? this.ParseBooleanField(parts[10], "停止后询问恢复") : false
+            ? this.ParseBooleanField(parts[10], "每次恢复前询问") : false
         displayConfig := this.DisplayConfigCodec.CreateDefault()
         if displayValues.Has(appEntry.Key) {
             displayValue := displayValues[appEntry.Key]

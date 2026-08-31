@@ -1633,7 +1633,7 @@ class ItalianStrings {
             "; UiScale: percentuale di ridimensionamento della interfaccia, valori supportati: 80, 90, 100, 110, 125, 150, 175 e 200.")
         catalog.Set("如果设置了恢复前询问，应从第几次停止开始询问？",
             "Chiedi il ripristino a partire dall'arresto numero:")
-        catalog.Set("停止后询问恢复的起始停止次数必须为 1-9999。",
+        catalog.Set("每次恢复前询问的起始停止次数必须为 1-9999。",
             "Il numero iniziale di arresti per la conferma del ripristino deve essere compreso tra 1 e 9999.")
         return catalog
     }

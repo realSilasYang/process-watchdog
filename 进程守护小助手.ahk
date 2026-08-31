@@ -657,7 +657,7 @@ ConfigureMainContextMenu(isAdmin := false, batchLogSupported := false) {
         Tr("🛡️ 以管理员身份运行"), isAdmin)
     contextMenu.Add(adminLabel, ToggleRunAsAdmin)
     contextMenu.Add(FormatContextMenuToggleLabel(
-        Tr("🔔 停止后每次询问恢复"), false), ToggleAskBeforeRestart)
+        Tr("🔔 每次恢复前询问"), false), ToggleAskBeforeRestart)
     if batchLogSupported {
         contextMenu.Add(Tr("📄 查看批处理输出日志"), OpenProcessLog)
     }
@@ -681,7 +681,7 @@ BuildMainContextPopupItems(isAdmin := false, batchLogSupported := false,
         {Text: Tr("⚙️ 进程识别与启动设置"), Action: OpenEnvSettings},
         {Text: Tr("🛡️ 以管理员身份运行"), Check: isAdmin,
             Action: ToggleRunAsAdmin},
-        {Text: Tr("🔔 停止后每次询问恢复"), Check: askBeforeRestart,
+        {Text: Tr("🔔 每次恢复前询问"), Check: askBeforeRestart,
             Action: ToggleAskBeforeRestart},
     ]
     if batchLogSupported {
