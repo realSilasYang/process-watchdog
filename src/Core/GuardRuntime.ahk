@@ -75,20 +75,53 @@ class GuardRuntime {
                     < stateObj.SnapshotRequestTicks {
                 continue
             }
-            purpose := stateObj.SnapshotWaitPurpose
-            notBeforeTicks := stateObj.SnapshotNotBeforeTicks
-            stateObj.ClearSnapshotCoordination()
-            delayMs := Max(1, notBeforeTicks - nowTicks)
-            task := purpose == "Restart"
-                ? this.ScheduleRestartFor(path, stateObj, delayMs)
-                : this.ScheduleVerificationFor(path, stateObj, delayMs)
-            if !(task is TargetScheduledTask)
-                continue
-            stateObj.StoreSnapshotEvidence(purpose, snapshotIndex)
-            stateObj.TargetStartTicks := 0
-            resumed := true
+            try {
+                purpose := stateObj.SnapshotWaitPurpose
+                notBeforeTicks := stateObj.SnapshotNotBeforeTicks
+                stateObj.ClearSnapshotCoordination()
+                delayMs := Max(1, notBeforeTicks - nowTicks)
+                task := purpose == "Restart"
+                    ? this.ScheduleRestartFor(path, stateObj, delayMs)
+                    : this.ScheduleVerificationFor(path, stateObj, delayMs)
+                if !(task is TargetScheduledTask) {
+                    this.RecoverSnapshotResumeFailure(path, stateObj,
+                        Error("未能安排快照恢复任务"))
+                    continue
+                }
+                if !stateObj.StoreSnapshotEvidence(purpose, snapshotIndex)
+                    throw Error("无法保存快照恢复证据")
+                stateObj.TargetStartTicks := 0
+                resumed := true
+            } catch as snapshotResumeError {
+                ; 快照可能同时唤醒多个目标；单个目标的调度或状态异常
+                ; 只能回收自身状态，不能中止后续目标的恢复。
+                this.RecoverSnapshotResumeFailure(path, stateObj,
+                    snapshotResumeError)
+            }
         }
         return resumed
+    }
+
+    RecoverSnapshotResumeFailure(path, stateObj, resumeError) {
+        if !this.IsSupervisorCurrent(path, stateObj)
+            return false
+        try {
+            stateObj.CancelScheduledTasks()
+            stateObj.Pending := false
+            stateObj.TargetStartTicks := 0
+            stateObj.IsRestarting := false
+            if stateObj.Enabled {
+                stateObj.TransitionTo(GuardPhase.Initializing)
+                try this.UpdateState(path, stateObj,
+                    this.Text("初始化..."), GuardStatusKind.Initializing)
+            } else {
+                stateObj.TransitionTo(GuardPhase.Paused)
+            }
+        } catch as recoveryError {
+            try this.LogTargetMonitorError(path, recoveryError)
+        }
+        try this.LogTargetMonitorError(path, resumeError)
+        return true
     }
 
     HandleTaskError(taskError, task) {
@@ -228,10 +261,10 @@ class GuardRuntime {
                 if !stateObj.Enabled || stateObj.OneShot
                     || stateObj.RelocationPending
                     continue
-                this.RecoverOrphanedPending(path, stateObj)
-                if stateObj.Pending
-                    continue
                 try {
+                    this.RecoverOrphanedPending(path, stateObj)
+                    if stateObj.Pending
+                        continue
                     hasLivePid := this.Callbacks.StateProcessIdentityIsValid
                         .Call(path, stateObj)
                     if (InStr(path, "\") && !hasLivePid
