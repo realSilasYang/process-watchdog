@@ -20,6 +20,23 @@ AssertGuardRuntimePrompt(condition, message) {
         throw Error(message)
 }
 
+SnapshotResumeTestLog(*) {
+}
+
+SnapshotResumeTestNormalize(path) {
+    return path
+}
+
+class FailingSnapshotResumeSupervisor extends TargetSupervisor {
+    ScheduleRestart(*) {
+        throw Error("模拟单个目标恢复调度异常")
+    }
+
+    ScheduleVerification(*) {
+        throw Error("模拟单个目标复核调度异常")
+    }
+}
+
 RunGuardRuntimePromptTests() {
     runtime := {askBeforeRestartFromStopCount: 2}
     runtimeController := GuardRuntime(runtime, {})
@@ -40,4 +57,42 @@ RunGuardRuntimePromptTests() {
     supervisor.AskBeforeRestart := false
     AssertGuardRuntimePrompt(!runtimeController.ShouldPromptAfterConfirmedStop(
         supervisor), "未开启询问恢复的条目仍显示了恢复选择")
+
+    ; 同一份进程快照可能同时恢复多个目标。前一个目标调度失败时，
+    ; 后一个目标仍必须保留自己的恢复任务。
+    for purpose in ["Restart", "Verify"] {
+        batchRuntime := {
+            appStates: Map(),
+            scheduler: WatchdogScheduler("", false),
+            checkInterval: 2000
+        }
+        batchRuntime.appStates.CaseSense := "Off"
+        failedPath := "C:\\batch-failed-" purpose ".exe"
+        resumedPath := "C:\\batch-resumed-" purpose ".exe"
+        failedSupervisor := FailingSnapshotResumeSupervisor()
+        resumedSupervisor := TargetSupervisor()
+        failedSupervisor.Scheduler := batchRuntime.scheduler
+        resumedSupervisor.Scheduler := batchRuntime.scheduler
+        failedSupervisor.Pending := true
+        resumedSupervisor.Pending := true
+        failedSupervisor.BeginSnapshotWait(purpose, 1, 10000)
+        resumedSupervisor.BeginSnapshotWait(purpose, 1, 10000)
+        batchRuntime.appStates[failedPath] := failedSupervisor
+        batchRuntime.appStates[resumedPath] := resumedSupervisor
+        batchRuntimeController := GuardRuntime(batchRuntime, {
+            Log: SnapshotResumeTestLog,
+            NormalizeTargetPath: SnapshotResumeTestNormalize
+        })
+        snapshotIndex := ProcessSnapshotIndex([], 100)
+        AssertGuardRuntimePrompt(batchRuntimeController.OnSnapshotPublished(
+            [], snapshotIndex), "单个目标恢复异常导致批次没有继续处理：" purpose)
+        AssertGuardRuntimePrompt(!failedSupervisor.Pending
+            && failedSupervisor.Phase == GuardPhase.Initializing,
+            "恢复调度失败的目标没有回到可重试状态：" purpose)
+        resumedTask := purpose == "Restart"
+            ? resumedSupervisor.RestartTask : resumedSupervisor.VerifyTask
+        AssertGuardRuntimePrompt(resumedSupervisor.Pending
+            && resumedTask is TargetScheduledTask,
+            "前一个目标恢复异常干扰了后一个目标的恢复：" purpose)
+    }
 }
