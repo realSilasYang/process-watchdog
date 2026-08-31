@@ -9,9 +9,14 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🎉 Version [2.1.4] - 2026-08-31
 
+### 🚀 Improvements
+
+- **Recovery-confirmation wording:** Interface and documentation wording now consistently says “Ask before every recovery,” accurately describing when confirmation occurs.
+
 ### 🐛 Fixed
 
 - **Isolated batch startup and recovery:** During the first batch startup or recovery of monitored targets, a script or application launch failure is recorded and retried for that target only, without interrupting startup or recovery of the remaining targets.
+- **Fully concurrent batch stops:** Stopping multiple or all targets remains fully concurrent, with errors isolated per target; raising the AutoHotkey thread capacity prevents trailing list items from remaining on “Stopping” during large batches because of the default thread limit.
 
 ---
 
