@@ -58,6 +58,21 @@ RunGuardRuntimePromptTests() {
     AssertGuardRuntimePrompt(!runtimeController.ShouldPromptAfterConfirmedStop(
         supervisor), "未开启询问恢复的条目仍显示了恢复选择")
 
+    ; 迟到的停止回调不能清理已经进入下一代的手动结束事务。
+    manualStopSupervisor := TargetSupervisor()
+    manualStopSupervisor.ManualStopRequested := true
+    manualStopSupervisor.ManualStopGeneration :=
+        manualStopSupervisor.Generation
+    AssertGuardRuntimePrompt(!ClearManualStopRequest(manualStopSupervisor,
+        manualStopSupervisor.Generation + 1)
+        && manualStopSupervisor.ManualStopRequested,
+        "旧代际停止回调错误清理了当前手动结束请求")
+    AssertGuardRuntimePrompt(ClearManualStopRequest(manualStopSupervisor,
+        manualStopSupervisor.Generation)
+        && !manualStopSupervisor.ManualStopRequested
+        && manualStopSupervisor.ManualStopGeneration == 0,
+        "当前代际停止回调没有正确清理手动结束请求")
+
     ; 同一份进程快照可能同时恢复多个目标。前一个目标调度失败时，
     ; 后一个目标仍必须保留自己的恢复任务。
     for purpose in ["Restart", "Verify"] {

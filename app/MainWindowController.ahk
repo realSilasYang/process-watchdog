@@ -661,6 +661,43 @@ ReadRegistryDefaultValue(keyName) {
         return ""
 }
 
+ManualStopRequestIsCurrent(path, stateObj, expectedGeneration := 0) {
+    try {
+        if !IsObject(stateObj) || !App.appStates.Has(path)
+            || App.appStates[path] != stateObj
+            || !stateObj.ManualStopRequested
+            || (expectedGeneration
+                && stateObj.Generation != expectedGeneration)
+            || (expectedGeneration && stateObj.HasOwnProp(
+                "ManualStopGeneration")
+                && stateObj.ManualStopGeneration != expectedGeneration)
+            return false
+        return true
+    } catch {
+        return false
+    }
+}
+
+ClearManualStopRequest(stateObj, expectedGeneration := 0) {
+    if !IsObject(stateObj) || !stateObj.ManualStopRequested
+        return false
+    if expectedGeneration && stateObj.HasOwnProp("ManualStopGeneration")
+        && stateObj.ManualStopGeneration != expectedGeneration
+        return false
+    stateObj.ManualStopRequested := false
+    if stateObj.HasOwnProp("ManualStopGeneration")
+        stateObj.ManualStopGeneration := 0
+    return true
+}
+
+ManualStopKnownProcessIsStopped(stateObj) {
+    try return stateObj.PID && stateObj.PIDCreationIdentity
+        && App.targetStopper.GetIdentityStatus(stateObj.PID,
+            stateObj.PIDCreationIdentity) == 0
+    catch
+        return false
+}
+
 RestartSelectedApp(*) {
     paths := CaptureSelectedWatchPaths(true)
     if !paths.Length
