@@ -1201,6 +1201,9 @@ PerformManualStop(path, expectedSupervisor, expectedGeneration,
                     operationGeneration, attempt)
                 return
             }
+            stateObj.ManualStopPID := pid
+            stateObj.ManualStopCreationIdentity := creationIdentity
+            stateObj.ManualStopInProgress := true
             ; 正常关闭和 Ctrl+C 等待可能持续数秒。目标身份和事务代际已经在
             ; 门内冻结，耗时停止放到门外执行，避免阻塞其它守护对象与配置操作。
             App.guardWorkGate.Leave()
@@ -1213,12 +1216,8 @@ PerformManualStop(path, expectedSupervisor, expectedGeneration,
                 stopResult := TargetStopResult(false,
                     TargetStopStage.Failed, errorDetail)
             }
-            completionCallback := CompleteManualStopAfterStop.Bind(path,
-                stateObj, operationGeneration, pid, creationIdentity,
-                stopResult)
-            try SetTimer(completionCallback, -1)
-            catch
-                completionCallback.Call()
+            CompleteManualStopAfterStop(path, stateObj, operationGeneration,
+                pid, creationIdentity, stopResult)
             return
         }
         FinalizeManualStop(path, stateObj, operationGeneration)
@@ -1240,20 +1239,19 @@ CompleteManualStopAfterStop(path, expectedSupervisor,
     gateHeld := false
     try {
         if !ManualStopRequestIsCurrent(path, expectedSupervisor,
-            expectedGeneration)
-            return
-        if !App.guardWorkGate.TryEnter("ManualStopAfterStop") {
-            retryCallback := CompleteManualStopAfterStop.Bind(path,
-                expectedSupervisor, expectedGeneration, pid,
-                creationIdentity, stopResult)
-            TryScheduleManualStopCallback(retryCallback, path,
-                expectedSupervisor, expectedGeneration)
+            expectedGeneration) {
+            if IsObject(stateObj)
+                && stateObj.ManualStopGeneration == expectedGeneration
+                stateObj.ManualStopInProgress := false
             return
         }
-        gateHeld := true
+        try gateHeld := App.guardWorkGate.TryEnter("ManualStopAfterStop")
+        catch
+            gateHeld := false
         if !ManualStopRequestIsCurrent(path, expectedSupervisor,
             expectedGeneration)
             return
+        stateObj.ManualStopInProgress := false
         if !stopResult.Stopped {
             identityStatus := App.targetStopper.GetIdentityStatus(pid,
                 creationIdentity)
@@ -1269,6 +1267,7 @@ CompleteManualStopAfterStop(path, expectedSupervisor,
         }
         FinalizeManualStop(path, stateObj, expectedGeneration)
     } catch as completionError {
+        stateObj.ManualStopInProgress := false
         if ManualStopRequestIsCurrent(path, stateObj, expectedGeneration)
             try FinalizeManualStopFailure(path, stateObj, expectedGeneration,
                 Tr("结束运行失败，目标进程未能停止：{1}", path))
@@ -1288,6 +1287,9 @@ FinalizeManualStop(path, stateObj, expectedGeneration) {
     stateObj.TargetStartTicks := 0
     stateObj.FailCount := 0
     ClearManualStopRequest(stateObj, expectedGeneration)
+    stateObj.ManualStopInProgress := false
+    stateObj.ManualStopPID := 0
+    stateObj.ManualStopCreationIdentity := ""
     try ClearStateProcessIdentity(stateObj)
     try stateObj.TransitionTo(GuardPhase.Paused)
     try UpdateState(path, Tr("⏸️ 已暂停"), stateObj, expectedGeneration,
@@ -1301,6 +1303,9 @@ FinalizeManualStopFailure(path, stateObj, expectedGeneration, logMessage) {
     stateObj.Pending := false
     stateObj.TargetStartTicks := 0
     ClearManualStopRequest(stateObj, expectedGeneration)
+    stateObj.ManualStopInProgress := false
+    stateObj.ManualStopPID := 0
+    stateObj.ManualStopCreationIdentity := ""
     try stateObj.TransitionTo(GuardPhase.Paused)
     try UpdateState(path, Tr("❌ 无法结束运行"), stateObj,
         expectedGeneration, true, GuardStatusKind.Paused)
