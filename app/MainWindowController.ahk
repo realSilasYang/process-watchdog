@@ -663,14 +663,17 @@ ReadRegistryDefaultValue(keyName) {
 
 ManualStopRequestIsCurrent(path, stateObj, expectedGeneration := 0) {
     try {
+        manualGeneration := (IsObject(stateObj)
+            && stateObj.HasOwnProp("ManualStopGeneration"))
+            ? stateObj.ManualStopGeneration : 0
         if !IsObject(stateObj) || !App.appStates.Has(path)
             || App.appStates[path] != stateObj
             || !stateObj.ManualStopRequested
-            || (expectedGeneration
-                && stateObj.Generation != expectedGeneration)
-            || (expectedGeneration && stateObj.HasOwnProp(
-                "ManualStopGeneration")
-                && stateObj.ManualStopGeneration != expectedGeneration)
+            || (App.HasOwnProp("shutdownStarted") && App.shutdownStarted)
+            || (expectedGeneration && manualGeneration
+                && manualGeneration != expectedGeneration)
+            || (expectedGeneration && stateObj.Generation != expectedGeneration
+                && manualGeneration != expectedGeneration)
             return false
         return true
     } catch {
@@ -698,100 +701,93 @@ ManualStopKnownProcessIsStopped(stateObj) {
         return false
 }
 
-ScheduleManualStopDispatch(delayMs := 1) {
-    if !App.HasOwnProp("manualStopQueue") || !App.manualStopQueue.Length
+RememberManualStopCallback(stateObj, callback) {
+    if !IsObject(stateObj) || !IsObject(callback)
         return false
-    if App.HasOwnProp("manualStopInFlight")
-        && App.HasOwnProp("manualStopMaxConcurrency")
-        && App.manualStopInFlight >= Max(1,
-            Integer(App.manualStopMaxConcurrency))
-        return false
-    if !App.HasOwnProp("manualStopDispatchTimer")
-        App.manualStopDispatchTimer := DispatchManualStopQueue.Bind()
-    if App.HasOwnProp("manualStopDispatchArmed")
-        && App.manualStopDispatchArmed
-        return true
-    App.manualStopDispatchArmed := true
-    try {
-        SetTimer(App.manualStopDispatchTimer, -Max(1, delayMs))
-        return true
-    } catch as scheduleError {
-        App.manualStopDispatchArmed := false
-        FailQueuedManualStops(scheduleError)
-        return false
+    if stateObj.HasOwnProp("ManualStopCallback")
+        && IsObject(stateObj.ManualStopCallback)
+        && stateObj.ManualStopCallback != callback {
+        try SetTimer(stateObj.ManualStopCallback, 0)
     }
+    stateObj.ManualStopCallback := callback
+    return true
 }
 
-DispatchManualStopQueue(*) {
-    if !App.HasOwnProp("manualStopQueue")
-        return
-    App.manualStopDispatchArmed := false
-    try {
-        maxConcurrency := App.HasOwnProp("manualStopMaxConcurrency")
-            ? Max(1, Integer(App.manualStopMaxConcurrency)) : 4
-        while App.manualStopQueue.Length
-            && App.manualStopInFlight < maxConcurrency {
-            request := App.manualStopQueue.RemoveAt(1)
-            if !IsObject(request)
-                continue
-            App.manualStopInFlight++
-            try {
-                SetTimer(DispatchManualStopRequest.Bind(request), -1)
-            } catch as dispatchError {
-                App.manualStopInFlight := Max(0,
-                    App.manualStopInFlight - 1)
-                try FinalizeManualStopFailure(request.Path, request.State,
-                    request.Generation,
-                    Tr("结束运行失败，目标进程未能停止：{1}", request.Path))
-                try LogMsg(Tr("后台调度任务异常（{1}）：{2}",
-                    request.Path, TrDiagnostic(dispatchError.Message)))
-            }
-        }
-    } finally {
-        if App.manualStopQueue.Length
-            && App.manualStopInFlight < maxConcurrency
-            ScheduleManualStopDispatch(1)
-    }
+ClearManualStopCallback(stateObj, callback := "") {
+    if !IsObject(stateObj) || !stateObj.HasOwnProp("ManualStopCallback")
+        return false
+    if IsObject(callback) && stateObj.ManualStopCallback != callback
+        return false
+    currentCallback := stateObj.ManualStopCallback
+    stateObj.ManualStopCallback := ""
+    if IsObject(currentCallback)
+        try SetTimer(currentCallback, 0)
+    return true
 }
 
-DispatchManualStopRequest(request, *) {
+ScheduleManualStopRequest(request) {
+    callback := ""
     try {
-        try PerformManualStop(request.Path, request.State,
+        callback := PerformManualStop.Bind(request.Path, request.State,
             request.Generation, 0)
-        catch as dispatchError {
-            try FinalizeManualStopFailure(request.Path, request.State,
-                request.Generation,
-                Tr("结束运行失败，目标进程未能停止：{1}", request.Path))
-            try LogMsg(Tr("后台调度任务异常（{1}）：{2}",
-                request.Path, TrDiagnostic(dispatchError.Message)))
-        }
-    } finally {
-        App.manualStopInFlight := Max(0, App.manualStopInFlight - 1)
-        if App.manualStopQueue.Length
-            && (!App.HasOwnProp("manualStopMaxConcurrency")
-                || App.manualStopInFlight < Max(1,
-                    Integer(App.manualStopMaxConcurrency)))
-            ScheduleManualStopDispatch(1)
-    }
-}
-
-FailQueuedManualStops(scheduleError := "") {
-    if !App.HasOwnProp("manualStopQueue")
-        return 0
-    failed := 0
-    while App.manualStopQueue.Length {
-        request := App.manualStopQueue.RemoveAt(1)
-        if !IsObject(request)
-            continue
-        failed++
+        RememberManualStopCallback(request.State, callback)
+        request.State.ManualStopCallbackStarted := false
+        SetTimer(callback, -1)
+    } catch as scheduleError {
+        try ClearManualStopCallback(request.State, callback)
         try FinalizeManualStopFailure(request.Path, request.State,
             request.Generation,
             Tr("结束运行失败，目标进程未能停止：{1}", request.Path))
-        if IsObject(scheduleError)
-            try LogMsg(Tr("后台调度任务异常（{1}）：{2}", request.Path,
-                TrDiagnostic(scheduleError.Message)))
+        try LogMsg(Tr("后台调度任务异常（{1}）：{2}", request.Path,
+            TrDiagnostic(scheduleError.Message)))
     }
-    return failed
+    return true
+}
+
+ScheduleManualStopReconciliation() {
+    if !App.HasOwnProp("manualStopReconcileTimer")
+        App.manualStopReconcileTimer := ReconcileManualStopStates.Bind()
+    try {
+        SetTimer(App.manualStopReconcileTimer, -250)
+        return true
+    } catch as timerError {
+        try LogMsg(Tr("后台调度任务异常：{1}",
+            TrDiagnostic(timerError.Message)))
+        return false
+    }
+}
+
+ReconcileManualStopStates(*) {
+    if !App.HasOwnProp("manualStopReconcileTimer")
+        return false
+    if App.HasOwnProp("shutdownStarted") && App.shutdownStarted {
+        try SetTimer(App.manualStopReconcileTimer, 0)
+        return false
+    }
+    pending := false
+    for path, stateObj in App.appStates {
+        if !IsObject(stateObj) || !stateObj.ManualStopRequested
+            || !stateObj.Pending || stateObj.Enabled
+            continue
+        pending := true
+        generation := stateObj.HasOwnProp("ManualStopGeneration")
+            ? stateObj.ManualStopGeneration : stateObj.Generation
+        ; 停止回调可能正在等待系统返回；身份复核只负责收尾已经退出的
+        ; 目标，不会启动另一条停止路径，也不会限制批量派发。
+        if generation && ManualStopKnownProcessIsStopped(stateObj) {
+            try FinalizeManualStop(path, stateObj, generation)
+        } else if stateObj.HasOwnProp("ManualStopCallback")
+            && IsObject(stateObj.ManualStopCallback)
+            && stateObj.HasOwnProp("ManualStopCallbackStarted")
+            && !stateObj.ManualStopCallbackStarted {
+            try SetTimer(stateObj.ManualStopCallback, -1)
+        }
+    }
+    if pending
+        ScheduleManualStopReconciliation()
+    else
+        try SetTimer(App.manualStopReconcileTimer, 0)
+    return pending
 }
 
 RestartSelectedApp(*) {

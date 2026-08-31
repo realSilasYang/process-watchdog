@@ -178,12 +178,8 @@ ReleaseApplicationMutex() {
 }
 
 ShutdownApplicationResources(*) {
-    if IsSet(App) && App.HasOwnProp("manualStopDispatchTimer")
-        try SetTimer(App.manualStopDispatchTimer, 0)
-    if IsSet(App) && App.HasOwnProp("manualStopDispatchArmed")
-        App.manualStopDispatchArmed := false
-    if IsSet(App) && App.HasOwnProp("manualStopQueue")
-        try FailQueuedManualStops()
+    if IsSet(App) && App.HasOwnProp("manualStopReconcileTimer")
+        try SetTimer(App.manualStopReconcileTimer, 0)
     if App.appsDirty
         try SaveAppsToIni(false)
     try SetTimer(App.configSaveRetryTimer, 0)

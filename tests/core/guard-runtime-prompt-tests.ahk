@@ -73,6 +73,22 @@ RunGuardRuntimePromptTests() {
         && manualStopSupervisor.ManualStopGeneration == 0,
         "当前代际停止回调没有正确清理手动结束请求")
 
+    ; 代际仅因旧任务失效而漂移时，仍应允许当前手动停止事务完成收尾。
+    driftPath := "__manual-stop-generation-drift-test__"
+    driftSupervisor := TargetSupervisor()
+    driftSupervisor.ManualStopRequested := true
+    driftSupervisor.ManualStopGeneration := driftSupervisor.Generation
+    driftGeneration := driftSupervisor.ManualStopGeneration
+    driftSupervisor.Generation++
+    global App
+    App := {appStates: Map()}
+    App.appStates.CaseSense := "Off"
+    App.appStates[driftPath] := driftSupervisor
+    AssertGuardRuntimePrompt(ManualStopRequestIsCurrent(driftPath,
+        driftSupervisor, driftGeneration),
+        "手动停止事务在旧任务失效后被错误判定为过期")
+    App.appStates.Delete(driftPath)
+
     ; 同一份进程快照可能同时恢复多个目标。前一个目标调度失败时，
     ; 后一个目标仍必须保留自己的恢复任务。
     for purpose in ["Restart", "Verify"] {
