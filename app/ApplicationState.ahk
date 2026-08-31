@@ -51,6 +51,12 @@ class ApplicationState {
         this.guardWorkGate := GuardWorkGate(GetTickCount64, LogMsg)
         this.guardMutationQueue := GuardMutationQueue(this.guardWorkGate,
             HandleGuardMutationError)
+        ; 批量停止使用有限并发：让多个目标的停止等待重叠，同时避免一次性
+        ; 创建大量短定时器导致尾部请求丢失。
+        this.manualStopQueue := []
+        this.manualStopInFlight := 0
+        this.manualStopMaxConcurrency := 4
+        this.manualStopDispatchArmed := false
         this.appStates := Map()
         this.appStates.CaseSense := "Off"
         this.scheduler := WatchdogScheduler("", true, "")

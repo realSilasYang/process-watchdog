@@ -180,6 +180,8 @@ ReleaseApplicationMutex() {
 ShutdownApplicationResources(*) {
     if IsSet(App) && App.HasOwnProp("manualStopDispatchTimer")
         try SetTimer(App.manualStopDispatchTimer, 0)
+    if IsSet(App) && App.HasOwnProp("manualStopDispatchArmed")
+        App.manualStopDispatchArmed := false
     if IsSet(App) && App.HasOwnProp("manualStopQueue")
         try FailQueuedManualStops()
     if App.appsDirty
