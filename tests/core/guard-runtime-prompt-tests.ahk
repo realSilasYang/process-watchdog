@@ -5,7 +5,7 @@
 
 try {
     RunGuardRuntimePromptTests()
-    FileAppend("GUARD_RUNTIME_PROMPT|PASS`n", "*")
+    try FileAppend("GUARD_RUNTIME_PROMPT|PASS`n", "*")
     ExitApp(0)
 } catch as testError {
     failureText := testError.File " (" testError.Line "): "
