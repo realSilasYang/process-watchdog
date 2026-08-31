@@ -19,6 +19,7 @@
 
 #Requires AutoHotkey v2.0 64-bit
 #SingleInstance Off
+#MaxThreads 255 ; 批量停止会并发等待退出，默认 10 会让尾部对象串行压栈
 #Warn All, StdOut ; 严格警告写入诊断输出，避免后台启动被不可见对话框阻塞
 
 #Include src\Platform\Win32.ahk

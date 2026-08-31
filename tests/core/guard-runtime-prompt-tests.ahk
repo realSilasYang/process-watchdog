@@ -56,8 +56,28 @@ class BatchManualStopTestSpecs {
 }
 
 class BatchManualStopTestStopper {
+    static Active := 0
+    static MaximumActive := 0
+    static Started := 0
+
+    static Reset() {
+        this.Active := 0
+        this.MaximumActive := 0
+        this.Started := 0
+    }
+
     Stop(*) {
-        return TargetStopResult(true, TargetStopStage.AlreadyStopped)
+        BatchManualStopTestStopper.Active++
+        BatchManualStopTestStopper.Started++
+        BatchManualStopTestStopper.MaximumActive := Max(
+            BatchManualStopTestStopper.MaximumActive,
+            BatchManualStopTestStopper.Active)
+        try {
+            ; 真实停止会等待窗口关闭、Ctrl+C 或强制终止。保持多个定时器
+            ; 同时挂起，才能覆盖 AutoHotkey 的线程总数上限。
+            Sleep(250)
+            return TargetStopResult(true, TargetStopStage.AlreadyStopped)
+        } finally BatchManualStopTestStopper.Active--
     }
 }
 
@@ -147,6 +167,7 @@ RunGuardRuntimePromptTests() {
         logRevision: 0, shutdownStarted: false}
     batchApp.appStates.CaseSense := "Off"
     App := batchApp
+    BatchManualStopTestStopper.Reset()
     batchStates := []
     Loop 13 {
         batchPath := "__batch-manual-stop-" A_Index "__"
@@ -162,7 +183,11 @@ RunGuardRuntimePromptTests() {
     for request in batchStates
         SetTimer(PerformManualStop.Bind(request.Path, request.State,
             request.Generation, 0), -1)
-    Sleep(500)
+    Sleep(1500)
+    AssertGuardRuntimePrompt(BatchManualStopTestStopper.Started == 13
+        && BatchManualStopTestStopper.MaximumActive == 13,
+        "批量结束没有同时进入全部 13 个停止任务（最大并发："
+            BatchManualStopTestStopper.MaximumActive "）")
     for request in batchStates
         AssertGuardRuntimePrompt(!request.State.Pending
             && !request.State.ManualStopRequested
