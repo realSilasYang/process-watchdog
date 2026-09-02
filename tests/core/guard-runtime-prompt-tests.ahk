@@ -139,6 +139,12 @@ RunGuardRuntimePromptTests() {
     AssertGuardRuntimePrompt(!promptSupervisor.CancelStopPrompt(
         "external-running") && promptCloseCalls == 1,
         "恢复询问窗口取消不是幂等的")
+    ordinaryTaskSupervisor := TargetSupervisor({Pending: true,
+        TargetStartTicks: 5000})
+    AssertGuardRuntimePrompt(!ordinaryTaskSupervisor.CancelStopPrompt()
+        && ordinaryTaskSupervisor.Pending
+        && ordinaryTaskSupervisor.TargetStartTicks == 5000,
+        "没有恢复询问时取消动作错误清除了普通重启任务")
 
     ; 等待询问时 Pending 不能阻断后台轮询；检测到目标已自行恢复后，
     ; 运行态回调必须被调用，从而触发询问窗口的自动关闭。
