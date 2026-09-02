@@ -7,12 +7,23 @@
 
 ## 🚧 [未发布]
 
+## 🎉 版本 [2.1.5] - 2026-09-03
+
 ### 🐛 修复
 
-- 取消恢复询问窗口时现在仅清除询问会话状态，不再错误地清除普通计划重启任务的倒计时
-- 目标进程在外部恢复运行时自动关闭恢复选择提示窗口，避免遗留过时的询问对话框
-- 在恢复询问窗口挂起期间保持监控目标状态，一旦确认进程已启动立即取消提示
-- 隔离提示取消逻辑以防旧轮次的提示窗口被重复触发，并增加回归测试覆盖
+- **恢复期间持续监控**：设置“每次恢复前询问”的守护对象结束后仍持续轮询状态，确保外部启动或自行恢复能够被及时发现。
+- **外部恢复自动关闭询问**：目标在恢复询问窗口等待期间重新运行时，自动关闭过时的提示，不再要求用户处理已经失效的选择。
+- **询问状态代际隔离**：取消或关闭旧一轮询问不会影响后续恢复轮次，迟到的默认选择也不会误暂停对象。
+- **普通重启任务保护**：没有询问窗口时不再错误清除计划重启任务的 `Pending` 状态和倒计时。
+
+---
+
+### 📦 发布物说明
+
+- **`fonts.zip`（可选字体包）**：提供首选字体和回退字体，需先安装到 Windows；它不是程序运行必需。
+- **`process-watchdog-2.1.5-source.zip`（完整源码版）**：包含 AHK 源码、模块、测试和文档，不含字体，适合审阅、开发或从源码运行；本机需要 AutoHotkey v2 x64。
+- **`process-watchdog-2.1.5-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证和运行所需资源，不含字体；无需安装 AutoHotkey，适合完整解压后长期使用。
+- **Everything（[官方最新版](https://www.voidtools.com/downloads/)）**：为程序搜索提供索引和后台服务；随包 `Everything64.dll` 只是 IPC 客户端，不能替代 Everything 本体。
 
 ## 🎉 版本 [2.1.4] - 2026-08-31
 
@@ -656,7 +667,8 @@
 - 后台文件扫描使用 `DirExist` 明确区分目录边界，临时文件遇到瞬时占用时执行
   短时有界重试；测试分别报告结果协议、实际文件集合和清理失败。
 
-[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.4...HEAD
+[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.5...HEAD
+[2.1.5]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.5
 [2.1.4]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.4
 [2.1.3]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.3
 [2.1.2]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.2

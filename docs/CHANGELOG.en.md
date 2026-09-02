@@ -7,6 +7,24 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.1.5] - 2026-09-03
+
+### 🐛 Fixed
+
+- **Continuous monitoring during recovery:** Targets configured to ask before every recovery continue to be polled after stopping, so an external or self-start is detected promptly.
+- **Automatic prompt dismissal:** When a target resumes while its recovery prompt is waiting, the stale prompt closes automatically instead of asking the user to choose an obsolete action.
+- **Prompt generation isolation:** Cancelling or closing an older prompt generation no longer affects a later recovery round, and a delayed default choice cannot pause the target incorrectly.
+- **Pending restart protection:** Scheduled restart `Pending` state and countdown are no longer cleared when there is no recovery prompt to cancel.
+
+---
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides preferred and fallback interface fonts that must be installed into Windows first; it is not required to run the application.
+- **`process-watchdog-2.1.5-source.zip` (complete source edition):** Includes the AHK source, modules, tests, and documentation without fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64 locally.
+- **`process-watchdog-2.1.5-windows-x64.zip` (complete portable edition, recommended):** Includes the EXE, documentation, licenses, and required runtime resources without fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([latest version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application search; the bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
 ## 🎉 Version [2.1.4] - 2026-08-31
 
 ### 🚀 Improvements
@@ -701,7 +719,8 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.4...HEAD
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.5...HEAD
+[2.1.5]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.5
 [2.1.4]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.4
 [2.1.3]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.3
 [2.1.2]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.2
