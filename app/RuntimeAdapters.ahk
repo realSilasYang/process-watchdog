@@ -425,6 +425,8 @@ UpdateRunningState(path, stateObj, expectedGeneration := 0) {
     if (!App.appStates.Has(path) || App.appStates[path] != stateObj
         || !stateObj.Enabled || stateObj.Generation != expectedGeneration)
         return false
+    if stateObj.HasOwnProp("StopPromptPending") && stateObj.StopPromptPending
+        try stateObj.CancelStopPrompt("external-running")
     stateObj.TransitionTo(GuardPhase.Running)
     stateObj.StoppedEvidenceTicks := 0
     if permissionMismatch {
