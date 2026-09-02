@@ -137,8 +137,10 @@ class TargetSupervisor {
         this.StopPromptPending := false
         this.StopPromptGeneration := 0
         this.StopPromptTaskQueued := false
-        this.Pending := false
-        this.TargetStartTicks := 0
+        if hadPrompt {
+            this.Pending := false
+            this.TargetStartTicks := 0
+        }
         if IsObject(token) {
             token.Cancelled := true
             token.CancelValue := reason
