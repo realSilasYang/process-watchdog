@@ -218,9 +218,10 @@ RefreshDarkChoiceButtons(buttons, mbHwnd, *) {
     return refreshedAny
 }
 
-; 四选一深色对话框用于需要明确恢复策略的守护事件。关闭窗口按最后一个选项
-; 处理，避免用户关闭提示后目标永远停留在等待选择状态。
-ShowDarkChoiceBox(Message, Title, choices, ownerGui := "") {
+; 四选一深色对话框用于需要明确恢复策略的守护事件。用户关闭窗口按最后一个
+; 选项处理；后台取消则返回专用值，避免外部恢复被误判为暂停守护。
+ShowDarkChoiceBox(Message, Title, choices, ownerGui := "",
+    cancellationToken := "") {
     if !IsObject(choices) || !choices.Length
         return ""
     Message := NormalizeUserVisibleParentheses(Message)
@@ -301,12 +302,30 @@ ShowDarkChoiceBox(Message, Title, choices, ownerGui := "") {
         try MovePointerToControlCenter(firstChoiceButton)
         SetTimer(ConfirmDarkChoicePointer.Bind(firstChoiceButton, mbHwnd), -1)
         SetTimer(ConfirmDarkChoicePointer.Bind(firstChoiceButton, mbHwnd), -25)
+        if IsObject(cancellationToken) {
+            cancellationToken.Hwnd := mbHwnd
+            cancellationToken.Close := (*) => CancelDarkChoiceBox(mb,
+                ownerLease, &closed, &selected, cancellationToken)
+            ; 状态轮询可能在窗口创建期间先发现目标已经恢复运行；
+            ; 取消标记必须在完成句柄登记后立即兑现，不能留下孤立弹窗。
+            if cancellationToken.Cancelled
+                cancellationToken.Close.Call()
+        }
         WinWaitClose(mbHwnd)
         return selected
     } catch as choiceError {
         CloseDarkMsgBox(mb, ownerLease, &closed)
         throw choiceError
     }
+}
+
+CancelDarkChoiceBox(mb, ownerLease, &closed, &selected,
+    cancellationToken := "") {
+    selected := IsObject(cancellationToken)
+        && cancellationToken.HasOwnProp("CancelValue")
+        ? cancellationToken.CancelValue : "external-running"
+    CloseDarkMsgBox(mb, ownerLease, &closed)
+    return true
 }
 
 ConfirmDarkChoicePointer(button, mbHwnd, *) {

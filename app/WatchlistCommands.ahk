@@ -1111,13 +1111,21 @@ ShowRestartDecisionPrompt(path, stateObj, generation, targetName, *) {
         {Text: Tr("等待 3 分钟"), Value: "minute3"},
         {Text: Tr("暂停守护"), Value: "pause"}
     ]
+    cancellationToken := {Cancelled: false, Hwnd: 0,
+        CancelValue: "external-running"}
+    stateObj.StopPromptCancellation := cancellationToken
     try decision := ShowDarkChoiceBox(
         Tr("监测到守护对象已停止：{1}`n请选择后续处理方式。", targetName),
-        Tr("进程守护小助手 事件提醒"), choices, Main.gui)
+        Tr("进程守护小助手 事件提醒"), choices, Main.gui,
+        cancellationToken)
     catch as promptError {
         LogMsg(Tr("恢复选择弹窗创建失败：{1}",
             TrDiagnostic(promptError.Message)))
         decision := "pause"
+    } finally {
+        if stateObj.HasOwnProp("StopPromptCancellation")
+            && stateObj.StopPromptCancellation == cancellationToken
+            stateObj.StopPromptCancellation := ""
     }
     applyChoice := ApplyRestartDecision.Bind(path, stateObj,
         generation, decision)

@@ -93,6 +93,7 @@ class TargetSupervisor {
         this.StopPromptPending := false
         this.StopPromptGeneration := 0
         this.StopPromptTaskQueued := false
+        this.StopPromptCancellation := ""
 
         if IsObject(initialValues) {
             for propertyName, propertyValue in initialValues.OwnProps()
@@ -122,17 +123,37 @@ class TargetSupervisor {
         this.RestartTask := ""
         this.VerifyTask := ""
         this.ClearSnapshotCoordination()
+        this.CancelStopPrompt()
+        if invalidateGeneration
+            this.Generation++
+    }
+
+    CancelStopPrompt(reason := "cancelled") {
+        hadPrompt := this.StopPromptPending
+            || (this.HasOwnProp("StopPromptCancellation")
+                && IsObject(this.StopPromptCancellation))
+        token := this.HasOwnProp("StopPromptCancellation")
+            ? this.StopPromptCancellation : ""
         this.StopPromptPending := false
         this.StopPromptGeneration := 0
         this.StopPromptTaskQueued := false
-        if invalidateGeneration
-            this.Generation++
+        this.Pending := false
+        this.TargetStartTicks := 0
+        if IsObject(token) {
+            token.Cancelled := true
+            token.CancelValue := reason
+            if token.HasOwnProp("Close") && IsObject(token.Close)
+                try token.Close.Call()
+        }
+        this.StopPromptCancellation := ""
+        return hadPrompt
     }
 
     ; 用户暂停、恢复，或配置身份发生变化时，上一轮守护尝试留下的倒计时、
     ; 验证次数和不确定证据都已经失去语义。统一从这里清空，避免某条命令路径
     ; 漏掉字段后，让新一轮守护继承旧轮次的失败或 Pending 状态。
     ResetGuardAttemptState() {
+        this.CancelStopPrompt()
         this.Pending := false
         this.TargetStartTicks := 0
         this.FailCount := 0
@@ -148,9 +169,6 @@ class TargetSupervisor {
         this.ManualStopCreationIdentity := ""
         this.StoppedEvidenceTicks := 0
         this.StopCountSinceGuardReset := 0
-        this.StopPromptPending := false
-        this.StopPromptGeneration := 0
-        this.StopPromptTaskQueued := false
     }
 
     BeginSnapshotWait(purpose, requestTicks, deadlineTicks,

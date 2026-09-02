@@ -117,6 +117,92 @@ RunGuardRuntimePromptTests() {
         && manualStopSupervisor.ManualStopGeneration == 0,
         "当前代际停止回调没有正确清理手动结束请求")
 
+    ; 询问窗口必须可以被后台运行状态轮询取消；取消后迟到的默认选择
+    ; 不能再把已经运行中的目标暂停，且窗口关闭回调只执行一次。
+    promptSupervisor := TargetSupervisor({Enabled: 1,
+        StopPromptPending: true,
+        StopPromptGeneration: 1,
+        Pending: true})
+    promptCloseCalls := 0
+    promptToken := {Cancelled: false, CancelValue: "external-running",
+        Close: (*) => promptCloseCalls++}
+    promptSupervisor.StopPromptCancellation := promptToken
+    AssertGuardRuntimePrompt(promptSupervisor.CancelStopPrompt(
+        "external-running")
+        && promptToken.Cancelled
+        && promptToken.CancelValue == "external-running"
+        && promptCloseCalls == 1
+        && !promptSupervisor.StopPromptPending
+        && !promptSupervisor.Pending
+        && promptSupervisor.StopPromptCancellation == "",
+        "后台运行状态没有完整取消恢复询问窗口")
+    AssertGuardRuntimePrompt(!promptSupervisor.CancelStopPrompt(
+        "external-running") && promptCloseCalls == 1,
+        "恢复询问窗口取消不是幂等的")
+
+    ; 等待询问时 Pending 不能阻断后台轮询；检测到目标已自行恢复后，
+    ; 运行态回调必须被调用，从而触发询问窗口的自动关闭。
+    promptPollCounters := {Observed: 0, RunningUpdates: 0,
+        IdentityChecks: 0, SubjectChecks: 0, Errors: 0,
+        LastError: ""}
+    promptPollRuntime := {appStates: Map(), appOrder: ["prompt-target"],
+        guardWorkGate: GuardWorkGate(),
+        scheduler: WatchdogScheduler("", false),
+        processSnapshots: {Pump: (*) => 0}}
+    promptPollRuntime.appStates.CaseSense := "Off"
+    promptPollState := TargetSupervisor({Enabled: 1, Pending: true,
+        StopPromptPending: true, StopPromptGeneration: 1})
+    promptPollRuntime.appStates["prompt-target"] := promptPollState
+    promptPollController := GuardRuntime(promptPollRuntime, {
+        StateProcessIdentityIsValid: (*) =>
+            (promptPollCounters.IdentityChecks++, false),
+        TargetSubjectExists: (*) =>
+            (promptPollCounters.SubjectChecks++, true),
+        ObserveTarget: (*) => (promptPollCounters.Observed++,
+            ProcessObservation.Running(24680, "PROMPT-TEST-ID")),
+        SetProcessIdentity: (*) => 0,
+        UpdateRunningState: (path, stateObj, generation) =>
+            (promptPollCounters.RunningUpdates++, stateObj.Pending := false),
+        Log: (message) => (promptPollCounters.Errors++,
+            promptPollCounters.LastError := message),
+        LogSlow: (*) => 0,
+        NormalizeTargetPath: (path) => path,
+        Now: (*) => 1000
+    })
+    promptPollController.MonitorTick()
+    AssertGuardRuntimePrompt(promptPollCounters.Observed == 1
+        && promptPollCounters.RunningUpdates == 1,
+        "等待恢复询问时后台没有继续轮询运行状态（探测："
+            promptPollCounters.Observed "，运行更新："
+            promptPollCounters.RunningUpdates "，启用："
+            promptPollState.Enabled "，待处理：" promptPollState.Pending
+            "，询问：" promptPollState.StopPromptPending "，错误："
+            promptPollCounters.LastError "，身份："
+            promptPollCounters.IdentityChecks "，主体："
+            promptPollCounters.SubjectChecks "）")
+
+    ; 验证真实的运行态适配入口也会执行同一取消动作，而不是只依赖
+    ; MonitorTick 测试替身恰好清除 Pending。
+    runningAdapterState := TargetSupervisor({Enabled: 1,
+        StopPromptPending: true, StopPromptGeneration: 1, Pending: true})
+    adapterCloseCalls := 0
+    runningAdapterToken := {Cancelled: false,
+        Close: (*) => adapterCloseCalls++}
+    runningAdapterState.StopPromptCancellation := runningAdapterToken
+    adapterPath := "__prompt-running-adapter__"
+    adapterApp := {appStates: Map()}
+    adapterApp.appStates.CaseSense := "Off"
+    adapterApp.appStates[adapterPath] := runningAdapterState
+    App := adapterApp
+    AssertGuardRuntimePrompt(UpdateRunningState(adapterPath,
+        runningAdapterState, runningAdapterState.Generation)
+        && adapterCloseCalls == 1
+        && runningAdapterToken.Cancelled
+        && !runningAdapterState.StopPromptPending
+        && !runningAdapterState.Pending
+        && runningAdapterState.Phase == GuardPhase.Running,
+        "运行态适配入口没有关闭恢复询问窗口")
+
     ; 同一份进程快照可能同时恢复多个目标。前一个目标调度失败时，
     ; 后一个目标仍必须保留自己的恢复任务。
     for purpose in ["Restart", "Verify"] {

@@ -263,7 +263,9 @@ class GuardRuntime {
                     continue
                 try {
                     this.RecoverOrphanedPending(path, stateObj)
-                    if stateObj.Pending
+                    ; 等待“每次恢复前询问”时 Pending 只是表示询问会话存活；
+                    ; 仍必须继续探测目标，以便外部恢复运行后自动关闭询问窗口。
+                    if stateObj.Pending && !stateObj.StopPromptPending
                         continue
                     hasLivePid := this.Callbacks.StateProcessIdentityIsValid
                         .Call(path, stateObj)
@@ -306,7 +308,10 @@ class GuardRuntime {
                     continue
 
                 try {
-                if stateObj.Pending
+                ; 询问会话不能沿用普通启动 Pending 的跳过规则；它需要继续
+                ; 经过下面的进程探测。仍未运行时在证据处理前直接保持等待，
+                ; 防止每个轮询周期重新累计停止证据并重复安排弹窗。
+                if stateObj.Pending && !stateObj.StopPromptPending
                     continue
 
                 if stateObj.OneShot {
@@ -448,6 +453,9 @@ class GuardRuntime {
                         missingStatusKind)
                     continue
                 }
+
+                if stateObj.StopPromptPending
+                    continue
 
                 if (stateObj.Phase != GuardPhase.SuspectedStopped) {
                     stateObj.StoppedEvidenceTicks := targetObservation
