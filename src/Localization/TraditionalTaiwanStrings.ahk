@@ -1331,6 +1331,9 @@ class TraditionalTaiwanStrings {
             "🔄 反转状态",
                 "🔄 切換狀態")
         catalog.Set(
+            "🔄 反转",
+                "🔄 切換")
+        catalog.Set(
             "🔄 检查",
                 "🔄 檢查")
         catalog.Set(

@@ -1331,6 +1331,9 @@ class TraditionalHongKongStrings {
             "🔄 反转状态",
                 "🔄 反轉狀態")
         catalog.Set(
+            "🔄 反转",
+                "🔄 反轉")
+        catalog.Set(
             "🔄 检查",
                 "🔄 檢查")
         catalog.Set(

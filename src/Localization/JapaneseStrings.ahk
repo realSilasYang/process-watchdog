@@ -1331,6 +1331,9 @@ class JapaneseStrings {
             "🔄 反转状态",
                 "🔄 状態を切り替え")
         catalog.Set(
+            "🔄 反转",
+                "🔄 切り替え")
+        catalog.Set(
             "🔄 检查",
                 "🔄 確認")
         catalog.Set(

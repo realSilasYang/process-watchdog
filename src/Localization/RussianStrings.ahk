@@ -1331,6 +1331,9 @@ class RussianStrings {
             "🔄 反转状态",
                 "🔄 Инвертировать состояние")
         catalog.Set(
+            "🔄 反转",
+                "🔄 Инвертировать")
+        catalog.Set(
             "🔄 检查",
                 "🔄 Проверить")
         catalog.Set(

@@ -1331,6 +1331,9 @@ class VietnameseStrings {
             "🔄 反转状态",
                 "🔄 Đảo trạng thái")
         catalog.Set(
+            "🔄 反转",
+                "🔄 Đảo")
+        catalog.Set(
             "🔄 检查",
                 "🔄 Kiểm tra")
         catalog.Set(

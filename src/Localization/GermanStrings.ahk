@@ -1331,6 +1331,9 @@ class GermanStrings {
             "🔄 反转状态",
                 "🔄 Status umkehren")
         catalog.Set(
+            "🔄 反转",
+                "🔄 Umkehren")
+        catalog.Set(
             "🔄 检查",
                 "🔄 Prüfen")
         catalog.Set(

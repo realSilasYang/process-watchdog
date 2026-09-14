@@ -1331,6 +1331,9 @@ class EnglishStrings {
             "🔄 反转状态",
                 "🔄 Toggle States")
         catalog.Set(
+            "🔄 反转",
+                "🔄 Toggle")
+        catalog.Set(
             "🔄 检查",
                 "🔄 Check")
         catalog.Set(
