@@ -1331,6 +1331,9 @@ class PortugueseBrazilStrings {
             "🔄 反转状态",
                 "🔄 Inverter status")
         catalog.Set(
+            "🔄 反转",
+                "🔄 Inverter")
+        catalog.Set(
             "🔄 检查",
                 "🔄 Verificar")
         catalog.Set(

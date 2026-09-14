@@ -1331,6 +1331,9 @@ class KoreanStrings {
             "🔄 反转状态",
                 "🔄 상태 반전")
         catalog.Set(
+            "🔄 反转",
+                "🔄 반전")
+        catalog.Set(
             "🔄 检查",
                 "🔄 확인")
         catalog.Set(
