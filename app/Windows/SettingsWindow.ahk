@@ -500,21 +500,18 @@ class SettingsWindow extends ManagedWindow {
             Tr("崩溃自动重启延迟序列（秒）："), fieldControls)
         this.retryEdit := this.AddSettingsEdit(3, 0, 176, 147,
             App.retrySequence, "", fieldControls)
-        this.askBeforeRestartFromStopCountLabel := this.AddSettingsFieldLabel(
-            3, 230, Tr("如果设置了恢复前询问，应从第几次停止开始询问？"), fieldControls)
-        this.askBeforeRestartFromStopCountEdit := this.AddSettingsEdit(3, 0,
-            256, 60, App.askBeforeRestartFromStopCount, "Number",
-            fieldControls)
+        ; AskBeforeRestartFromStopCount 为旧配置保留在 INI 结构中；恢复询问
+        ; 现在按小助手启动后观测到的目标状态决定。隐藏旧值并在保存时原样
+        ; 写回，避免打开设置窗口就改写旧配置。
         this.recursiveImportCheck := this.AddTabControl(3,
-            this.gui.Add("CheckBox", "x0 y302 h24 c"
+            this.gui.Add("CheckBox", "x0 y230 h24 c"
                 UiThemeService.Color("Text"),
                 Tr("导入文件夹时包含子目录")))
         fieldControls.Push(this.recursiveImportCheck)
         layout.MonitoringField := this.CenterSettingsControlGroup(
             fieldControls)
         this.recursiveImportCheck.Value := App.recursiveBatchImport ? 1 : 0
-        for editControl in [this.intervalEdit, this.retryEdit,
-                this.askBeforeRestartFromStopCountEdit]
+        for editControl in [this.intervalEdit, this.retryEdit]
             SetDarkControl(editControl.Hwnd)
         SetDarkControl(this.recursiveImportCheck.Hwnd)
         RegisterHandCursorControl(this.recursiveImportCheck)
@@ -847,10 +844,6 @@ class SettingsWindow extends ManagedWindow {
             : App.checkInterval
         retrySequenceValue := this.retryEdit ? this.retryEdit.Value
             : App.retrySequence
-        askBeforeRestartFromStopCountValue :=
-            this.askBeforeRestartFromStopCountEdit
-                ? this.askBeforeRestartFromStopCountEdit.Value
-                : App.askBeforeRestartFromStopCount
         gracefulStopValue := this.gracefulStopEdit
             ? this.gracefulStopEdit.Value : App.gracefulStopSeconds
         ctrlCWaitValue := this.ctrlCWaitEdit ? this.ctrlCWaitEdit.Value
@@ -882,16 +875,12 @@ class SettingsWindow extends ManagedWindow {
 
         gracefulStopSeconds := ParseBoundedInteger(gracefulStopValue, 1, 300)
         ctrlCWaitSeconds := ParseBoundedInteger(ctrlCWaitValue, 1, 60)
-        askBeforeRestartFromStopCount := ParseBoundedInteger(
-            askBeforeRestartFromStopCountValue, 1, 9999)
+        ; 保留旧设置的校验与原样写回，兼容已有 watchdog.ini；它不再影响
+        ; 恢复询问时机。
+        askBeforeRestartFromStopCount := App.askBeforeRestartFromStopCount
         logMaxEntries := ParseBoundedInteger(logMaxValue, 50, 10000)
         logRetentionDays := ParseBoundedInteger(logRetentionValue, 1, 3650)
         logDirectory := Trim(logDirectoryValue)
-        if !askBeforeRestartFromStopCount {
-            ShowDarkMsgBoxDeferred(Tr("每次恢复前询问的起始停止次数必须为 1-9999。"),
-                Tr("参数错误"), "Error", this.gui)
-            return
-        }
         if !gracefulStopSeconds || !ctrlCWaitSeconds || !logMaxEntries
             || !logRetentionDays || logDirectory == "" {
             ShowDarkMsgBoxDeferred(Tr("扩展设置包含无效数值。`n`nGUI 程序关闭超时：1-300 秒`nCLI 程序关闭超时：1-60 秒`n运行日志显示上限：50-10000 条`n批处理日志保留天数：1-3650 天"),

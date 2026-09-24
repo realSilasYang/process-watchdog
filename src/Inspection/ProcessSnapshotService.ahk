@@ -664,6 +664,9 @@ class ProcessSnapshotService {
                 outputText .= "|" this.Encoder.Call(
                     processInfo.HasOwnProp("identity")
                         ? processInfo.identity : "")
+                outputText .= "|" this.Encoder.Call(
+                    processInfo.HasOwnProp("sessionId")
+                        ? processInfo.sessionId : "")
                     . "`r`n"
             }
         } catch {
@@ -710,7 +713,7 @@ class ProcessSnapshotService {
                 continue
             }
             parts := StrSplit(A_LoopField, "|")
-            if parts.Length != 7
+            if parts.Length != 8
                 return []
             try processId := Integer(parts[1])
             catch
@@ -727,6 +730,7 @@ class ProcessSnapshotService {
                     exe: this.Decoder.Call(parts[5]),
                     creation: this.Decoder.Call(parts[6]),
                     identity: this.Decoder.Call(parts[7]),
+                    sessionId: this.Decoder.Call(parts[8]),
                     observedTicks: capturedAtTicks})
             } catch
                 return []

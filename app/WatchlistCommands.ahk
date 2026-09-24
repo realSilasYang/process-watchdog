@@ -952,6 +952,7 @@ ApplyAppConfigTransition(path, stateObj, sourceItem, targetItem) {
     stateObj.DisplayConfig := nextDisplay
 
     if identityChanged {
+        stateObj.ResetStartupObservation()
         stateObj.ShortcutTargetSource := nextResolvedTarget == "" ? ""
             : (nextResolvedTargetManual ? "用户指定" : "已保存身份")
         stateObj.ShortcutResolveCheckedTicks := GetTickCount64()

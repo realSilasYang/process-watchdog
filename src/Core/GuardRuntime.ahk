@@ -35,6 +35,9 @@ class GuardRuntime {
                 && !this.Runtime.targetRelocationService.Start()
                 this.Log(this.Text("守护目标内容迁移识别服务未能启动。"))
             SetTimer(this.MonitorTimer, this.Runtime.checkInterval)
+            ; 先完成一次同步观测，锁定“小助手进程启动后”的真实目标状态；
+            ; 避免目标在首个定时周期前退出而被误当作启动时未运行。
+            this.MonitorTick()
             return true
         } catch {
             try SetTimer(this.MonitorTimer, 0)
@@ -267,6 +270,27 @@ class GuardRuntime {
                     ; 仍必须继续探测目标，以便外部恢复运行后自动关闭询问窗口。
                     if stateObj.Pending && !stateObj.StopPromptPending
                         continue
+                    ; 快捷方式的真实目标可能在应用升级后发生变化。旧版本曾把
+                    ; 安装目录中的 Windows 服务保存为驻留身份，必须在使用缓存
+                    ; PID 之前重新核对 LNK，才能及时纠正这类过期身份。
+                    SplitPath(path, , , &preflightExtension)
+                    preflightShortcut := StrLower(preflightExtension) == "lnk"
+                    autoShortcut := preflightShortcut
+                        && (!stateObj.HasOwnProp("ResolvedTargetManual")
+                            || !stateObj.ResolvedTargetManual)
+                    if autoShortcut {
+                        forceShortcutRefresh := !stateObj.HasOwnProp(
+                            "ShortcutPreflightChecked")
+                            || !stateObj.ShortcutPreflightChecked
+                        stateObj.ShortcutPreflightChecked := true
+                        if (this.Callbacks.HasOwnProp(
+                                "RefreshShortcutIdentity")
+                            && this.Callbacks.RefreshShortcutIdentity.Call(
+                                path, stateObj, forceShortcutRefresh)) {
+                            if this.Callbacks.HasOwnProp("SaveApps")
+                                this.Callbacks.SaveApps.Call()
+                        }
+                    }
                     hasLivePid := this.Callbacks.StateProcessIdentityIsValid
                         .Call(path, stateObj)
                     if (InStr(path, "\") && !hasLivePid
@@ -439,6 +463,14 @@ class GuardRuntime {
                             isRunning, targetObservation.CreationIdentity)
                 }
 
+                ; 首次得到确定的运行/停止证据时锁定本次小助手生命周期的基线。
+                ; 快照未知、目标缺失和快捷方式重解析失败均在此之前继续处理，
+                ; 不应把它们误记为“启动时已停止”。
+                ; 目标路径缺失时的“停止”只是缺失证据，不能把它锁定为
+                ; 小助手启动时的真实状态；运行证据本身始终足以建立基线。
+                if isRunning || targetSubjectExists
+                    stateObj.CaptureStartupObservation(!!isRunning)
+
                 if isRunning {
                     this.Callbacks.SetProcessIdentity.Call(stateObj,
                         isRunning, targetObservation.CreationIdentity)
@@ -529,11 +561,18 @@ class GuardRuntime {
         if !stateObj.HasOwnProp("AskBeforeRestart")
             || !stateObj.AskBeforeRestart
             return false
-        try threshold := Integer(this.Runtime.askBeforeRestartFromStopCount)
-        catch
-            threshold := 2
-        threshold := Max(1, Min(9999, threshold))
-        return stateObj.StopCountSinceGuardReset >= threshold
+        ; 守护对象启动时已在运行，第一次确认停止就需要用户决定；
+        ; 启动时未运行时允许第一次恢复直接执行，之后每次确认停止都进入
+        ; 询问。旧版停止次数配置仍保留读取兼容，但不再影响这一例外机制。
+        firstConfirmedStop := !stateObj.HasOwnProp(
+            "FirstConfirmedStopObserved")
+            || !stateObj.FirstConfirmedStopObserved
+        stateObj.FirstConfirmedStopObserved := true
+        if firstConfirmedStop
+            return stateObj.HasOwnProp("StartupObservationCaptured")
+                && stateObj.StartupObservationCaptured
+                && stateObj.StartupObservedRunning
+        return true
     }
 
     ObserveAvailableRelocationTarget(path, stateObj) {

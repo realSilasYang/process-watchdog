@@ -1,7 +1,8 @@
 #Requires AutoHotkey v2.0 64-bit
 #Warn All, StdOut
 
-; 询问恢复按全局停止次数阈值触发，条目开关只决定是否参与询问。
+; 首次恢复是否询问取决于小助手启动时的目标运行基线，条目开关只决定
+; 后续是否参与询问；旧的停止次数设置仅保留配置兼容。
 
 try {
     RunGuardRuntimePromptTests()
@@ -84,23 +85,32 @@ class BatchManualStopTestStopper {
 RunGuardRuntimePromptTests() {
     runtime := {askBeforeRestartFromStopCount: 2}
     runtimeController := GuardRuntime(runtime, {})
-    supervisor := TargetSupervisor({AskBeforeRestart: true})
+    ; 启动时未运行：首次确认停止允许直接恢复；后续确认停止始终询问，
+    ; 与旧的 AskBeforeRestartFromStopCount 数值无关。
+    stoppedAtStartup := TargetSupervisor({AskBeforeRestart: true})
+    stoppedAtStartup.CaptureStartupObservation(false)
     AssertGuardRuntimePrompt(!runtimeController.ShouldPromptAfterConfirmedStop(
-        supervisor) && supervisor.StopCountSinceGuardReset == 1,
-        "全局阈值为 2 时首次确认停止仍显示了恢复选择")
+        stoppedAtStartup) && stoppedAtStartup.StopCountSinceGuardReset == 1,
+        "启动时未运行的目标首次确认停止错误显示了恢复选择")
     AssertGuardRuntimePrompt(runtimeController.ShouldPromptAfterConfirmedStop(
-        supervisor) && supervisor.StopCountSinceGuardReset == 2,
-        "全局阈值为 2 时第二次确认停止没有显示恢复选择")
-
-    supervisor.ResetGuardAttemptState()
-    runtime.askBeforeRestartFromStopCount := 1
+        stoppedAtStartup) && stoppedAtStartup.StopCountSinceGuardReset == 2,
+        "启动时未运行的目标后续确认停止没有显示恢复选择")
+    stoppedAtStartup.ResetGuardAttemptState()
     AssertGuardRuntimePrompt(runtimeController.ShouldPromptAfterConfirmedStop(
-        supervisor) && supervisor.StopCountSinceGuardReset == 1,
-        "全局阈值为 1 时首次确认停止没有显示恢复选择")
+        stoppedAtStartup),
+        "重置本轮守护状态后错误地再次跳过恢复询问")
 
-    supervisor.AskBeforeRestart := false
+    ; 启动时已运行：首次确认停止立即询问。
+    runningAtStartup := TargetSupervisor({AskBeforeRestart: true})
+    runningAtStartup.CaptureStartupObservation(true)
+    AssertGuardRuntimePrompt(runtimeController.ShouldPromptAfterConfirmedStop(
+        runningAtStartup) && runningAtStartup.StopCountSinceGuardReset == 1,
+        "启动时运行中的目标首次确认停止没有显示恢复选择")
+
+    noPromptSupervisor := TargetSupervisor({AskBeforeRestart: false})
+    noPromptSupervisor.CaptureStartupObservation(true)
     AssertGuardRuntimePrompt(!runtimeController.ShouldPromptAfterConfirmedStop(
-        supervisor), "未开启询问恢复的条目仍显示了恢复选择")
+        noPromptSupervisor), "未开启询问恢复的条目仍显示了恢复选择")
 
     ; 迟到的停止回调不能清理已经进入下一代的手动结束事务。
     manualStopSupervisor := TargetSupervisor()
@@ -177,7 +187,9 @@ RunGuardRuntimePromptTests() {
     })
     promptPollController.MonitorTick()
     AssertGuardRuntimePrompt(promptPollCounters.Observed == 1
-        && promptPollCounters.RunningUpdates == 1,
+        && promptPollCounters.RunningUpdates == 1
+        && promptPollState.StartupObservationCaptured
+        && promptPollState.StartupObservedRunning,
         "等待恢复询问时后台没有继续轮询运行状态（探测："
             promptPollCounters.Observed "，运行更新："
             promptPollCounters.RunningUpdates "，启用："

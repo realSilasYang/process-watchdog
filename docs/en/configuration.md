@@ -82,9 +82,13 @@ The directory containing the real runtime entry determines the configuration loc
 background process after startup. Set it to `0` to disable only the startup
 check; the About page can still check manually.
 
-`AskBeforeRestartFromStopCount=2` controls which confirmed stop first shows a
-recovery choice for items with “Ask before every recovery” enabled. The valid range is
-`1-9999`; applying a new value takes effect immediately and starts a new stop-count round.
+`AskBeforeRestartFromStopCount` is a compatibility field retained from older versions. It is
+still read, validated, and written with the `1-9999` range, but it no longer controls which
+stop opens a recovery choice. The assistant now uses the first valid observation after startup:
+if the target is already running, the first confirmed stop shows the recovery choice; if the target
+is not running after startup, the first recovery starts directly without a choice. Once that target
+has been through the first recovery, “Ask before every recovery” shows the choice for subsequent
+confirmed stops.
 
 ## Monitored items and launch environments
 

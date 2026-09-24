@@ -7,6 +7,25 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.1.6] - 2026-09-25
+
+### 🚀 Improved
+
+- **Startup baseline for recovery prompts:** With “Ask before every recovery” enabled, a target already running when the assistant starts now opens the choice on its first confirmed stop; a target not running at startup recovers directly once, then asks on later confirmed stops. The legacy stop-count configuration field remains readable and writable for compatibility.
+
+### 🐛 Fixed
+
+- **Shortcut process-state detection:** Shortcuts now recheck their effective target and exclude same-directory processes running as Windows services in Session 0, so MyDockFinder no longer remains incorrectly marked as running after it exits.
+
+---
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides preferred and fallback interface fonts that must be installed into Windows first; it is not required to run the application.
+- **`process-watchdog-2.1.6-source.zip` (complete source edition):** Includes the AHK source, modules, tests, and documentation without fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64 locally.
+- **`process-watchdog-2.1.6-windows-x64.zip` (complete portable edition, recommended):** Includes the EXE, documentation, licenses, and required runtime resources without fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([latest version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application search; the bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
 ## 🎉 Version [2.1.5] - 2026-09-03
 
 ### 🐛 Fixed
@@ -719,7 +738,8 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.5...HEAD
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.6...HEAD
+[2.1.6]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.6
 [2.1.5]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.5
 [2.1.4]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.4
 [2.1.3]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.3

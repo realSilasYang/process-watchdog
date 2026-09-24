@@ -264,6 +264,11 @@ class ProcessSnapshotIndex {
             if (imagePath == "" || InStr(imagePath, root "\") != 1)
                 continue
             liveStatus := this.GetLiveStatus(processInfo)
+            ; 安装目录中的 Session 0 进程通常是 Windows 服务。它们可能与
+            ; 桌面程序共用目录和文件名，但不会由用户快捷方式启动；把这类
+            ; 进程拿来推断“短命启动器”的真实驻留目标会造成错误绑定。
+            if liveStatus > 0 && this.IsSessionZeroProcess(processInfo)
+                continue
             if liveStatus > 0
                 runningPaths[imagePath] := processInfo.exe
             else if liveStatus < 0
@@ -276,6 +281,29 @@ class ProcessSnapshotIndex {
                 evidence.Uncertain.Push(executablePath)
         }
         return evidence
+    }
+
+    IsSessionZeroProcess(processInfo) {
+        if !IsObject(processInfo)
+            return false
+        if processInfo.HasOwnProp("sessionId") {
+            try {
+                sessionId := Integer(processInfo.sessionId)
+                if sessionId >= 0
+                    return sessionId == 0
+            } catch {
+            }
+        }
+        if !processInfo.HasOwnProp("pid") || !processInfo.pid
+            return false
+        sessionId := 0
+        try {
+            if DllCall("kernel32\ProcessIdToSessionId", "UInt",
+                Integer(processInfo.pid), "UInt*", &sessionId, "Int")
+                return sessionId == 0
+        } catch {
+        }
+        return false
     }
 
     ObserveExecutableInRoot(rootPath, preferredName := "") {
@@ -517,7 +545,7 @@ class ProcessSnapshotIndex {
     static CopyProcessInfo(processInfo) {
         copy := {}
         for propertyName in ["pid", "parent", "name", "cmd", "exe", "creation",
-            "identity", "observedTicks"] {
+            "identity", "sessionId", "observedTicks"] {
             if processInfo.HasOwnProp(propertyName)
                 copy.%propertyName% := processInfo.%propertyName%
         }
