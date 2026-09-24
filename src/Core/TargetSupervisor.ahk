@@ -90,6 +90,11 @@ class TargetSupervisor {
         this.StoppedEvidenceTicks := 0
         this.AskBeforeRestart := false
         this.StopCountSinceGuardReset := 0
+        ; 进程级启动基线只记录本次小助手生命周期内的首次确定观测。
+        ; 未知或目标缺失时不应锁定基线，避免把查询失败误判为已停止。
+        this.StartupObservationCaptured := false
+        this.StartupObservedRunning := false
+        this.FirstConfirmedStopObserved := false
         this.StopPromptPending := false
         this.StopPromptGeneration := 0
         this.StopPromptTaskQueued := false
@@ -171,6 +176,20 @@ class TargetSupervisor {
         this.ManualStopCreationIdentity := ""
         this.StoppedEvidenceTicks := 0
         this.StopCountSinceGuardReset := 0
+    }
+
+    CaptureStartupObservation(isRunning) {
+        if this.StartupObservationCaptured
+            return false
+        this.StartupObservationCaptured := true
+        this.StartupObservedRunning := !!isRunning
+        return true
+    }
+
+    ResetStartupObservation() {
+        this.StartupObservationCaptured := false
+        this.StartupObservedRunning := false
+        this.FirstConfirmedStopObserved := false
     }
 
     BeginSnapshotWait(purpose, requestTicks, deadlineTicks,

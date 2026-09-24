@@ -1792,10 +1792,8 @@ class EnglishStrings {
         catalog.Set("界面缩放：", "Interface scale:")
         catalog.Set("; UiScale：界面缩放百分比，支持 80、90、100、110、125、150、175、200。",
             "; UiScale: interface scale percentage, supported values are 80, 90, 100, 110, 125, 150, 175, and 200.")
-        catalog.Set("如果设置了恢复前询问，应从第几次停止开始询问？",
-            "If Ask Before Recovery is enabled, which stop should prompting begin with?")
-        catalog.Set("每次恢复前询问的起始停止次数必须为 1-9999。",
-            "The start count for asking before recovery must be between 1 and 9999.")
+        catalog.Set("AskBeforeRestartFromStopCount：旧版本兼容字段，仍读写并校验 1～9999；恢复询问现在按小助手启动后首次有效运行状态决定。",
+            "AskBeforeRestartFromStopCount is retained for compatibility, validated and saved in the 1-9999 range; first-recovery prompting now follows the first valid target state observed after assistant startup.")
         return catalog
     }
 }

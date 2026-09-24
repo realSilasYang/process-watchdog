@@ -6,6 +6,7 @@
 
 #Include ..\..\src\Platform\Win32.ahk
 #Include ..\..\src\Core\TargetSpecs.ahk
+#Include ..\..\src\Inspection\ProcessSnapshotIndex.ahk
 #Include ..\..\src\Inspection\ShortcutResolver.ahk
 #Include ..\..\src\Inspection\ShortcutTargetResolver.ahk
 
@@ -154,6 +155,10 @@ RunShortcutTargetResolverTests() {
     residentOutsideRoot := testRoot "\resident-other"
     residentOutside := residentOutsideRoot "\Product.Avalonia.exe"
     residentShortcut := testRoot "\Resident.lnk"
+    serviceRoot := testRoot "\service-target"
+    serviceLauncher := serviceRoot "\Dock_64.exe"
+    serviceProcess := serviceRoot "\MyDock.exe"
+    serviceShortcut := testRoot "\MyDockFinder.lnk"
     try {
         try DirDelete(testRoot, true)
         DirCreate(testRoot)
@@ -164,6 +169,7 @@ RunShortcutTargetResolverTests() {
         DirCreate(portableAppRoot)
         DirCreate(residentRuntimeRoot)
         DirCreate(residentOutsideRoot)
+        DirCreate(serviceRoot)
         FileAppend("#Requires AutoHotkey v2.0`n", scriptPath, "UTF-8")
         FileCreateShortcut(A_AhkPath, directShortcut, testRoot)
         FileCreateShortcut(A_AhkPath, argumentShortcut, testRoot,
@@ -310,6 +316,25 @@ RunShortcutTargetResolverTests() {
                 residentShortcut, true, &liveLauncherSource))
                 == ShortcutTargetTestCanonical(residentLauncher),
             "启动器仍在运行时被子目录进程错误替换")
+
+        ; MDF 的 MyDock.exe 是 Session 0 Windows 服务；它与桌面启动器位于
+        ; 同一目录时，不能被当成快捷方式的真实驻留进程。
+        FileCopy(A_AhkPath, serviceLauncher)
+        FileCopy(A_AhkPath, serviceProcess)
+        FileCreateShortcut(serviceLauncher, serviceShortcut, serviceRoot)
+        serviceIndex := ProcessSnapshotIndex([
+            {pid: DllCall("kernel32\GetCurrentProcessId", "UInt"),
+                name: "MyDock.exe", cmd: "", exe: serviceProcess,
+                creation: "", identity: "", sessionId: 0}],
+            100, true, ShortcutTargetTestCanonical)
+        snapshots.Index := serviceIndex
+        serviceTarget := resolver.ResolveEffective(serviceShortcut, true,
+            &serviceSource)
+        AssertShortcutTargetResolver(
+            ShortcutTargetTestCanonical(serviceTarget)
+                == ShortcutTargetTestCanonical(serviceLauncher)
+            && serviceSource == "快捷方式目标",
+            "Session 0 的 MyDock 服务被错误保存为快捷方式真实目标")
 
         snapshots.Index := ShortcutTargetTestResidentIndex(
             [residentProcess, residentHelper])

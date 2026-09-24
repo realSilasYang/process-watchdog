@@ -96,7 +96,8 @@ RunProcessSnapshotServiceTests() {
         5000, 30000, false)
     snapshot := [{pid: currentPid, parent: 0, name: "Sample.exe",
         cmd: '"C:\Apps\Sample.exe"', exe: "C:\Apps\Sample.exe",
-        creation: "CURRENT", observedTicks: clockState.Now}]
+        creation: "CURRENT", sessionId: 1,
+        observedTicks: clockState.Now}]
 
     lateServiceHolder := {Service: ""}
     lateService := ProcessSnapshotService("",
@@ -235,6 +236,7 @@ RunProcessSnapshotServiceTests() {
         AssertSnapshotService(resultReady && decodedSnapshot.Length == 1
             && decodedSnapshot[1].pid == currentPid
             && decodedSnapshot[1].exe == "C:\Apps\Sample.exe"
+            && decodedSnapshot[1].sessionId == "1"
             && capturedAtTicks == clockState.Now,
             "后台快照结果文件回读错误")
 

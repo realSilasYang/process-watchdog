@@ -200,16 +200,18 @@ QueryProcessSnapshot(&snapshotReady) {
     snapshot := []
     try {
         wmiService := ComObjGet("winmgmts:")
-        processes := wmiService.ExecQuery("SELECT ProcessId, ParentProcessId, Name, CommandLine, ExecutablePath, CreationDate FROM Win32_Process")
+        processes := wmiService.ExecQuery("SELECT ProcessId, ParentProcessId, Name, CommandLine, ExecutablePath, CreationDate, SessionId FROM Win32_Process")
         for process in processes {
             processInfo := {pid: 0, parent: 0, name: "", cmd: "", exe: "",
-                creation: "", identity: "", observedTicks: GetTickCount64()}
+                creation: "", identity: "", sessionId: -1,
+                observedTicks: GetTickCount64()}
             try processInfo.pid := Integer(process.ProcessId)
             try processInfo.parent := Integer(process.ParentProcessId)
             try processInfo.name := process.Name
             try processInfo.cmd := process.CommandLine
             try processInfo.exe := process.ExecutablePath
             try processInfo.creation := process.CreationDate
+            try processInfo.sessionId := Integer(process.SessionId)
             if processInfo.pid
                 processInfo.identity := App.processInspector
                     .GetCreationIdentity(processInfo.pid)
@@ -502,6 +504,7 @@ InvalidateShortcutRuntimeIdentity(path, stateObj) {
         return false
     }
     stateObj.CancelScheduledTasks()
+    stateObj.ResetStartupObservation()
     stateObj.ResetGuardAttemptState()
     ClearStateProcessIdentity(stateObj)
     if !stateObj.Enabled {
