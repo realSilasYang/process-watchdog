@@ -7,6 +7,25 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 🚧 [Unreleased]
 
+## 🎉 Version [2.1.7] - 2026-10-23
+
+### 🚀 Improved
+
+- **Startup login delay:** Configured a default 5-second login delay (`PT5S`) for the scheduled task autostart trigger, preventing resource contention during user logon and allowing desktop and notification area services to settle before launching the watchdog.
+
+### 🐛 Fixed
+
+- **Support window title display:** Removed redundant minimize and maximize boxes from the support/help dialog, preventing the window title from being squeezed or truncated in compact widths.
+
+---
+
+### 📦 Release Assets
+
+- **`fonts.zip` (optional font package):** Provides preferred and fallback interface fonts that must be installed into Windows first; it is not required to run the application.
+- **`process-watchdog-2.1.7-source.zip` (complete source edition):** Includes the AHK source, modules, tests, and documentation without fonts; intended for review, development, or source execution and requires AutoHotkey v2 x64 locally.
+- **`process-watchdog-2.1.7-windows-x64.zip` (complete portable edition, recommended):** Includes the EXE, documentation, licenses, and required runtime resources without fonts; requires no AutoHotkey installation and is intended for long-term use after full extraction.
+- **Everything ([latest version](https://www.voidtools.com/downloads/)):** Provides the index and background service used by application search; the bundled `Everything64.dll` is only an IPC client and cannot replace Everything itself.
+
 ## 🎉 Version [2.1.6] - 2026-09-25
 
 ### 🚀 Improved
@@ -738,7 +757,8 @@ categories based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for transient temporary-file locks. Tests report protocol, actual files, and
   cleanup failures separately.
 
-[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.6...HEAD
+[Unreleased]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.7...HEAD
+[2.1.7]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.7
 [2.1.6]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.6
 [2.1.5]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.5
 [2.1.4]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.4
