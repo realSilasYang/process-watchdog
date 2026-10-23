@@ -16,7 +16,8 @@ class SupportInfoWindow extends ManagedWindow {
         if this.ShowExisting()
             return
 
-        if !this.CreateOwnedGui(this.owner, "", Tr("帮助"))
+        if !this.CreateOwnedGui(this.owner, "-MinimizeBox -MaximizeBox",
+            Tr("帮助"))
             return
         try {
             this.gui.OnEvent("Escape", ObjBindMethod(this, "Close"))

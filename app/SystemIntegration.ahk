@@ -609,6 +609,7 @@ ToggleTask(ownerGui := "", *) {
 
             ; 登录触发器比系统启动触发器更适合需要托盘图标的交互程序。
             trigger := taskDef.Triggers.Create(9) ; 9 即 TASK_TRIGGER_LOGON，表示用户登录触发。
+            trigger.Delay := "PT5S" ; 延迟 5 秒启动，等待资源管理器与托盘服务完全就绪
 
             ; 任务在电池供电和长时间运行时都不应被计划程序自动终止。
             settings := taskDef.Settings

@@ -7,6 +7,25 @@
 
 ## 🚧 [未发布]
 
+## 🎉 版本 [2.1.7] - 2026-10-23
+
+### 🚀 优化
+
+- **开机自启登录延迟**：计划任务开机自启默认配置 5 秒登录延迟，避免系统刚登录时因启动项并发争抢系统资源造成卡顿，等待资源管理器与托盘服务平稳就绪后自动启动守护。
+
+### 🐛 修复
+
+- **帮助窗口标题显示**：主窗口帮助弹窗移除多余的最小化和最大化按钮选项，避免紧凑宽度下窗口标题“帮助”被系统标题栏按钮挤压截断或隐藏。
+
+---
+
+### 📦 发布物说明
+
+- **`fonts.zip`（可选字体包）**：提供首选字体和回退字体，需先安装到 Windows；它不是程序运行必需。
+- **`process-watchdog-2.1.7-source.zip`（完整源码版）**：包含 AHK 源码、模块、测试和文档，不含字体，适合审阅、开发或从源码运行；本机需要 AutoHotkey v2 x64。
+- **`process-watchdog-2.1.7-windows-x64.zip`（完整便携版，推荐）**：包含 EXE、说明文档、许可证和运行所需资源，不含字体；无需安装 AutoHotkey，适合完整解压后长期使用。
+- **Everything（[官方最新版](https://www.voidtools.com/downloads/)）**：为程序搜索提供索引和后台服务；随包 `Everything64.dll` 只是 IPC 客户端，不能替代 Everything 本体。
+
 ## 🎉 版本 [2.1.6] - 2026-09-25
 
 ### 🚀 优化
@@ -686,7 +705,8 @@
 - 后台文件扫描使用 `DirExist` 明确区分目录边界，临时文件遇到瞬时占用时执行
   短时有界重试；测试分别报告结果协议、实际文件集合和清理失败。
 
-[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.6...HEAD
+[未发布]: https://github.com/realSilasYang/process-watchdog/compare/v2.1.7...HEAD
+[2.1.7]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.7
 [2.1.6]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.6
 [2.1.5]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.5
 [2.1.4]: https://github.com/realSilasYang/process-watchdog/releases/tag/v2.1.4
